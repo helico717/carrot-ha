@@ -51,6 +51,7 @@ class Engine:
         if self.s.get('trip'):self.s['trip']['partial']=True
     def tick(self,now,onroad,gps=None,sampled=None,enabled=None):
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
+        was_charging=s['vehicle'].get('charging') is True
         trip=s.get('trip')
         if onroad and not trip:
             trip=s['trip']={'id':str(uuid.uuid4()),'deviceId':self.device,'startedAt':stamp(now),'durationS':0,'distanceM':0,'route':[],'last_at':now,'partial':old_onroad is None}
@@ -86,37 +87,27 @@ class Engine:
                 if value is not None and (not isinstance(value,float) or math.isfinite(value)):
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)
-            wh=sampled.get('battery_wh')
-            prev=s.get('energy_sample')
-            power=s['vehicle'].get('charge_power_w') if wh is not None else None
-            if wh is not None:
-                if prev:
-                    dt=now-prev['at'];delta=wh-prev['wh']
-                    if not onroad and not prev['onroad'] and 90<=dt<=240:
-                        power=0
-                        estimate=delta*3600/dt
-                        if 300<=estimate<=250000:
-                            power=estimate
-                            month=datetime.fromtimestamp(now,timezone(timedelta(hours=9))).strftime('%Y-%m')
-                            ledger=s['charge_months'].setdefault(month,{'slow_kwh':0,'fast_kwh':0,'cost_krw':0})
-                            kind='slow' if estimate<=11000 else 'fast'
-                            ledger[kind+'_kwh']+=delta/1000;ledger['cost_krw']+=delta/1000*(280 if kind=='slow' else 320)
-                            charge=s.get('charge')
-                            if not charge:charge=s['charge']={'id':str(uuid.uuid4()),'started_at':stamp(prev['at']),'energy_kwh':0,'duration_s':0,'partial':False}
-                            charge['energy_kwh']+=delta/1000;charge['duration_s']+=dt;charge['ended_at']=stamp(now)
-                            s['last_charge_increase']=now
-                        elif estimate>250000 and s.get('charge'):s['charge']['partial']=True
-                    elif (dt>240 or onroad!=prev['onroad']) and s.get('charge'):
-                        s['charge']['partial']=True
-                if not prev or now-prev['at']>=90 or onroad!=prev['onroad']:
-                    s['energy_sample']={'wh':wh,'at':now,'onroad':onroad}
-                if onroad:power=0
-            if s.get('charge') and (onroad or now-s.get('last_charge_increase',now)>=300):
-                s['charge_sessions'].append(s.pop('charge'));s['charge_sessions']=s['charge_sessions'][-50:]
-            s['vehicle']['charging']=None if wh is None or power is None else power>=300
-            s['vehicle']['charge_power_w']=None if wh is None else round(power or 0)
-        interval=30 if onroad else 60
-        if changed or now-s.get('last_upload',0)>=interval:
+            self._sample_energy(now, onroad, sampled.get('battery_wh'))
+        # Expire state even when no new CAN sample arrives.
+        candidate=s.get('charge_candidate')
+        if candidate and now-candidate['ended_at']>=300:
+            s.pop('charge_candidate',None)
+        if s.get('charge') and (onroad or now-s.get('last_charge_increase',now)>=300):
+            s['charge_sessions'].append(s.pop('charge'))
+            s['charge_sessions']=s['charge_sessions'][-50:]
+        measured=s.get('field_measured_at',{}).get('battery_wh')
+        fresh=measured is not None and 0<=now-datetime.fromisoformat(measured).timestamp()<=120
+        if onroad:
+            s.pop('charge_candidate',None)
+            if not old_onroad:s.pop('energy_sample',None)
+            s['vehicle'].update(charging=False,charge_power_w=0)
+        elif not fresh:
+            s['vehicle'].update(charging=None,charge_power_w=None)
+        else:
+            s['vehicle']['charging']=bool(s.get('charge'))
+        charging_started=s['vehicle'].get('charging') is True and not was_charging
+        interval=30 if onroad or s['vehicle'].get('charging') is True else 60
+        if changed or charging_started or now-s.get('last_upload',0)>=interval:
             vehicle=dict(s['vehicle'])
             measured=s['field_measured_at'].get('battery_wh') or s.get('measured_at')
             age=now-datetime.fromisoformat(measured).timestamp() if measured else 999999
@@ -127,3 +118,53 @@ class Engine:
         if events or now-self.last_saved>=5:
             self.store.save(s,events,now);self.last_saved=now
         return events
+
+    def _sample_energy(self, now, onroad, wh):
+        """Validate non-overlapping energy windows before committing charge totals.
+
+        100 Wh confirms in one window; two consecutive positive windows totalling
+        at least 50 Wh confirm a small increase. These are heuristic thresholds,
+        not a charger connection signal. Keep the existing 90-240 second window.
+        """
+        if not isinstance(wh,(int,float)) or not math.isfinite(wh) or wh<=0:
+            return
+        s=self.s
+        prev=s.get('energy_sample')
+        if onroad or not prev or prev['onroad']!=onroad or not 0<=now-prev['at']<=240:
+            s['energy_sample']={'wh':wh,'at':now,'onroad':onroad}
+            s.pop('charge_candidate',None)
+            s['vehicle']['charge_power_w']=0 if onroad else None
+            if s.get('charge'):s['charge']['partial']=True
+            return
+        dt=now-prev['at']
+        if dt<90:return
+        delta=wh-prev['wh']
+        estimate=delta*3600/dt
+        s['energy_sample']={'wh':wh,'at':now,'onroad':onroad}
+        s['vehicle']['charge_power_w']=round(estimate) if 300<=estimate<=250000 else 0
+        if not 300<=estimate<=250000:
+            s.pop('charge_candidate',None)
+            if estimate>250000 and s.get('charge'):s['charge']['partial']=True
+            return
+        window={'started_at':prev['at'],'ended_at':now,'delta':delta,'dt':dt,'power':estimate}
+        if s.get('charge'):
+            windows=[window]
+        else:
+            candidate=s.get('charge_candidate')
+            windows=candidate['windows']+[window] if candidate and candidate['ended_at']==prev['at'] else [window]
+            s['charge_candidate']={'windows':windows,'ended_at':now}
+            if delta<100 and not (len(windows)>=2 and sum(w['delta'] for w in windows)>=50):
+                return
+            s['charge']={'id':str(uuid.uuid4()),'started_at':stamp(windows[0]['started_at']),
+                         'energy_kwh':0,'duration_s':0,'partial':False}
+            s.pop('charge_candidate',None)
+        for w in windows:
+            month=datetime.fromtimestamp(w['ended_at'],timezone(timedelta(hours=9))).strftime('%Y-%m')
+            ledger=s['charge_months'].setdefault(month,{'slow_kwh':0,'fast_kwh':0,'cost_krw':0})
+            kind='slow' if w['power']<=11000 else 'fast'
+            ledger[kind+'_kwh']+=w['delta']/1000
+            ledger['cost_krw']+=w['delta']/1000*(280 if kind=='slow' else 320)
+            s['charge']['energy_kwh']+=w['delta']/1000
+            s['charge']['duration_s']+=w['dt']
+        s['charge']['ended_at']=stamp(now)
+        s['last_charge_increase']=now
