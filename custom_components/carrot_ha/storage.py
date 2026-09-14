@@ -66,16 +66,24 @@ class Archive:
         return [json.loads(row[0]) for row in rows]
 
     def overview(self, device):
-        from zoneinfo import ZoneInfo
-        month = datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y-%m')
+        try:
+            from zoneinfo import ZoneInfo
+            kst = ZoneInfo('Asia/Seoul')
+        except Exception:
+            from datetime import timedelta
+            kst = timezone(timedelta(hours=9))
+        month = datetime.now(kst).strftime('%Y-%m')
         with self.connect() as db:
             rows = db.execute("SELECT observed,json_extract(body,'$.data.distance_m') FROM events WHERE device=? AND kind='trip'",(device,)).fetchall()
-        current = [r for r in rows if datetime.fromisoformat(r[0]).astimezone(ZoneInfo('Asia/Seoul')).strftime('%Y-%m')==month]
+        def _to_kst(ts):
+            try: return datetime.fromisoformat(ts).astimezone(kst).strftime('%Y-%m')
+            except Exception: return ''
+        current = [r for r in rows if _to_kst(r[0])==month]
         summary = {'trip_count':len(rows),'recorded_distance_km':round(sum(r[1] or 0 for r in rows)/1000,2),'month_trip_count':len(current),'month_distance_km':round(sum(r[1] or 0 for r in current)/1000,2)}
         trips = self.history(device,'trip',1)
         if trips:
             trip = trips[0]['data']
-            summary.update(last_trip_distance_km=(trip.get('distance_m') or 0)/1000,last_trip_duration_s=trip.get('duration_s'),last_trip_at=trips[0]['observed_at'])
+            summary.update(last_trip_distance_km=round((trip.get('distance_m') or 0)/1000,2),last_trip_duration_s=int(round(trip['duration_s'])) if trip.get('duration_s') is not None else None,last_trip_at=trips[0]['observed_at'])
             route = trip.get('route') or []
             if route: summary['last_trip_parking'] = dict(route[-1],measured_at=trip.get('ended_at'))
             summary['last_trip_avg_kph'] = round(trip['distance_m']/trip['duration_s']*3.6,1) if trip.get('duration_s') and trip.get('distance_m') is not None else None
