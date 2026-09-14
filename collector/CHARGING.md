@@ -8,11 +8,11 @@ connection status. SOC and estimated power remain available before confirmation.
 - Hold smaller increases as a persisted candidate, without adding energy or cost. A non-positive/implausible window, driving, an invalid sampling gap, or 300 seconds without further candidate progress cancels it.
 - On confirmation, account for candidate windows once, using each window's time and estimated power for month and tariff selection.
 - Keep an established session through brief flat readings; close after 300 seconds without a qualifying increase or on driving. Battery measurements older than 120 seconds yield unknown charging and power, even when no samples arrive.
-- Upload immediately on entering confirmed charging, then every 30 seconds while charging or driving. Ordinary parking uses 60 seconds. Sampling and power calculation intervals are unchanged.
+- Upload every 30 seconds while driving and every 60 seconds while parked, including charging. Charging confirmation does not trigger an extra upload. Road-state changes still trigger an upload, as before. Sampling and power calculation intervals are unchanged.
 
 These thresholds are heuristics. Small real charging increases can take longer to
-confirm, and repeated BMS changes can still produce false positives. A 30-second
-upload does not guarantee a fresh power estimate or a 30-second HA notification;
+confirm, and repeated BMS changes can still produce false positives. A periodic
+upload does not guarantee a fresh power estimate or an equally frequent HA notification;
 cloud polling and automation conditions also matter. Historical records are not
 corrected. The SQLite schema is unchanged; candidate state is an additional JSON
 field. No comma deployment is performed by committing or publishing this branch.

@@ -51,7 +51,6 @@ class Engine:
         if self.s.get('trip'):self.s['trip']['partial']=True
     def tick(self,now,onroad,gps=None,sampled=None,enabled=None):
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
-        was_charging=s['vehicle'].get('charging') is True
         trip=s.get('trip')
         if onroad and not trip:
             trip=s['trip']={'id':str(uuid.uuid4()),'deviceId':self.device,'startedAt':stamp(now),'durationS':0,'distanceM':0,'route':[],'last_at':now,'partial':old_onroad is None}
@@ -105,9 +104,8 @@ class Engine:
             s['vehicle'].update(charging=None,charge_power_w=None)
         else:
             s['vehicle']['charging']=bool(s.get('charge'))
-        charging_started=s['vehicle'].get('charging') is True and not was_charging
-        interval=30 if onroad or s['vehicle'].get('charging') is True else 60
-        if changed or charging_started or now-s.get('last_upload',0)>=interval:
+        interval=30 if onroad else 60
+        if changed or now-s.get('last_upload',0)>=interval:
             vehicle=dict(s['vehicle'])
             measured=s['field_measured_at'].get('battery_wh') or s.get('measured_at')
             age=now-datetime.fromisoformat(measured).timestamp() if measured else 999999

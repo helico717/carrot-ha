@@ -29,15 +29,26 @@ class ChargingTests(unittest.TestCase):
         self.assertEqual(self.engine.s['charge_months'],{})
         self.assertEqual(self.engine.s['charge_sessions'],[])
 
-    def test_fast_charge_immediate_and_thirty_second_upload(self):
+    def test_fast_charge_waits_for_sixty_second_upload(self):
         self.tick(0,20000)
         self.tick(60,21000)
         events=self.tick(90,21500)
-        self.assertEqual(len(events),1)
-        self.assertTrue(events[0][1]['vehicle']['charging'])
-        self.assertEqual(events[0][1]['vehicle']['charge_power_w'],60000)
+        self.assertEqual(events,[])
+        self.assertTrue(self.engine.s['vehicle']['charging'])
+        self.assertEqual(self.engine.s['vehicle']['charge_power_w'],60000)
         self.assertEqual(self.tick(119,22000),[])
         self.assertEqual(len(self.tick(120)),1)
+
+    def test_driving_keeps_thirty_second_upload(self):
+        self.tick(0,20000,onroad=True)
+        self.assertEqual(self.tick(29,20000,onroad=True),[])
+        self.assertEqual(len(self.tick(30,20000,onroad=True)),1)
+
+    def test_six_hours_parked_keeps_reporting(self):
+        uploads=[]
+        for t in range(0,21601):
+            if self.tick(t):uploads.append(t)
+        self.assertEqual(uploads,list(range(0,21601,60)))
 
     def test_candidate_survives_restart_and_counts_once(self):
         self.tick(0,20000)
@@ -57,8 +68,9 @@ class ChargingTests(unittest.TestCase):
         self.assertFalse(self.engine.s['vehicle']['charging'])
         self.assertEqual(self.engine.s['charge_months'],{})
 
-    def test_end_returns_to_sixty_seconds(self):
+    def test_end_keeps_sixty_seconds(self):
         self.tick(0,20000)
+        self.tick(60,20250)
         self.tick(90,20500)
         for t in range(120,390,30):
             self.tick(t,20500)
