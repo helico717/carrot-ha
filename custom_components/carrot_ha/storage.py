@@ -50,11 +50,19 @@ class Archive:
             db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body',
                        (event['device_id'], event['event_id'], observed, event['kind'], body))
 
-    def history(self, device, kind, limit=100, offset=0):
+    def history(self, device, kind, limit=100, offset=0, since=None):
         if kind not in ('state', 'trip', 'charge') or not 1 <= limit <= 500 or offset < 0:
             raise ValueError('Invalid history query')
+        if since is not None:
+            since = datetime.fromisoformat(since.replace('Z', '+00:00'))
+            if since.tzinfo is None:
+                raise ValueError('History boundary must include a timezone')
+            since = since.astimezone(timezone.utc).isoformat()
         with self.connect() as db:
-            rows = db.execute('SELECT body FROM events WHERE device=? AND kind=? ORDER BY observed DESC, rowid DESC LIMIT ? OFFSET ?', (device, kind, limit, offset)).fetchall()
+            if since is None:
+                rows = db.execute('SELECT body FROM events WHERE device=? AND kind=? ORDER BY observed DESC, rowid DESC LIMIT ? OFFSET ?', (device, kind, limit, offset)).fetchall()
+            else:
+                rows = db.execute("SELECT body FROM events WHERE device=? AND kind=? AND julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) >= julianday(?) ORDER BY julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) DESC, rowid DESC LIMIT ? OFFSET ?", (device, kind, since, limit, offset)).fetchall()
         return [json.loads(row[0]) for row in rows]
 
     def overview(self, device):

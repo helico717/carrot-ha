@@ -1,0 +1,16 @@
+import {readFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const source=await readFile(new URL('../custom_components/carrot_ha/frontend/carrot-trip-days.js',import.meta.url),'utf8');
+const {tripDateKey,tripDays,loadRecentTrips}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+assert.equal(tripDateKey('2026-09-13T15:01:00Z','Asia/Seoul'),'2026-09-14');
+const days=tripDays([{data:{started_at:'2026-09-13T15:01:00Z'}},{data:{started_at:'2026-09-13T14:59:00Z'}}],'Asia/Seoul',new Date('2026-09-14T04:00:00Z'));
+assert.equal(days.length,7);assert.equal(days[0].key,'2026-09-08');assert.deepEqual(days[6].indices,[0]);assert.deepEqual(days[5].indices,[1]);
+const dst=tripDays([],'America/New_York',new Date('2026-03-09T04:30:00Z'));
+assert.equal(dst[0].key,'2026-03-03');assert.equal(dst[6].key,'2026-03-09');
+let calls=0;
+const many=await loadRecentTrips(async (_,url)=>{calls++;return {events:Array.from({length:url.includes('offset=0&')?100:3},()=>({data:{}}))};},'device');
+assert.equal(calls,2);assert.equal(many.events.length,103);
+const latest={data:{started_at:'2025-01-01T00:00:00Z'}};
+const fallback=await loadRecentTrips(async(_,url)=>({events:url.includes('since=')?[]:[latest]}),'device');
+assert.deepEqual(fallback.events,[latest]);
+console.log('Trip date grouping, timezone/DST, pagination and latest-trip fallback passed.');

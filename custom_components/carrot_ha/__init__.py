@@ -115,7 +115,7 @@ class HistoryView(HomeAssistantView):
             kind = request.query.get('kind', 'trip')
             limit = int(request.query.get('limit', '100'))
             offset = int(request.query.get('offset', '0'))
-            rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset)
+            rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset, request.query.get('since'))
         except ValueError:
             return web.Response(status=400)
         return web.json_response({'events': rows, 'offset': offset, 'limit': limit})
