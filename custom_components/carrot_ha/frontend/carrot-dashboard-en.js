@@ -174,6 +174,49 @@ class CarrotDashboard extends HTMLElement {
 @container(max-width:700px){.hours .charge-run-wrap{--wrap-gap:2px}}
 @container(max-width:700px){.hours .charge-run-wrap>em{width:19px;height:24px;top:-11px}}
 
+.status-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px}
+.status-group{display:flex;flex-direction:column}
+.status-group .paneltitle{padding:14px 18px;border-bottom:1px solid var(--line)}
+.status-group .paneltitle h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0;font-weight:650}
+.status-group .paneltitle h2 ha-icon{width:18px;height:18px;color:var(--orange)}
+.status-list{padding:4px 18px 8px;flex:1}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.status-row:last-child{border-bottom:none}
+.status-label-wrap{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.status-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--muted);flex-shrink:0}
+:host([data-theme="light"]) .status-icon{background:rgba(0,0,0,.04);color:var(--muted)}
+.status-icon ha-icon{width:16px;height:16px}
+.status-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-val{font-size:13px;font-weight:650;color:var(--ink);text-align:right;white-space:nowrap}
+.status-val small{font-size:11px;font-weight:normal;color:var(--muted);margin-left:3px}
+.status-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:14px;white-space:nowrap}
+.status-badge.on{background:rgba(114,223,155,.18);color:var(--green)}
+:host([data-theme="light"]) .status-badge.on{background:#e6f9ee;color:#187845}
+.status-badge.off{background:rgba(149,155,158,.18);color:var(--muted)}
+:host([data-theme="light"]) .status-badge.off{background:#eef1f3;color:#5b686e}
+.status-badge.dim{background:rgba(149,155,158,.1);color:var(--muted)}
+
+.raw-data-card{margin-top:16px;border-radius:18px}
+.raw-data-card summary{padding:14px 18px;cursor:pointer;user-select:none;list-style:none;font-size:13px;font-weight:600;color:var(--ink)}
+.raw-data-card summary::-webkit-details-marker{display:none}
+.raw-data-card[open] summary{border-bottom:1px solid var(--line)}
+.raw-summary-content{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
+.raw-summary-title{display:flex;align-items:center;gap:8px}
+.raw-summary-title ha-icon{width:18px;height:18px;color:var(--muted)}
+.raw-toggle-hint{font-size:11px;font-weight:normal;color:var(--muted)}
+.raw-content{padding:14px 18px 18px}
+.raw-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.raw-count{font-size:11px;color:var(--muted)}
+.copy-raw-btn{display:inline-flex;align-items:center;gap:6px;background:#202528;border:1px solid #343a3e;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .15s}
+.copy-raw-btn:hover{background:#2b3237;border-color:#485157}
+.copy-raw-btn.copied{background:rgba(114,223,155,.2);border-color:var(--green);color:var(--green)}
+:host([data-theme="light"]) .copy-raw-btn{background:#fff;border-color:var(--line);color:var(--ink)}
+:host([data-theme="light"]) .copy-raw-btn:hover{background:#f0f3f5}
+:host([data-theme="light"]) .copy-raw-btn.copied{background:#e6f9ee;border-color:#187845;color:#187845}
+.copy-raw-btn ha-icon{width:15px;height:15px}
+.raw-content pre{margin:0;max-height:360px;overflow:auto;background:rgba(0,0,0,.28);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.55;color:#c9d1d9}
+:host([data-theme="light"]) .raw-content pre{background:#f4f6f8;color:#24292f}
+@container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
 `;
     this.shadowRoot.append(themeStyle);
     this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{this.batteryDay=Number(b.dataset.day);this.render();});
@@ -188,18 +231,86 @@ class CarrotDashboard extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
     this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{this.selected=Number(b.dataset.trip);this.tab='trips';this.render();});
     this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=0;this.load();});
+    const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
+    if(copyBtn)copyBtn.onclick=async(e)=>{
+      e.preventDefault();e.stopPropagation();
+      const raw=JSON.stringify(v,null,2);
+      try{
+        if(navigator.clipboard&&window.isSecureContext){
+          await navigator.clipboard.writeText(raw);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=raw;ta.style.position='fixed';ta.style.opacity='0';
+          document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+        }
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML=`${icon('check')} <span>Copied!</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>Copy all</span>`;}},2000);
+      }catch(err){
+        copyBtn.innerHTML=`${icon('alert-circle-outline')} <span>Copy failed</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>Copy all</span>`;}},2000);
+      }
+    };
     if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
     if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
   }
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
     if(this.tab==='parking')return `<section class="panel"><div class="paneltitle parking-heading"><h2>Parking location</h2><span class="sub">${time(v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${v.parking_latitude==null?'Waiting for location':`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`}<p class="sub">Last recorded parking location</p></div></section>`;
-    if(this.tab==='vehicle')return `<h2 class="section" style="margin-top:0">Vehicle information</h2><div class="allvalues">${[
-      ['Distance this month',n(v.month_distance_km)+' km'],['Trips this month',n(v.month_trip_count,0)+'  trips'],['Battery level',n(v.soc_percent)+' %'],['Battery energy',n(v.battery_kwh)+' kWh'],['Odometer',n(v.odometer_km,0)+' km'],['Range',n(v.range_km)+' km'],['HV battery',n(v.hv_voltage)+' V'],['12V battery',n(v.aux_voltage,2)+' V'],['Estimated BMS capacity',n(v.measured_capacity_kwh)+' kWh'],['SOC calculation capacity',n(v.soc_capacity_kwh)+' kWh'],['Outside temperature',n(v.outside_temp_c)+' °C'],['Air conditioning',v.ac_on==null?'Unavailable':v.ac_on?'On':'Off'],['Blower level',n(v.blower_level,0)],['Blower control voltage',n(v.blower_volt)+' V'],['Driver seat heating',n(v.seat_heat_left,0)],['Passenger seat heating',n(v.seat_heat_right,0)],['Recirculation signal',n(v.recirc,0)],['GPS accuracy',n(v.gps_accuracy_m)+' m'],['Current speed',n(v.speed_kph)+' km/h'],['Heading',n(v.bearing_deg)+' °'],['Recorded distance',n(v.recorded_distance_km)+' km'],['Driving assistance',v.enabled==null?'Unavailable':v.enabled?'Enabled':'Disabled']].map(([l,x])=>`<div class="table-row"><span>${l}</span><b>${esc(x)}</b></div>`).join('')}</div><p class="notice">— means unavailable. Estimated BMS capacity is not battery health. SOC calculation capacity calibrates the displayed percentage. Odometer and recorded distance are different values.</p><details><summary>Show all received data</summary><pre>${esc(JSON.stringify(v,null,2))}</pre></details>`;
+    if(this.tab==='vehicle')return this.vehicleStatusView(v);
     if(this.tab==='charge')return `${this.batteryHistory()}<div class="tiles">${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}${metric('Charging cost this month',n(v.month_charge_cost,0),'KRW','cash','estimated')}${metric('Slow charging (estimated)',n(v.month_slow_kwh),'kWh','power-plug')}${metric('Fast charging (estimated)',n(v.month_fast_kwh),'kWh','flash')}</div>${this.chargeHistory()}<p class="notice">Estimated from battery energy increases. Up to 11 kW is classified as slow charging. Estimated cost: ${n(v.month_charge_cost,0)} KRW using preset rates. No measurements are available when the vehicle is asleep or comma is off.</p>`;
     const tiles=isTrip?`${metric('Distance',n(trip.distance_m==null?null:trip.distance_m/1000,2),'km','map-marker-distance')}${metric('Duration',duration(trip.duration_s),'','timer-outline')}${metric('Average speed',n(trip.duration_s?trip.distance_m/trip.duration_s*3.6:null,0),'km/h','speedometer-medium')}${metric('Top speed',n(this.maxSpeed(trip.route),0),'km/h','speedometer')}`:
       `${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_w==null?null:v.charge_power_w/1000),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
     return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'Trip details':'Parking location'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>Low · 0 km/h</span><i class="gradient"></i><span>High · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length} route points · Start: light blue / End: blue</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'Waiting for location'}</b><div class="sub">Last parking location or trip destination</div>`}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">Vehicle condition</h2><div class="tiles">${metric('Outside temperature',n(v.outside_temp_c),'°C','thermometer')}${metric('12V battery',n(v.aux_voltage,2),'V','car-battery')}${metric('Air conditioning',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('Blower level',n(v.blower_level,0),'','fan')}</div>`:''}`;
+  }
+  vehicleStatusView(v){
+    const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
+      let valHtml;
+      if(isBadge){
+        valHtml=`<span class="status-badge ${badgeType}">${esc(val)}</span>`;
+      }else{
+        const isNone=val==='—'||val==null;
+        const uText=(!isNone&&unit)?`<small>${esc(unit)}</small>`:'';
+        valHtml=`<b class="status-val">${esc(val)}${uText}</b>`;
+      }
+      return `<div class="status-row"><div class="status-label-wrap"><span class="status-icon">${icon(ico)}</span><span class="status-label">${label}</span></div>${valHtml}</div>`;
+    };
+
+    const batteryItems=[
+      row('battery','Battery level',n(v.soc_percent),'%'),
+      row('car-electric','Range',n(v.range_km),'km'),
+      row('flash','Battery energy',n(v.battery_kwh),'kWh'),
+      row('flash-outline','HV battery',n(v.hv_voltage),'V'),
+      row('car-battery','12V battery',n(v.aux_voltage,2),'V'),
+      row('battery-sync','Estimated BMS capacity',n(v.measured_capacity_kwh),'kWh'),
+      row('calculator','SOC calculation capacity',n(v.soc_capacity_kwh),'kWh')
+    ];
+
+    const drivingItems=[
+      row('counter','Odometer',n(v.odometer_km,0),'km'),
+      row('routes','Distance this month',n(v.month_distance_km),'km'),
+      row('car-multiple','Trips this month',n(v.month_trip_count,0),'trips'),
+      row('speedometer','Current speed',n(v.speed_kph),'km/h'),
+      row('compass-outline','Heading',n(v.bearing_deg),'°'),
+      row('car-cruise-control','Driving assistance',v.enabled==null?'Unavailable':v.enabled?'Enabled':'Disabled','',true,v.enabled==null?'dim':v.enabled?'on':'off'),
+      row('crosshairs-gps','GPS accuracy',n(v.gps_accuracy_m),'m'),
+      row('map-clock-outline','Recorded distance',n(v.recorded_distance_km),'km')
+    ];
+
+    const climateItems=[
+      row('thermometer','Outside temperature',n(v.outside_temp_c),'°C'),
+      row('snowflake','Air conditioning',v.ac_on==null?'Unavailable':v.ac_on?'On':'Off','',true,v.ac_on==null?'dim':v.ac_on?'on':'off'),
+      row('fan','Blower level',n(v.blower_level,0)),
+      row('fan-auto','Blower control voltage',n(v.blower_volt),'V'),
+      row('car-seat-heater','Driver seat heating',n(v.seat_heat_left,0)),
+      row('car-seat-heater','Passenger seat heating',n(v.seat_heat_right,0)),
+      row('air-filter','Recirculation signal',n(v.recirc,0))
+    ];
+
+    const group=(title,ico,items)=>`<div class="status-group panel"><div class="paneltitle"><h2>${icon(ico)}${title}</h2><span class="sub">${items.length} items</span></div><div class="status-list">${items.join('')}</div></div>`;
+
+    const fieldCount=Object.keys(v||{}).length;
+    return `<h2 class="section" style="margin-top:0">Vehicle information</h2><div class="status-groups">${group('Battery & Power','battery-charging',batteryItems)}${group('Driving & Records','steering',drivingItems)}${group('Climate & Cabin','fan',climateItems)}</div><p class="notice">— means unavailable. Estimated BMS capacity is not battery health. SOC calculation capacity calibrates the displayed percentage. Odometer and recorded distance are different values.</p><details class="raw-data-card panel"><summary><div class="raw-summary-content"><span class="raw-summary-title">${icon('code-json')} Show all received data</span><span class="raw-toggle-hint">Raw payload</span></div></summary><div class="raw-content"><div class="raw-toolbar"><span class="raw-count">Raw received payload (${fieldCount} fields)</span><button type="button" class="copy-raw-btn" aria-label="Copy all received data">${icon('content-copy')}<span>Copy all</span></button></div><pre>${esc(JSON.stringify(v,null,2))}</pre></div></details>`;
   }
   chargeHistory(){
     const days=tripDays(this.charges,this._hass?.config?.time_zone);

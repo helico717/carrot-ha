@@ -1,7 +1,7 @@
 {
   "domain": "carrot_ha",
   "name": "Carrot HA",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "config_flow": true,
   "dependencies": [
     "http"

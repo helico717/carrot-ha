@@ -174,6 +174,49 @@ class CarrotDashboard extends HTMLElement {
 @container(max-width:700px){.hours .charge-run-wrap{--wrap-gap:2px}}
 @container(max-width:700px){.hours .charge-run-wrap>em{width:19px;height:24px;top:-11px}}
 
+.status-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px}
+.status-group{display:flex;flex-direction:column}
+.status-group .paneltitle{padding:14px 18px;border-bottom:1px solid var(--line)}
+.status-group .paneltitle h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0;font-weight:650}
+.status-group .paneltitle h2 ha-icon{width:18px;height:18px;color:var(--orange)}
+.status-list{padding:4px 18px 8px;flex:1}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.status-row:last-child{border-bottom:none}
+.status-label-wrap{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.status-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--muted);flex-shrink:0}
+:host([data-theme="light"]) .status-icon{background:rgba(0,0,0,.04);color:var(--muted)}
+.status-icon ha-icon{width:16px;height:16px}
+.status-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-val{font-size:13px;font-weight:650;color:var(--ink);text-align:right;white-space:nowrap}
+.status-val small{font-size:11px;font-weight:normal;color:var(--muted);margin-left:3px}
+.status-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:14px;white-space:nowrap}
+.status-badge.on{background:rgba(114,223,155,.18);color:var(--green)}
+:host([data-theme="light"]) .status-badge.on{background:#e6f9ee;color:#187845}
+.status-badge.off{background:rgba(149,155,158,.18);color:var(--muted)}
+:host([data-theme="light"]) .status-badge.off{background:#eef1f3;color:#5b686e}
+.status-badge.dim{background:rgba(149,155,158,.1);color:var(--muted)}
+
+.raw-data-card{margin-top:16px;border-radius:18px}
+.raw-data-card summary{padding:14px 18px;cursor:pointer;user-select:none;list-style:none;font-size:13px;font-weight:600;color:var(--ink)}
+.raw-data-card summary::-webkit-details-marker{display:none}
+.raw-data-card[open] summary{border-bottom:1px solid var(--line)}
+.raw-summary-content{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
+.raw-summary-title{display:flex;align-items:center;gap:8px}
+.raw-summary-title ha-icon{width:18px;height:18px;color:var(--muted)}
+.raw-toggle-hint{font-size:11px;font-weight:normal;color:var(--muted)}
+.raw-content{padding:14px 18px 18px}
+.raw-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.raw-count{font-size:11px;color:var(--muted)}
+.copy-raw-btn{display:inline-flex;align-items:center;gap:6px;background:#202528;border:1px solid #343a3e;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .15s}
+.copy-raw-btn:hover{background:#2b3237;border-color:#485157}
+.copy-raw-btn.copied{background:rgba(114,223,155,.2);border-color:var(--green);color:var(--green)}
+:host([data-theme="light"]) .copy-raw-btn{background:#fff;border-color:var(--line);color:var(--ink)}
+:host([data-theme="light"]) .copy-raw-btn:hover{background:#f0f3f5}
+:host([data-theme="light"]) .copy-raw-btn.copied{background:#e6f9ee;border-color:#187845;color:#187845}
+.copy-raw-btn ha-icon{width:15px;height:15px}
+.raw-content pre{margin:0;max-height:360px;overflow:auto;background:rgba(0,0,0,.28);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.55;color:#c9d1d9}
+:host([data-theme="light"]) .raw-content pre{background:#f4f6f8;color:#24292f}
+@container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
 `;
     this.shadowRoot.append(themeStyle);
     this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{this.batteryDay=Number(b.dataset.day);this.render();});
@@ -188,18 +231,86 @@ class CarrotDashboard extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
     this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{this.selected=Number(b.dataset.trip);this.tab='trips';this.render();});
     this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=0;this.load();});
+    const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
+    if(copyBtn)copyBtn.onclick=async(e)=>{
+      e.preventDefault();e.stopPropagation();
+      const raw=JSON.stringify(v,null,2);
+      try{
+        if(navigator.clipboard&&window.isSecureContext){
+          await navigator.clipboard.writeText(raw);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=raw;ta.style.position='fixed';ta.style.opacity='0';
+          document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+        }
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML=`${icon('check')} <span>복사 완료!</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>모두 복사</span>`;}},2000);
+      }catch(err){
+        copyBtn.innerHTML=`${icon('alert-circle-outline')} <span>복사 실패</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>모두 복사</span>`;}},2000);
+      }
+    };
     if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='지도를 불러오지 못했습니다';});});
     if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
   }
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
     if(this.tab==='parking')return `<section class="panel"><div class="paneltitle parking-heading"><h2>주차 위치</h2><span class="sub">${time(v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${v.parking_latitude==null?'위치 정보 대기 중':`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`}<p class="sub">마지막으로 기록된 주차 위치</p></div></section>`;
-    if(this.tab==='vehicle')return `<h2 class="section" style="margin-top:0">차량 정보</h2><div class="allvalues">${[
-      ['이번 달 주행거리',n(v.month_distance_km)+' km'],['이번 달 주행 횟수',n(v.month_trip_count,0)+' 회'],['배터리 잔량',n(v.soc_percent)+' %'],['배터리 에너지',n(v.battery_kwh)+' kWh'],['총 주행거리',n(v.odometer_km,0)+' km'],['주행가능거리',n(v.range_km)+' km'],['고전압 배터리',n(v.hv_voltage)+' V'],['12V 배터리',n(v.aux_voltage,2)+' V'],['BMS 용량 추정',n(v.measured_capacity_kwh)+' kWh'],['SOC 계산 용량',n(v.soc_capacity_kwh)+' kWh'],['외부 온도',n(v.outside_temp_c)+' °C'],['에어컨',v.ac_on==null?'정보 없음':v.ac_on?'작동':'꺼짐'],['송풍 단계',n(v.blower_level,0)],['송풍 제어 전압',n(v.blower_volt)+' V'],['운전석 열선',n(v.seat_heat_left,0)],['조수석 열선',n(v.seat_heat_right,0)],['내기순환 신호',n(v.recirc,0)],['GPS 정확도',n(v.gps_accuracy_m)+' m'],['현재 속도',n(v.speed_kph)+' km/h'],['진행 방향',n(v.bearing_deg)+' °'],['기록된 누적 거리',n(v.recorded_distance_km)+' km'],['주행 보조',v.enabled==null?'정보 없음':v.enabled?'활성':'비활성']].map(([l,x])=>`<div class="table-row"><span>${l}</span><b>${esc(x)}</b></div>`).join('')}</div><p class="notice">— 는 정보 없음입니다. BMS 용량 추정은 실제 열화율이 아니며 SOC 계산 용량은 계기판 표시 보정에 사용합니다. 총 주행거리와 기록된 누적 거리는 서로 다른 값입니다.</p><details><summary>수신 데이터 전체 보기</summary><pre>${esc(JSON.stringify(v,null,2))}</pre></details>`;
+    if(this.tab==='vehicle')return this.vehicleStatusView(v);
     if(this.tab==='charge')return `${this.batteryHistory()}<div class="tiles">${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}${metric('이번 달 충전 요금',n(v.month_charge_cost,0),'원','cash','추정치')}${metric('완속 분류',n(v.month_slow_kwh),'kWh','power-plug')}${metric('급속 분류',n(v.month_fast_kwh),'kWh','flash')}</div>${this.chargeHistory()}<p class="notice">배터리 에너지 증가로 추정합니다. 11kW 이하를 완속으로 분류하며, 요금 ${n(v.month_charge_cost,0)}원은 기본 단가 기준 추정입니다. 차량이 잠들거나 콤마 전원이 꺼지면 측정할 수 없습니다.</p>`;
     const tiles=isTrip?`${metric('주행거리',n(trip.distance_m==null?null:trip.distance_m/1000,2),'km','map-marker-distance')}${metric('주행시간',duration(trip.duration_s),'','timer-outline')}${metric('평균속도',n(trip.duration_s?trip.distance_m/trip.duration_s*3.6:null,0),'km/h','speedometer-medium')}${metric('최고속도',n(this.maxSpeed(trip.route),0),'km/h','speedometer')}`:
       `${metric('배터리 잔량',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력 · 추정',n(v.charge_power_w==null?null:v.charge_power_w/1000),'kW','ev-station',v.charging?'충전 증가 감지':'관측값 기준')}`;
     return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'주행 상세':'주차 위치'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>저속 · 0 km/h</span><i class="gradient"></i><span>고속 · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length}개 경로 좌표 · 출발 하늘색 / 도착 파랑</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'위치 정보 대기 중'}</b><div class="sub">최근 주차 또는 마지막 주행 도착 위치</div>`}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">차량 컨디션</h2><div class="tiles">${metric('외부 온도',n(v.outside_temp_c),'°C','thermometer')}${metric('12V 배터리',n(v.aux_voltage,2),'V','car-battery')}${metric('에어컨',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('송풍 단계',n(v.blower_level,0),'','fan')}</div>`:''}`;
+  }
+  vehicleStatusView(v){
+    const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
+      let valHtml;
+      if(isBadge){
+        valHtml=`<span class="status-badge ${badgeType}">${esc(val)}</span>`;
+      }else{
+        const isNone=val==='—'||val==null;
+        const uText=(!isNone&&unit)?`<small>${esc(unit)}</small>`:'';
+        valHtml=`<b class="status-val">${esc(val)}${uText}</b>`;
+      }
+      return `<div class="status-row"><div class="status-label-wrap"><span class="status-icon">${icon(ico)}</span><span class="status-label">${label}</span></div>${valHtml}</div>`;
+    };
+
+    const batteryItems=[
+      row('battery','배터리 잔량',n(v.soc_percent),'%'),
+      row('car-electric','주행가능거리',n(v.range_km),'km'),
+      row('flash','배터리 에너지',n(v.battery_kwh),'kWh'),
+      row('flash-outline','고전압 배터리',n(v.hv_voltage),'V'),
+      row('car-battery','12V 배터리',n(v.aux_voltage,2),'V'),
+      row('battery-sync','BMS 용량 추정',n(v.measured_capacity_kwh),'kWh'),
+      row('calculator','SOC 계산 용량',n(v.soc_capacity_kwh),'kWh')
+    ];
+
+    const drivingItems=[
+      row('counter','총 주행거리',n(v.odometer_km,0),'km'),
+      row('routes','이번 달 주행거리',n(v.month_distance_km),'km'),
+      row('car-multiple','이번 달 주행 횟수',n(v.month_trip_count,0),'회'),
+      row('speedometer','현재 속도',n(v.speed_kph),'km/h'),
+      row('compass-outline','진행 방향',n(v.bearing_deg),'°'),
+      row('car-cruise-control','주행 보조',v.enabled==null?'정보 없음':v.enabled?'활성':'비활성','',true,v.enabled==null?'dim':v.enabled?'on':'off'),
+      row('crosshairs-gps','GPS 정확도',n(v.gps_accuracy_m),'m'),
+      row('map-clock-outline','기록된 누적 거리',n(v.recorded_distance_km),'km')
+    ];
+
+    const climateItems=[
+      row('thermometer','외부 온도',n(v.outside_temp_c),'°C'),
+      row('snowflake','에어컨',v.ac_on==null?'정보 없음':v.ac_on?'작동':'꺼짐','',true,v.ac_on==null?'dim':v.ac_on?'on':'off'),
+      row('fan','송풍 단계',n(v.blower_level,0)),
+      row('fan-auto','송풍 제어 전압',n(v.blower_volt),'V'),
+      row('car-seat-heater','운전석 열선',n(v.seat_heat_left,0)),
+      row('car-seat-heater','조수석 열선',n(v.seat_heat_right,0)),
+      row('air-filter','내기순환 신호',n(v.recirc,0))
+    ];
+
+    const group=(title,ico,items)=>`<div class="status-group panel"><div class="paneltitle"><h2>${icon(ico)}${title}</h2><span class="sub">${items.length}개 항목</span></div><div class="status-list">${items.join('')}</div></div>`;
+
+    const fieldCount=Object.keys(v||{}).length;
+    return `<h2 class="section" style="margin-top:0">차량 정보</h2><div class="status-groups">${group('배터리 & 전력','battery-charging',batteryItems)}${group('주행 & 운행 기록','steering',drivingItems)}${group('공조 & 실내 환경','fan',climateItems)}</div><p class="notice">— 는 정보 없음입니다. BMS 용량 추정은 실제 열화율이 아니며 SOC 계산 용량은 계기판 표시 보정에 사용합니다. 총 주행거리와 기록된 누적 거리는 서로 다른 값입니다.</p><details class="raw-data-card panel"><summary><div class="raw-summary-content"><span class="raw-summary-title">${icon('code-json')} 수신 데이터 전체 보기</span><span class="raw-toggle-hint">JSON 원본 데이터</span></div></summary><div class="raw-content"><div class="raw-toolbar"><span class="raw-count">수신된 원본 데이터 (${fieldCount}개 필드)</span><button type="button" class="copy-raw-btn" aria-label="수신 데이터 전체 복사">${icon('content-copy')}<span>모두 복사</span></button></div><pre>${esc(JSON.stringify(v,null,2))}</pre></div></details>`;
   }
   chargeHistory(){
     const days=tripDays(this.charges,this._hass?.config?.time_zone);
