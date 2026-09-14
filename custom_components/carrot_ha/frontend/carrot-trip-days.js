@@ -29,3 +29,86 @@ export async function loadRecentTrips(api, id, now = new Date()) {
   }
   return {events};
 }
+
+export function mergeConsecutiveCharges(events, maxGapSeconds = 900) {
+  if (!Array.isArray(events) || events.length <= 1) return events || [];
+  const getStart = e => new Date(e.data?.started_at || e.observed_at || 0).getTime();
+  const getEnd = e => {
+    if (e.data?.ended_at) return new Date(e.data.ended_at).getTime();
+    const dur = Number(e.data?.duration_s) || 0;
+    return getStart(e) + dur * 1000;
+  };
+
+  // Sort ascending by start time for merging
+  const sorted = [...events].sort((a, b) => getStart(a) - getStart(b));
+  const merged = [];
+
+  for (const event of sorted) {
+    if (!event || !event.data) continue;
+    if (merged.length === 0) {
+      merged.push({
+        ...event,
+        data: {
+          ...event.data,
+          merge_parts: [{
+            started_at: event.data.started_at,
+            duration_s: event.data.duration_s,
+            energy_kwh: event.data.energy_kwh
+          }]
+        }
+      });
+      continue;
+    }
+
+    const prev = merged[merged.length - 1];
+    const prevEnd = getEnd(prev);
+    const currStart = getStart(event);
+    const gapSeconds = (currStart - prevEnd) / 1000;
+
+    if (gapSeconds >= -60 && gapSeconds <= maxGapSeconds) {
+      const prevDur = Number(prev.data.duration_s) || 0;
+      const currDur = Number(event.data.duration_s) || 0;
+      const prevKwh = Number(prev.data.energy_kwh) || 0;
+      const currKwh = Number(event.data.energy_kwh) || 0;
+      const endMs = Math.max(prevEnd, getEnd(event));
+
+      prev.data = {
+        ...prev.data,
+        ended_at: new Date(endMs).toISOString(),
+        duration_s: prevDur + currDur,
+        energy_kwh: Math.round((prevKwh + currKwh) * 1000) / 1000,
+        partial: Boolean(prev.data.partial || event.data.partial),
+        merged: true,
+        merge_count: (prev.data.merge_count || 1) + 1,
+        merge_gap_s: Math.max(0, Math.round(gapSeconds)),
+        merge_parts: [
+          ...(prev.data.merge_parts || [{
+            started_at: prev.data.started_at,
+            duration_s: prevDur,
+            energy_kwh: prevKwh
+          }]),
+          {
+            started_at: event.data.started_at,
+            duration_s: currDur,
+            energy_kwh: currKwh
+          }
+        ]
+      };
+    } else {
+      merged.push({
+        ...event,
+        data: {
+          ...event.data,
+          merge_parts: [{
+            started_at: event.data.started_at,
+            duration_s: event.data.duration_s,
+            energy_kwh: event.data.energy_kwh
+          }]
+        }
+      });
+    }
+  }
+
+  // Preserve original descending order (newest first)
+  return merged.sort((a, b) => getStart(b) - getStart(a));
+}
