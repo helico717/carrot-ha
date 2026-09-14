@@ -178,16 +178,17 @@ class CarrotDashboard extends HTMLElement {
 .status-group{display:flex;flex-direction:column}
 .status-group .paneltitle{padding:14px 18px;border-bottom:1px solid var(--line)}
 .status-group .paneltitle h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0;font-weight:650}
-.status-group .paneltitle h2 ha-icon{width:18px;height:18px;color:var(--orange)}
+.status-group .paneltitle h2 ha-icon{--mdc-icon-size:20px;--iron-icon-width:20px;--iron-icon-height:20px;width:20px;height:20px;color:#1260e8;display:flex;align-items:center;justify-content:center}
+:host([data-theme="dark"]) .status-group .paneltitle h2 ha-icon{color:#60a5fa}
 .status-list{padding:4px 18px 8px;flex:1}
-.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
 .status-row:last-child{border-bottom:none}
-.status-label-wrap{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-.status-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.06);color:var(--muted);flex-shrink:0}
-:host([data-theme="light"]) .status-icon{background:rgba(0,0,0,.04);color:var(--muted)}
-.status-icon ha-icon{width:16px;height:16px}
-.status-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.status-val{font-size:13px;font-weight:650;color:var(--ink);text-align:right;white-space:nowrap}
+.status-label-wrap{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.status-icon{display:grid;place-items:center;width:32px;height:32px;min-width:32px;border-radius:50%;background:#edf4fe;color:#1260e8;flex-shrink:0}
+:host([data-theme="dark"]) .status-icon{background:#162235;color:#60a5fa}
+.status-icon ha-icon{--mdc-icon-size:18px;--iron-icon-width:18px;--iron-icon-height:18px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:inherit}
+.status-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.status-val{font-size:13px;font-weight:650;color:var(--ink);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .status-val small{font-size:11px;font-weight:normal;color:var(--muted);margin-left:3px}
 .status-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:14px;white-space:nowrap}
 .status-badge.on{background:rgba(114,223,155,.18);color:var(--green)}
@@ -202,7 +203,7 @@ class CarrotDashboard extends HTMLElement {
 .raw-data-card[open] summary{border-bottom:1px solid var(--line)}
 .raw-summary-content{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
 .raw-summary-title{display:flex;align-items:center;gap:8px}
-.raw-summary-title ha-icon{width:18px;height:18px;color:var(--muted)}
+.raw-summary-title ha-icon{--mdc-icon-size:18px;--iron-icon-width:18px;--iron-icon-height:18px;width:18px;height:18px;color:var(--muted);display:flex;align-items:center;justify-content:center}
 .raw-toggle-hint{font-size:11px;font-weight:normal;color:var(--muted)}
 .raw-content{padding:14px 18px 18px}
 .raw-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
@@ -213,7 +214,7 @@ class CarrotDashboard extends HTMLElement {
 :host([data-theme="light"]) .copy-raw-btn{background:#fff;border-color:var(--line);color:var(--ink)}
 :host([data-theme="light"]) .copy-raw-btn:hover{background:#f0f3f5}
 :host([data-theme="light"]) .copy-raw-btn.copied{background:#e6f9ee;border-color:#187845;color:#187845}
-.copy-raw-btn ha-icon{width:15px;height:15px}
+.copy-raw-btn ha-icon{--mdc-icon-size:15px;--iron-icon-width:15px;--iron-icon-height:15px;width:15px;height:15px;display:flex;align-items:center;justify-content:center}
 .raw-content pre{margin:0;max-height:360px;overflow:auto;background:rgba(0,0,0,.28);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.55;color:#c9d1d9}
 :host([data-theme="light"]) .raw-content pre{background:#f4f6f8;color:#24292f}
 @container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
