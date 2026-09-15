@@ -200,13 +200,13 @@ class CarrotDashboard extends HTMLElement {
       .charge-marker::after{content:attr(data-bottom);position:absolute;top:100%;right:4px;left:auto;transform:none;margin-top:3px;font-size:10px;font-weight:600;letter-spacing:-0.2px;color:#f8fafc;background:rgba(15,23,42,0.92);backdrop-filter:blur(4px);padding:1.5px 7px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
       :host([data-theme="light"]) .charge-marker::before{color:#156332;text-shadow:none}
       :host([data-theme="light"]) .charge-marker::after{color:#1e293b;background:rgba(255,255,255,0.95);border-color:rgba(0,0,0,0.12);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(74,222,128,0.7)}
-      .marker-cap.top{top:-1.5px}
-      .marker-cap.bottom{bottom:-1.5px}
+      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:4px;height:4px;padding:0 !important;margin:0 !important;box-sizing:border-box !important;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(74,222,128,0.7)}
+      .marker-cap.cap-top{top:-2px}
+      .marker-cap.cap-bottom{bottom:-2px}
       .energy-head.charging-left{display:flex;align-items:center;justify-content:flex-start;position:relative;z-index:5}
       .energy-head.charging-left .charge-info-stack{display:flex;flex-direction:column;gap:1px}
-      .energy-head.charging-left .charge-status-label{font-size:12px;font-weight:700;color:#6ee7b7;letter-spacing:0.5px;text-transform:uppercase}
-      :host([data-theme="light"]) .energy-head.charging-left .charge-status-label{color:#156332}
+      .energy-head.charging-left .charge-status-label{font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.5px;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,0.35)}
+      :host([data-theme="light"]) .energy-head.charging-left .charge-status-label{color:#ffffff}
       .energy-head.charging-left .soc-value{display:flex;align-items:baseline;gap:4px;font-size:48px;font-weight:900;color:#fff;line-height:1}
       .energy-head.charging-left .soc-value small{font-size:24px;color:#fff}
       @container(max-width:700px){
@@ -449,8 +449,8 @@ class CarrotDashboard extends HTMLElement {
        `${metric('주행가능거리',n(v.range_km,0),'km','car-electric')}`;
 
     const markersHtml=charging
-      ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap top"></span><span class="marker-cap bottom"></span></div>`:''}`+
-       `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap top"></span><span class="marker-cap bottom"></span></div>`
+      ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
+       `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
       :'';
 
     const sweepHtml=charging
