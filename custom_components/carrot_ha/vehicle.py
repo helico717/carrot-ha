@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from .battery import calibrated_soc
+from .battery import calibrated_soc, estimate_charging_times
 
 def values(runtime):
     latest = runtime.get('latest', {})
@@ -17,6 +17,14 @@ def values(runtime):
         data['charge_power_kw'] = round(power_w / 1000, 1)
     elif data.get('charge_power_kw') is not None:
         data['charge_power_kw'] = round(data['charge_power_kw'], 1)
+
+    charging_est = estimate_charging_times(
+        data.get('battery_kwh'),
+        data.get('measured_capacity_kwh') or capacity,
+        power_w
+    )
+    data.update(charging_est)
+
     if isinstance(data.get('odometer_km'), (int, float)):
         data['odometer_km'] = int(round(data['odometer_km']))
     if isinstance(data.get('outside_temp_c'), (int, float)):

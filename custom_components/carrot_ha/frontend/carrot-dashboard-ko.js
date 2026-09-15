@@ -346,6 +346,13 @@ class CarrotDashboard extends HTMLElement {
       row('battery','배터리 잔량',n(v.soc_percent),'%'),
       row('car-electric','주행가능거리',n(v.range_km),'km'),
       row('flash','배터리 에너지',n(v.battery_kwh),'kWh'),
+      row('ev-station','충전 전력 (추정)',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),1),'kW'),
+      ...(v.charging?[
+        row('timer-sand','80% 충전 남은시간',v.time_to_80_s!=null?shortDuration(v.time_to_80_s):'—',''),
+        row('clock-end','80% 충전 완료시각',time(v.eta_80),''),
+        row('timer-sand','100% 충전 남은시간',v.time_to_100_s!=null?shortDuration(v.time_to_100_s):'—',''),
+        row('clock-end','100% 충전 완료시각',time(v.eta_100),'')
+      ]:[]),
       row('flash-outline','고전압 배터리',n(v.hv_voltage),'V'),
       row('car-battery','12V 배터리',n(v.aux_voltage,2),'V'),
       row('battery-sync','BMS 용량 추정',n(v.measured_capacity_kwh),'kWh'),
