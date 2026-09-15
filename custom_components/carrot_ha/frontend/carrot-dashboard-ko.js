@@ -192,7 +192,11 @@ class CarrotDashboard extends HTMLElement {
       .sweep-overlay{position:absolute;inset:0;border-radius:18px;overflow:hidden;pointer-events:none;z-index:2}
       .sweep-clipper{position:absolute;top:0;left:0;bottom:0;width:var(--soc);overflow:hidden}
       .sweep-beam{position:absolute;top:0;left:-60%;width:60%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.08) 30%,rgba(255,255,255,0.45) 50%,rgba(255,255,255,0.08) 70%,transparent 100%);filter:blur(1px);animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite}
+      .sweep-beam.fast{animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite !important}
+      .sweep-beam.slow{animation:chargeSweep 4.4s cubic-bezier(0.4,0,0.2,1) infinite !important}
+      .sweep-beam.driving,.energy.is-driving .sweep-beam{width:60%!important;height:100%!important;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.1) 20%,rgba(255,255,255,0.75) 50%,rgba(255,255,255,0.1) 80%,transparent 100%)!important;filter:blur(1px)!important;animation:driveSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite!important}
       @keyframes chargeSweep{0%{left:-60%;opacity:0.15}20%{opacity:1}80%{opacity:1}100%{left:100%;opacity:0.1}}
+      @keyframes driveSweep{0%{left:100%;opacity:0.1}15%{opacity:1}85%{opacity:1}100%{left:-60%;opacity:0.1}}
       .charge-marker{position:absolute;top:-6px;bottom:-6px;width:2px;background:rgba(255,255,255,0.9);box-shadow:0 0 5px rgba(255,255,255,0.4);z-index:4;pointer-events:none;border-radius:999px}
       .charge-marker.marker-80{left:80%;transform:translateX(-50%)}
       .charge-marker.marker-100{left:100%;transform:translateX(-100%)}
@@ -203,15 +207,25 @@ class CarrotDashboard extends HTMLElement {
       .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:4px;height:4px;padding:0 !important;margin:0 !important;box-sizing:border-box !important;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(74,222,128,0.7)}
       .marker-cap.cap-top{top:-2px}
       .marker-cap.cap-bottom{bottom:-2px}
+      .energy-head{position:relative;z-index:5}
       .energy-head.charging-left{display:flex;align-items:center;justify-content:flex-start;position:relative;z-index:5}
       .energy-head.charging-left .charge-info-stack{display:flex;flex-direction:column;gap:1px}
-      .energy-head.charging-left .charge-status-label{font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.5px;text-transform:uppercase;text-shadow:0 1px 2px rgba(0,0,0,0.35)}
+      .energy-head.charging-left .charge-status-label{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.35)}
       :host([data-theme="light"]) .energy-head.charging-left .charge-status-label{color:#ffffff}
-      .energy-head.charging-left .soc-value{display:flex;align-items:baseline;gap:4px;font-size:48px;font-weight:900;color:#fff;line-height:1}
-      .energy-head.charging-left .soc-value small{font-size:24px;color:#fff}
+      .energy-head .soc-value,.energy-head.charging-left .soc-value{font-family:Inter,Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important;display:flex;align-items:baseline;gap:4px;font-size:48px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px}
+      .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-family:Inter,Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important;font-size:24px;font-weight:700;color:#fff;letter-spacing:normal}
+      .energy-head .battery-label{display:flex;align-items:center;gap:10px}
+      .energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+      .battery-head-icon{width:26px;height:26px;fill:#ffffff !important;flex-shrink:0;opacity:0.95;filter:drop-shadow(0 0 4px rgba(255,255,255,0.4))}
+      :host([data-theme="light"]) .battery-head-icon{fill:#ffffff !important}
+      .charge-head-bolt{width:26px;height:34px;fill:#4ade80 !important;flex-shrink:0;margin-right:8px;filter:drop-shadow(0 0 6px rgba(74,222,128,0.6))}
+      :host([data-theme="light"]) .charge-head-bolt{fill:#4ade80 !important}
       @container(max-width:700px){
-        .energy-head.charging-left .soc-value{font-size:38px}
-        .energy-head.charging-left .soc-value small{font-size:20px}
+        .energy-head .soc-value,.energy-head.charging-left .soc-value{font-size:38px !important}
+        .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-size:20px !important}
+        .energy-head .battery-label span{font-size:18px !important}
+        .battery-head-icon{width:22px;height:22px}
+        .charge-head-bolt{width:22px;height:30px;margin-right:6px}
         .quick-metrics .metric:nth-child(n+3){display:block !important}
       }
       .quick-metrics .metric.charge-power strong{color:#4ade80 !important}
@@ -434,19 +448,23 @@ class CarrotDashboard extends HTMLElement {
   }
   overview(v){
     const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'||Boolean(v.charging);
+    const isDriving=Boolean(v.onroad);
     const latest=this.trips[0]?.data;
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
     const status=this.vehicleStatus(v).label;
     const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
+    const isFast=typeof powerKw==='number'&&powerKw>=11;
+    const chargeLabel=isFast?'고속충전중...':'완속충전중...';
+    const sweepSpeedClass=isFast?'fast':'slow';
     const quickMetrics=charging
-      ?`${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
-       `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`+
-       `${metric('충전 전력 · 추정',n(powerKw,1),'kW','ev-station','충전 중','charge-power')}`+
-       `${metric('예상 완료시간',v.eta_100?timeOnly(v.eta_100):'계산 중','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' 남음':'100% 목표')}`
+      ?`${metric('충전 전력 · 추정',n(powerKw,1),'kW','ev-station',isFast?'급속 충전':'완속 충전','charge-power')}`+
+       `${metric('예상 완료시간',v.eta_100?timeOnly(v.eta_100):'계산 중','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' 남음':'100% 목표')}`+
+       `${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
+       `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`
       :`${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
-       `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`+
        `${metric('이번 달 주행',n(v.month_distance_km),'km','routes')}`+
-       `${metric('주행가능거리',n(v.range_km,0),'km','car-electric')}`;
+       `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`+
+       `${metric('이번 달 충전요금',n(v.month_charge_cost,0),'원','cash','추정치')}`;
 
     const markersHtml=charging
       ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
@@ -454,14 +472,16 @@ class CarrotDashboard extends HTMLElement {
       :'';
 
     const sweepHtml=charging
-      ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam"></div></div></div>`
-      :'';
+      ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam ${sweepSpeedClass}"></div></div></div>`
+      :(isDriving
+        ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>`
+        :'');
 
     const energyHeadHtml=charging
-      ?`<div class="energy-head charging-left"><div class="charge-info-stack"><span class="charge-status-label">충전중</span><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></div>`
-      :`<div class="energy-head"><div class="battery-label"><span>배터리 잔량</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div>`;
+      ?`<div class="energy-head charging-left"><svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg><div class="charge-info-stack"><span class="charge-status-label">${chargeLabel}</span><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></div>`
+      :`<div class="energy-head"><div class="battery-label"><svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg><span>배터리 잔량</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div>`;
 
-    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at)}</small></span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>외기 <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>공조 <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
+    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at)}</small></span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>외기 <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>공조 <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
