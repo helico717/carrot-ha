@@ -27,7 +27,7 @@ const icon = name => {
   if(name==='flash-double')return `<svg viewBox="0 0 24 24" style="width:var(--mdc-icon-size,20px);height:var(--mdc-icon-size,20px);display:inline-block" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`;
   return `<ha-icon icon="mdi:${name}"></ha-icon>`;
 };
-const metric = (label,value,unit,ico,sub='') => `<div class="metric">${icon(ico)}<span class="label">${label}</span><strong>${esc(value)}<small>${esc(unit)}</small></strong>${sub?`<span class="hint">${esc(sub)}</span>`:''}</div>`;
+const metric = (label,value,unit,ico,sub='',cls='') => `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(value)}<small>${esc(unit)}</small></strong>${sub?`<span class="hint">${esc(sub)}</span>`:''}</div>`;
 function leaflet() {
   if (!window.__carrotLeaflet) window.__carrotLeaflet = new Promise((resolve,reject)=>{
     const script=document.createElement('script');script.src=assetBase+'leaflet.js';
@@ -186,23 +186,36 @@ class CarrotDashboard extends HTMLElement {
     `;
     themeStyle.textContent+=`
       .energy{position:relative;overflow:visible;margin:12px 0 16px}
+      .energy.is-charging{margin:32px 0 40px !important}
+      @container(max-width:700px){.energy.is-charging{margin:30px 0 38px !important}}
       .energy.is-charging,:host([data-theme="light"]) .energy.is-charging{background:linear-gradient(90deg,#198346 0 var(--soc),#11562f var(--soc) 100%)}
       .sweep-overlay{position:absolute;inset:0;border-radius:18px;overflow:hidden;pointer-events:none;z-index:2}
       .sweep-clipper{position:absolute;top:0;left:0;bottom:0;width:var(--soc);overflow:hidden}
       .sweep-beam{position:absolute;top:0;left:-60%;width:60%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.08) 30%,rgba(255,255,255,0.45) 50%,rgba(255,255,255,0.08) 70%,transparent 100%);filter:blur(1px);animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite}
       @keyframes chargeSweep{0%{left:-60%;opacity:0.15}20%{opacity:1}80%{opacity:1}100%{left:100%;opacity:0.1}}
-      .charge-marker{position:absolute;top:-10px;bottom:-10px;width:2px;background:rgba(255,255,255,0.92);box-shadow:0 0 6px rgba(255,255,255,0.65);z-index:10;pointer-events:none}
-      .charge-marker.marker-80{left:80%;transform:translateX(-1px)}
-      .charge-marker.marker-100{left:100%;transform:translateX(-2px)}
-      .charge-marker::before{content:attr(data-top);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;font-size:11px;font-weight:700;letter-spacing:-0.2px;color:#4ade80;text-shadow:0 1px 3px rgba(0,0,0,0.85);white-space:nowrap}
-      .charge-marker::after{content:attr(data-bottom);position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;font-size:11px;font-weight:600;letter-spacing:-0.2px;color:#f1f5f9;background:rgba(15,23,42,0.88);backdrop-filter:blur(4px);padding:2px 7px;border-radius:9999px;border:1px solid rgba(255,255,255,0.18);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
-      .charge-marker.marker-100::before,.charge-marker.marker-100::after{left:auto;right:0;transform:none}
-      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 5px #4ade80}
-      .marker-cap.top{top:-3px}
-      .marker-cap.bottom{bottom:-3px}
+      .charge-marker{position:absolute;top:-6px;bottom:-6px;width:2px;background:rgba(255,255,255,0.9);box-shadow:0 0 5px rgba(255,255,255,0.4);z-index:4;pointer-events:none;border-radius:999px}
+      .charge-marker.marker-80{left:80%;transform:translateX(-50%)}
+      .charge-marker.marker-100{left:100%;transform:translateX(-100%)}
+      .charge-marker::before{content:attr(data-top);position:absolute;bottom:100%;right:5px;left:auto;transform:none;margin-bottom:2px;font-size:11px;font-weight:700;letter-spacing:-0.3px;color:#4ade80;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap;text-align:right}
+      .charge-marker::after{content:attr(data-bottom);position:absolute;top:100%;right:4px;left:auto;transform:none;margin-top:3px;font-size:10px;font-weight:600;letter-spacing:-0.2px;color:#f8fafc;background:rgba(15,23,42,0.92);backdrop-filter:blur(4px);padding:1.5px 7px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
       :host([data-theme="light"]) .charge-marker::before{color:#156332;text-shadow:none}
-      :host([data-theme="light"]) .charge-marker::after{color:#1e293b;background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.12);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
-      .quick-metrics .metric{display:block}
+      :host([data-theme="light"]) .charge-marker::after{color:#1e293b;background:rgba(255,255,255,0.95);border-color:rgba(0,0,0,0.12);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(74,222,128,0.7)}
+      .marker-cap.top{top:-1.5px}
+      .marker-cap.bottom{bottom:-1.5px}
+      .energy-head.charging-left{display:flex;align-items:center;justify-content:flex-start;position:relative;z-index:5}
+      .energy-head.charging-left .charge-info-stack{display:flex;flex-direction:column;gap:1px}
+      .energy-head.charging-left .charge-status-label{font-size:12px;font-weight:700;color:#6ee7b7;letter-spacing:0.5px;text-transform:uppercase}
+      :host([data-theme="light"]) .energy-head.charging-left .charge-status-label{color:#156332}
+      .energy-head.charging-left .soc-value{display:flex;align-items:baseline;gap:4px;font-size:48px;font-weight:900;color:#fff;line-height:1}
+      .energy-head.charging-left .soc-value small{font-size:24px;color:#fff}
+      @container(max-width:700px){
+        .energy-head.charging-left .soc-value{font-size:38px}
+        .energy-head.charging-left .soc-value small{font-size:20px}
+        .quick-metrics .metric:nth-child(n+3){display:block !important}
+      }
+      .quick-metrics .metric.charge-power strong{color:#4ade80 !important}
+      :host([data-theme="light"]) .quick-metrics .metric.charge-power strong{color:#16a34a !important}
     `;
     themeStyle.textContent+=`.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
 `;
@@ -428,7 +441,7 @@ class CarrotDashboard extends HTMLElement {
     const quickMetrics=charging
       ?`${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
        `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`+
-       `${metric('Estimated charging power',n(powerKw,1),'kW','ev-station','Charging')}`+
+       `${metric('Estimated charging power',n(powerKw,1),'kW','ev-station','Charging','charge-power')}`+
        `${metric('Estimated completion',v.eta_100?timeOnly(v.eta_100):'Calculating','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' left':'100% target')}`
       :`${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
        `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`+
@@ -444,7 +457,11 @@ class CarrotDashboard extends HTMLElement {
       ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam"></div></div></div>`
       :'';
 
-    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}<div class="energy-head"><div class="battery-label"><span>${charging?'Charging':'Battery level'}</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
+    const energyHeadHtml=charging
+      ?`<div class="energy-head charging-left"><div class="charge-info-stack"><span class="charge-status-label">Charging</span><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></div>`
+      :`<div class="energy-head"><div class="battery-label"><span>Battery level</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div>`;
+
+    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
