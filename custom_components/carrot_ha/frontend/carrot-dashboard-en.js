@@ -7,6 +7,7 @@ const timeOnly = v => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).to
 const duration = v => typeof v==='number' ? [Math.floor(v/3600),Math.floor(v/60)%60,Math.floor(v)%60].map(x=>String(x).padStart(2,'0')).join(':') : '—';
 const shortDuration = v => typeof v==='number' ? (Math.floor(v/3600)?Math.floor(v/3600)+' h ':'')+Math.floor(v/60)%60+' min' : '—';
 const formatDuration = s => { if(typeof s !== 'number' || !Number.isFinite(s)) return '—'; const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); if(h > 0 && m > 0) return `${h}h ${m}m elapsed`; if(h > 0) return `${h}h elapsed`; return `${m}m elapsed`; };
+const chargeDuration = s => { if(typeof s !== 'number' || !Number.isFinite(s)) return '—'; if(s <= 0) return 'Done'; const totalMins = Math.round(s/60); const h = Math.floor(totalMins/60); const m = totalMins%60; if(h === 0) return `${m}m`; return m === 0 ? `${h}h` : `${h}h ${m}m`; };
 const parkingDuration = (parkingAt, refTime) => {
   if (!parkingAt) return '—';
   const pTime = new Date(parkingAt).getTime();
@@ -183,8 +184,27 @@ class CarrotDashboard extends HTMLElement {
 .battery-history{background:var(--panel,#1d1d20);border:1px solid var(--line);border-radius:24px;padding:26px;margin-bottom:20px;color:var(--ink)}
 :host([data-theme="light"]) .battery-history{background:#f3f5f8}.battery-history h2{margin:0;font-size:21px}.demo-note,.chart-key{font-size:11px;color:var(--muted)}.usage-total{padding:16px 0 24px;display:flex;flex-direction:column}.usage-total strong{font-size:46px}.usage-total span{font-size:17px;color:var(--muted)}.history-plot{position:relative;padding-right:45px}.week-bars,.hours{height:160px;display:flex;gap:12px;border-bottom:1px solid #8885;background:repeating-linear-gradient(to top,transparent 0,transparent calc(50% - 1px),#8884 calc(50% - 1px),#8884 50%)}.week-bars button{position:relative;flex:1;background:none;border:0;padding:0 10px;display:flex;align-items:flex-end}.week-bars i{display:block;width:100%;background:var(--bar);border-radius:7px 7px 0 0}.week-bars button[aria-pressed="true"]{color:var(--bar)}.week-bars button span{position:absolute;top:100%;left:0;right:0;text-align:center;padding-top:8px;font-size:14px}.week-bars small{display:block;font-size:10px}.axis{position:absolute;right:0;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:var(--muted)}.history-plot+.chart-key{margin-top:48px}.battery-history h3{font-size:14px;margin-top:28px}.hours{gap:4px;height:160px}.hour{position:relative;flex:1;display:flex;align-items:flex-end}.hour i{width:100%;background:#77777f;border-radius:3px 3px 0 0}.hour.parked i{opacity:.4}.hour.charging{background:#54ce6530;border-top:4px solid #5ad46d}.hour.charging i{background:#5ad46d}.hour em{position:absolute;top:-22px;width:100%;text-align:center;color:#5ad46d;font-size:24px}.hours-label{display:flex;justify-content:space-between;padding-right:45px;font-size:11px;color:var(--muted);margin-top:8px}.usage-stats{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);margin-top:20px;padding-top:18px;color:var(--muted);font-size:13px}.usage-stats strong{display:block;font-size:25px;color:var(--ink);margin-top:8px}@container(max-width:700px){.battery-history{padding:18px}.week-bars{gap:4px}.week-bars button{padding:0 4px}.usage-stats strong{font-size:22px}.hours{gap:2px}}
     `;
-    themeStyle.textContent+=`.energy.is-charging,:host([data-theme="light"]) .energy.is-charging{background:linear-gradient(90deg,#198346 0 var(--soc),#11562f var(--soc) 100%)}
-.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
+    themeStyle.textContent+=`
+      .energy{position:relative;overflow:visible;margin:12px 0 16px}
+      .energy.is-charging,:host([data-theme="light"]) .energy.is-charging{background:linear-gradient(90deg,#198346 0 var(--soc),#11562f var(--soc) 100%)}
+      .sweep-overlay{position:absolute;inset:0;border-radius:18px;overflow:hidden;pointer-events:none;z-index:2}
+      .sweep-clipper{position:absolute;top:0;left:0;bottom:0;width:var(--soc);overflow:hidden}
+      .sweep-beam{position:absolute;top:0;left:-60%;width:60%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.08) 30%,rgba(255,255,255,0.45) 50%,rgba(255,255,255,0.08) 70%,transparent 100%);filter:blur(1px);animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite}
+      @keyframes chargeSweep{0%{left:-60%;opacity:0.15}20%{opacity:1}80%{opacity:1}100%{left:100%;opacity:0.1}}
+      .charge-marker{position:absolute;top:-10px;bottom:-10px;width:2px;background:rgba(255,255,255,0.92);box-shadow:0 0 6px rgba(255,255,255,0.65);z-index:10;pointer-events:none}
+      .charge-marker.marker-80{left:80%;transform:translateX(-1px)}
+      .charge-marker.marker-100{left:100%;transform:translateX(-2px)}
+      .charge-marker::before{content:attr(data-top);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;font-size:11px;font-weight:700;letter-spacing:-0.2px;color:#4ade80;text-shadow:0 1px 3px rgba(0,0,0,0.85);white-space:nowrap}
+      .charge-marker::after{content:attr(data-bottom);position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:4px;font-size:11px;font-weight:600;letter-spacing:-0.2px;color:#f1f5f9;background:rgba(15,23,42,0.88);backdrop-filter:blur(4px);padding:2px 7px;border-radius:9999px;border:1px solid rgba(255,255,255,0.18);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
+      .charge-marker.marker-100::before,.charge-marker.marker-100::after{left:auto;right:0;transform:none}
+      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 5px #4ade80}
+      .marker-cap.top{top:-3px}
+      .marker-cap.bottom{bottom:-3px}
+      :host([data-theme="light"]) .charge-marker::before{color:#156332;text-shadow:none}
+      :host([data-theme="light"]) .charge-marker::after{color:#1e293b;background:rgba(255,255,255,0.92);border-color:rgba(0,0,0,0.12);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+      .quick-metrics .metric{display:block}
+    `;
+    themeStyle.textContent+=`.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
 `;
     themeStyle.textContent+=`.hour.driving i{background:#bbc7d8;opacity:1}.hour.parked i{background:linear-gradient(180deg,#8e8e93,#c7c7cc);opacity:1}.hour.charging i{background:#5ad46d;opacity:1}`;
     themeStyle.textContent+=`.usage-total strong{display:flex;align-items:baseline;gap:10px;white-space:nowrap}.usage-total .usage-caption{font-size:.55em;font-weight:600;color:inherit}.week-bars i{border-radius:10px 10px 3px 3px}.hour i{border-radius:7px 7px 2px 2px}.hour.charging{border-top:0;border-radius:7px 7px 0 0}.hour.charging:before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:#5ad46d;border-radius:999px}.hour em{top:-18px;left:50%;width:30px;height:38px;transform:translateX(-50%);z-index:2;line-height:0;pointer-events:none}.hour em svg{display:block;width:100%;height:100%}@container(max-width:700px){.hour em{width:22px;height:29px;top:-14px}}`;
@@ -400,13 +420,31 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="panel trip-history"><div class="paneltitle"><h2>Recent trips</h2><span class="sub">Last 7 days</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} trips"><span class="trip-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} trips</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(e.data.started_at||e.observed_at)}</b><small>${duration(e.data.duration_s)}</small></span><strong>${n((e.data.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">No trips recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its trips.</div>'}</section>`;
   }
   overview(v){
-    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on';
+    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'||Boolean(v.charging);
     const latest=this.trips[0]?.data;
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
     const status=this.vehicleStatus(v).label;
-    const power=charging?'Charging':'Not charging';
-    const powerUnit='';
-    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%"><div class="energy-head"><div class="battery-label"><span>${charging?'Charging':'Battery level'}</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></section><div class="quick-metrics">${metric('Odometer',n(v.odometer_km,0),'km','counter')}${metric('Charging status',power,powerUnit,'ev-station')}${metric('Distance this month',n(v.month_distance_km),'km','routes')}${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
+    const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
+    const quickMetrics=charging
+      ?`${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
+       `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`+
+       `${metric('Estimated charging power',n(powerKw,1),'kW','ev-station','Charging')}`+
+       `${metric('Estimated completion',v.eta_100?timeOnly(v.eta_100):'Calculating','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' left':'100% target')}`
+      :`${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
+       `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`+
+       `${metric('Distance this month',n(v.month_distance_km),'km','routes')}`+
+       `${metric('Range',n(v.range_km,0),'km','car-electric')}`;
+
+    const markersHtml=charging
+      ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap top"></span><span class="marker-cap bottom"></span></div>`:''}`+
+       `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap top"></span><span class="marker-cap bottom"></span></div>`
+      :'';
+
+    const sweepHtml=charging
+      ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam"></div></div></div>`
+      :'';
+
+    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}<div class="energy-head"><div class="battery-label"><span>${charging?'Charging':'Battery level'}</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
