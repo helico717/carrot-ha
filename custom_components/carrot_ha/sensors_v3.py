@@ -7,8 +7,7 @@ FIELDS = {
  'odometer_km':('총 주행거리','km','mdi:counter','distance',0),
  'outside_temp_c':('외기 온도','°C','mdi:thermometer','temperature',1),
  'aux_voltage':('12V 배터리 전압','V','mdi:car-battery','voltage',2),
- 'charge_power_w':('충전 전력 추정','W','mdi:ev-station','power',0),
- 'charge_power_kw':('충전 전력 (kW)','kW','mdi:ev-station','power',1),
+ 'charge_power_w':('충전 전력 추정','kW','mdi:ev-station','power',1),
  'time_to_80_s':('80% 충전 남은시간','s','mdi:timer-sand','duration',0),
  'eta_80':('80% 충전 완료시각',None,'mdi:clock-end','timestamp',None),
  'time_to_100_s':('100% 충전 남은시간','s','mdi:timer-sand','duration',0),
@@ -61,10 +60,13 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def native_value(self):
         value=self.data.get(self.key)
-        if self.key=='charge_power_kw' and value is None:
-            raw_w=self.data.get('charge_power_w')
-            if isinstance(raw_w,(int,float)):
-                value=round(raw_w/1000,1)
+        if self.key=='charge_power_w':
+            if isinstance(value,(int,float)):
+                return round(value/1000.0, 1)
+            kw=self.data.get('charge_power_kw')
+            if isinstance(kw,(int,float)):
+                return round(kw, 1)
+            return None
         if self._attr_device_class=='timestamp' and value:
             try:return datetime.fromisoformat(value.replace('Z','+00:00'))
             except (ValueError,AttributeError):return None
