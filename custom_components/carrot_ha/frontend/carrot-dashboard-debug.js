@@ -705,22 +705,32 @@ export default class CarrotDebugDashboard extends HTMLElement {
       .battery-head-icon {
         width: 26px;
         height: 26px;
-        fill: #60a5fa;
+        fill: #ffffff !important;
         flex-shrink: 0;
-        filter: drop-shadow(0 0 5px rgba(96, 165, 250, 0.4));
+        opacity: 0.95;
+        filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
       }
 
       :host([data-theme="light"]) .battery-head-icon {
-        fill: #2563eb;
+        fill: #ffffff !important;
       }
 
       .charge-head-bolt {
         width: 26px;
         height: 34px;
-        fill: #4ade80;
+        fill: #4ade80 !important;
         flex-shrink: 0;
         margin-right: 8px;
         filter: drop-shadow(0 0 6px rgba(74, 222, 128, 0.6));
+      }
+
+      :host([data-theme="light"]) .charge-head-bolt {
+        fill: #4ade80 !important;
+      }
+
+      .energy-head {
+        position: relative !important;
+        z-index: 5 !important;
       }
 
       /* Sweep animation frequencies */
@@ -733,18 +743,30 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
 
       /* Reverse sweep for Driving mode (Discharge effect) */
-      .energy.is-driving .sweep-beam.driving {
-        left: 100% !important;
-        background: linear-gradient(90deg, transparent 0%, rgba(147, 197, 253, 0.08) 30%, rgba(224, 242, 254, 0.45) 50%, rgba(147, 197, 253, 0.08) 70%, transparent 100%) !important;
+      .sweep-beam.driving,
+      .energy.is-driving .sweep-beam {
+        width: 60% !important;
+        height: 100% !important;
+        background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.1) 20%, rgba(255, 255, 255, 0.75) 50%, rgba(255, 255, 255, 0.1) 80%, transparent 100%) !important;
         filter: blur(1px) !important;
-        animation: driveSweep 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+        animation: driveSweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
       }
 
       @keyframes driveSweep {
-        0% { left: 100%; opacity: 0.1; }
-        20% { opacity: 0.85; }
-        80% { opacity: 0.85; }
-        100% { left: -60%; opacity: 0.1; }
+        0% {
+          left: 100%;
+          opacity: 0.1;
+        }
+        15% {
+          opacity: 1;
+        }
+        85% {
+          opacity: 1;
+        }
+        100% {
+          left: -60%;
+          opacity: 0.1;
+        }
       }
 
       /* Mobile responsiveness overrides */
