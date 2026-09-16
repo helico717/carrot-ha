@@ -210,17 +210,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const measuredAt=this.state.mode==='unknown'?null:new Date(impaired?this.scenarioAt-(this.state.mode==='stale'?2400000:this.state.mode==='offline'?600000:30000):now).toISOString();
     const receivedAt=new Date(this.state.mode==='offline'?this.scenarioAt-600000:this.state.mode==='cloud_error'?this.scenarioAt-30000:now-30000).toISOString();
 
-    // 80% calculations
-    const target80Kwh = BMS_CAPACITY * 0.8;
-    const need80Kwh = Math.max(0, target80Kwh - currentKwh);
-    const sec80 = Math.round((need80Kwh / this.state.powerKw) * 3600);
-    const eta80 = new Date(Date.now() + sec80 * 1000).toISOString();
-
-    // 100% calculations
-    const target100Kwh = BMS_CAPACITY * 1.0;
-    const need100Kwh = Math.max(0, target100Kwh - currentKwh);
-    const sec100 = Math.round((need100Kwh / this.state.powerKw) * 3600);
-    const eta100 = new Date(Date.now() + sec100 * 1000).toISOString();
+    // 80% & 100% calculations (ID.4 Charging Curve - Option 1: Bottleneck Model)
+    const { sec80, eta80, sec100, eta100, simpleSec80, simpleSec100 } = estimateChargingTimesWithCurve(
+      this.state.soc,
+      this.state.powerKw,
+      BMS_CAPACITY,
+      now,
+      this.state.calcModel || 'curve'
+    );
 
     const v = {
       stale: this.state.mode === 'stale',
@@ -267,6 +264,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       v.eta_80 = eta80;
       v.time_to_100_s = sec100;
       v.eta_100 = eta100;
+      v.calc_model = this.state.calcModel || 'curve';
+      v.simple_sec80 = simpleSec80;
+      v.simple_sec100 = simpleSec100;
     } else {
       v.charge_power_kw = 0;
       v.charge_power_w = 0;
@@ -292,12 +292,28 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const elKwh = this.shadowRoot.querySelector('#inspectKwh');
 
     if (el80) {
-      el80.innerHTML = v.charging === true
-        ? (v.soc_percent >= 80 ? '<span class="text-amber-400">도달 완료 (80% 바 자동 숨김)</span>' : `<b>${this.formatDuration(sec80)}</b>`)
-        : '—';
+      if (v.charging === true) {
+        if (v.soc_percent >= 80) {
+          el80.innerHTML = '<span class="text-amber-400">도달 완료 (80% 바 자동 숨김)</span>';
+        } else {
+          const comp = v.simple_sec80 != null && this.state.calcModel !== 'simple' && v.simple_sec80 !== sec80
+            ? `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec80)} (${sec80 > v.simple_sec80 ? '+' : ''}${Math.round((sec80 - v.simple_sec80)/60)}분)</small>`
+            : '';
+          el80.innerHTML = `<b>${this.formatDuration(sec80)}</b>${comp}`;
+        }
+      } else {
+        el80.innerHTML = '—';
+      }
     }
     if (el100) {
-      el100.innerHTML = v.charging === true ? `<b>${this.formatDuration(sec100)}</b>` : '—';
+      if (v.charging === true) {
+        const comp = v.simple_sec100 != null && this.state.calcModel !== 'simple' && v.simple_sec100 !== sec100
+          ? `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec100)} (${sec100 > v.simple_sec100 ? '+' : ''}${Math.round((sec100 - v.simple_sec100)/60)}분)</small>`
+          : '';
+        el100.innerHTML = `<b>${this.formatDuration(sec100)}</b>${comp}`;
+      } else {
+        el100.innerHTML = '—';
+      }
     }
     if (elEta) {
       elEta.innerHTML = v.charging === true ? `<b>${this.formatTime(eta100)}</b>` : '—';
@@ -316,6 +332,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
     if (elKwh) {
       elKwh.innerHTML = `<b>${(v.battery_kwh || 0).toFixed(1)}</b> / ${BMS_CAPACITY} kWh`;
+    }
+    const elModel = this.shadowRoot.querySelector('#inspectModel');
+    if (elModel) {
+      elModel.textContent = this.state.calcModel === 'simple' ? '기존 단순 선형' : 'ID.4 커브 (옵션 1: 병목)';
+      elModel.style.color = this.state.calcModel === 'simple' ? '#94a3b8' : '#34d399';
     }
   }
 
@@ -704,22 +725,39 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span>충전 전력 (추정) <small style="color:#9ca3af;font-weight:normal">(11kW 완속/고속 분기)</small></span>
                 <span id="powerVal" class="value">${this.state.powerKw.toFixed(1)} kW</span>
               </div>
-              <input id="powerSlider" type="range" min="2.0" max="150.0" value="${this.state.powerKw}" step="0.1">
+              <input id="powerSlider" type="range" min="2.0" max="200.0" value="${this.state.powerKw}" step="0.1">
               <div class="preset-dropdown-row">
                 <span class="preset-label">빠른 프리셋</span>
                 <select id="powerSelect" class="preset-select" aria-label="충전 전력 프리셋">
-                  <option value="" disabled ${![3.0, 7.0, 9.9, 50.0, 100.0, 135.0].includes(this.state.powerKw) ? 'selected' : ''}>직접 조절 중 (${this.state.powerKw.toFixed(1)} kW)</option>
+                  <option value="" disabled ${![3.0, 7.0, 9.9, 50.0, 100.0, 135.0, 185.0].includes(this.state.powerKw) ? 'selected' : ''}>직접 조절 중 (${this.state.powerKw.toFixed(1)} kW)</option>
                   <option value="3.0" ${this.state.powerKw === 3.0 ? 'selected' : ''}>3.0 kW (220V 비상 충전)</option>
                   <option value="7.0" ${this.state.powerKw === 7.0 ? 'selected' : ''}>7.0 kW (표준 완속 충전)</option>
                   <option value="9.9" ${this.state.powerKw === 9.9 ? 'selected' : ''}>9.9 kW (ID.4 완속 최대)</option>
                   <option value="50.0" ${this.state.powerKw === 50.0 ? 'selected' : ''}>50.0 kW (공용 급속 충전)</option>
                   <option value="100.0" ${this.state.powerKw === 100.0 ? 'selected' : ''}>100.0 kW (초급속 충전)</option>
                   <option value="135.0" ${this.state.powerKw === 135.0 ? 'selected' : ''}>135.0 kW (ID.4 급속 피크)</option>
+                  <option value="185.0" ${this.state.powerKw === 185.0 ? 'selected' : ''}>185.0 kW (2023 ID.4 초급속 피크)</option>
                 </select>
               </div>
             </div>
 
-            <!-- Group 4: 테마 & 언어 -->
+            <!-- Group 4: 충전 시간 계산 모델 -->
+            <div class="control-group">
+              <div class="group-label">
+                <span>충전 시간 계산 모델 <small style="color:#9ca3af;font-weight:normal">(테스트용)</small></span>
+                <span id="calcModelVal" class="value">${this.state.calcModel === 'simple' ? '단순 선형' : 'ID.4 커브 (옵션 1)'}</span>
+              </div>
+              <div class="btn-group">
+                <button id="btnModelCurve" class="${this.state.calcModel !== 'simple' ? 'active charge' : ''}">⚡ ID.4 커브 (옵션 1: 병목)</button>
+                <button id="btnModelSimple" class="${this.state.calcModel === 'simple' ? 'active' : ''}">📏 기존 단순 선형</button>
+              </div>
+              <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4">
+                • <b>ID.4 커브 (옵션 1)</b>: 실측 속도와 ID.4 충전 커브의 병목 min(P_real, P_curve)을 1% 단위로 수치 적분하여 계산합니다.<br>
+                • <b>기존 단순 선형</b>: 잔여 용량 / 현재 속도로 단순 계산합니다.
+              </div>
+            </div>
+
+            <!-- Group 5: 테마 & 언어 -->
             <div class="control-group">
               <div class="group-label">
                 <span>디스플레이 환경</span>
@@ -754,6 +792,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
               <div class="inspect-item">
                 <span>저장 배터리 용량</span>
                 <strong id="inspectKwh">—</strong>
+              </div>
+              <div class="inspect-item">
+                <span>계산 방식</span>
+                <strong id="inspectModel" style="color:#34d399;font-size:12px;">ID.4 커브 (옵션 1: 병목)</strong>
               </div>
             </div>
 
@@ -1133,7 +1175,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (powerSelect.options && powerSelect.options[0]) {
           powerSelect.options[0].textContent = `직접 조절 중 (${val.toFixed(1)} kW)`;
         }
-        const matches = [3.0, 7.0, 9.9, 50.0, 100.0, 135.0].some(p => Math.abs(p - val) < 0.05);
+        const matches = [3.0, 7.0, 9.9, 50.0, 100.0, 135.0, 185.0].some(p => Math.abs(p - val) < 0.05);
         powerSelect.value = matches ? val.toFixed(1) : '';
       }
     };
@@ -1157,6 +1199,29 @@ export default class CarrotDebugDashboard extends HTMLElement {
           updatePowerPresetUI(val);
           this.applyDebugTelemetry();
         }
+      });
+    }
+
+    // Calculation Model Toggle (Curve Option 1 vs Simple Linear)
+    const btnModelCurve = root.querySelector('#btnModelCurve');
+    const btnModelSimple = root.querySelector('#btnModelSimple');
+    const calcModelVal = root.querySelector('#calcModelVal');
+
+    if (btnModelCurve && btnModelSimple) {
+      btnModelCurve.addEventListener('click', () => {
+        this.state.calcModel = 'curve';
+        btnModelCurve.className = 'active charge';
+        btnModelSimple.className = '';
+        if (calcModelVal) calcModelVal.textContent = 'ID.4 커브 (옵션 1)';
+        this.applyDebugTelemetry();
+      });
+
+      btnModelSimple.addEventListener('click', () => {
+        this.state.calcModel = 'simple';
+        btnModelSimple.className = 'active';
+        btnModelCurve.className = '';
+        if (calcModelVal) calcModelVal.textContent = '단순 선형';
+        this.applyDebugTelemetry();
       });
     }
 
@@ -1189,12 +1254,16 @@ export default class CarrotDebugDashboard extends HTMLElement {
         this.state.mode = 'charging';
         this.state.soc = 74;
         this.state.powerKw = 9.9;
+        this.state.calcModel = 'curve';
         if (socSlider) socSlider.value = 74;
         if (socVal) socVal.textContent = '74%';
         updateSocPresetUI(74);
         if (powerSlider) powerSlider.value = 9.9;
         if (powerVal) powerVal.textContent = '9.9 kW';
         updatePowerPresetUI(9.9);
+        if (calcModelVal) calcModelVal.textContent = 'ID.4 커브 (옵션 1)';
+        if (btnModelCurve) btnModelCurve.className = 'active charge';
+        if (btnModelSimple) btnModelSimple.className = '';
         updateModeBtns();
         this.applyDebugTelemetry();
       });
