@@ -11,7 +11,15 @@ export function tripDays(events, timeZone, now = new Date()) {
   return Array.from({length:7}, (_, i) => {
     const date = new Date(+anchor - (6-i)*86400000);
     const key = date.toISOString().slice(0,10);
-    return {key, date, today:i===6, indices:events.flatMap((e,index) => tripDateKey(e.data.started_at || e.observed_at,timeZone) === key ? [index] : [])};
+    return {
+      key,
+      date,
+      today: i === 6,
+      indices: (events || []).flatMap((e, index) => {
+        const timeVal = e?.data?.started_at || e?.started_at || e?.observed_at || e?.data?.observed_at;
+        return tripDateKey(timeVal, timeZone) === key ? [index] : [];
+      })
+    };
   });
 }
 export async function loadRecentTrips(api, id, now = new Date()) {

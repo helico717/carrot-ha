@@ -174,4 +174,8 @@ class FrontendVersionView(HomeAssistantView):
         self.version = version
 
     async def get(self, request):
-        return web.json_response({'version': self.version}, headers={'Cache-Control': 'no-store'})
+        try:
+            version = _read_frontend_version()
+        except Exception:
+            version = self.version
+        return web.json_response({'version': version}, headers={'Cache-Control': 'no-store'})

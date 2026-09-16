@@ -13,12 +13,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
       soc: 74,
       powerKw: 9.9,
       lang: 'ko',
-      theme: 'dark'
+      theme: 'auto'
     };
+    this._userThemeSelected = false;
+  }
+
+  getEffectiveTheme(theme = this.state.theme) {
+    if (theme === 'light' || theme === 'dark') return theme;
+    const isDark = this._hass?.themes?.darkMode ?? window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return isDark ? 'dark' : 'light';
   }
 
   connectedCallback() {
     this.style.display = 'block';
+    if (!this._userThemeSelected) {
+      this.state.theme = this.getEffectiveTheme('auto');
+    }
     this.render();
   }
 
@@ -32,10 +42,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (this.dashCard) {
-      // Keep only theme synchronization; do not forward hass directly to prevent real HA entity reads
       this.dashCard._hass = hass;
-      if (this.state.theme === 'auto') {
-        this.dashCard.applyTheme();
+    }
+    if (!this._userThemeSelected) {
+      const haTheme = this.getEffectiveTheme('auto');
+      if (this.getAttribute('data-theme') !== haTheme) {
+        this.applyTheme(haTheme, true);
       }
     }
   }
@@ -95,7 +107,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       state_evaluated_at: new Date().toISOString(),
       measured_at: new Date().toISOString(),
       last_sync: new Date().toISOString(),
-      cloud_status: '시뮬레이션 (UI 조절기 제어)',
+      cloud_status: this.state.lang === 'en' ? 'Simulation (UI Controller)' : '시뮬레이션 (UI 조절기 제어)',
       soc_percent: this.state.soc,
       battery_kwh: currentKwh,
       soc_capacity_kwh: BMS_CAPACITY,
@@ -635,9 +647,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
     this.applyDebugTelemetry();
   }
 
-  applyTheme(theme) {
-    if (theme) this.state.theme = theme;
-    const currentTheme = this.state.theme || 'dark';
+  applyTheme(theme, syncDashCard = true) {
+    if (theme) {
+      this.state.theme = (theme === 'auto') ? this.getEffectiveTheme('auto') : theme;
+    }
+    const currentTheme = this.getEffectiveTheme();
     this.setAttribute('data-theme', currentTheme);
 
     const btnTheme = this.shadowRoot?.querySelector('#btnThemeToggle');
@@ -645,7 +659,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       btnTheme.textContent = currentTheme === 'dark' ? '🌙 테마: 다크' : '☀️ 테마: 라이트';
     }
 
-    if (this.dashCard) {
+    if (syncDashCard && this.dashCard) {
       this.dashCard.themeMode = currentTheme;
       this.dashCard.applyTheme();
       this.dashCard.render();
@@ -661,7 +675,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     this.dashCard = document.createElement(tagName);
     this.dashCard.setConfig({
       ...(this.config || {}),
-      color_mode: this.state.theme
+      color_mode: this.getEffectiveTheme()
     });
 
     // Make load a permanent simulated action so it never queries Cloudflare or HA REST APIs
@@ -678,9 +692,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const origDashApplyTheme = this.dashCard.applyTheme.bind(this.dashCard);
     this.dashCard.applyTheme = () => {
       origDashApplyTheme();
-      const cardTheme = this.dashCard.getAttribute('data-theme') || 'dark';
-      if (this.state.theme !== cardTheme) {
-        this.applyTheme(cardTheme);
+      const cardTheme = this.dashCard.getAttribute('data-theme') || this.getEffectiveTheme();
+      if (this.getAttribute('data-theme') !== cardTheme) {
+        this.applyTheme(cardTheme, false);
       }
     };
 
@@ -961,20 +975,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
     };
 
-    socSlider.addEventListener('input', (e) => {
-      this.state.soc = Number(e.target.value);
-      socVal.textContent = this.state.soc + '%';
-      updateSocPresetUI(this.state.soc);
-      this.applyDebugTelemetry();
-    });
+    if (socSlider) {
+      socSlider.addEventListener('input', (e) => {
+        this.state.soc = Number(e.target.value);
+        if (socVal) socVal.textContent = this.state.soc + '%';
+        updateSocPresetUI(this.state.soc);
+        this.applyDebugTelemetry();
+      });
+    }
 
     if (socSelect) {
       socSelect.addEventListener('change', (e) => {
         const val = Number(e.target.value);
         if (!isNaN(val)) {
           this.state.soc = val;
-          socSlider.value = val;
-          socVal.textContent = val + '%';
+          if (socSlider) socSlider.value = val;
+          if (socVal) socVal.textContent = val + '%';
           updateSocPresetUI(val);
           this.applyDebugTelemetry();
         }
@@ -996,20 +1012,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
     };
 
-    powerSlider.addEventListener('input', (e) => {
-      this.state.powerKw = Number(e.target.value);
-      powerVal.textContent = this.state.powerKw.toFixed(1) + ' kW';
-      updatePowerPresetUI(this.state.powerKw);
-      this.applyDebugTelemetry();
-    });
+    if (powerSlider) {
+      powerSlider.addEventListener('input', (e) => {
+        this.state.powerKw = Number(e.target.value);
+        if (powerVal) powerVal.textContent = this.state.powerKw.toFixed(1) + ' kW';
+        updatePowerPresetUI(this.state.powerKw);
+        this.applyDebugTelemetry();
+      });
+    }
 
     if (powerSelect) {
       powerSelect.addEventListener('change', (e) => {
         const val = Number(e.target.value);
         if (!isNaN(val)) {
           this.state.powerKw = val;
-          powerSlider.value = val;
-          powerVal.textContent = val.toFixed(1) + ' kW';
+          if (powerSlider) powerSlider.value = val;
+          if (powerVal) powerVal.textContent = val.toFixed(1) + ' kW';
           updatePowerPresetUI(val);
           this.applyDebugTelemetry();
         }
@@ -1018,33 +1036,42 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     // Theme Toggle
     const btnTheme = root.querySelector('#btnThemeToggle');
-    btnTheme.addEventListener('click', () => {
-      const nextTheme = this.state.theme === 'dark' ? 'light' : 'dark';
-      this.applyTheme(nextTheme);
-    });
+    if (btnTheme) {
+      btnTheme.addEventListener('click', () => {
+        this._userThemeSelected = true;
+        const currentTheme = this.getEffectiveTheme();
+        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        this.applyTheme(nextTheme, true);
+      });
+    }
 
     // Language Toggle
     const btnLang = root.querySelector('#btnLangToggle');
-    btnLang.addEventListener('click', () => {
-      this.state.lang = this.state.lang === 'ko' ? 'en' : 'ko';
-      btnLang.textContent = this.state.lang === 'ko' ? '🌐 언어: 한국어 (KO)' : '🌐 Language: English (EN)';
-      this.mountDashboard();
-      this.applyDebugTelemetry();
-    });
+    if (btnLang) {
+      btnLang.addEventListener('click', () => {
+        this.state.lang = this.state.lang === 'ko' ? 'en' : 'ko';
+        btnLang.textContent = this.state.lang === 'ko' ? '🌐 언어: 한국어 (KO)' : '🌐 Language: English (EN)';
+        this.mountDashboard();
+        this.applyDebugTelemetry();
+      });
+    }
 
     // Reset Button
-    root.querySelector('#btnReset').addEventListener('click', () => {
-      this.state.mode = 'charging';
-      this.state.soc = 74;
-      this.state.powerKw = 9.9;
-      socSlider.value = 74;
-      socVal.textContent = '74%';
-      updateSocPresetUI(74);
-      powerSlider.value = 9.9;
-      powerVal.textContent = '9.9 kW';
-      updatePowerPresetUI(9.9);
-      updateModeBtns();
-      this.applyDebugTelemetry();
-    });
+    const btnReset = root.querySelector('#btnReset');
+    if (btnReset) {
+      btnReset.addEventListener('click', () => {
+        this.state.mode = 'charging';
+        this.state.soc = 74;
+        this.state.powerKw = 9.9;
+        if (socSlider) socSlider.value = 74;
+        if (socVal) socVal.textContent = '74%';
+        updateSocPresetUI(74);
+        if (powerSlider) powerSlider.value = 9.9;
+        if (powerVal) powerVal.textContent = '9.9 kW';
+        updatePowerPresetUI(9.9);
+        updateModeBtns();
+        this.applyDebugTelemetry();
+      });
+    }
   }
 }
