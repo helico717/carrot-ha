@@ -152,7 +152,7 @@ class DashboardView(HomeAssistantView):
         data=values(runtime)
         from homeassistant.helpers import entity_registry as er
         registry=er.async_get(self.hass)
-        data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online')}
+        data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online','emergency_charging')}
         data['vehicle_model']=runtime['entry'].options.get('vehicle_model','Volkswagen MEB')
         data['battery_history']=await self.hass.async_add_executor_job(history,runtime['archive'],runtime['entry'].data['device_id'],runtime['entry'].options.get('soc_capacity_kwh',78.0),self.hass.config.time_zone)
         return web.json_response({'device_id':runtime['entry'].data['device_id'],'values':data})

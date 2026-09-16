@@ -271,11 +271,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
       v.simple_sec80 = simpleSec80;
       v.simple_sec100 = simpleSec100;
       v.effective_kw = liveKw;
+      v.emergency_charging = !impaired && (liveKw <= 1.5);
     } else {
       v.charge_power_kw = 0;
       v.charge_power_w = 0;
       v.charger_max_kw = 0;
       v.effective_kw = 0;
+      v.emergency_charging = false;
       v.time_to_80_s = null;
       v.eta_80 = null;
       v.time_to_100_s = null;
@@ -300,6 +302,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const elEffective = this.shadowRoot.querySelector('#inspectEffective');
     const elIntake = this.shadowRoot.querySelector('#effectiveIntakeVal');
     const elSocLabel = this.shadowRoot.querySelector('#effectiveSocLabel');
+    const elEmergency = this.shadowRoot.querySelector('#inspectEmergency');
+    const elEmergencyNotice = this.shadowRoot.querySelector('#emergencyNotice');
 
     if (elSocLabel) {
       elSocLabel.textContent = `${this.state.soc}%`;
@@ -309,11 +313,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const chargerKw = this.state.powerKw;
     const effectiveKw = Math.min(chargerKw, curveVal);
     const isThrottled = chargerKw > curveVal;
+    const isEmergency = v.charging === true && !v.stale && (effectiveKw <= 1.5);
 
     if (elIntake) {
       if (v.charging === true) {
         if (this.state.soc >= 100) {
           elIntake.innerHTML = '<span style="color:#94a3b8;">완충됨 (0.0 kW)</span>';
+        } else if (isEmergency) {
+          elIntake.innerHTML = `<span style="color:#ef4444;font-weight:700;">${effectiveKw.toFixed(1)} kW (비상충전 모드)</span>`;
         } else if (isThrottled) {
           elIntake.innerHTML = `<span style="color:#f59e0b;font-weight:700;">${effectiveKw.toFixed(1)} kW</span> <small style="color:#94a3b8;font-size:10.5px;">(차량 커브 ${curveVal.toFixed(1)} kW 제한)</small>`;
         } else {
@@ -321,6 +328,29 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
       } else {
         elIntake.innerHTML = '<span style="color:#94a3b8;">0.0 kW (충전 아님)</span>';
+      }
+    }
+
+    if (elEmergencyNotice) {
+      if (isEmergency) {
+        elEmergencyNotice.style.display = 'block';
+        elEmergencyNotice.textContent = '⚠️ 완속 충전기 미체결로 인한 1kW 비상충전 모드 진입으로 추정됩니다 (HA 엔터티 ON 조건).';
+      } else {
+        elEmergencyNotice.style.display = 'none';
+      }
+    }
+
+    if (elEmergency) {
+      if (v.charging === true) {
+        if (v.stale === true) {
+          elEmergency.innerHTML = '<span style="color:#94a3b8;">데이터 지연 (확인 불가)</span>';
+        } else if (isEmergency) {
+          elEmergency.innerHTML = '<span style="color:#ef4444;font-weight:700;">🚨 비상충전 감지 (≤1.5kW)</span>';
+        } else {
+          elEmergency.innerHTML = '<span style="color:#34d399;font-weight:600;">정상 충전</span>';
+        }
+      } else {
+        elEmergency.innerHTML = '—';
       }
     }
 
@@ -332,6 +362,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
       if (v.charging === true) {
         if (this.state.soc >= 100) {
           elEffective.innerHTML = '<b style="color:#94a3b8;">0.0 kW (완충)</b>';
+        } else if (isEmergency) {
+          elEffective.innerHTML = `<b style="color:#ef4444;">${effectiveKw.toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#f87171;font-weight:normal;">(비상충전 감지)</small>`;
         } else if (isThrottled) {
           elEffective.innerHTML = `<b style="color:#f59e0b;">${effectiveKw.toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#94a3b8;font-weight:normal;">(커브 ${curveVal.toFixed(1)}kW 병목)</small>`;
         } else {
@@ -800,9 +832,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span id="powerVal" class="value">${this.state.powerKw.toFixed(1)} kW</span>
               </div>
               
-              <!-- 완속 (AC) 버튼군: 3, 7, 11 kW -->
-              <div class="charger-section-title">🔌 완속 충전기 (AC)</div>
+              <!-- 완속 (AC) / 비상 충전 버튼군: 1, 3, 7, 11 kW -->
+              <div class="charger-section-title">🔌 완속 충전기 (AC) & 비상 충전</div>
               <div class="btn-group">
+                <button data-charger="1" class="${Math.abs(this.state.powerKw - 1) < 0.1 ? 'active charge' : ''}">1 kW<small>비상충전중</small></button>
                 <button data-charger="3" class="${Math.abs(this.state.powerKw - 3) < 0.1 ? 'active charge' : ''}">3 kW<small>비상 220V</small></button>
                 <button data-charger="7" class="${Math.abs(this.state.powerKw - 7) < 0.1 ? 'active charge' : ''}">7 kW<small>표준 완속</small></button>
                 <button data-charger="11" class="${Math.abs(this.state.powerKw - 11) < 0.1 ? 'active charge' : ''}">11 kW<small>공용/심야 완속</small></button>
@@ -817,18 +850,19 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <button data-charger="500" class="${Math.abs(this.state.powerKw - 500) < 0.1 ? 'active charge' : ''}">500 kW<small>메가와트급</small></button>
               </div>
 
-              <!-- 충전기 출력 슬라이더 (2kW ~ 500kW) -->
+              <!-- 충전기 출력 슬라이더 (1kW ~ 500kW) -->
               <div style="margin-top: 8px;">
                 <div style="display:flex; justify-content:space-between; font-size:11px; color:#94a3b8; margin-bottom:3px;">
                   <span>충전기 정격 출력 미세조절</span>
                   <span id="sliderValLabel">${this.state.powerKw.toFixed(1)} kW</span>
                 </div>
-                <input id="powerSlider" type="range" min="2.0" max="500.0" value="${this.state.powerKw}" step="1">
+                <input id="powerSlider" type="range" min="1.0" max="500.0" value="${this.state.powerKw}" step="1">
               </div>
 
               <!-- 실시간 인입 전력 피드백 -->
               <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
                 🔋 <b>현재 배터리(<span id="effectiveSocLabel">${this.state.soc}%</span>) 실제 인입 전력</b>: <span id="effectiveIntakeVal" style="font-weight:700;color:#34d399;">—</span>
+                <div id="emergencyNotice" style="display:none;font-size:10.5px;color:#f87171;margin-top:3px;font-weight:600;"></div>
                 <div style="font-size:10px;color:#64748b;margin-top:2px;">
                   * 차량 수전 한계(ID.4 커브)와 충전기 출력(P_charger)의 병목 min(P_charger, P_curve)으로 자동 산출됩니다.
                 </div>
@@ -890,6 +924,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
               <div class="inspect-item">
                 <span>실제 수전 전력 (P_eff)</span>
                 <strong id="inspectEffective">—</strong>
+              </div>
+              <div class="inspect-item">
+                <span>비상 충전 모드 추정</span>
+                <strong id="inspectEmergency">—</strong>
               </div>
               <div class="inspect-item">
                 <span>저장 배터리 용량</span>

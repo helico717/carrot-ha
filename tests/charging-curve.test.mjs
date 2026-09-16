@@ -33,8 +33,8 @@ assert.equal(ID4_CHARGING_CURVE_KW[95], 46.8);
 
 console.log('Testing EVSE charger presets & bottleneck behavior...');
 
-// AC Chargers (3, 7, 11 kW) - curve never bottlenecks these at 50% SOC
-for (const p of [3, 7, 11]) {
+// AC Chargers (1, 3, 7, 11 kW) - curve never bottlenecks these at 50% SOC
+for (const p of [1, 3, 7, 11]) {
   const res = estimateChargingTimesWithCurve(50, p, 77);
   assert.equal(res.effectiveKw, p, `AC charger ${p}kW should not be throttled at 50%`);
 }
@@ -80,8 +80,30 @@ assert.equal(debug.dashCard.v.charger_max_kw, 350);
 assert.equal(debug.dashCard.v.charge_power_kw, 91.8);
 assert.equal(debug.dashCard.v.charge_power_w, 91800);
 assert.equal(debug.dashCard.v.charging, true);
+assert.equal(debug.dashCard.v.emergency_charging, false);
+
+// Test 1kW Emergency Charging mode
+debug.state.powerKw = 1;
+debug.applyDebugTelemetry();
+assert.equal(debug.dashCard.v.charger_max_kw, 1);
+assert.equal(debug.dashCard.v.charge_power_kw, 1.0);
+assert.equal(debug.dashCard.v.charge_power_w, 1000);
+assert.equal(debug.dashCard.v.emergency_charging, true);
+
+// Test when vehicle state is stale, emergency_charging should not be active
+debug.state.mode = 'stale';
+debug.applyDebugTelemetry();
+assert.equal(debug.dashCard.v.debug_raw.emergency_charging, false);
+
+// Restore charging mode
+debug.state.mode = 'charging';
+debug.state.powerKw = 7;
+debug.applyDebugTelemetry();
+assert.equal(debug.dashCard.v.emergency_charging, false);
 
 // Check template elements
+assert.ok(source.includes('data-charger="1"'));
+assert.ok(source.includes('비상충전중'));
 assert.ok(source.includes('data-charger="3"'));
 assert.ok(source.includes('data-charger="7"'));
 assert.ok(source.includes('data-charger="11"'));
@@ -93,5 +115,6 @@ assert.ok(source.includes('max="500.0"'));
 assert.ok(source.includes('id="effectiveIntakeVal"'));
 assert.ok(source.includes('id="inspectCharger"'));
 assert.ok(source.includes('id="inspectEffective"'));
+assert.ok(source.includes('id="inspectEmergency"'));
 
 console.log('All charging curve and EVSE preset tests passed successfully!');

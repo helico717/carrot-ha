@@ -46,6 +46,41 @@ def values(runtime):
         data['stale'] = bool(data.get('stale')) or age > 180
     except (ValueError,TypeError,KeyError,AttributeError): data['stale'] = True
     if data.get('onroad') is not None: data['onroad'] = bool(data['onroad'])
+
+    # Emergency Charging Detection (ID.4 imperfect plug connection -> ~1kW emergency charging)
+    # Condition: not stale, charging, and charge_power <= 1.5kW for >= 300 seconds (5 minutes)
+    power_kw = data.get('charge_power_kw')
+    is_charging = bool(data.get('charging'))
+    is_stale = bool(data.get('stale'))
+    is_low_power = is_charging and isinstance(power_kw, (int, float)) and power_kw <= 1.5
+
+    now_utc = datetime.now(timezone.utc)
+    try:
+        event_time = datetime.fromisoformat(data['measured_at'].replace('Z', '+00:00'))
+        if event_time.tzinfo is None:
+            event_time = event_time.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError, KeyError, AttributeError):
+        event_time = now_utc
+
+    ref_time = event_time
+    if not is_stale and (now_utc - event_time).total_seconds() < 180:
+        ref_time = max(event_time, now_utc)
+
+    low_power_start = runtime.get('low_power_charging_since')
+    if is_low_power:
+        if low_power_start is None:
+            low_power_start = event_time
+            runtime['low_power_charging_since'] = low_power_start
+        try:
+            duration = (ref_time - low_power_start).total_seconds()
+        except TypeError:
+            duration = 0
+        data['low_power_duration_s'] = max(0, int(duration))
+        data['emergency_charging'] = bool(not is_stale and duration >= 300)
+    else:
+        runtime['low_power_charging_since'] = None
+        data['low_power_duration_s'] = 0
+        data['emergency_charging'] = False
     try:
         from zoneinfo import ZoneInfo
         kst = ZoneInfo('Asia/Seoul')
