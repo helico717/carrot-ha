@@ -343,27 +343,43 @@ export default class CarrotDebugDashboard extends HTMLElement {
           cursor: pointer;
         }
 
-        /* Quick presets chip */
-        .presets {
+        /* Preset Dropdown */
+        .preset-dropdown-row {
           display: flex;
-          gap: 6px;
-          overflow-x: auto;
+          align-items: center;
+          gap: 8px;
+          margin-top: 2px;
         }
 
-        .presets button {
-          padding: 4px 8px;
-          font-size: 11px;
-          border-radius: 6px;
+        .preset-label {
+          font-size: 11.5px;
+          color: #9ca3af;
+          white-space: nowrap;
+          font-weight: 600;
+        }
+
+        .preset-select {
+          flex: 1;
+          font: inherit;
+          font-size: 12px;
+          font-weight: 600;
+          color: #f3f4f6;
           background: #111827;
           border: 1px solid #374151;
-          color: #9ca3af;
+          border-radius: 8px;
+          padding: 6px 10px;
           cursor: pointer;
-          white-space: nowrap;
+          outline: none;
+          transition: all 0.2s ease;
         }
 
-        .presets button:hover {
-          color: #f3f4f6;
+        .preset-select:hover {
           border-color: #4b5563;
+        }
+
+        .preset-select:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
         }
 
         /* Live Inspector Card */
@@ -404,6 +420,88 @@ export default class CarrotDebugDashboard extends HTMLElement {
         .reset-btn:hover {
           color: #fff;
           background: #374151;
+        }
+
+        /* Light Theme Adaptation */
+        :host([data-theme="light"]) {
+          color: #1e293b;
+        }
+        :host([data-theme="light"]) .preview-pane {
+          background: #f8fafc;
+          border-color: #3b82f6;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        }
+        :host([data-theme="light"]) .debug-panel {
+          background: #ffffff;
+          border-color: #e2e8f0;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+        }
+        :host([data-theme="light"]) .panel-header {
+          border-bottom-color: #e2e8f0;
+        }
+        :host([data-theme="light"]) .panel-header h3 {
+          color: #0f172a;
+        }
+        :host([data-theme="light"]) .panel-header .tag {
+          background: #d1fae5;
+          color: #065f46;
+        }
+        :host([data-theme="light"]) .control-group {
+          background: #f8fafc;
+          border-color: #e2e8f0;
+        }
+        :host([data-theme="light"]) .group-label {
+          color: #475569;
+        }
+        :host([data-theme="light"]) .group-label span.value {
+          color: #059669;
+        }
+        :host([data-theme="light"]) .btn-group button,
+        :host([data-theme="light"]) .reset-btn {
+          background: #ffffff;
+          border-color: #cbd5e1;
+          color: #334155;
+        }
+        :host([data-theme="light"]) .btn-group button:hover,
+        :host([data-theme="light"]) .reset-btn:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+          border-color: #94a3b8;
+        }
+        :host([data-theme="light"]) .preset-label {
+          color: #64748b;
+        }
+        :host([data-theme="light"]) .preset-select {
+          color: #0f172a;
+          background: #ffffff;
+          border-color: #cbd5e1;
+        }
+        :host([data-theme="light"]) .preset-select:hover {
+          border-color: #94a3b8;
+        }
+        :host([data-theme="light"]) .btn-group button.active {
+          background: #2563eb;
+          color: #ffffff;
+          border-color: #1d4ed8;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        }
+        :host([data-theme="light"]) .btn-group button.active.charge {
+          background: #059669;
+          border-color: #047857;
+          box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+        }
+        :host([data-theme="light"]) .inspector-box {
+          background: #f0fdf4;
+          border-color: #bbf7d0;
+        }
+        :host([data-theme="light"]) .inspect-item span {
+          color: #059669;
+        }
+        :host([data-theme="light"]) .inspect-item strong {
+          color: #0f172a;
+        }
+        :host([data-theme="light"]) .sub-note {
+          color: #64748b !important;
         }
       </style>
 
@@ -453,13 +551,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span id="socVal" class="value">${this.state.soc}%</span>
               </div>
               <input id="socSlider" type="range" min="5" max="100" value="${this.state.soc}" step="1">
-              <div class="presets">
-                <button data-soc="20">20% (경고)</button>
-                <button data-soc="50">50%</button>
-                <button data-soc="74">74% (현재)</button>
-                <button data-soc="80">80% (경계)</button>
-                <button data-soc="85">85% (80초과)</button>
-                <button data-soc="100">100%</button>
+              <div class="preset-dropdown-row">
+                <span class="preset-label">빠른 프리셋</span>
+                <select id="socSelect" class="preset-select" aria-label="배터리 잔량 프리셋">
+                  <option value="" disabled ${![20, 50, 74, 80, 85, 100].includes(this.state.soc) ? 'selected' : ''}>직접 조절 중 (${this.state.soc}%)</option>
+                  <option value="20" ${this.state.soc === 20 ? 'selected' : ''}>20% (경고 · 저전압)</option>
+                  <option value="50" ${this.state.soc === 50 ? 'selected' : ''}>50% (평균 잔량)</option>
+                  <option value="74" ${this.state.soc === 74 ? 'selected' : ''}>74% (현재 ID.4 시뮬레이션)</option>
+                  <option value="80" ${this.state.soc === 80 ? 'selected' : ''}>80% (충전 목표 기준선)</option>
+                  <option value="85" ${this.state.soc === 85 ? 'selected' : ''}>85% (80% 초과 구간)</option>
+                  <option value="100" ${this.state.soc === 100 ? 'selected' : ''}>100% (완충 완료)</option>
+                </select>
               </div>
             </div>
 
@@ -470,13 +572,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span id="powerVal" class="value">${this.state.powerKw.toFixed(1)} kW</span>
               </div>
               <input id="powerSlider" type="range" min="2.0" max="150.0" value="${this.state.powerKw}" step="0.1">
-              <div class="presets">
-                <button data-kw="3.0">3kW (220V)</button>
-                <button data-kw="7.0">7kW (완속)</button>
-                <button data-kw="9.9">9.9kW (ID.4)</button>
-                <button data-kw="50.0">50kW (급속)</button>
-                <button data-kw="100.0">100kW</button>
-                <button data-kw="135.0">135kW (피크)</button>
+              <div class="preset-dropdown-row">
+                <span class="preset-label">빠른 프리셋</span>
+                <select id="powerSelect" class="preset-select" aria-label="충전 전력 프리셋">
+                  <option value="" disabled ${![3.0, 7.0, 9.9, 50.0, 100.0, 135.0].includes(this.state.powerKw) ? 'selected' : ''}>직접 조절 중 (${this.state.powerKw.toFixed(1)} kW)</option>
+                  <option value="3.0" ${this.state.powerKw === 3.0 ? 'selected' : ''}>3.0 kW (220V 비상 충전)</option>
+                  <option value="7.0" ${this.state.powerKw === 7.0 ? 'selected' : ''}>7.0 kW (표준 완속 충전)</option>
+                  <option value="9.9" ${this.state.powerKw === 9.9 ? 'selected' : ''}>9.9 kW (ID.4 완속 최대)</option>
+                  <option value="50.0" ${this.state.powerKw === 50.0 ? 'selected' : ''}>50.0 kW (공용 급속 충전)</option>
+                  <option value="100.0" ${this.state.powerKw === 100.0 ? 'selected' : ''}>100.0 kW (초급속 충전)</option>
+                  <option value="135.0" ${this.state.powerKw === 135.0 ? 'selected' : ''}>135.0 kW (ID.4 급속 피크)</option>
+                </select>
               </div>
             </div>
 
@@ -486,10 +592,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span>디스플레이 환경</span>
               </div>
               <div class="btn-group">
-                <button id="btnThemeToggle">다크 모드</button>
-                <button id="btnLangToggle">한국어 (KO)</button>
+                <button id="btnThemeToggle">${this.state.theme === 'dark' ? '🌙 테마: 다크' : '☀️ 테마: 라이트'}</button>
+                <button id="btnLangToggle">${this.state.lang === 'ko' ? '🌐 언어: 한국어 (KO)' : '🌐 Language: English (EN)'}</button>
               </div>
-              <div style="color:#9ca3af;font-size:11px;line-height:1.4">
+              <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4">
                 라이트/다크 테마 및 언어 변경 시 마커와 카드 대비를 즉시 확인합니다.
               </div>
             </div>
@@ -525,7 +631,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     this.mountDashboard();
     this.bindEvents();
+    this.applyTheme(this.state.theme);
     this.applyDebugTelemetry();
+  }
+
+  applyTheme(theme) {
+    if (theme) this.state.theme = theme;
+    const currentTheme = this.state.theme || 'dark';
+    this.setAttribute('data-theme', currentTheme);
+
+    const btnTheme = this.shadowRoot?.querySelector('#btnThemeToggle');
+    if (btnTheme) {
+      btnTheme.textContent = currentTheme === 'dark' ? '🌙 테마: 다크' : '☀️ 테마: 라이트';
+    }
+
+    if (this.dashCard) {
+      this.dashCard.themeMode = currentTheme;
+      this.dashCard.applyTheme();
+      this.dashCard.render();
+    }
   }
 
   mountDashboard() {
@@ -548,10 +672,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     if (this._hass) {
       this.dashCard._hass = this._hass;
-      if (this.state.theme === 'auto') {
-        this.dashCard.applyTheme();
-      }
     }
+
+    // Two-way theme sync: when user changes theme inside dashboard dropdown, sync debug panel
+    const origDashApplyTheme = this.dashCard.applyTheme.bind(this.dashCard);
+    this.dashCard.applyTheme = () => {
+      origDashApplyTheme();
+      const cardTheme = this.dashCard.getAttribute('data-theme') || 'dark';
+      if (this.state.theme !== cardTheme) {
+        this.applyTheme(cardTheme);
+      }
+    };
 
     // Patch embedded card with updated layouts, animations, icons, fonts, and mock data
     this.patchDashCard(this.dashCard);
@@ -566,116 +697,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.applyDebugTelemetry();
     };
 
-    const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';
-    const time = v => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '기록 없음';
-    const timeOnly = v => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '기록 없음';
-    const shortDuration = v => typeof v==='number' ? (Math.floor(v/3600)?Math.floor(v/3600)+'시간 ':'')+Math.floor(v/60)%60+'분' : '—';
-    const chargeDuration = s => { if(typeof s !== 'number' || !Number.isFinite(s)) return '—'; if(s <= 0) return '완료'; const totalMins = Math.round(s/60); const h = Math.floor(totalMins/60); const m = totalMins%60; if(h === 0) return `${m}분`; return m === 0 ? `${h}시간` : `${h}시간 ${m}분`; };
-    const icon = name => {
-      if(name==='flash-double')return `<svg viewBox="0 0 24 24" style="width:var(--mdc-icon-size,20px);height:var(--mdc-icon-size,20px);display:inline-block" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`;
-      return `<ha-icon icon="mdi:${name}"></ha-icon>`;
-    };
-    const metric = (label,value,unit,ico,sub='',cls='') => `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(value)}<small>${esc(unit)}</small></strong>${sub?`<span class="hint">${esc(sub)}</span>`:''}</div>`;
-
+    const isEn = this.state.lang === 'en';
     card.vehicleStatus = (v) => {
-      if (v.vehicle_state === 'stale') return { key: 'stale', label: '차량 데이터 지연 · 시뮬레이션' };
-      if (v.vehicle_state === 'unknown') return { key: 'unknown', label: '상태 확인 중 · 시뮬레이션' };
-      if (v.charging) return { key: 'charging', label: '충전중' };
-      if (v.onroad) return { key: 'driving', label: '주행 중' };
-      return { key: 'parked', label: '주차중' };
-    };
-
-    card.overview = (v) => {
-      const charging = Boolean(v.charging);
-      const isDriving = v.vehicle_state === 'driving';
-      const latest = card.trips?.[0]?.data;
-      const soc = Number.isFinite(v.soc_percent) ? Math.max(0, Math.min(100, v.soc_percent)) : null;
-      const status = card.vehicleStatus(v).label;
-      const powerKw = v.charge_power_kw ?? (v.charge_power_w == null ? null : v.charge_power_w / 1000);
-      const isFast = typeof powerKw === 'number' && powerKw >= 11;
-      const chargeLabel = isFast ? '고속충전중...' : '완속충전중...';
-      const sweepSpeedClass = isFast ? 'fast' : 'slow';
-
-      // 4 Cards Layout
-      // Charging: [충전 전력 · 추정, 예상 완료시간] on top, [총 주행거리, 이번 달 충전량] on bottom
-      // Parked/Driving: [총 주행거리, 이번 달 주행, 이번 달 충전량, 이번 달 충전요금]
-      const quickMetrics = charging
-        ? `${metric('충전 전력 · 추정', n(powerKw, 1), 'kW', 'ev-station', isFast ? '급속 충전' : '완속 충전', 'charge-power')}` +
-          `${metric('예상 완료시간', v.eta_100 ? timeOnly(v.eta_100) : '계산 중', '', 'clock-end', v.time_to_100_s != null ? chargeDuration(v.time_to_100_s) + ' 남음' : '100% 목표')}` +
-          `${metric('총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
-          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}`
-        : `${metric('총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
-          `${metric('이번 달 주행', n(v.month_distance_km), 'km', 'routes')}` +
-          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}` +
-          `${metric('이번 달 충전요금', n(v.month_charge_cost, 0), '원', 'cash', '추정치')}`;
-
-      // Markers HTML (charging only)
-      const markersHtml = charging
-        ? `${(soc == null || soc < 80) ? `<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>` : ''}` +
-          `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
-        : '';
-
-      // Sweep animation:
-      // Charging: forward beam with slow (4.4s) or fast (2.2s) speed
-      // Driving: reverse beam (energy discharge, 2.5s)
-      // Parked: static (no sweep HTML)
-      const sweepHtml = charging
-        ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam ${sweepSpeedClass}"></div></div></div>`
-        : (isDriving
-          ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>`
-          : '');
-
-      // Battery bar head HTML
-      // Charging: Lightning bolt icon + stacked status & SOC
-      // Parked / Driving: Battery outline icon + '배터리 잔량' + SOC
-      const energyHeadHtml = charging
-        ? `<div class="energy-head charging-left">
-             <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
-             <div class="charge-info-stack">
-               <span class="charge-status-label">${chargeLabel}</span>
-               <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
-             </div>
-           </div>`
-        : `<div class="energy-head">
-             <div class="battery-label">
-               <svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>
-               <span>배터리 잔량</span>
-             </div>
-             <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
-           </div>`;
-
-      return `<div class="cockpit">
-        <section class="hero">
-          <div class="hero-copy"><h2>${esc(status).replace('\n', '<br>')}</h2></div>
-          ${card.vehicleImage()}
-        </section>
-        <div class="quick">
-          <section class="energy ${charging ? 'is-charging' : ''} ${isDriving ? 'is-driving' : ''}" style="--soc:${soc ?? 0}%">
-            ${sweepHtml}
-            ${markersHtml}
-            ${energyHeadHtml}
-          </section>
-          <div class="quick-metrics">${quickMetrics}</div>
-        </div>
-      </div>
-      <div class="overview-links">
-        <button class="shortcut" data-tab="parking">
-          <span><b>주차 위치</b><small>${v.parking_latitude == null ? '위치 수신 대기' : time(v.parking_at)}</small></span>
-          <em>지도 →</em>
-          <div class="mini-map parking-mini"></div>
-        </button>
-        <button class="shortcut" data-tab="trips">
-          <span><b>최근 주행</b><small>${latest ? n(latest.distance_m == null ? null : latest.distance_m / 1000, 2) + ' km' : '기록 없음'}</small><small>${latest ? shortDuration(latest.duration_s) : '새 주행 기록을 기다립니다'}</small></span>
-          <em>보기 →</em>
-          <div class="mini-map trip-mini"></div>
-        </button>
-      </div>
-      <div class="mini-condition">
-        <span>외기 <b>${n(v.outside_temp_c)}°C</b></span>
-        <span>12V <b>${n(v.aux_voltage, 1)}V</b></span>
-        <span>공조 <b>${v.ac_on == null ? '—' : v.ac_on ? 'ON' : 'OFF'}</b></span>
-      </div>`;
+      if (v.vehicle_state === 'stale') return { key: 'stale', label: isEn ? 'Stale data · Simulation' : '차량 데이터 지연 · 시뮬레이션' };
+      if (v.vehicle_state === 'unknown') return { key: 'unknown', label: isEn ? 'State pending · Simulation' : '상태 확인 중 · 시뮬레이션' };
+      if (v.charging) return { key: 'charging', label: isEn ? 'Charging' : '충전중' };
+      if (v.onroad) return { key: 'driving', label: isEn ? 'Driving' : '주행 중' };
+      return { key: 'parked', label: isEn ? 'Parked' : '주차중' };
     };
 
     if (!card.trips || card.trips.length === 0) {
@@ -702,11 +730,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
       card.charges = [
         {
           id: 'sim-charge-1',
-          started_at: new Date(Date.now() - 7200000).toISOString(),
-          ended_at: new Date(Date.now() - 3600000).toISOString(),
-          energy_kwh: 22.4,
-          duration_s: 3600,
-          partial: false
+          observed_at: new Date(Date.now() - 3600000).toISOString(),
+          data: {
+            started_at: new Date(Date.now() - 7200000).toISOString(),
+            ended_at: new Date(Date.now() - 3600000).toISOString(),
+            energy_kwh: 22.4,
+            duration_s: 3600,
+            partial: false
+          }
         }
       ];
     }
@@ -916,61 +947,87 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
     });
 
-    // SOC Slider
+    // SOC Slider & Preset Dropdown
     const socSlider = root.querySelector('#socSlider');
     const socVal = root.querySelector('#socVal');
+    const socSelect = root.querySelector('#socSelect');
+
+    const updateSocPresetUI = (val) => {
+      if (socSelect) {
+        if (socSelect.options && socSelect.options[0]) {
+          socSelect.options[0].textContent = `직접 조절 중 (${val}%)`;
+        }
+        socSelect.value = [20, 50, 74, 80, 85, 100].includes(val) ? String(val) : '';
+      }
+    };
+
     socSlider.addEventListener('input', (e) => {
       this.state.soc = Number(e.target.value);
       socVal.textContent = this.state.soc + '%';
+      updateSocPresetUI(this.state.soc);
       this.applyDebugTelemetry();
     });
 
-    // SOC Preset Chips
-    root.querySelectorAll('.presets button[data-soc]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.state.soc = Number(btn.getAttribute('data-soc'));
-        socSlider.value = this.state.soc;
-        socVal.textContent = this.state.soc + '%';
-        this.applyDebugTelemetry();
+    if (socSelect) {
+      socSelect.addEventListener('change', (e) => {
+        const val = Number(e.target.value);
+        if (!isNaN(val)) {
+          this.state.soc = val;
+          socSlider.value = val;
+          socVal.textContent = val + '%';
+          updateSocPresetUI(val);
+          this.applyDebugTelemetry();
+        }
       });
-    });
+    }
 
-    // Power Slider
+    // Power Slider & Preset Dropdown
     const powerSlider = root.querySelector('#powerSlider');
     const powerVal = root.querySelector('#powerVal');
+    const powerSelect = root.querySelector('#powerSelect');
+
+    const updatePowerPresetUI = (val) => {
+      if (powerSelect) {
+        if (powerSelect.options && powerSelect.options[0]) {
+          powerSelect.options[0].textContent = `직접 조절 중 (${val.toFixed(1)} kW)`;
+        }
+        const matches = [3.0, 7.0, 9.9, 50.0, 100.0, 135.0].some(p => Math.abs(p - val) < 0.05);
+        powerSelect.value = matches ? val.toFixed(1) : '';
+      }
+    };
+
     powerSlider.addEventListener('input', (e) => {
       this.state.powerKw = Number(e.target.value);
       powerVal.textContent = this.state.powerKw.toFixed(1) + ' kW';
+      updatePowerPresetUI(this.state.powerKw);
       this.applyDebugTelemetry();
     });
 
-    // Power Preset Chips
-    root.querySelectorAll('.presets button[data-kw]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.state.powerKw = Number(btn.getAttribute('data-kw'));
-        powerSlider.value = this.state.powerKw;
-        powerVal.textContent = this.state.powerKw.toFixed(1) + ' kW';
-        this.applyDebugTelemetry();
+    if (powerSelect) {
+      powerSelect.addEventListener('change', (e) => {
+        const val = Number(e.target.value);
+        if (!isNaN(val)) {
+          this.state.powerKw = val;
+          powerSlider.value = val;
+          powerVal.textContent = val.toFixed(1) + ' kW';
+          updatePowerPresetUI(val);
+          this.applyDebugTelemetry();
+        }
       });
-    });
+    }
 
     // Theme Toggle
     const btnTheme = root.querySelector('#btnThemeToggle');
     btnTheme.addEventListener('click', () => {
-      this.state.theme = this.state.theme === 'dark' ? 'light' : 'dark';
-      btnTheme.textContent = this.state.theme === 'dark' ? '다크 모드' : '라이트 모드';
-      if (this.dashCard) {
-        this.dashCard.themeMode = this.state.theme;
-        this.dashCard.applyTheme();
-        this.dashCard.render();
-      }
+      const nextTheme = this.state.theme === 'dark' ? 'light' : 'dark';
+      this.applyTheme(nextTheme);
     });
 
     // Language Toggle
     const btnLang = root.querySelector('#btnLangToggle');
     btnLang.addEventListener('click', () => {
       this.state.lang = this.state.lang === 'ko' ? 'en' : 'ko';
-      btnLang.textContent = this.state.lang === 'ko' ? '한국어 (KO)' : 'English (EN)';
+      btnLang.textContent = this.state.lang === 'ko' ? '🌐 언어: 한국어 (KO)' : '🌐 Language: English (EN)';
       this.mountDashboard();
       this.applyDebugTelemetry();
     });
@@ -982,8 +1039,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.state.powerKw = 9.9;
       socSlider.value = 74;
       socVal.textContent = '74%';
+      updateSocPresetUI(74);
       powerSlider.value = 9.9;
       powerVal.textContent = '9.9 kW';
+      updatePowerPresetUI(9.9);
       updateModeBtns();
       this.applyDebugTelemetry();
     });

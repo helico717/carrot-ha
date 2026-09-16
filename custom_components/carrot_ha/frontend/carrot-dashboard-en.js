@@ -85,6 +85,13 @@ class CarrotDashboard extends HTMLElement {
         }
       }
     }
+    if(this.tab==='charge'){
+      const days=tripDays(this.charges,this._hass?.config?.time_zone);
+      if(!this.chargeDay||!days.some(d=>d.key===this.chargeDay)){
+        const today=days.find(d=>d.today)||days[days.length-1];
+        this.chargeDay=today?today.key:null;
+      }
+    }
     const v=this.v,trip=this.trips[this.selected]?.data||{},route=trip.route||[];
     const isTrip=this.tab==='trips';
     const state=this.vehicleStatus(v),badge=state.label;
@@ -441,7 +448,10 @@ class CarrotDashboard extends HTMLElement {
   }
   chargeHistory(){
     const days=tripDays(this.charges,this._hass?.config?.time_zone);
-    if(this.chargeDay&&!days.some(d=>d.key===this.chargeDay))this.chargeDay=null;
+    if(!this.chargeDay||!days.some(d=>d.key===this.chargeDay)){
+      const today=days.find(d=>d.today)||days[days.length-1];
+      this.chargeDay=today?today.key:null;
+    }
     const selected=days.find(d=>d.key===this.chargeDay);
     const labels=d=>d.date.toLocaleDateString('en-US',{day:'numeric',weekday:'short',timeZone:'UTC'});
     return `<section class="panel charge-history"><div class="paneltitle"><h2>Charging records</h2><span class="sub">Last 7 days</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} charges"><span class="trip-today charge-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} charges</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i];const fast=Boolean(e.data.energy_kwh&&e.data.duration_s&&(e.data.energy_kwh/(e.data.duration_s/3600)>11));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;return `<div class="row charge-row"><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeOnly(e.data.started_at)}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'Fast':'Slow'}</span><span class="charge-dur">${formatDuration(e.data.duration_s)}</span>${e.data.merged?`<span class="merge-badge">${e.data.merge_count} merged</span>`:''}</div></div></div><div class="charge-val"><strong>${n(e.data.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub" title="${e.data.merged?(e.data.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${e.data.merged?`Reconnected in ${Math.max(1,Math.round((e.data.merge_gap_s||0)/60))}m`:(e.data.partial?'Partial data':'Recorded energy')}</span></div></div>`;}).join(''):'<div class="empty">No charges recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its charges.</div>'}</section>`;
