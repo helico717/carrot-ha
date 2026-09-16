@@ -1183,6 +1183,52 @@ export default class CarrotDebugDashboard extends HTMLElement {
       card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
     }
 
+    // Restructure Overview tab into 2-column balanced layout on desktop while keeping mobile identical
+    if (typeof card.overview === 'function' && !card._overviewPatched) {
+      card._overviewPatched = true;
+      const origOverview = card.overview.bind(card);
+      card.overview = function(v) {
+        const html = origOverview(v);
+        try {
+          const heroStart = html.indexOf('<section class="hero');
+          const heroEnd = html.indexOf('</section><div class="quick">');
+          const energyStart = html.indexOf('<section class="energy');
+          const energyEnd = html.indexOf('</section><div class="quick-metrics">');
+          const metricsStart = html.indexOf('<div class="quick-metrics">');
+          const metricsEnd = html.indexOf('</div></div><div class="overview-links">');
+          const linksStart = html.indexOf('<div class="overview-links">');
+          const linksEnd = html.indexOf('</div><div class="mini-condition">');
+          const condStart = html.indexOf('<div class="mini-condition">');
+
+          if (heroStart !== -1 && heroEnd !== -1 && energyStart !== -1 && energyEnd !== -1 &&
+              metricsStart !== -1 && metricsEnd !== -1 && linksStart !== -1 && linksEnd !== -1 && condStart !== -1) {
+            const heroHtml = html.slice(heroStart, heroEnd + 10);
+            const energyHtml = html.slice(energyStart, energyEnd + 10);
+            const metricsHtml = html.slice(metricsStart, metricsEnd);
+            const linksHtml = html.slice(linksStart, linksEnd + 6);
+            const condHtml = html.slice(condStart);
+
+            return `
+              <div class="cockpit desktop-balanced-cockpit">
+                <div class="overview-col-visual">
+                  ${heroHtml}
+                  ${condHtml}
+                </div>
+                <div class="overview-col-telemetry">
+                  ${energyHtml}
+                  ${metricsHtml}
+                  ${linksHtml}
+                </div>
+              </div>
+            `;
+          }
+        } catch (e) {
+          console.warn('Carrot HA Debug: Overview restructuring fallback', e);
+        }
+        return html;
+      };
+    }
+
     const origRender = card.render.bind(card);
     card.render = () => {
       const chargeState=card.v.charging?'on':'off';
@@ -1347,7 +1393,178 @@ export default class CarrotDebugDashboard extends HTMLElement {
         filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) !important;
       }
 
-      /* Mobile responsiveness overrides */
+      /* ========================================================= */
+      /* Overview Tab: Desktop 2-Column Balanced Dashboard Layout  */
+      /* ========================================================= */
+      @container (min-width: 820px) {
+        .cockpit.desktop-balanced-cockpit {
+          display: grid !important;
+          grid-template-columns: minmax(320px, 1.05fr) minmax(380px, 1.35fr) !important;
+          gap: 16px 20px !important;
+          align-items: stretch !important;
+          margin-bottom: 0 !important;
+        }
+
+        .overview-col-visual {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 14px !important;
+          min-width: 0 !important;
+          height: 100% !important;
+        }
+
+        .overview-col-visual .hero {
+          flex: 1 !important;
+          min-height: 340px !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: space-between !important;
+          border-radius: 20px !important;
+          overflow: hidden !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          background: #181d22 !important;
+          margin: 0 !important;
+        }
+
+        :host([data-theme="light"]) .overview-col-visual .hero {
+          background: #f0f3f5 !important;
+          border-color: var(--line) !important;
+        }
+
+        .overview-col-visual .hero-copy {
+          padding: 22px 24px 0 !important;
+        }
+
+        .overview-col-visual .hero-copy h2 {
+          font-size: 30px !important;
+          letter-spacing: -0.5px !important;
+          line-height: 1.2 !important;
+        }
+
+        .overview-col-visual .hero .car-image {
+          max-height: 250px !important;
+          width: 100% !important;
+          object-fit: contain !important;
+          object-position: center !important;
+          margin: auto 0 !important;
+          padding: 12px 18px !important;
+        }
+
+        /* Mini condition integrated under Hero */
+        .overview-col-visual .mini-condition {
+          display: flex !important;
+          justify-content: space-around !important;
+          align-items: center !important;
+          gap: 10px !important;
+          padding: 14px 18px !important;
+          margin-top: 0 !important;
+          border-top: none !important;
+          border-radius: 16px !important;
+          border: 1px solid var(--line) !important;
+          background: #14171a !important;
+          font-size: 12.5px !important;
+          color: #9ca3af !important;
+        }
+
+        :host([data-theme="light"]) .overview-col-visual .mini-condition {
+          background: #ffffff !important;
+          border-color: var(--line) !important;
+          color: #5b686e !important;
+        }
+
+        .overview-col-visual .mini-condition span b {
+          font-weight: 700 !important;
+          color: var(--ink) !important;
+          font-size: 13.5px !important;
+          margin-left: 2px !important;
+        }
+
+        /* Right column: Telemetry & Quick Links */
+        .overview-col-telemetry {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+          min-width: 0 !important;
+        }
+
+        .overview-col-telemetry .energy {
+          margin: 0 !important;
+        }
+
+        .overview-col-telemetry .energy.is-charging {
+          margin: 0 !important;
+        }
+
+        .overview-col-telemetry .quick-metrics {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 10px !important;
+        }
+
+        .overview-col-telemetry .overview-links {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 10px !important;
+          margin-top: 0 !important;
+        }
+
+        .overview-col-telemetry .shortcut {
+          min-height: 120px !important;
+          padding: 12px 14px !important;
+        }
+
+        .overview-col-telemetry .shortcut b {
+          font-size: 16px !important;
+          line-height: 1.3 !important;
+        }
+
+        .overview-col-telemetry .shortcut small {
+          font-size: 11px !important;
+        }
+
+        .overview-col-telemetry .mini-map {
+          height: 98px !important;
+          width: 98px !important;
+        }
+      }
+
+      /* Mobile & Compact Screens (< 820px): 100% Identical to Classic Mobile */
+      @container (max-width: 819px) {
+        .cockpit.desktop-balanced-cockpit {
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+        }
+
+        .overview-col-visual,
+        .overview-col-telemetry {
+          display: contents !important;
+        }
+
+        .hero {
+          order: 1 !important;
+        }
+
+        .energy {
+          order: 2 !important;
+        }
+
+        .quick-metrics {
+          order: 3 !important;
+        }
+
+        .overview-links {
+          order: 4 !important;
+          margin-top: 2px !important;
+        }
+
+        .mini-condition {
+          order: 5 !important;
+          margin-top: 4px !important;
+        }
+      }
+
+      /* Mobile typography and layout overrides */
       @container (max-width: 700px) {
         .energy-head .soc-value,
         .energy-head.charging-left .soc-value {
