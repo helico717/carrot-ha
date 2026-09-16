@@ -3,6 +3,39 @@
 
 const BMS_CAPACITY = 70.8; // kWh (ID.4 BMS pack capacity)
 
+// Display-only policy; raw input is retained separately and never written to HA.
+export const DEBUG_FRESHNESS = { measurement: 180, telemetry: 300, sync: 180 };
+export const DEBUG_MODES = [
+  {mode:'charging', key:'charging', ko:'충전중', en:'Charging'},
+  {mode:'driving', key:'driving', ko:'주행 중', en:'Driving'},
+  {mode:'parked', key:'parked', ko:'주차중', en:'Parked'},
+  {mode:'stale', key:'stale', ko:'차량 데이터 지연', en:'Vehicle data delayed'},
+  {mode:'offline', key:'offline', ko:'통신 지연', en:'Communication delayed'},
+  {mode:'cloud_error', key:'connection_unknown', ko:'연결 확인 불가', en:'Connection unavailable'},
+  {mode:'unknown', key:'unknown', ko:'상태 확인 불가', en:'Status unavailable'}
+];
+export function debugDisplay(raw, now = Date.now(), lastGood = null) {
+  const age = value => {
+    const t = typeof value === 'string' ? Date.parse(value) : NaN;
+    return Number.isFinite(t) && t <= now ? (now-t)/1000 : null;
+  };
+  const measured = age(raw.measured_at), telemetry = age(raw.last_received), sync = age(raw.last_sync);
+  const connection = raw.cloud_status === 'error' || sync === null || sync > DEBUG_FRESHNESS.sync
+    ? 'unknown' : telemetry === null ? 'unknown' : telemetry >= DEBUG_FRESHNESS.telemetry ? 'offline' : 'online';
+  const stale = raw.stale === true || (measured !== null && measured > DEBUG_FRESHNESS.measurement);
+  const key = measured === null ? 'unknown' : connection === 'offline' ? 'offline' : stale ? 'stale'
+    : connection !== 'online' ? 'connection_unknown' : raw.onroad ? 'driving' : raw.charging ? 'charging'
+    : raw.onroad === false ? 'parked' : 'unknown';
+  const live = ['driving','charging','parked'].includes(key);
+  // Keep the last healthy card contents, including power/ETA and visual mode.
+  // Freshness changes only the status label, never the recorded measurements.
+  const recorded = !live && lastGood ? lastGood : raw;
+  const values = {...recorded, simulated:true, display_state:key, stale,
+    measurement_age_s:measured, last_confirmed_state:raw.last_confirmed_state, last_confirmed_at:raw.last_confirmed_at, connection_state:connection,
+    telemetry_age_s:telemetry, sync_age_s:sync};
+  return values;
+}
+
 export default class CarrotDebugDashboard extends HTMLElement {
   constructor() {
     super();
@@ -30,7 +63,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.state.theme = this.getEffectiveTheme('auto');
     }
     this.render();
+    clearInterval(this.freshnessTimer);
+    this.freshnessTimer=setInterval(()=>this.applyDebugTelemetry(),30000);
   }
+
+  disconnectedCallback(){clearInterval(this.freshnessTimer);}
 
   setConfig(config) {
     this.config = config || {};
@@ -81,8 +118,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (!this.dashCard) return;
 
     const currentKwh = (this.state.soc / 100) * BMS_CAPACITY;
-    const isCharging = ['charging', 'conflict'].includes(this.state.mode);
-    const isDriving = this.state.mode === 'driving';
+    const impaired=['stale','unknown','offline','cloud_error'].includes(this.state.mode);
+    const lastMode=impaired?(this.lastGood?.mode||null):this.state.mode;
+    const isCharging=lastMode==='charging';
+    const isDriving=lastMode==='driving';
+    const now=Date.now();
+    if(this.scenarioMode!==this.state.mode){this.scenarioMode=this.state.mode;this.scenarioAt=now;}
+    const measuredAt=this.state.mode==='unknown'?null:new Date(impaired?this.scenarioAt-(this.state.mode==='stale'?2400000:this.state.mode==='offline'?600000:30000):now).toISOString();
+    const receivedAt=new Date(this.state.mode==='offline'?this.scenarioAt-600000:this.state.mode==='cloud_error'?this.scenarioAt-30000:now-30000).toISOString();
 
     // 80% calculations
     const target80Kwh = BMS_CAPACITY * 0.8;
@@ -97,22 +140,26 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const eta100 = new Date(Date.now() + sec100 * 1000).toISOString();
 
     const v = {
-      ...(this.dashCard.v || {}),
+      stale: this.state.mode === 'stale',
       simulated: true,
       state_version: 1,
-      vehicle_state: this.state.mode === 'conflict' ? 'charging' : this.state.mode,
+      vehicle_state: this.state.mode,
       state_reason: this.state.mode === 'stale' ? 'battery_measurement_expired' : this.state.mode === 'unknown' ? 'motion_unavailable' : 'stationary_energy_increase',
-      last_confirmed_state: 'charging',
-      last_confirmed_at: new Date(Date.now() - 2400000).toISOString(),
+      last_confirmed_state: this.lastGood?.mode || null,
+      last_confirmed_at: this.lastGood ? (impaired && measuredAt ? measuredAt : this.lastGood.at) : null,
       state_evaluated_at: new Date().toISOString(),
-      measured_at: new Date().toISOString(),
-      last_sync: new Date().toISOString(),
-      cloud_status: this.state.lang === 'en' ? 'Simulation (UI Controller)' : '시뮬레이션 (UI 조절기 제어)',
+      measured_at: measuredAt,
+      last_received: receivedAt,
+      gps_measured_at: measuredAt,
+      field_measured_at: Object.fromEntries(['battery_wh','outside_temp_c','aux_voltage','ac_on'].map(k=>[k,measuredAt])),
+      last_sync: new Date(this.state.mode==='cloud_error'?this.scenarioAt-30000:now).toISOString(),
+      cloud_status: this.state.mode==='cloud_error'?'error':'ok',
+      speed_kph: isDriving?42:0,
       soc_percent: this.state.soc,
       battery_kwh: currentKwh,
       soc_capacity_kwh: BMS_CAPACITY,
       charging: isCharging,
-      onroad: isDriving || this.state.mode === 'conflict',
+      onroad: isDriving,
       odometer_km: 76233,
       month_distance_km: 1248,
       month_charge_kwh: 155.9,
@@ -128,13 +175,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       longitude: 126.9780
     };
 
-    if (!v.cloud_raw_state) {
-      v.cloud_raw_state = {
-        device_id: 'simulated-debug',
-        onroad: isDriving || this.state.mode === 'conflict' ? 1 : 0,
-        updated_at: new Date().toISOString()
-      };
-    }
+    v.cloud_raw_state = {device_id:'simulated-debug',onroad:v.onroad?1:0,updated_at:receivedAt};
 
     if (isCharging) {
       v.charge_power_kw = this.state.powerKw;
@@ -152,10 +193,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
       v.eta_100 = null;
     }
 
-    this.dashCard.v = v;
+    const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
+    if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
+    this.dashCard.v = {...displayed, debug_raw: v};
     this.dashCard.busy = false;
     this.dashCard.render();
-    this.updateInspectorReadout(v, sec80, sec100, eta100);
+    this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
   }
 
   updateInspectorReadout(v, sec80, sec100, eta100) {
@@ -166,26 +209,26 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const elKwh = this.shadowRoot.querySelector('#inspectKwh');
 
     if (el80) {
-      el80.innerHTML = this.state.mode === 'charging'
-        ? (this.state.soc >= 80 ? '<span class="text-amber-400">도달 완료 (80% 바 자동 숨김)</span>' : `<b>${this.formatDuration(sec80)}</b>`)
+      el80.innerHTML = v.charging === true
+        ? (v.soc_percent >= 80 ? '<span class="text-amber-400">도달 완료 (80% 바 자동 숨김)</span>' : `<b>${this.formatDuration(sec80)}</b>`)
         : '—';
     }
     if (el100) {
-      el100.innerHTML = this.state.mode === 'charging' ? `<b>${this.formatDuration(sec100)}</b>` : '—';
+      el100.innerHTML = v.charging === true ? `<b>${this.formatDuration(sec100)}</b>` : '—';
     }
     if (elEta) {
-      elEta.innerHTML = this.state.mode === 'charging' ? `<b>${this.formatTime(eta100)}</b>` : '—';
+      elEta.innerHTML = v.charging === true ? `<b>${this.formatTime(eta100)}</b>` : '—';
     }
     if (elSpeed) {
-      if (this.state.mode === 'charging') {
-        const isFast = this.state.powerKw >= 11;
+      if (v.charging === true) {
+        const isFast = v.charge_power_kw >= 11;
         elSpeed.innerHTML = isFast
           ? '<span style="color:#60a5fa;font-weight:700">⚡ 고속 충전 (2.2초 주기)</span>'
           : '<span style="color:#34d399;font-weight:700">🔌 완속 충전 (4.4초 주기)</span>';
-      } else if (this.state.mode === 'driving') {
+      } else if (v.onroad === true) {
         elSpeed.innerHTML = '<span style="color:#38bdf8;font-weight:700">🚗 주행 방전 (역방향 2.5초)</span>';
       } else {
-        elSpeed.innerHTML = '<span style="color:#9ca3af;font-weight:700">🅿️ 주차 (정적 바)</span>';
+        elSpeed.textContent = v.display_state==='parked'?'주차 · 정적 표시':'최신 측정 없음 · 애니메이션 중단';
       }
     }
     if (elKwh) {
@@ -542,12 +585,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span>차량 동작 모드</span>
               </div>
               <div class="btn-group">
-                <button id="btnModeCharge" class="${this.state.mode === 'charging' ? 'active charge' : ''}">⚡ 충전중</button>
-                <button id="btnModeStale" class="${this.state.mode === 'stale' ? 'active' : ''}">데이터 40분 지연</button>
-                <button id="btnModeUnknown" class="${this.state.mode === 'unknown' ? 'active' : ''}">이동 정보 없음</button>
-                <button id="btnModeConflict" class="${this.state.mode === 'conflict' ? 'active charge' : ''}">Onroad 켜짐 + 충전</button>
-                <button id="btnModePark" class="${this.state.mode === 'parked' ? 'active' : ''}">🅿️ 주차/미충전</button>
-                <button id="btnModeDrive" class="${this.state.mode === 'driving' ? 'active' : ''}">🚗 주행중</button>
+                ${DEBUG_MODES.map(item=>`<button data-mode="${item.mode}" class="${this.state.mode===item.mode?(item.mode==='charging'?'active charge':'active'):''}">${item[this.state.lang==='en'?'en':'ko']}</button>`).join('')}
               </div>
               <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4">
                 • <b>충전중</b>: 80/100% 마커, 완속(<11kW)/고속(≥11kW) 문구 및 속도 분기, 충전전력/ETA 상단 배치<br>
@@ -675,6 +713,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     this.dashCard = document.createElement(tagName);
     this.dashCard.setConfig({
       ...(this.config || {}),
+      charging_entity: 'binary_sensor.carrot_debug_simulated',
       color_mode: this.getEffectiveTheme()
     });
 
@@ -712,12 +751,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
     };
 
     const isEn = this.state.lang === 'en';
-    card.vehicleStatus = (v) => {
-      if (v.vehicle_state === 'stale') return { key: 'stale', label: isEn ? 'Stale data · Simulation' : '차량 데이터 지연 · 시뮬레이션' };
-      if (v.vehicle_state === 'unknown') return { key: 'unknown', label: isEn ? 'State pending · Simulation' : '상태 확인 중 · 시뮬레이션' };
-      if (v.charging) return { key: 'charging', label: isEn ? 'Charging' : '충전중' };
-      if (v.onroad) return { key: 'driving', label: isEn ? 'Driving' : '주행 중' };
-      return { key: 'parked', label: isEn ? 'Parked' : '주차중' };
+    card.vehicleStatus = v => {
+      const labels=Object.fromEntries(DEBUG_MODES.map(item=>[item.key,item[isEn?'en':'ko']]));
+      const key=v.display_state||debugDisplay(v).display_state;
+      const elapsed=Number.isFinite(v.measurement_age_s)?Math.floor(v.measurement_age_s/60):null;
+      const label=key==='stale'&&elapsed!==null?`${labels.stale} · ${elapsed}${isEn?' min ago':'분 전'}`:labels[key]||labels.unknown;
+      return {key,label};
     };
 
     if (!card.trips || card.trips.length === 0) {
@@ -758,6 +797,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     const origRender = card.render.bind(card);
     card.render = () => {
+      const chargeState=card.v.charging?'on':'off';
+      card._hass={...(this._hass||{}),states:{...(this._hass?.states||{}),'binary_sensor.carrot_debug_simulated':{state:chargeState}}};
       origRender();
       const refreshBtn = card.shadowRoot?.querySelector('.refresh');
       if (refreshBtn) {
@@ -782,6 +823,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
 
     style.textContent = `
+      .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
+      :host([data-theme="light"]) .badge.stale,:host([data-theme="light"]) .badge.unknown,:host([data-theme="light"]) .badge.offline,:host([data-theme="light"]) .badge.connection_unknown{background:#fff1bd;color:#745400}
       /* Typography & Alignment Unification across States */
       .energy-head .soc-value,
       .energy-head.charging-left .soc-value {
@@ -928,38 +971,18 @@ export default class CarrotDebugDashboard extends HTMLElement {
   bindEvents() {
     const root = this.shadowRoot;
 
-    // Mode Buttons
-    const modeBtnIds = [
-      ['btnModeCharge', 'charging'],
-      ['btnModeStale', 'stale'],
-      ['btnModeUnknown', 'unknown'],
-      ['btnModeConflict', 'conflict'],
-      ['btnModePark', 'parked'],
-      ['btnModeDrive', 'driving']
-    ];
-
+    // Use the exact same state list as the upper-right badge.
     const updateModeBtns = () => {
-      modeBtnIds.forEach(([id]) => {
-        const b = root.querySelector('#' + id);
-        if (b) b.className = '';
+      root.querySelectorAll('[data-mode]').forEach(button=>{
+        const mode=button.dataset.mode;
+        button.className=this.state.mode===mode?(mode==='charging'?'active charge':'active'):'';
       });
-      const activeId = modeBtnIds.find(([, m]) => m === this.state.mode)?.[0];
-      const activeBtn = activeId ? root.querySelector('#' + activeId) : null;
-      if (activeBtn) {
-        activeBtn.className = ['charging', 'conflict'].includes(this.state.mode) ? 'active charge' : 'active';
-      }
     };
-
-    modeBtnIds.forEach(([id, mode]) => {
-      const btn = root.querySelector('#' + id);
-      if (btn) {
-        btn.addEventListener('click', () => {
-          this.state.mode = mode;
-          updateModeBtns();
-          this.applyDebugTelemetry();
-        });
-      }
-    });
+    root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+      this.state.mode=button.dataset.mode;
+      updateModeBtns();
+      this.applyDebugTelemetry();
+    }));
 
     // SOC Slider & Preset Dropdown
     const socSlider = root.querySelector('#socSlider');
