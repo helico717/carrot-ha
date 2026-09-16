@@ -24,10 +24,17 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
       position: sticky;
       top: 0;
       z-index: 100;
+      flex-wrap: wrap;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .brand-title {
@@ -49,10 +56,17 @@
       font-weight: 600;
     }
 
+    .controls-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
     .viewport-controls {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       background: #0d1117;
       padding: 4px;
       border-radius: 10px;
@@ -85,11 +99,35 @@
       box-shadow: 0 1px 4px rgba(31, 111, 235, 0.4);
     }
 
+    /* Map 50% Toggle Button */
+    .map-toggle-btn {
+      background: #065f46;
+      color: #6ee7b7;
+      border: 1px solid #059669;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 4px rgba(6, 95, 70, 0.4);
+    }
+
+    .map-toggle-btn.off {
+      background: #21262d;
+      color: #8b949e;
+      border-color: #30363d;
+      box-shadow: none;
+    }
+
     .width-indicator {
       font-size: 12px;
       color: #8b949e;
       font-variant-numeric: tabular-nums;
-      min-width: 75px;
+      min-width: 65px;
       text-align: right;
     }
 
@@ -105,7 +143,7 @@
     }
 
     .frame-container {
-      width: 1200px;
+      width: 1280px;
       max-width: 100%;
       background: #0f141c;
       border-radius: 24px;
@@ -134,21 +172,27 @@
 <body>
 
   <header class="preview-header">
-    <div class="brand-title">
-      <span>🥕 Carrot HA</span>
-      <span>대시보드 실시간 프리뷰</span>
-      <span class="badge-tag">데스크탑 반응형 개선</span>
+    <div class="header-left">
+      <div class="brand-title">
+        <span>🥕 Carrot HA</span>
+        <span>실시간 인터랙티브 프리뷰</span>
+        <span class="badge-tag">실험실</span>
+      </div>
     </div>
 
-    <div class="viewport-controls">
-      <button class="viewport-btn" data-width="390">📱 모바일 (390px)</button>
-      <button class="viewport-btn" data-width="768">📱 태블릿 (768px)</button>
-      <button class="viewport-btn" data-width="1024">💻 데스크탑 (1024px)</button>
-      <button class="viewport-btn active" data-width="1280">🖥️ 데스크탑 (1280px)</button>
-      <button class="viewport-btn" data-width="100%">↔️ 전체 폭 (100%)</button>
-    </div>
+    <div class="controls-wrap">
+      <button id="mapHalfToggle" class="map-toggle-btn">🗺️ 직사각형 50% 지도 적용 (ON)</button>
 
-    <div class="width-indicator" id="widthLabel">1280px</div>
+      <div class="viewport-controls">
+        <button class="viewport-btn" data-width="390">📱 모바일 (390px)</button>
+        <button class="viewport-btn" data-width="768">📱 태블릿 (768px)</button>
+        <button class="viewport-btn" data-width="1024">💻 데스크탑 (1024px)</button>
+        <button class="viewport-btn active" data-width="1280">🖥️ 데스크탑 (1280px)</button>
+        <button class="viewport-btn" data-width="100%">↔️ 전체 폭 (100%)</button>
+      </div>
+
+      <div class="width-indicator" id="widthLabel">1280px</div>
+    </div>
   </header>
 
   <main class="preview-stage">
@@ -213,6 +257,147 @@
     const container = document.getElementById('frameContainer');
     const widthLabel = document.getElementById('widthLabel');
     const buttons = document.querySelectorAll('.viewport-btn');
+    const debugCard = document.getElementById('debugCard');
+    const mapHalfToggle = document.getElementById('mapHalfToggle');
+
+    let mapHalfEnabled = true;
+
+    // 50% Map Style Definition (Non-square, fully fills right half of card)
+    const MAP_HALF_CSS = `
+      .shortcut {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+        grid-template-rows: 1fr auto !important;
+        gap: 12px !important;
+        padding: 10px 10px 10px 14px !important;
+        min-height: 124px !important;
+        align-items: stretch !important;
+      }
+
+      .shortcut > span {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        min-width: 0 !important;
+        padding-top: 2px !important;
+      }
+
+      .shortcut > span b {
+        font-size: 15px !important;
+        line-height: 1.3 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+
+      .shortcut > span small {
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+        margin-top: 4px !important;
+        color: var(--muted) !important;
+      }
+
+      .shortcut > em {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+        align-self: end !important;
+        font-size: 11.5px !important;
+        font-weight: 600 !important;
+        padding-bottom: 2px !important;
+      }
+
+      /* Non-square rectangular map: completely fills the right 50% width and 100% height */
+      .mini-map {
+        grid-column: 2 !important;
+        grid-row: 1 / 3 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 104px !important;
+        max-width: none !important;
+        max-height: none !important;
+        aspect-ratio: auto !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        align-self: stretch !important;
+        justify-self: stretch !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+      }
+
+      @container (max-width: 819px) {
+        .overview-links {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: 10px !important;
+        }
+
+        .shortcut {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          min-height: 120px !important;
+          padding: 10px 10px 10px 14px !important;
+        }
+
+        .shortcut > span b {
+          font-size: 15.5px !important;
+        }
+
+        .mini-map {
+          min-height: 100px !important;
+        }
+      }
+    `;
+
+    function updateMapHalfStyle() {
+      const card = debugCard?.dashCard;
+      if (!card || !card.shadowRoot) return;
+
+      let styleEl = card.shadowRoot.querySelector('#preview-map-half-enhancement');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'preview-map-half-enhancement';
+        card.shadowRoot.appendChild(styleEl);
+      }
+
+      if (mapHalfEnabled) {
+        styleEl.textContent = MAP_HALF_CSS;
+        mapHalfToggle.classList.remove('off');
+        mapHalfToggle.textContent = '🗺️ 직사각형 50% 지도 적용 (ON)';
+      } else {
+        styleEl.textContent = '';
+        mapHalfToggle.classList.add('off');
+        mapHalfToggle.textContent = '🗺️ 기존 112px 정사각형 (OFF)';
+      }
+
+      // Invalidate Leaflet maps after layout recalculation
+      setTimeout(() => {
+        if (card.miniMaps && card.miniMaps.length) {
+          card.miniMaps.forEach(m => {
+            try { m.invalidateSize(); } catch (e) {}
+          });
+        }
+      }, 100);
+    }
+
+    // Hook into debugCard render cycle
+    const checkReady = setInterval(() => {
+      if (debugCard && debugCard.dashCard && debugCard.dashCard.shadowRoot) {
+        clearInterval(checkReady);
+        updateMapHalfStyle();
+
+        // Also update whenever dashCard renders
+        const origRender = debugCard.dashCard.render.bind(debugCard.dashCard);
+        debugCard.dashCard.render = () => {
+          origRender();
+          updateMapHalfStyle();
+        };
+      }
+    }, 150);
+
+    mapHalfToggle.addEventListener('click', () => {
+      mapHalfEnabled = !mapHalfEnabled;
+      updateMapHalfStyle();
+    });
 
     buttons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -226,6 +411,13 @@
           container.style.width = `${w}px`;
           widthLabel.textContent = `${w}px`;
         }
+        setTimeout(() => {
+          if (debugCard?.dashCard?.miniMaps) {
+            debugCard.dashCard.miniMaps.forEach(m => {
+              try { m.invalidateSize(); } catch (e) {}
+            });
+          }
+        }, 320);
       });
     });
 

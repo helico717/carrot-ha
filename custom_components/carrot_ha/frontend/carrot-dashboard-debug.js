@@ -1243,6 +1243,28 @@ export default class CarrotDebugDashboard extends HTMLElement {
         };
       }
       this.injectCustomStyles(card);
+
+      if (typeof window !== 'undefined' && window.ResizeObserver) {
+        if (!card._mapResizeObserver) {
+          card._mapResizeObserver = new ResizeObserver(() => {
+            if (card.miniMaps && card.miniMaps.length) {
+              card.miniMaps.forEach(m => {
+                try { m.invalidateSize(); } catch (e) {}
+              });
+            }
+          });
+        }
+        card.shadowRoot?.querySelectorAll('.mini-map').forEach(el => {
+          card._mapResizeObserver.observe(el);
+        });
+      }
+      setTimeout(() => {
+        if (card.miniMaps && card.miniMaps.length) {
+          card.miniMaps.forEach(m => {
+            try { m.invalidateSize(); } catch (e) {}
+          });
+        }
+      }, 120);
     };
   }
 
@@ -1509,26 +1531,68 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
 
         .overview-col-telemetry .shortcut {
-          min-height: 120px !important;
-          padding: 12px 14px !important;
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          grid-template-rows: 1fr auto !important;
+          gap: 12px !important;
+          padding: 10px 10px 10px 14px !important;
+          min-height: 124px !important;
+          align-items: stretch !important;
+        }
+
+        .overview-col-telemetry .shortcut > span {
+          grid-column: 1 !important;
+          grid-row: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: flex-start !important;
+          min-width: 0 !important;
+          padding-top: 2px !important;
         }
 
         .overview-col-telemetry .shortcut b {
-          font-size: 16px !important;
+          font-size: 15px !important;
           line-height: 1.3 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
         }
 
         .overview-col-telemetry .shortcut small {
           font-size: 11px !important;
+          line-height: 1.35 !important;
+          margin-top: 4px !important;
+          color: var(--muted) !important;
         }
 
+        .overview-col-telemetry .shortcut > em {
+          grid-column: 1 !important;
+          grid-row: 2 !important;
+          align-self: end !important;
+          font-size: 11.5px !important;
+          font-weight: 600 !important;
+          padding-bottom: 2px !important;
+        }
+
+        /* Non-square rectangular map: occupies the entire right 50% of the card */
         .overview-col-telemetry .mini-map {
-          height: 98px !important;
-          width: 98px !important;
+          grid-column: 2 !important;
+          grid-row: 1 / 3 !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 104px !important;
+          max-width: none !important;
+          max-height: none !important;
+          aspect-ratio: auto !important;
+          border-radius: 12px !important;
+          overflow: hidden !important;
+          align-self: stretch !important;
+          justify-self: stretch !important;
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
         }
       }
 
-      /* Mobile & Compact Screens (< 820px): 100% Identical to Classic Mobile */
+      /* Mobile & Compact Screens (< 820px): Map also takes 50% width */
       @container (max-width: 819px) {
         .cockpit.desktop-balanced-cockpit {
           display: flex !important;
@@ -1556,6 +1620,50 @@ export default class CarrotDebugDashboard extends HTMLElement {
         .overview-links {
           order: 4 !important;
           margin-top: 2px !important;
+        }
+
+        .shortcut {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          grid-template-rows: 1fr auto !important;
+          gap: 10px !important;
+          padding: 10px 10px 10px 14px !important;
+          min-height: 118px !important;
+          align-items: stretch !important;
+        }
+
+        .shortcut > span {
+          grid-column: 1 !important;
+          grid-row: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          justify-content: flex-start !important;
+          min-width: 0 !important;
+        }
+
+        .shortcut > span b {
+          font-size: 15px !important;
+        }
+
+        .shortcut > em {
+          grid-column: 1 !important;
+          grid-row: 2 !important;
+          align-self: end !important;
+        }
+
+        .mini-map {
+          grid-column: 2 !important;
+          grid-row: 1 / 3 !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 98px !important;
+          max-width: none !important;
+          max-height: none !important;
+          aspect-ratio: auto !important;
+          border-radius: 12px !important;
+          overflow: hidden !important;
+          align-self: stretch !important;
+          justify-self: stretch !important;
         }
 
         .mini-condition {
