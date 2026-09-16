@@ -1275,8 +1275,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (!style) {
       style = document.createElement('style');
       style.id = 'debug-custom-enhancements';
-      card.shadowRoot.appendChild(style);
     }
+    card.shadowRoot.appendChild(style);
 
     style.textContent = `
       .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
@@ -1574,7 +1574,6 @@ export default class CarrotDebugDashboard extends HTMLElement {
           padding-bottom: 2px !important;
         }
 
-        /* Non-square rectangular map: occupies the entire right 50% of the card */
         .overview-col-telemetry .mini-map {
           grid-column: 2 !important;
           grid-row: 1 / 3 !important;
@@ -1592,7 +1591,16 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
       }
 
-      /* Mobile & Compact Screens (< 820px): Map also takes 50% width */
+      /* Tablet & Wide Mobile Optimization (520px - 819px): 2-column shortcut cards */
+      @container (min-width: 520px) and (max-width: 819px) {
+        .overview-links {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 12px !important;
+        }
+      }
+
+      /* Mobile & Compact Screens (< 820px): Universal 50% rectangular map */
       @container (max-width: 819px) {
         .cockpit.desktop-balanced-cockpit {
           display: flex !important;
@@ -1622,6 +1630,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
           margin-top: 2px !important;
         }
 
+        :host .shortcut,
+        ha-card .shortcut,
         .shortcut {
           display: grid !important;
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -1632,6 +1642,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
           align-items: stretch !important;
         }
 
+        :host .shortcut > span,
+        ha-card .shortcut > span,
         .shortcut > span {
           grid-column: 1 !important;
           grid-row: 1 !important;
@@ -1641,16 +1653,24 @@ export default class CarrotDebugDashboard extends HTMLElement {
           min-width: 0 !important;
         }
 
+        :host .shortcut > span b,
+        ha-card .shortcut > span b,
         .shortcut > span b {
           font-size: 15px !important;
         }
 
+        :host .shortcut > em,
+        ha-card .shortcut > em,
         .shortcut > em {
           grid-column: 1 !important;
           grid-row: 2 !important;
           align-self: end !important;
         }
 
+        :host .mini-map,
+        :host .shortcut .mini-map,
+        ha-card .mini-map,
+        .shortcut .mini-map,
         .mini-map {
           grid-column: 2 !important;
           grid-row: 1 / 3 !important;
@@ -1672,8 +1692,39 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
       }
 
-      /* Mobile typography and layout overrides */
+      /* Mobile typography and layout overrides (< 700px) */
       @container (max-width: 700px) {
+        :host .shortcut,
+        ha-card .shortcut,
+        .shortcut {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          grid-template-rows: 1fr auto !important;
+          gap: 10px !important;
+          padding: 10px 10px 10px 12px !important;
+          min-height: 116px !important;
+          align-items: stretch !important;
+        }
+
+        :host .mini-map,
+        :host .shortcut .mini-map,
+        ha-card .mini-map,
+        .shortcut .mini-map,
+        .mini-map {
+          grid-column: 2 !important;
+          grid-row: 1 / 3 !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 96px !important;
+          max-width: none !important;
+          max-height: none !important;
+          aspect-ratio: auto !important;
+          border-radius: 12px !important;
+          overflow: hidden !important;
+          align-self: stretch !important;
+          justify-self: stretch !important;
+        }
+
         .energy-head .soc-value,
         .energy-head.charging-left .soc-value {
           font-size: 38px !important;

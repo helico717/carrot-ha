@@ -262,8 +262,10 @@
 
     let mapHalfEnabled = true;
 
-    // 50% Map Style Definition (Non-square, fully fills right half of card)
+    // 50% Map Style Definition (Non-square, fully fills right half of card across all viewports)
     const MAP_HALF_CSS = `
+      :host .shortcut,
+      ha-card .shortcut,
       .shortcut {
         display: grid !important;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
@@ -274,6 +276,8 @@
         align-items: stretch !important;
       }
 
+      :host .shortcut > span,
+      ha-card .shortcut > span,
       .shortcut > span {
         grid-column: 1 !important;
         grid-row: 1 !important;
@@ -284,6 +288,8 @@
         padding-top: 2px !important;
       }
 
+      :host .shortcut > span b,
+      ha-card .shortcut > span b,
       .shortcut > span b {
         font-size: 15px !important;
         line-height: 1.3 !important;
@@ -292,6 +298,8 @@
         text-overflow: ellipsis !important;
       }
 
+      :host .shortcut > span small,
+      ha-card .shortcut > span small,
       .shortcut > span small {
         font-size: 11px !important;
         line-height: 1.35 !important;
@@ -299,6 +307,8 @@
         color: var(--muted) !important;
       }
 
+      :host .shortcut > em,
+      ha-card .shortcut > em,
       .shortcut > em {
         grid-column: 1 !important;
         grid-row: 2 !important;
@@ -309,6 +319,10 @@
       }
 
       /* Non-square rectangular map: completely fills the right 50% width and 100% height */
+      :host .mini-map,
+      :host .shortcut .mini-map,
+      ha-card .mini-map,
+      .shortcut .mini-map,
       .mini-map {
         grid-column: 2 !important;
         grid-row: 1 / 3 !important;
@@ -325,25 +339,54 @@
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
       }
 
-      @container (max-width: 819px) {
+      /* Tablet (520px - 819px): 2-column shortcut layout */
+      @container (min-width: 520px) and (max-width: 819px) {
         .overview-links {
           display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: 10px !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 12px !important;
         }
+      }
 
+      /* Mobile & Compact Screens (< 820px) */
+      @container (max-width: 819px) {
         .shortcut {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
           min-height: 120px !important;
           padding: 10px 10px 10px 14px !important;
         }
+      }
 
-        .shortcut > span b {
-          font-size: 15.5px !important;
+      /* Mobile (< 700px): override base ko dashboard container query */
+      @container (max-width: 700px) {
+        :host .shortcut,
+        ha-card .shortcut,
+        .shortcut {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          grid-template-rows: 1fr auto !important;
+          gap: 10px !important;
+          padding: 10px 10px 10px 12px !important;
+          min-height: 116px !important;
+          align-items: stretch !important;
         }
 
+        :host .mini-map,
+        :host .shortcut .mini-map,
+        ha-card .mini-map,
+        .shortcut .mini-map,
         .mini-map {
-          min-height: 100px !important;
+          grid-column: 2 !important;
+          grid-row: 1 / 3 !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 96px !important;
+          max-width: none !important;
+          max-height: none !important;
+          aspect-ratio: auto !important;
+          border-radius: 12px !important;
+          overflow: hidden !important;
+          align-self: stretch !important;
+          justify-self: stretch !important;
         }
       }
     `;
@@ -356,17 +399,24 @@
       if (!styleEl) {
         styleEl = document.createElement('style');
         styleEl.id = 'preview-map-half-enhancement';
-        card.shadowRoot.appendChild(styleEl);
       }
+      card.shadowRoot.appendChild(styleEl);
 
       if (mapHalfEnabled) {
         styleEl.textContent = MAP_HALF_CSS;
         mapHalfToggle.classList.remove('off');
         mapHalfToggle.textContent = '🗺️ 직사각형 50% 지도 적용 (ON)';
       } else {
-        styleEl.textContent = '';
+        styleEl.textContent = `
+          .shortcut { grid-template-columns: minmax(0, 1fr) 112px !important; }
+          .mini-map { width: 112px !important; height: 112px !important; max-width: 112px !important; }
+          @container (max-width: 700px) {
+            .shortcut { grid-template-columns: minmax(0, 1fr) 100px !important; }
+            .mini-map { width: 100px !important; height: 100px !important; max-width: 100px !important; }
+          }
+        `;
         mapHalfToggle.classList.add('off');
-        mapHalfToggle.textContent = '🗺️ 기존 112px 정사각형 (OFF)';
+        mapHalfToggle.textContent = '🗺️ 기존 정사각형 (OFF)';
       }
 
       // Invalidate Leaflet maps after layout recalculation
