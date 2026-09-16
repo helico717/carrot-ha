@@ -3,6 +3,88 @@
 
 const BMS_CAPACITY = 70.8; // kWh (ID.4 BMS pack capacity)
 
+// 2023 VW ID.4 Pro S AWD Theoretical Charging Curve (1% - 100% in kW)
+const ID4_CHARGING_CURVE_KW = [
+  181.3, // 0% fallback
+  181.3, 183.4, 183.3, 185.0, 187.1, 187.2, 187.2, 188.3, 189.1, 189.2, // 1-10%
+  190.2, 190.3, 190.2, 191.3, 191.3, 191.3, 191.3, 191.3, 192.3, 192.4, // 11-20%
+  189.2, 187.1, 184.4, 181.2, 179.2, 176.2, 170.2, 165.0, 160.2, 155.0, // 21-30%
+  150.2, 146.0, 144.0, 141.2, 138.2, 136.0, 132.9, 131.2, 129.1, 127.0, // 31-40%
+  124.0, 122.9, 120.1, 119.1, 117.0, 114.0, 112.9, 110.1, 109.1, 107.0, // 41-50%
+  107.0, 104.9, 103.8, 101.8, 101.9, 100.7, 100.1,  99.1,  98.0,  96.9, // 51-60%
+   96.0,  95.0,  93.9,  92.8,  91.8,  91.8,  91.8,  91.8,  91.8,  91.8, // 61-70%
+   91.8,  91.8,  91.9,  91.8,  92.9,  92.8,  92.8,  92.8,  91.8,  90.8, // 71-80%
+   90.0,  88.9,  85.9,  81.8,  79.1,  76.0,  72.8,  69.7,  66.9,  62.8, // 81-90%
+   59.7,  57.0,  52.7,  49.7,  46.8,  43.7,  40.6,  37.6,  34.8,  31.7  // 91-100%
+];
+
+function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_CAPACITY, baseTimeMs = Date.now(), calcModel = 'curve') {
+  if (typeof powerKw !== 'number' || powerKw < 0.3 || typeof currentSoc !== 'number') {
+    return { sec80: null, eta80: null, sec100: null, eta100: null, simpleSec80: null, simpleSec100: null };
+  }
+
+  const soc = Math.max(0, Math.min(100, currentSoc));
+  const currentKwh = (soc / 100) * capacityKwh;
+
+  // Simple linear benchmark calculation
+  const target80Kwh = capacityKwh * 0.8;
+  const need80Kwh = Math.max(0, target80Kwh - currentKwh);
+  const simpleSec80 = Math.round((need80Kwh / powerKw) * 3600);
+
+  const target100Kwh = capacityKwh * 1.0;
+  const need100Kwh = Math.max(0, target100Kwh - currentKwh);
+  const simpleSec100 = Math.round((need100Kwh / powerKw) * 3600);
+
+  if (calcModel === 'simple') {
+    return {
+      sec80: simpleSec80,
+      eta80: new Date(baseTimeMs + simpleSec80 * 1000).toISOString(),
+      sec100: simpleSec100,
+      eta100: new Date(baseTimeMs + simpleSec100 * 1000).toISOString(),
+      simpleSec80,
+      simpleSec100
+    };
+  }
+
+  // Option 1: Bottleneck Model (충전기 상한 및 커브 동시 적용)
+  const currentCurveKw = ID4_CHARGING_CURVE_KW[Math.min(100, Math.max(1, Math.round(soc)))];
+  const scale = powerKw > currentCurveKw ? Math.min(1.15, powerKw / currentCurveKw) : 1.0;
+
+  const calcTimeToSoc = (targetSoc) => {
+    if (soc >= targetSoc) return 0;
+    let totalSec = 0;
+    const startInt = Math.floor(soc);
+    const targetInt = Math.floor(targetSoc);
+
+    for (let s = startInt; s < targetInt; s++) {
+      const curveVal = ID4_CHARGING_CURVE_KW[Math.min(100, s + 1)] * scale;
+      const stepKw = Math.max(0.3, Math.min(powerKw, curveVal));
+      let stepFraction = 1.0;
+      if (s === startInt) {
+        stepFraction = (startInt + 1) - soc;
+      }
+      const stepKwh = capacityKwh * 0.01 * stepFraction;
+      totalSec += (stepKwh / stepKw) * 3600;
+    }
+
+    if (targetSoc > targetInt) {
+      const curveVal = ID4_CHARGING_CURVE_KW[Math.min(100, targetInt + 1)] * scale;
+      const stepKw = Math.max(0.3, Math.min(powerKw, curveVal));
+      const stepKwh = capacityKwh * 0.01 * (targetSoc - targetInt);
+      totalSec += (stepKwh / stepKw) * 3600;
+    }
+
+    return Math.round(totalSec);
+  };
+
+  const sec80 = calcTimeToSoc(80);
+  const sec100 = calcTimeToSoc(100);
+  const eta80 = new Date(baseTimeMs + sec80 * 1000).toISOString();
+  const eta100 = new Date(baseTimeMs + sec100 * 1000).toISOString();
+
+  return { sec80, eta80, sec100, eta100, simpleSec80, simpleSec100 };
+}
+
 // Display-only policy; raw input is retained separately and never written to HA.
 export const DEBUG_FRESHNESS = { measurement: 180, telemetry: 300, sync: 180 };
 export const DEBUG_MODES = [
@@ -45,6 +127,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       mode: 'charging', // 'charging' | 'parked' | 'driving'
       soc: 74,
       powerKw: 9.9,
+      calcModel: 'curve', // 'curve' (ID.4 curve Option 1) | 'simple' (legacy linear)
       lang: 'ko',
       theme: 'auto'
     };
@@ -937,6 +1020,26 @@ export default class CarrotDebugDashboard extends HTMLElement {
           left: -60%;
           opacity: 0.1;
         }
+      }
+
+      /* SOC low / critical styling */
+      .energy.is-low,
+      :host([data-theme="light"]) .energy.is-low,
+      .energy.soc-low,
+      :host([data-theme="light"]) .energy.soc-low {
+        background: linear-gradient(90deg, #e5a50a 0 var(--soc), #5c3809 var(--soc) 100%) !important;
+      }
+      .energy.is-critical,
+      :host([data-theme="light"]) .energy.is-critical,
+      .energy.soc-critical,
+      :host([data-theme="light"]) .energy.soc-critical {
+        background: linear-gradient(90deg, #dc2626 0 var(--soc), #6b1414 var(--soc) 100%) !important;
+      }
+      .energy.is-low .battery-head-icon,
+      .energy.soc-low .battery-head-icon,
+      .energy.is-critical .battery-head-icon,
+      .energy.soc-critical .battery-head-icon {
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)) !important;
       }
 
       /* Mobile responsiveness overrides */
