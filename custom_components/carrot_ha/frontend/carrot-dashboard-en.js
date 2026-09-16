@@ -152,7 +152,9 @@ class CarrotDashboard extends HTMLElement {
       .hero-copy{padding:16px 20px 0}.hero-copy h2{font-size:28px;margin:0;max-width:none}
       .hero .car-image{position:static;inset:auto;width:100%;max-width:100%;height:250px;object-fit:contain;object-position:center;display:block;min-width:0;flex-shrink:0;padding:12px}
       .badge.parked{background:#363b40;color:#e0e3e5}.badge.driving{background:#133960;color:#83bdff}.badge.charging{background:#173e29;color:#83e2a4}.badge.offline{background:#483c13;color:#ffe17b}
+      .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
       :host([data-theme="light"]) .badge.parked{background:#e4e7e9;color:#4b555b}:host([data-theme="light"]) .badge.driving{background:#e0edff;color:#1356a2}:host([data-theme="light"]) .badge.charging{background:#e2f2e7;color:#156332}:host([data-theme="light"]) .badge.offline{background:#fff1bd;color:#745400}
+      :host([data-theme="light"]) .badge.stale,:host([data-theme="light"]) .badge.unknown,:host([data-theme="light"]) .badge.offline,:host([data-theme="light"]) .badge.connection_unknown{background:#fff1bd;color:#745400}
       .energy{background:linear-gradient(90deg,#28583c 0 var(--soc),#18221f var(--soc) 100%);min-height:110px;display:flex;align-items:center}.energy-head{width:100%}
       :host([data-theme="light"]) .energy{background:linear-gradient(90deg,#b8dec6 0 var(--soc),#e8eeeb var(--soc) 100%)}
       .nav{margin:0 16px 12px}.theme-control{justify-content:flex-end}
@@ -170,11 +172,67 @@ class CarrotDashboard extends HTMLElement {
       :host([data-theme="light"]) .nav button.active{color:#1260e8}
       @container(max-width:700px){.energy{min-height:100px}.energy-head .soc-value{font-size:44px}.battery-label ha-icon{width:32px;height:32px}.battery-label{gap:6px}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:20px}.energy-head .soc-value{font-size:36px;gap:4px}.energy-head .soc-value small{font-size:20px}.quick-metrics .metric:nth-child(2) strong{font-size:17px}}
     `;
-    themeStyle.textContent+=`.shortcut{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 112px;grid-template-rows:1fr auto;padding:12px;gap:8px 12px;overflow:hidden;min-height:136px;align-items:start}.shortcut>span{grid-column:1;grid-row:1;padding:0}.shortcut>em{grid-column:1;grid-row:2;padding:0;align-self:end}.mini-map{grid-column:2;grid-row:1/3;height:112px;width:112px;align-self:center;border-radius:10px;overflow:hidden;pointer-events:none;background:#e5e9e7}.mini-map .leaflet-control-attribution{font-size:7px}:host([data-theme="dark"]) .mini-map{background:#20262b}:host([data-theme="dark"]) .mini-map .leaflet-tile-pane{filter:grayscale(1) invert(.91) hue-rotate(180deg) brightness(.8)}:host([data-theme="light"]) .mini-map .leaflet-tile-pane{filter:none}.overview-links{gap:12px}@container(max-width:700px){.overview-links{grid-template-columns:1fr}.shortcut{grid-template-columns:minmax(0,1fr) 100px;min-height:124px}.mini-map{height:100px;width:100px}.shortcut b{font-size:13px}.shortcut>em{font-size:12px}.shortcut small{font-size:11px}}`;
+    themeStyle.textContent+=`
+      .shortcut{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr auto;padding:10px 10px 10px 14px;gap:12px;overflow:hidden;min-height:124px;align-items:stretch}
+      .shortcut>span{grid-column:1;grid-row:1;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;padding-top:2px}
+      .shortcut>span b{font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .shortcut>span small{font-size:11px;line-height:1.35;margin-top:4px;color:var(--muted)}
+      .shortcut>em{grid-column:1;grid-row:2;padding:0;align-self:end;font-size:11.5px;font-weight:600;padding-bottom:2px}
+      .mini-map{grid-column:2;grid-row:1/3;height:100%;width:100%;min-height:104px;max-width:none;max-height:none;aspect-ratio:auto;align-self:stretch;justify-self:stretch;border-radius:12px;overflow:hidden;pointer-events:none;background:#e5e9e7;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08)}
+      .mini-map .leaflet-control-attribution{font-size:7px}
+      :host([data-theme="dark"]) .mini-map{background:#20262b}
+      :host([data-theme="dark"]) .mini-map .leaflet-tile-pane{filter:grayscale(1) invert(.91) hue-rotate(180deg) brightness(.8)}
+      :host([data-theme="light"]) .mini-map .leaflet-tile-pane{filter:none}
+      .overview-links{gap:12px}
+
+      @container (min-width: 820px) {
+        .cockpit.desktop-balanced-cockpit{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(380px,1.35fr);gap:16px 20px;align-items:stretch;margin-bottom:0}
+        .overview-col-visual{display:flex;flex-direction:column;gap:14px;min-width:0;height:100%}
+        .overview-col-visual .hero{flex:1;min-height:340px;display:flex;flex-direction:column;justify-content:space-between;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);background:#181d22;margin:0}
+        :host([data-theme="light"]) .overview-col-visual .hero{background:#f0f3f5;border-color:var(--line)}
+        .overview-col-visual .hero-copy{padding:22px 24px 0}
+        .overview-col-visual .hero-copy h2{font-size:30px;letter-spacing:-0.5px;line-height:1.2}
+        .overview-col-visual .hero .car-image{max-height:250px;width:100%;object-fit:contain;object-position:center;margin:auto 0;padding:12px 18px}
+        .overview-col-visual .mini-condition{display:flex;justify-content:space-around;align-items:center;gap:10px;padding:14px 18px;margin-top:0;border-top:none;border-radius:16px;border:1px solid var(--line);background:#14171a;font-size:12.5px;color:#9ca3af}
+        :host([data-theme="light"]) .overview-col-visual .mini-condition{background:#ffffff;border-color:var(--line);color:#5b686e}
+        .overview-col-visual .mini-condition span b{font-weight:700;color:var(--ink);font-size:13.5px;margin-left:2px}
+        .overview-col-telemetry{display:flex;flex-direction:column;gap:12px;min-width:0}
+        .overview-col-telemetry .energy,.overview-col-telemetry .energy.is-charging{margin:0}
+        .overview-col-telemetry .quick-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .overview-col-telemetry .overview-links{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0}
+        .overview-col-telemetry .shortcut{min-height:124px}
+        .overview-col-telemetry .mini-map{min-height:104px}
+      }
+
+      @container (min-width: 520px) and (max-width: 819px) {
+        .overview-links{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      }
+
+      @container (max-width: 819px) {
+        .cockpit.desktop-balanced-cockpit{display:flex;flex-direction:column;gap:12px}
+        .overview-col-visual,.overview-col-telemetry{display:contents}
+        .hero{order:1}
+        .energy{order:2}
+        .quick-metrics{order:3}
+        .overview-links{order:4;margin-top:2px}
+        .shortcut{padding:10px 10px 10px 14px;min-height:118px}
+        .mini-map{min-height:98px}
+        .mini-condition{order:5;margin-top:4px}
+      }
+
+      @container (max-width: 700px) {
+        .overview-links{grid-template-columns:1fr}
+        .shortcut{padding:10px 10px 10px 12px;min-height:116px}
+        .mini-map{min-height:96px}
+        .shortcut b{font-size:14px}
+        .shortcut>em{font-size:11.5px}
+        .shortcut small{font-size:11px}
+      }
+    `;
     themeStyle.textContent+=`
       :host([data-theme="light"]) .shortcut{background:#dceaff;border-color:#d4e4fc}
       :host([data-theme="dark"]) .shortcut{background:#203b5e;border-color:#284363}
-      .shortcut b{font-size:19px;line-height:1.35}.shortcut small{font-size:12px;margin-top:7px}
+      .shortcut b{font-size:15px;line-height:1.3}.shortcut small{font-size:11px;margin-top:4px}
       .shortcut em{color:#75baff}:host([data-theme="light"]) .shortcut em{color:#1260e8}
       .tiles .metric,:host([data-theme="light"]) .tiles .metric{background:rgba(18,96,232,.5);border-color:rgba(18,96,232,.3);color:var(--ink)}
       .tiles .metric .label,.tiles .metric small,.tiles .metric ha-icon,:host([data-theme="light"]) .tiles .metric small{color:var(--ink)}
@@ -184,7 +242,6 @@ class CarrotDashboard extends HTMLElement {
       .pin,:host([data-theme="light"]) .pin{background:#79ceff80;color:#092b45;border-color:#e4f5ff}
       .pin.end,:host([data-theme="light"]) .pin.end{background:#1260e880;color:var(--ink);border-color:#d5e6ff}
       .parking-heading{background:rgba(18,96,232,.5);color:var(--ink)}.parking-heading .sub{color:inherit}
-      @container(max-width:700px){.shortcut b{font-size:17px}.shortcut small{font-size:12px}}
     `;
     themeStyle.textContent+=`
       :host([data-theme="light"]) .tiles .metric,
@@ -360,6 +417,20 @@ class CarrotDashboard extends HTMLElement {
       }
     };
     if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
+    if (typeof window !== 'undefined' && window.ResizeObserver) {
+      if (!this._mapResizeObserver) {
+        this._mapResizeObserver = new ResizeObserver(() => {
+          if (this.miniMaps && this.miniMaps.length) {
+            this.miniMaps.forEach(m => {
+              try { m.invalidateSize(); } catch (e) {}
+            });
+          }
+        });
+      }
+      this.shadowRoot?.querySelectorAll('.mini-map').forEach(el => {
+        this._mapResizeObserver.observe(el);
+      });
+    }
     if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
   }
   body(v,trip,isTrip){
@@ -506,7 +577,7 @@ class CarrotDashboard extends HTMLElement {
 
     const socState=!charging&&soc!==null?(soc<15?'is-critical soc-critical':soc<30?'is-low soc-low':''):'';
 
-    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
+    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
@@ -518,6 +589,17 @@ class CarrotDashboard extends HTMLElement {
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'Offline'};
     if(online!=='on')return {key:'unknown',label:'Checking connection'};
+    const age = value => {
+      const t = typeof value === 'string' ? Date.parse(value) : NaN;
+      return Number.isFinite(t) && t <= Date.now() ? (Date.now()-t)/1000 : null;
+    };
+    const measuredAge = age(v.measured_at);
+    const stale = v.stale === true || (measuredAge !== null && measuredAge > 180);
+    if(stale && measuredAge !== null) {
+      const elapsed = Math.floor(measuredAge / 60);
+      return {key:'stale', label:`Vehicle data delayed · ${elapsed} min ago`};
+    }
+    if(stale) return {key:'stale', label:'Vehicle data delayed'};
     if(v.onroad)return {key:'driving',label:'Driving'};
     if(v.charging)return {key:'charging',label:'Charging'};
     return v.onroad===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
@@ -536,6 +618,9 @@ class CarrotDashboard extends HTMLElement {
       else if(!i&&Number.isFinite(v.parking_latitude)){const p=[v.parking_latitude,v.parking_longitude];map.setView(p,14);map.panBy([0,12],{animate:false});dot(p,'#1260e8');}
       else{this.miniMaps=this.miniMaps.filter(item=>item!==map);map.remove();node.textContent='No location data';}
     });
+    setTimeout(()=>{
+      this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
+    },100);
   }
 
   batteryHistory(){
