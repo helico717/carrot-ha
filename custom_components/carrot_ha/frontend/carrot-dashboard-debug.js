@@ -86,6 +86,122 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
   return { sec80, eta80, sec100, eta100, simpleSec80, simpleSec100, effectiveKw };
 }
 
+function generateMockBatteryHistory(currentSoc = 74, isCharging = false, isDriving = false, nowMs = Date.now()) {
+  const now = new Date(nowMs);
+  const currentHour = now.getHours();
+  const days = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const targetDate = new Date(nowMs);
+    targetDate.setDate(targetDate.getDate() - i);
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+
+    const isToday = (i === 0);
+    const hours = new Array(24).fill(null);
+    const charge_hours = new Array(24).fill(false);
+
+    let used = 0;
+    let drive_s = 0;
+    let charge_s = 0;
+    let valid_samples = 0;
+
+    if (!isToday) {
+      const patterns = [
+        { chargeStart: 1, chargeEnd: 5, chargeFrom: 45, chargeTo: 85, drive1Start: 8, drive1End: 9, soc1: 72, drive2Start: 18, drive2End: 19, soc2: 60, used: 25.0, drive_s: 5400, charge_s: 14400 },
+        { chargeStart: 13, chargeEnd: 14, chargeFrom: 20, chargeTo: 80, drive1Start: 9, drive1End: 12, soc1: 20, drive2Start: 15, drive2End: 18, soc2: 35, used: 105.0, drive_s: 18000, charge_s: 3600 },
+        { chargeStart: null, drive1Start: 12, drive1End: 13, soc1: 70, used: 10.0, drive_s: 2400, charge_s: 0 },
+        { chargeStart: 2, chargeEnd: 6, chargeFrom: 35, chargeTo: 90, drive1Start: 8, drive1End: 9, soc1: 78, drive2Start: 19, drive2End: 20, soc2: 65, used: 38.0, drive_s: 6000, charge_s: 14400 },
+        { chargeStart: 20, chargeEnd: 23, chargeFrom: 40, chargeTo: 80, drive1Start: 9, drive1End: 10, soc1: 68, drive2Start: 18, drive2End: 19, soc2: 52, used: 32.0, drive_s: 5800, charge_s: 10800 },
+        { chargeStart: 1, chargeEnd: 4, chargeFrom: 50, chargeTo: 85, drive1Start: 8, drive1End: 9, soc1: 74, drive2Start: 18, drive2End: 19, soc2: 62, used: 28.5, drive_s: 5400, charge_s: 10800 }
+      ];
+
+      const p = patterns[i - 1] || patterns[0];
+      used = p.used;
+      drive_s = p.drive_s;
+      charge_s = p.charge_s;
+
+      let currentSimSoc = p.chargeFrom || 60;
+      for (let h = 0; h < 24; h++) {
+        let charging = false;
+        let driving = false;
+
+        if (p.chargeStart != null && h >= p.chargeStart && h <= p.chargeEnd) {
+          charging = true;
+          charge_hours[h] = true;
+          const progress = (h - p.chargeStart + 1) / (p.chargeEnd - p.chargeStart + 1);
+          currentSimSoc = Math.min(100, Math.round(p.chargeFrom + (p.chargeTo - p.chargeFrom) * progress));
+        } else if (h === p.drive1Start || (p.drive1End && h === p.drive1End)) {
+          driving = true;
+          currentSimSoc = p.soc1;
+        } else if (p.drive2Start && (h === p.drive2Start || (p.drive2End && h === p.drive2End))) {
+          driving = true;
+          currentSimSoc = p.soc2;
+        }
+
+        hours[h] = {
+          soc: currentSimSoc,
+          charging,
+          driving,
+          last_known: !charging && !driving
+        };
+      }
+      valid_samples = 280;
+    } else {
+      let runningSoc = Math.min(100, Math.max(10, currentSoc + (isDriving ? 8 : isCharging ? -15 : 4)));
+      for (let h = 0; h <= currentHour; h++) {
+        if (h === currentHour) {
+          hours[h] = {
+            soc: currentSoc,
+            charging: isCharging,
+            driving: isDriving,
+            last_known: !isCharging && !isDriving
+          };
+          if (isCharging) charge_hours[h] = true;
+        } else {
+          const isMorningCommute = (h === 8 || h === 9);
+          const wasOvernightCharge = (h >= 1 && h <= 4);
+          let ch = wasOvernightCharge;
+          let dr = isMorningCommute;
+          if (ch) {
+            charge_hours[h] = true;
+            runningSoc = Math.min(95, runningSoc + 8);
+          } else if (dr) {
+            runningSoc = Math.max(20, runningSoc - 6);
+          }
+          hours[h] = {
+            soc: Math.round(runningSoc),
+            charging: ch,
+            driving: dr,
+            last_known: !ch && !dr
+          };
+        }
+      }
+      used = Math.round(Math.max(5, (100 - currentSoc) * 0.6) * 10) / 10;
+      drive_s = isDriving ? 3200 : 2100;
+      charge_s = isCharging ? 5400 : 1800;
+      valid_samples = Math.max(12, currentHour * 14);
+    }
+
+    days.push({
+      date: dateStr,
+      used,
+      drive_s,
+      charge_s,
+      covered_s: drive_s + charge_s + (isToday ? currentHour * 900 : 3600 * 8),
+      received_samples: valid_samples + 8,
+      valid_samples,
+      stale_samples: 1,
+      hours,
+      charge_hours
+    });
+  }
+
+  return days;
+}
+
 // Display-only policy; raw input is retained separately and never written to HA.
 export const DEBUG_FRESHNESS = { measurement: 180, telemetry: 300, sync: 180 };
 export const DEBUG_MODES = [
@@ -284,9 +400,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
       v.eta_100 = null;
     }
 
+    const batteryHistory = generateMockBatteryHistory(this.state.soc, isCharging, isDriving, now);
+    v.battery_history = batteryHistory;
+
     const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
     if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
-    this.dashCard.v = {...displayed, debug_raw: v};
+    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v};
     this.dashCard.busy = false;
     this.dashCard.render();
     this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
@@ -1059,6 +1178,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
       ];
     }
+    if (!card.v) card.v = {};
+    if (!card.v.battery_history) {
+      card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
+    }
 
     const origRender = card.render.bind(card);
     card.render = () => {
@@ -1411,3 +1534,4 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
   }
 }
+CarrotDebugDashboard.prototype.generateMockBatteryHistory = generateMockBatteryHistory;

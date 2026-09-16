@@ -39,7 +39,19 @@ debug.state.mode='cloud_error';debug.applyDebugTelemetry();assert.equal(debug.da
 debug.state.mode='charging';debug.applyDebugTelemetry();assert.equal(debug.dashCard.v.display_state,'charging');assert.equal(debug.dashCard.v.charge_power_w,9900);
 debug.state.mode='driving';debug.applyDebugTelemetry();
 debug.state.mode='stale';debug.applyDebugTelemetry();assert.equal(debug.dashCard.v.last_confirmed_state,'driving');assert.equal(debug.dashCard.v.onroad,true);
-console.log('Debug freshness: thresholds, raw isolation, expiry, last healthy state, outage and recovery passed.');
+
+// Verify simulated battery_history for charging tab
+debug.state.mode='charging';debug.state.soc=80;debug.applyDebugTelemetry();
+assert.equal(Array.isArray(debug.dashCard.v.battery_history),true);
+assert.equal(debug.dashCard.v.battery_history.length,7);
+const todayHistory=debug.dashCard.v.battery_history[6];
+assert.equal(todayHistory.hours.length,24);
+assert.equal(todayHistory.charge_hours.length,24);
+const currHour=new Date().getHours();
+assert.equal(todayHistory.hours[currHour].charging,true);
+assert.equal(todayHistory.hours[currHour].soc,80);
+
+console.log('Debug freshness: thresholds, raw isolation, expiry, last healthy state, outage, recovery and battery history passed.');
 
 assert.equal(source.includes('debug-freshness-notice'),false);
 assert.equal(source.includes('debug-last-value'),false);
