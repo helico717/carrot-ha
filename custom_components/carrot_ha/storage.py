@@ -13,6 +13,7 @@ class Archive:
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE INDEX IF NOT EXISTS history ON events(device,observed)')
+            db.execute('CREATE INDEX IF NOT EXISTS idx_events_kind_observed ON events(kind,observed)')
 
     @contextmanager
     def connect(self):
@@ -98,4 +99,56 @@ class Archive:
             if value is not None: db.execute('INSERT INTO cursors VALUES (?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value',(name,value))
             row = db.execute('SELECT value FROM cursors WHERE name=?',(name,)).fetchone()
         return row[0] if row else 0
+
+    def purge_expired(self, state_days=14, trip_days=90, charge_days=90, slim_trip_days=14):
+        """Purge expired records while maintaining dashboard and sensor integrity.
+        - state: 14 days (covers 7-day battery chart with safety margin)
+        - trip: 90 days (covers current and previous month distance/count totals)
+        - charge: 90 days (covers history view)
+        - slim trips older than slim_trip_days: clears route points to save 95% space while keeping summary stats.
+        """
+        counts = {'purged_state': 0, 'purged_trip': 0, 'purged_charge': 0, 'slimmed_trip': 0}
+        with self.connect() as db:
+            cur = db.execute(
+                "DELETE FROM events WHERE kind='state' AND julianday('now') - julianday(observed) > ?",
+                (state_days,)
+            )
+            counts['purged_state'] = cur.rowcount
+
+            cur = db.execute(
+                "DELETE FROM events WHERE kind='charge' AND julianday('now') - julianday(observed) > ?",
+                (charge_days,)
+            )
+            counts['purged_charge'] = cur.rowcount
+
+            cur = db.execute(
+                "DELETE FROM events WHERE kind='trip' AND julianday('now') - julianday(observed) > ?",
+                (trip_days,)
+            )
+            counts['purged_trip'] = cur.rowcount
+
+            if slim_trip_days is not None and slim_trip_days < trip_days:
+                cur = db.execute(
+                    """
+                    UPDATE events
+                    SET body = json_set(body, '$.data.route', json('[]'))
+                    WHERE kind='trip'
+                      AND julianday('now') - julianday(observed) > ?
+                      AND json_extract(body, '$.data.route') IS NOT NULL
+                      AND json_extract(body, '$.data.route') != '[]'
+                    """,
+                    (slim_trip_days,)
+                )
+                counts['slimmed_trip'] = cur.rowcount
+        return counts
+
+    def vacuum(self):
+        """Reclaim freed database pages from the filesystem."""
+        conn = sqlite3.connect(self.path, timeout=30)
+        try:
+            conn.isolation_level = None
+            conn.execute('VACUUM')
+        finally:
+            conn.close()
+
 

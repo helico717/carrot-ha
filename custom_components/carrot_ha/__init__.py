@@ -21,6 +21,16 @@ async def async_setup(hass, config):
     hass.http.register_view(HistoryView(hass))
     hass.http.register_view(DevicesView(hass))
     hass.http.register_view(DashboardView(hass))
+
+    async def async_handle_purge(call):
+        for runtime in hass.data.get(DOMAIN, {}).values():
+            if isinstance(runtime, dict) and 'archive' in runtime:
+                await hass.async_add_executor_job(runtime['archive'].purge_expired)
+                await hass.async_add_executor_job(runtime['archive'].vacuum)
+                runtime['summary'] = await hass.async_add_executor_job(runtime['archive'].overview, runtime['entry'].data['device_id'])
+                async_dispatcher_send(hass, DOMAIN + runtime['entry'].entry_id)
+
+    hass.services.async_register(DOMAIN, 'purge_database', async_handle_purge)
     return True
 
 async def async_setup_entry(hass, entry):
@@ -40,6 +50,19 @@ async def async_setup_entry(hass, entry):
             runtime['cloud_task'] = hass.async_create_background_task(sync(hass, runtime), 'carrot cloud sync')
     entry.async_on_unload(async_track_time_interval(hass, start_sync, timedelta(seconds=60)))
     start_sync()
+
+    async def run_daily_purge(now=None):
+        await hass.async_add_executor_job(archive.purge_expired)
+        runtime['summary'] = await hass.async_add_executor_job(archive.overview, entry.data['device_id'])
+        async_dispatcher_send(hass, DOMAIN + entry.entry_id)
+
+    async def run_weekly_vacuum(now=None):
+        await hass.async_add_executor_job(archive.vacuum)
+
+    entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_daily_purge()), timedelta(days=1)))
+    entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_weekly_vacuum()), timedelta(days=7)))
+    hass.async_create_task(run_daily_purge())
+
     return True
 
 async def _options_updated(hass, entry):

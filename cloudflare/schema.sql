@@ -130,4 +130,7 @@ CREATE TABLE IF NOT EXISTS telemetry_history (
  raw_json TEXT NOT NULL,
  UNIQUE(device_id,updated_at)
 );
+CREATE INDEX IF NOT EXISTS telemetry_history_updated_at_idx
+  ON telemetry_history(updated_at);
 CREATE TABLE IF NOT EXISTS trip_quality (id TEXT PRIMARY KEY, partial INTEGER NOT NULL);
+
