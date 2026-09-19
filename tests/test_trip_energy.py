@@ -93,6 +93,8 @@ class TestTripEnergy(unittest.TestCase):
         data = result[0]['data']
         self.assertEqual(data['start_battery_wh'], 50000.0)
         self.assertEqual(data['end_battery_wh'], 48000.0)
+        self.assertAlmostEqual(data['start_soc_percent'], 64.1, places=1)
+        self.assertAlmostEqual(data['end_soc_percent'], 61.5, places=1)
         self.assertEqual(data['energy_wh'], 2000.0)
         # efficiency = 10km / 2kWh = 5.0 km/kWh
         self.assertEqual(data['efficiency_km_kwh'], 5.0)

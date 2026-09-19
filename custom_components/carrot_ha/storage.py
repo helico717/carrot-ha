@@ -257,6 +257,8 @@ class Archive:
                 energy_wh = round(start_wh - end_wh, 1)
                 data['start_battery_wh'] = round(start_wh, 1)
                 data['end_battery_wh'] = round(end_wh, 1)
+                data['start_soc_percent'] = round(min(100.0, max(0.0, start_wh / (capacity_kwh * 1000) * 100)), 1)
+                data['end_soc_percent'] = round(min(100.0, max(0.0, end_wh / (capacity_kwh * 1000) * 100)), 1)
                 data['energy_wh'] = energy_wh
                 data['soc_used_percent'] = round(energy_wh / (capacity_kwh * 1000) * 100, 1)
 

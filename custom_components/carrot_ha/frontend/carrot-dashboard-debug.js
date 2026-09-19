@@ -1158,25 +1158,92 @@ export default class CarrotDebugDashboard extends HTMLElement {
     };
 
     if (!card.trips || card.trips.length === 0) {
+      const nowMs = Date.now();
       card.trips = [
         {
-          observed_at: new Date().toISOString(),
+          observed_at: new Date(nowMs - 300000).toISOString(),
           data: {
             id: 'sim-trip-1',
-            started_at: new Date(Date.now() - 1800000).toISOString(),
-            ended_at: new Date(Date.now() - 300000).toISOString(),
-            duration_s: 1500,
-            distance_m: 14200,
-            energy_wh: 2370,
-            efficiency_km_kwh: 5.99,
-            soc_used_percent: 3.04,
-            start_battery_wh: 45000,
-            end_battery_wh: 42630,
+            started_at: new Date(nowMs - 1494000 - 300000).toISOString(),
+            ended_at: new Date(nowMs - 300000).toISOString(),
+            duration_s: 1494, // 24m 54s -> "24분 동안 주행"
+            distance_m: 15600,
+            energy_wh: 2100,
+            efficiency_km_kwh: 7.4,
+            soc_used_percent: 2.7,
+            start_battery_wh: 59400,
+            end_battery_wh: 57300,
+            start_soc_percent: 76.2,
+            end_soc_percent: 73.5,
             route: [
               { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
               { latitude: 37.5680, longitude: 126.9800, speedMps: 11.2 },
               { latitude: 37.5700, longitude: 126.9830, speedMps: 14.5 },
               { latitude: 37.5720, longitude: 126.9850, speedMps: 0 }
+            ]
+          }
+        },
+        {
+          observed_at: new Date(nowMs - 3600000).toISOString(),
+          data: {
+            id: 'sim-trip-2',
+            started_at: new Date(nowMs - 3600000 - 1038000).toISOString(),
+            ended_at: new Date(nowMs - 3600000).toISOString(),
+            duration_s: 1038, // 17m 18s -> "17분 동안 주행"
+            distance_m: 6860,
+            energy_wh: 1200,
+            efficiency_km_kwh: 5.7,
+            soc_used_percent: 1.5,
+            start_battery_wh: 61600,
+            end_battery_wh: 60400,
+            start_soc_percent: 79.0,
+            end_soc_percent: 77.4,
+            route: [
+              { latitude: 37.5720, longitude: 126.9850, speedMps: 0 },
+              { latitude: 37.5750, longitude: 126.9900, speedMps: 8.5 },
+              { latitude: 37.5780, longitude: 126.9950, speedMps: 0 }
+            ]
+          }
+        },
+        {
+          observed_at: new Date(nowMs - 14400000).toISOString(),
+          data: {
+            id: 'sim-trip-3',
+            started_at: new Date(nowMs - 14400000 - 4500000).toISOString(),
+            ended_at: new Date(nowMs - 14400000).toISOString(),
+            duration_s: 4500, // 1h 15m -> "1시간 15분 동안 주행"
+            distance_m: 54600,
+            energy_wh: 8500,
+            efficiency_km_kwh: 6.4,
+            soc_used_percent: 10.9,
+            start_battery_wh: 70100,
+            end_battery_wh: 61600,
+            start_soc_percent: 89.9,
+            end_soc_percent: 79.0,
+            route: [
+              { latitude: 37.5000, longitude: 127.0000, speedMps: 0 },
+              { latitude: 37.5780, longitude: 126.9950, speedMps: 0 }
+            ]
+          }
+        },
+        {
+          observed_at: new Date(nowMs - 28800000).toISOString(),
+          data: {
+            id: 'sim-trip-4',
+            started_at: new Date(nowMs - 28800000 - 45000).toISOString(),
+            ended_at: new Date(nowMs - 28800000).toISOString(),
+            duration_s: 45, // < 1m -> "1분 미만 주행"
+            distance_m: 350,
+            energy_wh: 50,
+            efficiency_km_kwh: 7.0,
+            soc_used_percent: 0.1,
+            start_battery_wh: 70150,
+            end_battery_wh: 70100,
+            start_soc_percent: 90.0,
+            end_soc_percent: 89.9,
+            route: [
+              { latitude: 37.5000, longitude: 127.0000, speedMps: 0 },
+              { latitude: 37.5010, longitude: 127.0010, speedMps: 0 }
             ]
           }
         }
