@@ -361,6 +361,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
       month_distance_km: 1248,
       month_charge_kwh: 155.9,
       month_charge_cost: 43650,
+      month_slow_kwh: 45.5,
+      month_fast_kwh: 110.4,
       outside_temp_c: 24,
       aux_voltage: 13.8,
       ac_on: true,
@@ -570,6 +572,18 @@ export default class CarrotDebugDashboard extends HTMLElement {
           border: 2px dashed #3b82f6;
           padding: 8px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        #dashSlot {
+          width: 100%;
+          display: block;
+        }
+
+        #dashSlot > * {
+          width: 100% !important;
+          display: block;
         }
 
         .pane-badge {
@@ -1164,15 +1178,76 @@ export default class CarrotDebugDashboard extends HTMLElement {
       ];
     }
     if (!card.charges || card.charges.length === 0) {
+      const nowMs = Date.now();
+      const d1 = new Date(nowMs - 86400000); d1.setHours(1, 0, 0, 0);
+      const d2 = new Date(nowMs - 86400000 * 2); d2.setHours(13, 0, 0, 0);
+      const d4 = new Date(nowMs - 86400000 * 4); d4.setHours(2, 0, 0, 0);
+      const d5 = new Date(nowMs - 86400000 * 5); d5.setHours(20, 0, 0, 0);
+      const d6 = new Date(nowMs - 86400000 * 6); d6.setHours(1, 0, 0, 0);
       card.charges = [
         {
-          id: 'sim-charge-1',
-          observed_at: new Date(Date.now() - 3600000).toISOString(),
+          id: 'sim-charge-today',
+          observed_at: new Date(nowMs - 3600000).toISOString(),
           data: {
-            started_at: new Date(Date.now() - 7200000).toISOString(),
-            ended_at: new Date(Date.now() - 3600000).toISOString(),
-            energy_kwh: 22.4,
+            started_at: new Date(nowMs - 7200000).toISOString(),
+            ended_at: new Date(nowMs - 3600000).toISOString(),
+            energy_kwh: 18.2,
             duration_s: 3600,
+            partial: false
+          }
+        },
+        {
+          id: 'sim-charge-d1',
+          observed_at: new Date(d1.getTime() + 14400000).toISOString(),
+          data: {
+            started_at: d1.toISOString(),
+            ended_at: new Date(d1.getTime() + 14400000).toISOString(),
+            energy_kwh: 28.3,
+            duration_s: 14400,
+            partial: false
+          }
+        },
+        {
+          id: 'sim-charge-d2',
+          observed_at: new Date(d2.getTime() + 3600000).toISOString(),
+          data: {
+            started_at: d2.toISOString(),
+            ended_at: new Date(d2.getTime() + 3600000).toISOString(),
+            energy_kwh: 42.5,
+            duration_s: 3600,
+            partial: false
+          }
+        },
+        {
+          id: 'sim-charge-d4',
+          observed_at: new Date(d4.getTime() + 14400000).toISOString(),
+          data: {
+            started_at: d4.toISOString(),
+            ended_at: new Date(d4.getTime() + 14400000).toISOString(),
+            energy_kwh: 39.0,
+            duration_s: 14400,
+            partial: false
+          }
+        },
+        {
+          id: 'sim-charge-d5',
+          observed_at: new Date(d5.getTime() + 10800000).toISOString(),
+          data: {
+            started_at: d5.toISOString(),
+            ended_at: new Date(d5.getTime() + 10800000).toISOString(),
+            energy_kwh: 28.3,
+            duration_s: 10800,
+            partial: false
+          }
+        },
+        {
+          id: 'sim-charge-d6',
+          observed_at: new Date(d6.getTime() + 10800000).toISOString(),
+          data: {
+            started_at: d6.toISOString(),
+            ended_at: new Date(d6.getTime() + 10800000).toISOString(),
+            energy_kwh: 24.8,
+            duration_s: 10800,
             partial: false
           }
         }

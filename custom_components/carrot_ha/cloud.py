@@ -26,7 +26,7 @@ async def sync(hass, runtime):
     session = async_get_clientsession(hass)
     async def get(path):
         async with session.get(base + path, headers={'Authorization': 'Bearer ' + token,
-                                                    'User-Agent': 'CarrotHA/0.5.1',
+                                                    'User-Agent': 'CarrotHA/0.5.2',
                                                     'Accept': 'application/json'},
                                timeout=ClientTimeout(total=45), allow_redirects=False) as response:
             if response.status != 200:

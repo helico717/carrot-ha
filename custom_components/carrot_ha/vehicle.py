@@ -90,11 +90,20 @@ def values(runtime):
     month = datetime.now(kst).strftime('%Y-%m')
     entry = (data.get('charge_months') or {}).get(month)
     if entry is not None:
-        slow = round(entry.get('slow_kwh', 0), 2) if entry.get('slow_kwh') is not None else None
-        fast = round(entry.get('fast_kwh', 0), 2) if entry.get('fast_kwh') is not None else None
-        cost = int(round(entry.get('cost_krw', 0))) if entry.get('cost_krw') is not None else None
-        total = round((entry.get('slow_kwh') or 0) + (entry.get('fast_kwh') or 0), 2)
+        slow = round(entry.get('slow_kwh') or 0.0, 2)
+        fast = round(entry.get('fast_kwh') or 0.0, 2)
+        cost = int(round(entry.get('cost_krw') or 0))
+        total = round(slow + fast, 2)
         data.update(month_slow_kwh=slow, month_fast_kwh=fast, month_charge_cost=cost, month_charge_kwh=total)
+    else:
+        if data.get('month_slow_kwh') is None:
+            data['month_slow_kwh'] = 0.0
+        if data.get('month_fast_kwh') is None:
+            data['month_fast_kwh'] = 0.0
+        if data.get('month_charge_cost') is None:
+            data['month_charge_cost'] = 0
+        if data.get('month_charge_kwh') is None:
+            data['month_charge_kwh'] = 0.0
     parking = data.get('parking') or data.get('last_trip_parking') or {}
     data.update(parking_latitude=parking.get('latitude'),parking_longitude=parking.get('longitude'),parking_at=parking.get('measured_at') or parking.get('t'))
     return data
