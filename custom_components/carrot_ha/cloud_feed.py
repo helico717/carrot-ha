@@ -18,6 +18,8 @@ def parse_feed(feed, device_id):
             raise ValueError('Cloud returned a different vehicle')
         data = dict(raw.get('vehicle') or {})
         data.update(gps=raw.get('gps') or {}, onroad=state.get('onroad'), enabled=raw.get('enabled'), cloud_raw_state=state)
+        if 'driving' in data:
+            data['onroad'] = data['driving']
         stamp = state['updated_at']
         events.append(envelope(device_id, 'state', stamp, stamp, data))
         for session in data.get('charge_sessions') or []:

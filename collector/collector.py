@@ -77,8 +77,13 @@ def main():
             if 9000<=mv<=18000:sampled['aux_voltage']=round(mv/1000,2)
         enabled=None
         if sm.valid.get('selfdriveState') and mono-sm.recv_time['selfdriveState']<10:enabled=bool(sm['selfdriveState'].enabled)
-        engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled)
-        atomic(STATE/'status.json',{'status':'running','at':now,'onroad':engine.s.get('onroad'),'pending':store.count(),'can_fields':sorted((latest_sample or {}).keys()),'active_trip':bool(engine.s.get('trip'))})
+        motion=None
+        if sm.valid.get('carState') and sm.seen.get('carState') and mono-sm.recv_time['carState']<2:
+            car=sm['carState']
+            if car.canValid:
+                motion={'gear':str(car.gearShifter),'speed_mps':float(car.vEgo)}
+        engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion)
+        atomic(STATE/'status.json',{'status':'running','at':now,'onroad':engine.s['vehicle'].get('comma_onroad'),'driving':engine.s.get('onroad'),'gear':engine.s['vehicle'].get('gear'),'pending':store.count(),'can_fields':sorted((latest_sample or {}).keys()),'active_trip':bool(engine.s.get('trip'))})
 
 if __name__=='__main__':
     import fcntl

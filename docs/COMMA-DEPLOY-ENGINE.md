@@ -1,222 +1,87 @@
-# Comma 4 수집기(engine.py) 배포 및 검증 가이드
+# 콤마 수집기 업데이트: 키 ON 충전 검증
 
-Comma 장치(Comma 3 / 3X / 4)에서 실행 중인 Carrot HA 수집기(`id4-collector`)의 **충전 노이즈 검증 로직(`engine.py`)**을 안전하게 교체하고 확인하는 단계별 가이드입니다.
+이번 버전은 `collector.py`와 `engine.py`를 함께 교체합니다. engine.py만 교체하는 과거 절차는 사용하지 마세요.
+판정 기준과 제한은 [CHARGING-MOTION.md](CHARGING-MOTION.md)를 참고하세요.
 
----
+차량을 주차하고 전원을 끈 뒤 콤마는 대기 화면과 네트워크 연결을 유지합니다.
+명령이 실패하면 다음 단계로 넘어가지 않습니다. 토큰/connection.json/DB는 변경하지 않습니다.
 
-## 📌 작업 전 준비사항
+## 1. Mac: 파일 전송
 
-1. **Comma IP 확인**: Comma 기기 화면의 `Settings(설정) -> Network(네트워크)`에서 Wi-Fi IP 주소를 확인합니다. (예: `192.168.0.50`)
-2. **Mac 터미널 환경**: Mac 터미널에서 작업하며, Comma의 기본 계정은 `comma`입니다.
-3. **작업 위치 안내**:
-   - 💻 `[Mac]` : Mac 터미널에서 실행하는 커맨드
-   - 📱 `[Comma]` : Comma SSH 세션 내부에서 실행하는 커맨드
-
-> [!NOTE]
-> 커맨드 내 `<COMMA_IP>` 부분은 실제 본인 Comma의 IP 주소(예: `192.168.0.50`)로 변경하여 입력하세요.
-
----
-
-## 🚀 전체 작업 흐름 요약
-
-| 순서 | 작업 내용 | 실행 위치 | 핵심 커맨드 |
-|:---:|:---|:---:|:---|
-| 0 | 수정된 `engine.py` 준비 | 💻 `[Mac]` | `git show codex/charging-validation:collector/engine.py > ...` |
-| 1 | Comma SSH 접속 | 💻 `[Mac]` | `ssh comma@<COMMA_IP>` |
-| 2 | 기존 수집기 정지 | 📱 `[Comma]` | `rm -f /data/id4-collector/enabled && pkill -f ...` |
-| 3 | 정지 상태 확인 | 📱 `[Comma]` | `pgrep -fa collector` |
-| 4 | 기존 `engine.py` 백업 | 📱/💻 | `cp` (콤마 내부) 및 `scp` (Mac으로 복사) |
-| 5 | 수정된 `engine.py` 전송 | 💻 `[Mac]` | `scp <새파일> comma@<COMMA_IP>:/data/id4-collector/engine.py` |
-| 6 | 파일 적용 및 문법 검증 | 📱 `[Comma]` | `py_compile`, `grep`, `diff` |
-| 7 | 수집기 재시작 | 📱 `[Comma]` | `touch enabled && nohup bash supervisor.sh ... &` |
-| 8 | 정상 동작 및 로그 확인 | 📱 `[Comma]` | `pgrep`, `tail -f collector.log`, `status.py` |
-
----
-
-## 🛠️ 단계별 상세 절차
-
-### 0단계. [Mac] 수정된 `engine.py` 배포 파일 준비
-
-Mac 터미널(저장소 폴더: `/Users/davidlim/Documents/carrot-ha`)에서 충전 검증 로직이 포함된 브랜치(`codex/charging-validation`)의 최신 `engine.py`를 임시 배포용 파일로 추출합니다.
+현재 수정된 체크아웃에서 실행합니다. COMMA_IP를 실제 주소로 바꾸세요.
+SSH가 8022 포트라면 ssh에 `-p 8022`, scp에 `-P 8022`를 추가합니다.
 
 ```bash
 cd /Users/davidlim/Documents/carrot-ha
-
-# 충전 검증 커밋이 반영된 engine.py를 배포용 파일(/tmp/engine_new.py)로 추출
-git show codex/charging-validation:collector/engine.py > /tmp/engine_new.py
-
-# 파일이 정상적으로 추출되었는지 확인 (검증 함수 _sample_energy 검색)
-grep -n "_sample_energy" /tmp/engine_new.py
-```
-> 출력이 1줄 이상 나오면 정상적으로 준비된 것입니다.
-
----
-
-### 1단계. [Mac] Comma SSH 접속
-
-Mac 터미널에서 Comma로 SSH 접속합니다.
-
-```bash
-ssh comma@<COMMA_IP>
-```
-*(기본 포트는 22번입니다. 만약 포트가 8022번인 환경이라면 `ssh -p 8022 comma@<COMMA_IP>`로 접속하세요.)*
-
-접속이 완료되면 콤마의 프롬프트(`comma@comma:...$`)가 나타납니다.
-
----
-
-### 2단계. [Comma] 기존 수집기 정지
-
-수집기 감시 스크립트(`supervisor.sh`)의 자동 재시작을 방지하기 위해 플래그 파일(`enabled`)을 먼저 제거한 후 실행 중인 프로세스를 종료합니다.
-
-```bash
-# 1. 자동 재시작 방지 (enabled 파일 제거)
-rm -f /data/id4-collector/enabled
-
-# 2. 감시자 및 수집기 프로세스 종료
-pkill -f 'supervisor.sh'
-pkill -f 'collector.py'
+export COMMA_IP="192.168.43.1"
+shasum -a 256 collector/collector.py collector/engine.py
+scp collector/collector.py comma@"$COMMA_IP":/data/id4-collector/collector.py.new
+scp collector/engine.py comma@"$COMMA_IP":/data/id4-collector/engine.py.new
+ssh comma@"$COMMA_IP"
 ```
 
-> [!TIP]
-> `disable.py`를 실행하면 `/data/continue.sh`의 부팅 훅까지 지워지므로, 파일 교체 시에는 위와 같이 `enabled` 플래그 제거 후 `pkill`하는 방식이 부팅 구성을 보존하면서 가장 깔끔합니다.
+## 2. 콤마: 검증 및 백업
 
----
-
-### 3단계. [Comma] 수집기가 정상적으로 정지되었는지 확인
-
-실행 중인 수집기 프로세스가 남아있는지 확인합니다.
+이후 명령은 콤마에서 실행합니다. 두 해시가 Mac의 해당 파일과 일치해야 합니다.
 
 ```bash
-pgrep -fa 'collector'
-```
-
-**확인 기준:**
-- 아무런 출력도 나오지 않거나, 내가 방금 친 명령어 외에 프로세스가 표시되지 않으면 **정상 정지**된 상태입니다.
-- 만약 여전히 PID 번호와 함께 `/usr/local/venv/bin/python3 -u collector.py`가 남아있다면 강제 종료합니다:
-  ```bash
-  pkill -9 -f 'collector.py'
-  ```
-
----
-
-### 4단계. [Comma & Mac] 기존 engine.py 복사본 저장 (백업)
-
-만약의 상황에 즉시 롤백할 수 있도록 기존 정상 작동 파일을 Comma 내부와 Mac 양쪽에 백업합니다.
-
-#### 1) Comma 내부 백업 [Comma]
-Comma SSH 터미널에서 실행:
-```bash
-cp /data/id4-collector/engine.py /data/id4-collector/engine.py.bak_$(date +%Y%m%d_%H%M%S)
-cp /data/id4-collector/engine.py /data/id4-collector/engine.py.bak
-```
-
-#### 2) Mac으로 복사본 가져오기 [Mac]
-**새 Mac 터미널 창**을 열고 아래 커맨드를 실행하여 Mac 로컬에도 저장합니다:
-```bash
-scp comma@<COMMA_IP>:/data/id4-collector/engine.py /Users/davidlim/Documents/carrot-ha/collector/engine.py.bak_from_comma
-```
-
----
-
-### 5단계. [Mac] 수정된 engine.py를 Comma에 전송
-
-Mac 터미널에서 0단계에서 준비한 수정본을 Comma의 수집기 디렉토리로 복사합니다.
-
-```bash
-scp /tmp/engine_new.py comma@<COMMA_IP>:/data/id4-collector/engine.py
-```
-*(비밀번호를 묻는 경우 Comma SSH 비밀번호 입력)*
-
----
-
-### 6단계. [Comma] 파일이 정상적으로 들어갔는지 확인 및 문법 검증
-
-Comma SSH 터미널로 돌아와 파일이 온전히 들어갔는지 4가지 방법으로 검증합니다.
-
-```bash
-# 1. 파일 크기 및 수정 시간 확인
-ls -l /data/id4-collector/engine.py
-
-# 2. 신규 충전 검증 로직 키워드 확인
-grep -n "_sample_energy" /data/id4-collector/engine.py
-grep -n "charge_candidate" /data/id4-collector/engine.py
-
-# 3. 기존 백업 파일과의 변경점(Diff) 확인
-diff -u /data/id4-collector/engine.py.bak /data/id4-collector/engine.py
-
-# 4. Python 문법(Syntax Error) 무결성 검증
-/usr/local/venv/bin/python3 -m py_compile /data/id4-collector/engine.py
-```
-
-**확인 기준:**
-- `grep` 결과에 `_sample_energy`, `charge_candidate` 라인이 출력되어야 합니다.
-- `diff`에서 `_sample_energy` 함수 추가 및 충전 감지 판정 로직 변경이 보여야 합니다.
-- `py_compile` 실행 후 아무런 에러 메시지 없이 프롬프트가 떨어지면 문법 오류가 없는 것입니다.
-
----
-
-### 7단계. [Comma] 수집기 시작
-
-`enabled` 플래그를 다시 생성하고, 백그라운드 수집기 프로세스를 시작합니다.
-
-```bash
-# 1. 수집기 활성화 플래그 생성
-touch /data/id4-collector/enabled
-
-# 2. 백그라운드로 수집기 감시 프로세스 시작
 cd /data/id4-collector
-nohup bash /data/id4-collector/supervisor.sh >/dev/null 2>&1 < /dev/null &
+/usr/local/venv/bin/python3 -m py_compile collector.py.new engine.py.new
+sha256sum collector.py.new engine.py.new
+BACKUP_DIR="/data/id4-collector/backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP_DIR" &&
+cp -p collector.py engine.py "$BACKUP_DIR/" &&
+echo "Backup: $BACKUP_DIR"
 ```
 
----
+출력된 백업 경로를 보관하세요. 실패하면 중단합니다.
 
-### 8단계. [Comma] 수집기가 정상적으로 시작했는지 확인
+## 3. 콤마: 중단·교체·시작
 
-#### 1) 프로세스 동작 확인
 ```bash
-pgrep -fa 'collector'
+rm -f /data/id4-collector/enabled
+pkill -f '^bash /data/id4-collector/supervisor.sh$'
+pkill -f '^/usr/local/venv/bin/python3 -u collector.py$'
+pgrep -af '^bash /data/id4-collector/supervisor.sh$'
+pgrep -af '^/usr/local/venv/bin/python3 -u collector.py$'
 ```
-출력에 다음 두 프로세스가 모두 보여야 합니다:
-- `bash /data/id4-collector/supervisor.sh`
-- `/usr/local/venv/bin/python3 -u collector.py`
 
-#### 2) 실시간 로그 확인
+두 pgrep 출력이 모두 없어야 교체합니다.
+
 ```bash
-tail -f /data/id4-collector/collector.log
+mv collector.py.new collector.py &&
+mv engine.py.new engine.py &&
+/usr/local/venv/bin/python3 -m py_compile collector.py engine.py
 ```
-- CAN 샘플링 주기(~26초)에 맞춰 에러 없이 로그가 갱신되는지 확인합니다.
-- `Ctrl + C`를 눌러 로그 보기를 종료합니다.
 
-#### 3) 전송 상태 확인 스크립트 실행
+성공했을 때만 설치기를 실행합니다.
+
+```bash
+PYTHONPATH="/data/openpilot/pydeps:/data/openpilot${PYTHONPATH:+:$PYTHONPATH}" /usr/local/venv/bin/python3 /data/id4-collector/install.py
+```
+
+## 4. 콤마: 90초 후 확인
+
 ```bash
 python3 /data/id4-collector/status.py
+tail -n 30 /data/id4-collector/collector.log
 ```
-- `status.json` 및 `delivery.json`의 `age_seconds`가 최신 상태(수십 초 이내)인지 확인합니다.
 
----
+running, 최근 상태 시각, 업로드 ok, pending 감소를 확인합니다.
+그 다음 P에서 키 ON 시 gear=park, driving=false인지 확인합니다.
+키 ON인데 gear/driving이 null이면 차량 신호가 없거나 유효하지 않은 상태입니다.
+HA 통합도 함께 업데이트하고 HA 재시작 및 브라우저 새로고침을 수행해야 새 상태 표시를 완전히 지원합니다.
 
-## ⏪ 롤백(원상 복구) 절차
+## 원복
 
-새 `engine.py` 적용 후 예기치 않은 오류가 발생할 경우, 언제든 이전 상태로 즉시 되돌릴 수 있습니다.
-
-Comma SSH 터미널에서 아래 커맨드를 한 번에 실행합니다:
+3단계의 중단 명령과 프로세스 확인을 먼저 수행합니다.
+아래 경로는 2단계에서 실제 생성한 백업 경로로 바꿉니다.
 
 ```bash
-# 1. 실행 중인 프로세스 정지
-rm -f /data/id4-collector/enabled
-pkill -f 'supervisor.sh'
-pkill -f 'collector.py'
-
-# 2. 백업 파일로 원복
-cp /data/id4-collector/engine.py.bak /data/id4-collector/engine.py
-
-# 3. 수집기 재시작
-touch /data/id4-collector/enabled
-cd /data/id4-collector
-nohup bash /data/id4-collector/supervisor.sh >/dev/null 2>&1 < /dev/null &
-
-# 4. 확인
-pgrep -fa 'collector'
-tail -n 20 /data/id4-collector/collector.log
+BACKUP_DIR="/data/id4-collector/backup-실제백업시각"
+/usr/local/venv/bin/python3 -m py_compile "$BACKUP_DIR/collector.py" "$BACKUP_DIR/engine.py" &&
+cp -p "$BACKUP_DIR/collector.py" /data/id4-collector/collector.py &&
+cp -p "$BACKUP_DIR/engine.py" /data/id4-collector/engine.py
 ```
+
+성공하면 3단계 설치기를 실행한 뒤 4단계 상태를 확인합니다. DB를 덮어쓰지 않습니다.

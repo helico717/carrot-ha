@@ -600,9 +600,10 @@ class CarrotDashboard extends HTMLElement {
       return {key:'stale', label:`Vehicle data delayed · ${elapsed} min ago`};
     }
     if(stale) return {key:'stale', label:'Vehicle data delayed'};
-    if(v.onroad)return {key:'driving',label:'Driving'};
+    const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
+    if(driving)return {key:'driving',label:'Driving'};
     if(v.charging)return {key:'charging',label:'Charging'};
-    return v.onroad===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
+    return driving===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
   }
   async drawMiniMaps(v){
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];

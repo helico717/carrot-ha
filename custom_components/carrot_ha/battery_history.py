@@ -31,7 +31,7 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
             if day is not None:
                 day['valid_samples']+=1
                 if v.get('charging') in (True, 1):day['charge_hours'][local.hour]=True
-                day['hours'][local.hour]={'soc':min(100,soc),'charging':v.get('charging') is True,'driving':v.get('onroad') in (True, 1)}
+                day['hours'][local.hour]={'soc':min(100,soc),'charging':v.get('charging') is True,'driving':v.get('driving',v.get('onroad')) in (True, 1)}
             if previous and t>previous[0] and t-previous[0]<=300:
                 pt,ps,pv=previous;dt=t-pt
                 cursor=max(pt,start)
