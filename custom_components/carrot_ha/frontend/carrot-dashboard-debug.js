@@ -1166,7 +1166,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             id: 'sim-trip-1',
             started_at: new Date(nowMs - 1494000 - 300000).toISOString(),
             ended_at: new Date(nowMs - 300000).toISOString(),
-            duration_s: 1494, // 24m 54s -> "24분 동안 주행"
+            duration_s: 1494, // 24m 54s -> "24분"
             distance_m: 15600,
             energy_wh: 2100,
             efficiency_km_kwh: 7.4,
@@ -1189,7 +1189,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             id: 'sim-trip-2',
             started_at: new Date(nowMs - 3600000 - 1038000).toISOString(),
             ended_at: new Date(nowMs - 3600000).toISOString(),
-            duration_s: 1038, // 17m 18s -> "17분 동안 주행"
+            duration_s: 1038, // 17m 18s -> "17분"
             distance_m: 6860,
             energy_wh: 1200,
             efficiency_km_kwh: 5.7,
@@ -1211,7 +1211,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             id: 'sim-trip-3',
             started_at: new Date(nowMs - 14400000 - 4500000).toISOString(),
             ended_at: new Date(nowMs - 14400000).toISOString(),
-            duration_s: 4500, // 1h 15m -> "1시간 15분 동안 주행"
+            duration_s: 4500, // 1h 15m -> "1시간 15분"
             distance_m: 54600,
             energy_wh: 8500,
             efficiency_km_kwh: 6.4,
@@ -1232,7 +1232,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             id: 'sim-trip-4',
             started_at: new Date(nowMs - 28800000 - 45000).toISOString(),
             ended_at: new Date(nowMs - 28800000).toISOString(),
-            duration_s: 45, // < 1m -> "1분 미만 주행"
+            duration_s: 45, // < 1m -> "1분 미만"
             distance_m: 350,
             energy_wh: 50,
             efficiency_km_kwh: 7.0,
@@ -1428,6 +1428,64 @@ export default class CarrotDebugDashboard extends HTMLElement {
     style.textContent = `
       .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
       :host([data-theme="light"]) .badge.stale,:host([data-theme="light"]) .badge.unknown,:host([data-theme="light"]) .badge.offline,:host([data-theme="light"]) .badge.connection_unknown{background:#fff1bd;color:#745400}
+      .trip-days, .charge-days {
+        display: grid !important;
+        grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+        gap: 4px !important;
+        padding: 0 10px 15px !important;
+      }
+      .charge-days {
+        max-width: 480px !important;
+        margin: 0 auto 12px !important;
+      }
+      .trip-soc {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        font-size: 11.5px !important;
+        font-weight: 600 !important;
+        color: #34d399 !important;
+        background: rgba(16, 185, 129, 0.12) !important;
+        border: 1px solid rgba(16, 185, 129, 0.28) !important;
+        padding: 2px 7px !important;
+        border-radius: 6px !important;
+        letter-spacing: -0.2px !important;
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
+      }
+      :host([data-theme="light"]) .trip-soc {
+        background: #dcfce7 !important;
+        color: #15803d !important;
+        border-color: #86efac !important;
+      }
+      .trip-soc ha-icon {
+        --mdc-icon-size: 14px !important;
+        width: 14px !important;
+        height: 14px !important;
+        display: inline-block !important;
+        color: currentColor !important;
+        vertical-align: middle !important;
+      }
+      .trip-eff {
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-left: 6px !important;
+        font-weight: 600 !important;
+        font-size: 11.5px !important;
+        color: #38bdf8 !important;
+        background: rgba(56, 189, 248, 0.12) !important;
+        padding: 2px 7px !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(56, 189, 248, 0.25) !important;
+        letter-spacing: -0.2px !important;
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
+      }
+      :host([data-theme="light"]) .trip-eff {
+        background: #e0f2fe !important;
+        color: #0284c7 !important;
+        border-color: #bae6fd !important;
+      }
       /* Typography & Alignment Unification across States */
       .energy-head .soc-value,
       .energy-head.charging-left .soc-value {
