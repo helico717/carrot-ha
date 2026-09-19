@@ -60,6 +60,47 @@ for (const [name, DashClass, durExpected] of [
   // Assert trip-eff is adjacent (sibling), not nested inside trip-soc
   assert(!socInner.includes('trip-eff'), `${name}: trip-eff should NOT be nested inside trip-soc`);
 
+  // Test Case 2: start_battery_wh / end_battery_wh fallback when start_soc_percent is absent
+  const instWh = new DashClass();
+  instWh.v = { soc_capacity_kwh: 78.0 };
+  instWh.trips = [{
+    observed_at: '2026-09-19T10:50:00Z',
+    data: {
+      started_at: '2026-09-19T10:25:06Z',
+      ended_at: '2026-09-19T10:50:00Z',
+      duration_s: 1494,
+      distance_m: 11530,
+      efficiency_km_kwh: 7.4,
+      start_battery_wh: 59280, // 59280 / 78000 = 76%
+      end_battery_wh: 57720   // 57720 / 78000 = 74%
+    }
+  }];
+  instWh.tripDay = '2026-09-19';
+  const htmlWh = instWh.tripHistory(true);
+  assert(htmlWh.includes('class="trip-soc"'), `${name} Wh fallback: Missing trip-soc badge`);
+  assert(htmlWh.includes('76% → 74%'), `${name} Wh fallback: Expected calculated 76% → 74% from Wh`);
+  assert(htmlWh.includes('class="trip-eff"'), `${name} Wh fallback: Missing trip-eff badge`);
+  assert(htmlWh.includes('7.4 km/kWh'), `${name} Wh fallback: Missing 7.4 km/kWh`);
+  assert(!htmlWh.includes('00:24:54'), `${name} Wh fallback: Should NOT contain redundant 00:24:54`);
+
+  // Test Case 3: When no SOC is available at all, but duration & efficiency exist, do NOT duplicate duration
+  const instNoSoc = new DashClass();
+  instNoSoc.trips = [{
+    observed_at: '2026-09-19T10:50:00Z',
+    data: {
+      started_at: '2026-09-19T10:25:06Z',
+      ended_at: '2026-09-19T10:50:00Z',
+      duration_s: 1494,
+      distance_m: 11530,
+      efficiency_km_kwh: 7.4
+    }
+  }];
+  instNoSoc.tripDay = '2026-09-19';
+  const htmlNoSoc = instNoSoc.tripHistory(true);
+  assert(!htmlNoSoc.includes('class="trip-soc"'), `${name} NoSoc: Should not show trip-soc`);
+  assert(htmlNoSoc.includes('class="trip-eff"'), `${name} NoSoc: Should show trip-eff`);
+  assert(!htmlNoSoc.includes('00:24:54'), `${name} NoSoc: Should NOT duplicate 00:24:54 when duration text is already shown in header`);
+
   // Assert CSS rules directly from source
   const jsSource = name === 'Korean'
     ? await readFile(new URL('../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js', import.meta.url), 'utf8')

@@ -239,6 +239,31 @@ class TestTripEnergy(unittest.TestCase):
         self.assertNotIn('efficiency_km_kwh', data)
         self.assertAlmostEqual(data['soc_used_percent'], 0.6, places=1)
 
+    def test_soc_percent_direct_enrichment(self):
+        """Trip with state events containing soc_percent should enrich start/end SOC."""
+        t_start = self.now
+        t_end = self.now + timedelta(seconds=900)
+        self.archive.put({
+            'schema': 1, 'device_id': self.device, 'event_id': 's1', 'kind': 'state',
+            'observed_at': t_start.isoformat().replace('+00:00', 'Z'),
+            'data': {'soc_percent': 76.2}
+        })
+        self.archive.put({
+            'schema': 1, 'device_id': self.device, 'event_id': 's2', 'kind': 'state',
+            'observed_at': t_end.isoformat().replace('+00:00', 'Z'),
+            'data': {'soc_percent': 73.5}
+        })
+        trip = self._make_trip('t1', 0, 900, 10000)
+        self.archive.put(trip)
+
+        trips = self.archive.history(self.device, 'trip', 10)
+        result = self.archive.enrich_trips_energy(self.device, trips, capacity_kwh=78.0)
+
+        data = result[0]['data']
+        self.assertEqual(data['start_soc_percent'], 76.2)
+        self.assertEqual(data['end_soc_percent'], 73.5)
+        self.assertIn('efficiency_km_kwh', data)
+
 
 if __name__ == '__main__':
     unittest.main()

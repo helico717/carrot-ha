@@ -190,19 +190,22 @@ class Archive:
         min_time = (min(parsed) - timedelta(minutes=5)).isoformat()
         max_time = (max(parsed) + timedelta(minutes=5)).isoformat()
 
-        # Single query: fetch all state events with battery_wh in the range
+        # Single query: fetch all state events with battery_wh or soc_percent in the range
         with self.connect() as db:
             rows = db.execute(
                 """SELECT
                     COALESCE(
                         json_extract(body, '$.data.field_measured_at.battery_wh'),
+                        json_extract(body, '$.data.field_measured_at.soc_percent'),
                         observed
                     ) AS ts,
-                    json_extract(body, '$.data.battery_wh') AS wh
+                    json_extract(body, '$.data.battery_wh') AS wh,
+                    json_extract(body, '$.data.soc_percent') AS soc
                 FROM events
                 WHERE device=? AND kind='state'
                     AND observed >= ? AND observed <= ?
-                    AND json_extract(body, '$.data.battery_wh') IS NOT NULL
+                    AND (json_extract(body, '$.data.battery_wh') IS NOT NULL
+                         OR json_extract(body, '$.data.soc_percent') IS NOT NULL)
                 ORDER BY observed""",
                 (device, min_time, max_time)
             ).fetchall()
@@ -210,14 +213,20 @@ class Archive:
         if not rows:
             return trips
 
-        # Build sorted (epoch, battery_wh) samples
+        # Build sorted (epoch, battery_wh, soc_percent) samples
         samples = []
-        for ts_str, wh in rows:
-            if wh is None:
+        for ts_str, wh, soc in rows:
+            if wh is None and soc is None:
                 continue
             try:
                 t = _parse_ts(ts_str).timestamp()
-                samples.append((t, float(wh)))
+                if wh is not None:
+                    wh_val = float(wh)
+                    soc_val = float(soc) if soc is not None else min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
+                else:
+                    soc_val = float(soc)
+                    wh_val = (soc_val / 100.0) * (capacity_kwh * 1000)
+                samples.append((t, wh_val, soc_val))
             except (ValueError, TypeError):
                 continue
         if not samples:
@@ -225,22 +234,22 @@ class Archive:
 
         sample_times = [s[0] for s in samples]
 
-        def _nearest_wh(target_ts, max_gap_s=300):
-            """Find battery_wh closest to target_ts within max_gap_s."""
+        def _nearest_sample(target_ts, max_gap_s=300):
+            """Find (battery_wh, soc_percent) closest to target_ts within max_gap_s."""
             try:
                 t = _parse_ts(target_ts).timestamp()
             except (ValueError, TypeError):
                 return None
             idx = bisect.bisect_left(sample_times, t)
-            best_wh = None
+            best_sample = None
             best_gap = max_gap_s + 1
             for i in (idx - 1, idx):
                 if 0 <= i < len(samples):
                     gap = abs(samples[i][0] - t)
                     if gap < best_gap:
-                        best_wh = samples[i][1]
+                        best_sample = samples[i]
                         best_gap = gap
-            return best_wh if best_gap <= max_gap_s else None
+            return best_sample if best_gap <= max_gap_s else None
 
         # Enrich each trip
         for trip in trips:
@@ -250,15 +259,17 @@ class Archive:
             if not started or not ended:
                 continue
 
-            start_wh = _nearest_wh(started)
-            end_wh = _nearest_wh(ended)
+            start_sample = _nearest_sample(started)
+            end_sample = _nearest_sample(ended)
 
-            if start_wh is not None and end_wh is not None:
+            if start_sample is not None and end_sample is not None:
+                start_wh, start_soc = start_sample[1], start_sample[2]
+                end_wh, end_soc = end_sample[1], end_sample[2]
                 energy_wh = round(start_wh - end_wh, 1)
                 data['start_battery_wh'] = round(start_wh, 1)
                 data['end_battery_wh'] = round(end_wh, 1)
-                data['start_soc_percent'] = round(min(100.0, max(0.0, start_wh / (capacity_kwh * 1000) * 100)), 1)
-                data['end_soc_percent'] = round(min(100.0, max(0.0, end_wh / (capacity_kwh * 1000) * 100)), 1)
+                data['start_soc_percent'] = round(min(100.0, max(0.0, start_soc)), 1)
+                data['end_soc_percent'] = round(min(100.0, max(0.0, end_soc)), 1)
                 data['energy_wh'] = energy_wh
                 data['soc_used_percent'] = round(energy_wh / (capacity_kwh * 1000) * 100, 1)
 
