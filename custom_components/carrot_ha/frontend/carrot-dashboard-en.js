@@ -454,8 +454,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.tab==='overview')return this.overview(v);
     if(this.tab==='parking'){
       const isDriving=this.vehicleStatus(v).key==='driving';
-      const refNow=v.measured_at||new Date().toISOString();
-      const parkDur=parkingDuration(v.parking_at,refNow);
+      const parkDur=parkingDuration(v.parking_at);
       let auxStatus='Normal · No discharge risk';
       if(typeof v.aux_voltage==='number'){
         if(v.aux_voltage<12.0)auxStatus='Warning · Low voltage';
@@ -463,16 +462,16 @@ class CarrotDashboard extends HTMLElement {
       }
       const tiles=`
         ${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh,1)} kWh stored`)}
-        ${metric('Odometer',n(v.odometer_km,0),'km','counter','Vehicle odometer')}
-        ${isDriving?metric('Current speed',n(v.speed_kph,0),'km/h','speedometer','Current speed'):metric('12V battery',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
-        ${metric('Outside temperature',n(v.outside_temp_c,1),'°C','thermometer','Ambient temperature')}
+        ${metric('Odometer',n(v.odometer_km,0),'km','counter','Odometer reading')}
+        ${isDriving?metric('Current speed',n(v.speed_kph,0),'km/h','speedometer','Live cluster speed'):metric('12V battery',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
+        ${metric('Outside temp',n(v.outside_temp_c,1),'°C','thermometer','Ambient temp')}
       `;
       const lat=isDriving?(v.latitude??v.parking_latitude):v.parking_latitude;
       const lng=isDriving?(v.longitude??v.parking_longitude):v.parking_longitude;
       const timeStr=isDriving?`Live update ${time(v.measured_at)}`:`Recorded ${time(v.parking_at)}`;
       const chipHtml=isDriving
-        ?`<span class="parking-chip-badge driving"><i class="dot pulse"></i>Driving (Live)</span>`
-        :`<span class="parking-chip-badge"><i class="dot"></i>Parked · ${esc(parkDur)} ago</span>`;
+        ?`<span class="parking-chip-badge driving"><i class="dot pulse"></i>Driving (live)</span>`
+        :`<span class="parking-chip-badge"><i class="dot"></i>Parked${parkDur&&parkDur!=='—'?` · ${esc(parkDur)} ago`:''}</span>`;
       const captionSub=isDriving
         ?'Current vehicle position · Will be updated to new parking location when trip ends'
         :'Last recorded parking location';

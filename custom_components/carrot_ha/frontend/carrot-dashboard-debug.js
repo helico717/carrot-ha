@@ -336,6 +336,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.state.calcModel || 'curve'
     );
 
+    if (isDriving) {
+      this.simulatedParkingAt = null;
+    } else if (!this.simulatedParkingAt) {
+      this.simulatedParkingAt = new Date(this.scenarioAt - (this.state.mode === 'parked' ? 45 * 60000 : 0)).toISOString();
+    }
+
     const v = {
       stale: this.state.mode === 'stale',
       simulated: true,
@@ -369,7 +375,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       blower_level: 2,
       parking_latitude: 37.5665,
       parking_longitude: 126.9780,
-      parking_at: new Date().toISOString(),
+      parking_at: this.simulatedParkingAt || new Date(this.scenarioAt).toISOString(),
       latitude: 37.5665,
       longitude: 126.9780
     };

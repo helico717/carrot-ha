@@ -454,8 +454,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.tab==='overview')return this.overview(v);
     if(this.tab==='parking'){
       const isDriving=this.vehicleStatus(v).key==='driving';
-      const refNow=v.measured_at||new Date().toISOString();
-      const parkDur=parkingDuration(v.parking_at,refNow);
+      const parkDur=parkingDuration(v.parking_at);
       let auxStatus='정상 · 방전 위험 없음';
       if(typeof v.aux_voltage==='number'){
         if(v.aux_voltage<12.0)auxStatus='주의 · 저전압 경고';
@@ -472,7 +471,7 @@ class CarrotDashboard extends HTMLElement {
       const timeStr=isDriving?`실시간 수신 ${time(v.measured_at)}`:`주차 기록 ${time(v.parking_at)}`;
       const chipHtml=isDriving
         ?`<span class="parking-chip-badge driving"><i class="dot pulse"></i>주행 중 (실시간)</span>`
-        :`<span class="parking-chip-badge"><i class="dot"></i>주차중 · ${esc(parkDur)} 경과</span>`;
+        :`<span class="parking-chip-badge"><i class="dot"></i>주차중${parkDur&&parkDur!=='—'?` · ${esc(parkDur)} 경과`:''}</span>`;
       const captionSub=isDriving
         ?'현재 주행 중인 차량 위치입니다 · 운행이 종료되면 새로운 주차 위치로 자동 기록됩니다'
         :'마지막으로 기록된 주차 위치';
