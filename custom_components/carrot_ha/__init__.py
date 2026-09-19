@@ -141,6 +141,11 @@ class HistoryView(HomeAssistantView):
             rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset, request.query.get('since'))
         except ValueError:
             return web.Response(status=400)
+        if kind == 'trip' and rows:
+            capacity = runtime['entry'].options.get('soc_capacity_kwh', 78.0)
+            rows = await self.hass.async_add_executor_job(
+                runtime['archive'].enrich_trips_energy,
+                runtime['entry'].data['device_id'], rows, capacity)
         return web.json_response({'events': rows, 'offset': offset, 'limit': limit})
 
 class DevicesView(HomeAssistantView):

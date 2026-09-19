@@ -1167,6 +1167,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ended_at: new Date(Date.now() - 300000).toISOString(),
             duration_s: 1500,
             distance_m: 14200,
+            energy_wh: 2370,
+            efficiency_km_kwh: 5.99,
+            soc_used_percent: 3.04,
+            start_battery_wh: 45000,
+            end_battery_wh: 42630,
             route: [
               { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
               { latitude: 37.5680, longitude: 126.9800, speedMps: 11.2 },

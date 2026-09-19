@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 """SQLite archive with durable acknowledgements and persistent deduplication."""
+import bisect
 import sqlite3
 import json
 from datetime import datetime, timezone
@@ -151,4 +152,117 @@ class Archive:
         finally:
             conn.close()
 
+    def enrich_trips_energy(self, device, trips, capacity_kwh=78.0):
+        """Enrich trip events with energy consumption data from nearby state events.
+
+        For each trip, finds the nearest battery_wh readings around the start and
+        end times from state events. Adds energy_wh, efficiency_km_kwh, and
+        soc_used_percent to trip data in-memory (does not modify the database).
+        """
+        if not trips:
+            return trips
+
+        # Collect all trip time boundaries to determine query range
+        boundaries = []
+        for trip in trips:
+            data = trip.get('data', {})
+            for key in ('started_at', 'ended_at'):
+                ts = data.get(key)
+                if ts:
+                    boundaries.append(ts)
+        if not boundaries:
+            return trips
+
+        def _parse_ts(ts):
+            return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone(timezone.utc)
+
+        parsed = []
+        for b in boundaries:
+            try:
+                parsed.append(_parse_ts(b))
+            except (ValueError, TypeError):
+                continue
+        if not parsed:
+            return trips
+
+        # Expand range by 5 minutes on each side for nearest-neighbor lookup
+        from datetime import timedelta
+        min_time = (min(parsed) - timedelta(minutes=5)).isoformat()
+        max_time = (max(parsed) + timedelta(minutes=5)).isoformat()
+
+        # Single query: fetch all state events with battery_wh in the range
+        with self.connect() as db:
+            rows = db.execute(
+                """SELECT
+                    COALESCE(
+                        json_extract(body, '$.data.field_measured_at.battery_wh'),
+                        observed
+                    ) AS ts,
+                    json_extract(body, '$.data.battery_wh') AS wh
+                FROM events
+                WHERE device=? AND kind='state'
+                    AND observed >= ? AND observed <= ?
+                    AND json_extract(body, '$.data.battery_wh') IS NOT NULL
+                ORDER BY observed""",
+                (device, min_time, max_time)
+            ).fetchall()
+
+        if not rows:
+            return trips
+
+        # Build sorted (epoch, battery_wh) samples
+        samples = []
+        for ts_str, wh in rows:
+            if wh is None:
+                continue
+            try:
+                t = _parse_ts(ts_str).timestamp()
+                samples.append((t, float(wh)))
+            except (ValueError, TypeError):
+                continue
+        if not samples:
+            return trips
+
+        sample_times = [s[0] for s in samples]
+
+        def _nearest_wh(target_ts, max_gap_s=300):
+            """Find battery_wh closest to target_ts within max_gap_s."""
+            try:
+                t = _parse_ts(target_ts).timestamp()
+            except (ValueError, TypeError):
+                return None
+            idx = bisect.bisect_left(sample_times, t)
+            best_wh = None
+            best_gap = max_gap_s + 1
+            for i in (idx - 1, idx):
+                if 0 <= i < len(samples):
+                    gap = abs(samples[i][0] - t)
+                    if gap < best_gap:
+                        best_wh = samples[i][1]
+                        best_gap = gap
+            return best_wh if best_gap <= max_gap_s else None
+
+        # Enrich each trip
+        for trip in trips:
+            data = trip.get('data', {})
+            started = data.get('started_at')
+            ended = data.get('ended_at')
+            if not started or not ended:
+                continue
+
+            start_wh = _nearest_wh(started)
+            end_wh = _nearest_wh(ended)
+
+            if start_wh is not None and end_wh is not None:
+                energy_wh = round(start_wh - end_wh, 1)
+                data['start_battery_wh'] = round(start_wh, 1)
+                data['end_battery_wh'] = round(end_wh, 1)
+                data['energy_wh'] = energy_wh
+                data['soc_used_percent'] = round(energy_wh / (capacity_kwh * 1000) * 100, 1)
+
+                distance_m = data.get('distance_m')
+                if energy_wh > 0 and isinstance(distance_m, (int, float)) and distance_m > 0:
+                    data['efficiency_km_kwh'] = round((distance_m / 1000) / (energy_wh / 1000), 1)
+
+        return trips
 
