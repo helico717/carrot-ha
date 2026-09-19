@@ -567,11 +567,12 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="panel trip-history"><div class="paneltitle"><h2>Recent trips</h2><span class="sub">Last 7 days</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} trips"><span class="trip-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} trips</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(e.data.started_at||e.observed_at)}</b><small>${duration(e.data.duration_s)}</small></span><strong>${n((e.data.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">No trips recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its trips.</div>'}</section>`;
   }
   overview(v){
-    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'||Boolean(v.charging);
-    const isDriving=Boolean(v.onroad);
+    const displayState=this.vehicleStatus(v);
+    const charging=displayState.key==='charging';
+    const isDriving=displayState.key==='driving';
     const latest=this.trips[0]?.data;
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
-    const status=this.vehicleStatus(v).label;
+    const status=displayState.label;
     const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
     const isFast=typeof powerKw==='number'&&powerKw>=11;
     const chargeLabel=isFast?'Fast Charging...':'Slow Charging...';
@@ -621,12 +622,12 @@ class CarrotDashboard extends HTMLElement {
     };
     const measuredAge = age(v.measured_at);
     const stale = v.stale === true || (measuredAge !== null && measuredAge > 180);
-    if(stale && measuredAge !== null) {
-      const elapsed = Math.floor(measuredAge / 60);
-      return {key:'stale', label:`Vehicle data delayed · ${elapsed} min ago`};
-    }
-    if(stale) return {key:'stale', label:'Vehicle data delayed'};
     const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
+    if(stale) {
+      const last=driving===true?'driving':v.charging===true?'charging':driving===false?'parked':null;
+      const measured=measuredAge===null?'measurement time unavailable':`measured ${Math.floor(measuredAge/60)} min ago`;
+      return {key:'stale',label:last?`Last known: ${last} · ${measured}`:`Current state unknown · ${measured}`};
+    }
     if(driving)return {key:'driving',label:'Driving'};
     if(v.charging)return {key:'charging',label:'Charging'};
     return driving===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
