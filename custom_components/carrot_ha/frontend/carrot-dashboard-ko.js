@@ -437,7 +437,7 @@ class CarrotDashboard extends HTMLElement {
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
     if(this.tab==='parking'){
-      const isDriving=Boolean(v.onroad);
+      const isDriving=this.vehicleStatus(v).key==='driving';
       const refNow=v.measured_at||new Date().toISOString();
       const parkDur=parkingDuration(v.parking_at,refNow);
       let auxStatus='정상 · 방전 위험 없음';
@@ -616,20 +616,11 @@ class CarrotDashboard extends HTMLElement {
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'오프라인'};
     if(online!=='on')return {key:'unknown',label:'연결 확인 중'};
-    const age = value => {
-      const t = typeof value === 'string' ? Date.parse(value) : NaN;
-      return Number.isFinite(t) && t <= Date.now() ? (Date.now()-t)/1000 : null;
-    };
-    const measuredAge = age(v.measured_at);
-    const stale = v.stale === true || (measuredAge !== null && measuredAge > 180);
+    const isMoving=(v.speed_kph>5)||(typeof v.wheel_speed_mps==='number'&&v.wheel_speed_mps>1.5);
+    const isCharging=(Boolean(v.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving;
+    if(isCharging)return {key:'charging',label:'충전중'};
     const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
-    if(stale) {
-      const last=driving===true?'주행':v.charging===true?'충전':driving===false?'주차':null;
-      const measured=measuredAge===null?'측정 시각 확인 불가':`측정 ${Math.floor(measuredAge/60)}분 전`;
-      return {key:'stale',label:last?`마지막 확인: ${last} · ${measured}`:`현재 상태 확인 불가 · ${measured}`};
-    }
     if(driving)return {key:'driving',label:'주행 중'};
-    if(v.charging)return {key:'charging',label:'충전중'};
     return driving===false?{key:'parked',label:'주차중'}:{key:'unknown',label:'상태 확인 중'};
   }
   async drawMiniMaps(v){
@@ -642,8 +633,8 @@ class CarrotDashboard extends HTMLElement {
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
       const route=(this.trips[0]?.data?.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude));
       const dot=(p,c)=>L.circleMarker(p,{radius:5,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(map);
-      if(i&&route.length){const coords=route.map(p=>[p.latitude,p.longitude]);const max=Math.max(...route.map(p=>p.speedMps??p.speed_mps??0),1);for(let j=1;j<route.length;j++){let t=(route[j].speedMps??route[j].speed_mps??0)/max;L.polyline([coords[j-1],coords[j]],{color:`hsl(${18+118*t},95%,40%)`,weight:4,opacity:1}).addTo(map)}map.fitBounds(coords,{paddingTopLeft:[16,12],paddingBottomRight:[16,34],maxZoom:14});dot(coords[0],'#79ceff');dot(coords.at(-1),'#1260e8');}
-      else if(!i&&Number.isFinite(v.parking_latitude)){const p=[v.parking_latitude,v.parking_longitude];map.setView(p,14);map.panBy([0,12],{animate:false});dot(p,'#1260e8');}
+      if(i&&route.length){const coords=route.map(p=>[p.latitude,p.longitude]);const max=Math.max(...route.map(p=>p.speedMps??p.speed_mps??0),1);for(let j=1;j<route.length;j++){let t=(route[j].speedMps??route[j].speed_mps??0)/max;L.polyline([coords[j-1],coords[j]],{color:`hsl(${18+118*t},95%,40%)`,weight:4,opacity:1}).addTo(map)}map.fitBounds(coords,{padding:[16,16],maxZoom:14});dot(coords[0],'#79ceff');dot(coords.at(-1),'#1260e8');}
+      else if(!i&&Number.isFinite(v.parking_latitude)){const p=[v.parking_latitude,v.parking_longitude];map.setView(p,14);dot(p,'#1260e8');}
       else{this.miniMaps=this.miniMaps.filter(item=>item!==map);map.remove();node.textContent='위치 정보 없음';}
     });
     setTimeout(()=>{
@@ -665,7 +656,7 @@ class CarrotDashboard extends HTMLElement {
     try{
       const L=await leaflet();if(!node.isConnected)return;
       const points=route.filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
-      const isDriving=Boolean(v.onroad);
+      const isDriving=this.vehicleStatus(v).key==='driving';
       const liveCoord=(isDriving&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Math.abs(v.latitude)<=90&&Math.abs(v.longitude)<=180)?[v.latitude,v.longitude]:null;
       const parkingCoord=(Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)&&Math.abs(v.parking_latitude)<=90&&Math.abs(v.parking_longitude)<=180)?[v.parking_latitude,v.parking_longitude]:null;
       const targetPos=liveCoord||parkingCoord;
