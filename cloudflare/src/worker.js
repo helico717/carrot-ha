@@ -2201,15 +2201,66 @@ async function handleTelemetryHistory(request,env) {
   return json({events:rows.slice(0,limit),has_more:rows.length>limit});
 }
 
+async function purgeExpiredData(env, options = {}) {
+  const telemetryDays = options.telemetryDays || 14;
+  const tripDays = options.tripDays || 90;
+  const eventDays = options.eventDays || 30;
+  const results = {};
+  if (env.DB) {
+    try {
+      const tRes = await env.DB.prepare(
+        "DELETE FROM telemetry_history WHERE updated_at < datetime('now', '-' || ? || ' days')"
+      ).bind(telemetryDays).run();
+      results.purged_telemetry = tRes?.meta?.changes || 0;
+
+      const trRes = await env.DB.prepare(
+        "DELETE FROM trips WHERE ended_at < datetime('now', '-' || ? || ' days')"
+      ).bind(tripDays).run();
+      results.purged_trips = trRes?.meta?.changes || 0;
+
+      const qRes = await env.DB.prepare(
+        "DELETE FROM trip_quality WHERE id NOT IN (SELECT id FROM trips)"
+      ).run();
+      results.purged_quality = qRes?.meta?.changes || 0;
+
+      const evRes = await env.DB.prepare(
+        "DELETE FROM impact_events WHERE detected_at < datetime('now', '-' || ? || ' days')"
+      ).bind(eventDays).run();
+      results.purged_impact = evRes?.meta?.changes || 0;
+
+      const snRes = await env.DB.prepare(
+        "DELETE FROM snapshots WHERE captured_at < datetime('now', '-' || ? || ' days')"
+      ).bind(eventDays).run();
+      results.purged_snapshots = snRes?.meta?.changes || 0;
+    } catch (err) {
+      console.warn("purgeExpiredData error:", err?.message || err);
+      results.error = String(err);
+    }
+  }
+  return results;
+}
+
+async function handleCleanup(request, env) {
+  if (!authorize(request, env, true)) return json({ error: "unauthorized" }, 401);
+  const results = await purgeExpiredData(env);
+  return json({ ok: true, cleaned: results });
+}
+
 export default {
   async fetch(request, env) {
     if (!requireBindings(env)) return json({error: "missing_cloudflare_bindings"}, 503);
     const {pathname} = new URL(request.url);
+    if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
     if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
     if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
     if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
     if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
     if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
     return json({error: "not_found"}, 404);
+  },
+  async scheduled(event, env, ctx) {
+    if (env.DB) {
+      ctx.waitUntil(purgeExpiredData(env));
+    }
   }
 };

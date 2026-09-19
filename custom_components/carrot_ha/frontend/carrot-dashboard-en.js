@@ -1,11 +1,33 @@
+import {tripDays, loadRecentTrips, mergeConsecutiveCharges} from './carrot-trip-days.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('en-GB',{maximumFractionDigits:digits}) : '—';
 const time = v => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('en-GB',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}) : 'No records';
+const timeOnly = v => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit'}) : 'No records';
 const duration = v => typeof v==='number' ? [Math.floor(v/3600),Math.floor(v/60)%60,Math.floor(v)%60].map(x=>String(x).padStart(2,'0')).join(':') : '—';
 const shortDuration = v => typeof v==='number' ? (Math.floor(v/3600)?Math.floor(v/3600)+' h ':'')+Math.floor(v/60)%60+' min' : '—';
-const icon = name => `<ha-icon icon="mdi:${name}"></ha-icon>`;
-const metric = (label,value,unit,ico,sub='') => `<div class="metric">${icon(ico)}<span class="label">${label}</span><strong>${esc(value)}<small>${esc(unit)}</small></strong>${sub?`<span class="hint">${esc(sub)}</span>`:''}</div>`;
+const formatDuration = s => { if(typeof s !== 'number' || !Number.isFinite(s)) return '—'; const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); if(h > 0 && m > 0) return `${h}h ${m}m elapsed`; if(h > 0) return `${h}h elapsed`; return `${m}m elapsed`; };
+const chargeDuration = s => { if(typeof s !== 'number' || !Number.isFinite(s)) return '—'; if(s <= 0) return 'Done'; const totalMins = Math.round(s/60); const h = Math.floor(totalMins/60); const m = totalMins%60; if(h === 0) return `${m}m`; return m === 0 ? `${h}h` : `${h}h ${m}m`; };
+const parkingDuration = (parkingAt, refTime) => {
+  if (!parkingAt) return '—';
+  const pTime = new Date(parkingAt).getTime();
+  const now = refTime ? new Date(refTime).getTime() : Date.now();
+  const diffMs = Math.max(0, now - pTime);
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(diffMinutes / (60 * 24));
+  const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
+  const mins = diffMinutes % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0 || days > 0) parts.push(`${hours}h`);
+  parts.push(`${mins}m`);
+  return parts.join(' ');
+};
+const icon = name => {
+  if(name==='flash-double')return `<svg viewBox="0 0 24 24" style="width:var(--mdc-icon-size,20px);height:var(--mdc-icon-size,20px);display:inline-block" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`;
+  return `<ha-icon icon="mdi:${name}"></ha-icon>`;
+};
+const metric = (label,value,unit,ico,sub='',cls='') => `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(value)}<small>${esc(unit)}</small></strong>${sub?`<span class="hint">${esc(sub)}</span>`:''}</div>`;
 function leaflet() {
   if (!window.__carrotLeaflet) window.__carrotLeaflet = new Promise((resolve,reject)=>{
     const script=document.createElement('script');script.src=assetBase+'leaflet.js';
@@ -15,7 +37,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.selected=0;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.selected=0;this.chargeDay=null;}
   setConfig(config){this.config=config;this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
@@ -38,9 +60,11 @@ class CarrotDashboard extends HTMLElement {
       const id=encodeURIComponent(this.device.entry_id);
       const [dash,trips,charges]=await Promise.all([
         this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`),
-        this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=trip&limit=20&offset=${this.offset}`),
+        loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
-      this.v=dash.values;this.trips=trips.events;this.charges=charges.events;
+      const selectedStart=this.trips[this.selected]?.data?.started_at;
+      this.v=dash.values;this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
+      this.selected=Math.max(0,this.trips.findIndex(e=>e.data.started_at===selectedStart));
       if(this.selected>=this.trips.length)this.selected=0;
     }catch(e){this.error=e instanceof Error?e.message:'HA request failed. Check your administrator account and integration version.';}
     finally{this.busy=false;this.render();}
@@ -49,6 +73,25 @@ class CarrotDashboard extends HTMLElement {
   render(){
     this.clearMiniMaps();
     if(this.map){this.map.remove();this.map=null;}
+    if(this.tab==='trips'){
+      const days=tripDays(this.trips,this._hass?.config?.time_zone);
+      if(!this.tripDay||!days.some(d=>d.key===this.tripDay)){
+        const today=days.find(d=>d.today)||days[days.length-1];
+        this.tripDay=today?today.key:null;
+        if(today?.indices?.length){
+          this.selected=today.indices[0];
+        }else if(this.trips.length){
+          this.selected=0;
+        }
+      }
+    }
+    if(this.tab==='charge'){
+      const days=tripDays(this.charges,this._hass?.config?.time_zone);
+      if(!this.chargeDay||!days.some(d=>d.key===this.chargeDay)){
+        const today=days.find(d=>d.today)||days[days.length-1];
+        this.chargeDay=today?today.key:null;
+      }
+    }
     const v=this.v,trip=this.trips[this.selected]?.data||{},route=trip.route||[];
     const isTrip=this.tab==='trips';
     const state=this.vehicleStatus(v),badge=state.label;
@@ -60,8 +103,25 @@ class CarrotDashboard extends HTMLElement {
       :host{width:100%;min-width:0}ha-card{max-width:1440px;margin:auto}.top{padding:20px 24px 12px}.top h1{font-size:25px}.brand{font-size:10px}.nav{margin:0 24px 16px}.main{padding:0 24px 18px}.foot{margin-top:14px}.foot div{line-height:1.6}.cockpit{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px}.hero{position:relative;min-height:350px;overflow:hidden;border-radius:20px;background:radial-gradient(ellipse at 65% 80%,#c2cdd0,#e5e9e6 75%);color:#17272d}.hero-copy{position:relative;z-index:1;padding:24px}.hero-copy small{font-size:11px;letter-spacing:2px}.hero-copy h2{font-size:36px;line-height:1.15;margin:10px 0 0;letter-spacing:-1.5px}.hero .car-image{position:absolute;width:100%;height:100%;object-fit:cover;inset:0 0 auto;pointer-events:none}.quick{display:flex;flex-direction:column;gap:12px;min-width:0}.energy{background:#18221f;border:1px solid #34463e;border-radius:18px;padding:18px}.energy-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.energy-head strong{font-size:42px;line-height:1}.energy-head strong small{font-size:16px;color:#a9bdb0}.energy-head span{font-size:12px;color:#a9bdb0}.energy p{margin:8px 0 0;font-size:12px;color:#b8c9bf}.quick-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}.quick-metrics .metric{padding:13px}.quick-metrics .metric strong{font-size:22px}.quick-metrics .metric ha-icon{display:none}.quick-metrics .label{margin-bottom:6px}.shortcut{display:flex;align-items:center;text-align:left;justify-content:space-between;width:100%;padding:15px;border-radius:15px;border:1px solid var(--line);background:#181c1e;gap:12px}.shortcut b{display:block;font-size:13px}.shortcut small{display:block;color:var(--muted);font-size:11px;margin-top:5px}.shortcut em{font-style:normal;color:var(--green)}.overview-links{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.mini-condition{display:flex;justify-content:space-around;gap:8px;border-top:1px solid var(--line);padding-top:13px;margin-top:14px;color:#b9c0c3;font-size:12px}.mini-condition span{white-space:nowrap}.mini-condition b{color:var(--ink)}
       @container(max-width:700px){.top{padding:15px 16px 10px}.top h1{font-size:22px}.brand{font-size:9px;letter-spacing:2px}.nav{margin:0 16px 12px}.nav button{padding:10px 4px;font-size:12px}.main{padding:0 16px 14px}.cockpit{grid-template-columns:1fr;gap:12px}.hero{min-height:160px}.hero-copy{padding:17px}.hero-copy h2{font-size:28px;max-width:160px}.hero .car-image{width:83%;height:250px;left:20%;top:-48px;object-fit:cover}.energy{padding:13px 15px}.energy-head strong{font-size:34px}.batterybar{margin:10px 0 4px}.quick{gap:10px}.quick-metrics .metric{padding:11px 13px}.quick-metrics .metric strong{font-size:21px}.quick-metrics .label{font-size:11px}.quick-metrics .metric:nth-child(n+3){display:none}.overview-links{margin-top:10px}.shortcut{padding:12px}.shortcut small{line-height:1.5}.mini-condition{margin-top:10px;padding-top:10px;font-size:11px}.foot{font-size:10px;gap:8px}.foot .refresh{padding:9px}.map{height:310px}.metric ha-icon{margin-bottom:7px}.metric{padding:12px}.metric strong{font-size:23px}}@container(max-width:360px){.hero .car-image{left:15%;width:90%}.hero-copy h2{font-size:24px}.mini-condition{flex-wrap:wrap}.overview-links{grid-template-columns:1fr}.badge{font-size:9px}}
 
-    </style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||'Checking connection')}<br>HA updated ${time(v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`;
-    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{this.tab=b.dataset.tab;this.render();});
+    .trip-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;padding:0 10px 15px}.charge-days{max-width:480px;margin:0 auto 12px;gap:4px}.trip-day{max-width:52px;margin:0 auto;width:100%;aspect-ratio:1;min-width:0;border:0;border-radius:50%;padding:0;background:transparent;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer}.trip-day[aria-pressed="true"]{background:#dce8ff;color:#205fc6}:host([data-theme="dark"]) .trip-day[aria-pressed="true"]{background:#223a5c;color:#8fbdff}.charge-day[aria-pressed="true"]{background:#dce8ff;color:#205fc6}:host([data-theme="dark"]) .charge-day[aria-pressed="true"]{background:#223a5c;color:#8fbdff}.trip-day b{font-size:11px;white-space:nowrap}.trip-today{height:12px;line-height:12px;font-size:10px;color:#367bdd}:host([data-theme="dark"]) .trip-today{color:#8fbdff}.charge-today{color:#205fc6}:host([data-theme="dark"]) .charge-today{color:#8fbdff}.trip-count{display:flex;align-items:center;justify-content:center;gap:3px;font-size:11px;line-height:12px}.trip-count ha-icon{--mdc-icon-size:10px;width:10px;height:12px}.charge-count ha-icon{--mdc-icon-size:11px;width:11px;height:12px}.trip-day-heading{padding:13px 22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}.charge-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--line);font-size:13px;gap:12px}.charge-meta{display:flex;align-items:center;gap:14px;text-align:left;min-width:0;flex:1 1 auto}.charge-meta>div{min-width:0;text-align:left}.charge-icon-wrap,:host([data-theme="light"]) .charge-icon-wrap{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#edf4fe;color:#2563eb;flex-shrink:0}:host([data-theme="dark"]) .charge-icon-wrap{background:#162235;color:#60a5fa}.charge-icon-wrap.fast,:host([data-theme="light"]) .charge-icon-wrap.fast{background:#dbeafe;color:#1d4ed8}:host([data-theme="dark"]) .charge-icon-wrap.fast{background:#1e355b;color:#93c5fd}.charge-bolt{width:20px;height:20px;display:block;fill:currentColor}.charge-date{font-size:14px;font-weight:650;display:block;margin-bottom:4px;text-align:left!important;white-space:nowrap}.charge-info-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-align:left!important;flex-wrap:wrap}.charge-dur{color:var(--muted);font-size:12px;white-space:nowrap;flex-shrink:0}.speed-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;white-space:nowrap;flex-shrink:0}.speed-badge.slow,:host([data-theme="light"]) .speed-badge.slow{background:#edf4fe;color:#2563eb}:host([data-theme="dark"]) .speed-badge.slow{background:#162235;color:#60a5fa}.speed-badge.fast,:host([data-theme="light"]) .speed-badge.fast{background:#dbeafe;color:#1e40af}:host([data-theme="dark"]) .speed-badge.fast{background:#1e355b;color:#93c5fd}.merge-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;background:#f3e8ff;color:#6b21a8;white-space:nowrap;flex-shrink:0}:host([data-theme="dark"]) .merge-badge{background:#3b1d54;color:#e9d5ff}.charge-val{text-align:right;flex-shrink:0;max-width:55%}.charge-sub{display:block;font-size:11px;font-weight:normal;color:var(--muted);margin-top:2px;word-break:keep-all;line-height:1.3}@media(min-width:901px){.layout:has(.trip-history){grid-template-columns:minmax(0,1.35fr) minmax(390px,1fr)}}@media(max-width:420px){.trip-days{padding-left:3px;padding-right:3px;gap:0}.trip-day{gap:1px}.trip-day b{font-size:10px}.trip-today{font-size:9px;height:10px;line-height:10px}.trip-count{font-size:10px;line-height:10px}}
+.charge-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(360px,1fr);gap:18px;align-items:start}
+.charge-layout .battery-history{margin-bottom:0}
+.charge-sidebar{display:flex;flex-direction:column;gap:16px;min-width:0}
+.charge-sidebar-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px;margin-bottom:0}
+.charge-sidebar .charge-history .scroll{max-height:380px}
+.charge-sidebar .charge-days{max-width:100%;margin:0 0 10px;padding:0 8px 10px}
+@container(max-width:750px){.charge-layout{display:flex;flex-direction:column;gap:16px}.charge-sidebar-tiles{gap:10px}.charge-sidebar .charge-history .scroll{max-height:320px}}
+.parking-chip-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(18,96,232,0.18);color:#5ea2ff;border:1px solid rgba(18,96,232,0.35);padding:6px 14px;border-radius:22px;font-size:14.5px;font-weight:700;letter-spacing:-.3px}
+.parking-chip-badge.driving{background:rgba(19,120,69,0.22);color:#72df9b;border-color:rgba(114,223,155,0.4)}
+.parking-chip-badge .dot{width:9px;height:9px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
+.parking-chip-badge .dot.pulse{animation:pulse-dot 1.5s infinite}
+@keyframes pulse-dot{0%{transform:scale(0.9);opacity:.8}50%{transform:scale(1.3);opacity:1}100%{transform:scale(0.9);opacity:.8}}
+.parking-heading-wrap{display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px}
+.parking-heading-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.parking-heading-left h2{font-size:18px;margin:0}
+.parking-tiles{margin-top:18px}
+</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||'Checking connection')}<br>HA updated ${time(v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`;
+    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=0;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
@@ -84,13 +144,17 @@ class CarrotDashboard extends HTMLElement {
       :host([data-theme="light"]) .leaflet-bar a,:host([data-theme="light"]) .resetmap{background:#fff!important;color:#1b292f!important;border-color:#cbd5da!important}
       :host([data-theme="light"]) .pin{background:#72df9b}
       :host([data-theme="light"]) .pin.end{background:#ff8a18}
+      :host([data-theme="light"]) .parking-chip-badge{background:#e8f0fe;color:#1a73e8;border-color:#bad3fb}
+      :host([data-theme="light"]) .parking-chip-badge.driving{background:#e6f7ec;color:#187845;border-color:#a3e2b9}
     `;
     themeStyle.textContent+=`
       .hero{background:#777b80;color:#fff;min-height:280px;display:flex;flex-direction:column;border:0;min-width:0}
       .hero-copy{padding:16px 20px 0}.hero-copy h2{font-size:28px;margin:0;max-width:none}
       .hero .car-image{position:static;inset:auto;width:100%;max-width:100%;height:250px;object-fit:contain;object-position:center;display:block;min-width:0;flex-shrink:0;padding:12px}
       .badge.parked{background:#363b40;color:#e0e3e5}.badge.driving{background:#133960;color:#83bdff}.badge.charging{background:#173e29;color:#83e2a4}.badge.offline{background:#483c13;color:#ffe17b}
+      .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
       :host([data-theme="light"]) .badge.parked{background:#e4e7e9;color:#4b555b}:host([data-theme="light"]) .badge.driving{background:#e0edff;color:#1356a2}:host([data-theme="light"]) .badge.charging{background:#e2f2e7;color:#156332}:host([data-theme="light"]) .badge.offline{background:#fff1bd;color:#745400}
+      :host([data-theme="light"]) .badge.stale,:host([data-theme="light"]) .badge.unknown,:host([data-theme="light"]) .badge.offline,:host([data-theme="light"]) .badge.connection_unknown{background:#fff1bd;color:#745400}
       .energy{background:linear-gradient(90deg,#28583c 0 var(--soc),#18221f var(--soc) 100%);min-height:110px;display:flex;align-items:center}.energy-head{width:100%}
       :host([data-theme="light"]) .energy{background:linear-gradient(90deg,#b8dec6 0 var(--soc),#e8eeeb var(--soc) 100%)}
       .nav{margin:0 16px 12px}.theme-control{justify-content:flex-end}
@@ -108,11 +172,67 @@ class CarrotDashboard extends HTMLElement {
       :host([data-theme="light"]) .nav button.active{color:#1260e8}
       @container(max-width:700px){.energy{min-height:100px}.energy-head .soc-value{font-size:44px}.battery-label ha-icon{width:32px;height:32px}.battery-label{gap:6px}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:20px}.energy-head .soc-value{font-size:36px;gap:4px}.energy-head .soc-value small{font-size:20px}.quick-metrics .metric:nth-child(2) strong{font-size:17px}}
     `;
-    themeStyle.textContent+=`.shortcut{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 112px;grid-template-rows:1fr auto;padding:12px;gap:8px 12px;overflow:hidden;min-height:136px;align-items:start}.shortcut>span{grid-column:1;grid-row:1;padding:0}.shortcut>em{grid-column:1;grid-row:2;padding:0;align-self:end}.mini-map{grid-column:2;grid-row:1/3;height:112px;width:112px;align-self:center;border-radius:10px;overflow:hidden;pointer-events:none;background:#e5e9e7}.mini-map .leaflet-control-attribution{font-size:7px}:host([data-theme="dark"]) .mini-map{background:#20262b}:host([data-theme="dark"]) .mini-map .leaflet-tile-pane{filter:grayscale(1) invert(.91) hue-rotate(180deg) brightness(.8)}:host([data-theme="light"]) .mini-map .leaflet-tile-pane{filter:none}.overview-links{gap:12px}@container(max-width:700px){.overview-links{grid-template-columns:1fr}.shortcut{grid-template-columns:minmax(0,1fr) 100px;min-height:124px}.mini-map{height:100px;width:100px}.shortcut b{font-size:13px}.shortcut>em{font-size:12px}.shortcut small{font-size:11px}}`;
+    themeStyle.textContent+=`
+      .shortcut{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr auto;padding:10px 10px 10px 14px;gap:12px;overflow:hidden;min-height:124px;align-items:stretch}
+      .shortcut>span{grid-column:1;grid-row:1;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;padding-top:2px}
+      .shortcut>span b{font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .shortcut>span small{font-size:11px;line-height:1.35;margin-top:4px;color:var(--muted)}
+      .shortcut>em{grid-column:1;grid-row:2;padding:0;align-self:end;font-size:11.5px;font-weight:600;padding-bottom:2px}
+      .mini-map{grid-column:2;grid-row:1/3;height:100%;width:100%;min-height:104px;max-width:none;max-height:none;aspect-ratio:auto;align-self:stretch;justify-self:stretch;border-radius:12px;overflow:hidden;pointer-events:none;background:#e5e9e7;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.08)}
+      .mini-map .leaflet-control-attribution{font-size:7px}
+      :host([data-theme="dark"]) .mini-map{background:#20262b}
+      :host([data-theme="dark"]) .mini-map .leaflet-tile-pane{filter:grayscale(1) invert(.91) hue-rotate(180deg) brightness(.8)}
+      :host([data-theme="light"]) .mini-map .leaflet-tile-pane{filter:none}
+      .overview-links{gap:12px}
+
+      @container (min-width: 820px) {
+        .cockpit.desktop-balanced-cockpit{display:grid;grid-template-columns:minmax(320px,1.05fr) minmax(380px,1.35fr);gap:16px 20px;align-items:stretch;margin-bottom:0}
+        .overview-col-visual{display:flex;flex-direction:column;gap:14px;min-width:0;height:100%}
+        .overview-col-visual .hero{flex:1;min-height:340px;display:flex;flex-direction:column;justify-content:space-between;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);background:#181d22;margin:0}
+        :host([data-theme="light"]) .overview-col-visual .hero{background:#f0f3f5;border-color:var(--line)}
+        .overview-col-visual .hero-copy{padding:22px 24px 0}
+        .overview-col-visual .hero-copy h2{font-size:30px;letter-spacing:-0.5px;line-height:1.2}
+        .overview-col-visual .hero .car-image{max-height:250px;width:100%;object-fit:contain;object-position:center;margin:auto 0;padding:12px 18px}
+        .overview-col-visual .mini-condition{display:flex;justify-content:space-around;align-items:center;gap:10px;padding:14px 18px;margin-top:0;border-top:none;border-radius:16px;border:1px solid var(--line);background:#14171a;font-size:12.5px;color:#9ca3af}
+        :host([data-theme="light"]) .overview-col-visual .mini-condition{background:#ffffff;border-color:var(--line);color:#5b686e}
+        .overview-col-visual .mini-condition span b{font-weight:700;color:var(--ink);font-size:13.5px;margin-left:2px}
+        .overview-col-telemetry{display:flex;flex-direction:column;gap:12px;min-width:0}
+        .overview-col-telemetry .energy,.overview-col-telemetry .energy.is-charging{margin:0}
+        .overview-col-telemetry .quick-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .overview-col-telemetry .overview-links{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0}
+        .overview-col-telemetry .shortcut{min-height:124px}
+        .overview-col-telemetry .mini-map{min-height:104px}
+      }
+
+      @container (min-width: 520px) and (max-width: 819px) {
+        .overview-links{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      }
+
+      @container (max-width: 819px) {
+        .cockpit.desktop-balanced-cockpit{display:flex;flex-direction:column;gap:12px}
+        .overview-col-visual,.overview-col-telemetry{display:contents}
+        .hero{order:1}
+        .energy{order:2}
+        .quick-metrics{order:3}
+        .overview-links{order:4;margin-top:2px}
+        .shortcut{padding:10px 10px 10px 14px;min-height:118px}
+        .mini-map{min-height:98px}
+        .mini-condition{order:5;margin-top:4px}
+      }
+
+      @container (max-width: 700px) {
+        .overview-links{grid-template-columns:1fr}
+        .shortcut{padding:10px 10px 10px 12px;min-height:116px}
+        .mini-map{min-height:96px}
+        .shortcut b{font-size:14px}
+        .shortcut>em{font-size:11.5px}
+        .shortcut small{font-size:11px}
+      }
+    `;
     themeStyle.textContent+=`
       :host([data-theme="light"]) .shortcut{background:#dceaff;border-color:#d4e4fc}
       :host([data-theme="dark"]) .shortcut{background:#203b5e;border-color:#284363}
-      .shortcut b{font-size:19px;line-height:1.35}.shortcut small{font-size:12px;margin-top:7px}
+      .shortcut b{font-size:15px;line-height:1.3}.shortcut small{font-size:11px;margin-top:4px}
       .shortcut em{color:#75baff}:host([data-theme="light"]) .shortcut em{color:#1260e8}
       .tiles .metric,:host([data-theme="light"]) .tiles .metric{background:rgba(18,96,232,.5);border-color:rgba(18,96,232,.3);color:var(--ink)}
       .tiles .metric .label,.tiles .metric small,.tiles .metric ha-icon,:host([data-theme="light"]) .tiles .metric small{color:var(--ink)}
@@ -122,7 +242,6 @@ class CarrotDashboard extends HTMLElement {
       .pin,:host([data-theme="light"]) .pin{background:#79ceff80;color:#092b45;border-color:#e4f5ff}
       .pin.end,:host([data-theme="light"]) .pin.end{background:#1260e880;color:var(--ink);border-color:#d5e6ff}
       .parking-heading{background:rgba(18,96,232,.5);color:var(--ink)}.parking-heading .sub{color:inherit}
-      @container(max-width:700px){.shortcut b{font-size:17px}.shortcut small{font-size:12px}}
     `;
     themeStyle.textContent+=`
       :host([data-theme="light"]) .tiles .metric,
@@ -136,8 +255,60 @@ class CarrotDashboard extends HTMLElement {
 .battery-history{background:var(--panel,#1d1d20);border:1px solid var(--line);border-radius:24px;padding:26px;margin-bottom:20px;color:var(--ink)}
 :host([data-theme="light"]) .battery-history{background:#f3f5f8}.battery-history h2{margin:0;font-size:21px}.demo-note,.chart-key{font-size:11px;color:var(--muted)}.usage-total{padding:16px 0 24px;display:flex;flex-direction:column}.usage-total strong{font-size:46px}.usage-total span{font-size:17px;color:var(--muted)}.history-plot{position:relative;padding-right:45px}.week-bars,.hours{height:160px;display:flex;gap:12px;border-bottom:1px solid #8885;background:repeating-linear-gradient(to top,transparent 0,transparent calc(50% - 1px),#8884 calc(50% - 1px),#8884 50%)}.week-bars button{position:relative;flex:1;background:none;border:0;padding:0 10px;display:flex;align-items:flex-end}.week-bars i{display:block;width:100%;background:var(--bar);border-radius:7px 7px 0 0}.week-bars button[aria-pressed="true"]{color:var(--bar)}.week-bars button span{position:absolute;top:100%;left:0;right:0;text-align:center;padding-top:8px;font-size:14px}.week-bars small{display:block;font-size:10px}.axis{position:absolute;right:0;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:var(--muted)}.history-plot+.chart-key{margin-top:48px}.battery-history h3{font-size:14px;margin-top:28px}.hours{gap:4px;height:160px}.hour{position:relative;flex:1;display:flex;align-items:flex-end}.hour i{width:100%;background:#77777f;border-radius:3px 3px 0 0}.hour.parked i{opacity:.4}.hour.charging{background:#54ce6530;border-top:4px solid #5ad46d}.hour.charging i{background:#5ad46d}.hour em{position:absolute;top:-22px;width:100%;text-align:center;color:#5ad46d;font-size:24px}.hours-label{display:flex;justify-content:space-between;padding-right:45px;font-size:11px;color:var(--muted);margin-top:8px}.usage-stats{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);margin-top:20px;padding-top:18px;color:var(--muted);font-size:13px}.usage-stats strong{display:block;font-size:25px;color:var(--ink);margin-top:8px}@container(max-width:700px){.battery-history{padding:18px}.week-bars{gap:4px}.week-bars button{padding:0 4px}.usage-stats strong{font-size:22px}.hours{gap:2px}}
     `;
-    themeStyle.textContent+=`.energy.is-charging,:host([data-theme="light"]) .energy.is-charging{background:linear-gradient(90deg,#198346 0 var(--soc),#11562f var(--soc) 100%)}
-.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
+    themeStyle.textContent+=`
+      .energy{position:relative;overflow:visible;margin:12px 0 16px}
+      .energy.is-charging{margin:32px 0 40px !important}
+      @container(max-width:700px){.energy.is-charging{margin:30px 0 38px !important}}
+      .energy.is-charging,:host([data-theme="light"]) .energy.is-charging{background:linear-gradient(90deg,#198346 0 var(--soc),#11562f var(--soc) 100%)}
+      .energy.is-low,:host([data-theme="light"]) .energy.is-low,
+      .energy.soc-low,:host([data-theme="light"]) .energy.soc-low{background:linear-gradient(90deg,#e5a50a 0 var(--soc),#5c3809 var(--soc) 100%)}
+      .energy.is-critical,:host([data-theme="light"]) .energy.is-critical,
+      .energy.soc-critical,:host([data-theme="light"]) .energy.soc-critical{background:linear-gradient(90deg,#dc2626 0 var(--soc),#6b1414 var(--soc) 100%)}
+      .energy.is-low .battery-head-icon,.energy.soc-low .battery-head-icon,
+      .energy.is-critical .battery-head-icon,.energy.soc-critical .battery-head-icon{filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))}
+      .sweep-overlay{position:absolute;inset:0;border-radius:18px;overflow:hidden;pointer-events:none;z-index:2}
+      .sweep-clipper{position:absolute;top:0;left:0;bottom:0;width:var(--soc);overflow:hidden}
+      .sweep-beam{position:absolute;top:0;left:-60%;width:60%;height:100%;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.08) 30%,rgba(255,255,255,0.45) 50%,rgba(255,255,255,0.08) 70%,transparent 100%);filter:blur(1px);animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite}
+      .sweep-beam.fast{animation:chargeSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite !important}
+      .sweep-beam.slow{animation:chargeSweep 4.4s cubic-bezier(0.4,0,0.2,1) infinite !important}
+      .sweep-beam.driving,.energy.is-driving .sweep-beam{width:60%!important;height:100%!important;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.1) 20%,rgba(255,255,255,0.75) 50%,rgba(255,255,255,0.1) 80%,transparent 100%)!important;filter:blur(1px)!important;animation:driveSweep 2.2s cubic-bezier(0.4,0,0.2,1) infinite!important}
+      @keyframes chargeSweep{0%{left:-60%;opacity:0.15}20%{opacity:1}80%{opacity:1}100%{left:100%;opacity:0.1}}
+      @keyframes driveSweep{0%{left:100%;opacity:0.1}15%{opacity:1}85%{opacity:1}100%{left:-60%;opacity:0.1}}
+      .charge-marker{position:absolute;top:-6px;bottom:-6px;width:2px;background:rgba(255,255,255,0.9);box-shadow:0 0 5px rgba(255,255,255,0.4);z-index:4;pointer-events:none;border-radius:999px}
+      .charge-marker.marker-80{left:80%;transform:translateX(-50%)}
+      .charge-marker.marker-100{left:100%;transform:translateX(-100%)}
+      .charge-marker::before{content:attr(data-top);position:absolute;bottom:100%;right:5px;left:auto;transform:none;margin-bottom:2px;font-size:11px;font-weight:700;letter-spacing:-0.3px;color:#4ade80;text-shadow:0 1px 3px rgba(0,0,0,0.9);white-space:nowrap;text-align:right}
+      .charge-marker::after{content:attr(data-bottom);position:absolute;top:100%;right:4px;left:auto;transform:none;margin-top:3px;font-size:10px;font-weight:600;letter-spacing:-0.2px;color:#f8fafc;background:rgba(15,23,42,0.92);backdrop-filter:blur(4px);padding:1.5px 7px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.35)}
+      :host([data-theme="light"]) .charge-marker::before{color:#156332;text-shadow:none}
+      :host([data-theme="light"]) .charge-marker::after{color:#1e293b;background:rgba(255,255,255,0.95);border-color:rgba(0,0,0,0.12);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+      .marker-cap{position:absolute;left:50%;transform:translateX(-50%);width:4px;height:4px;padding:0 !important;margin:0 !important;box-sizing:border-box !important;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(74,222,128,0.7)}
+      .marker-cap.cap-top{top:-2px}
+      .marker-cap.cap-bottom{bottom:-2px}
+      .energy-head{position:relative;z-index:5}
+      .energy-head.charging-left{display:flex;align-items:center;justify-content:flex-start;position:relative;z-index:5}
+      .energy-head.charging-left .charge-info-stack{display:flex;flex-direction:column;gap:1px}
+      .energy-head.charging-left .charge-status-label{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.35)}
+      :host([data-theme="light"]) .energy-head.charging-left .charge-status-label{color:#ffffff}
+      .energy-head .soc-value,.energy-head.charging-left .soc-value{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important;display:flex;align-items:baseline;gap:4px;font-size:48px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1px}
+      .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important;font-size:24px;font-weight:700;color:#fff;letter-spacing:normal}
+      .energy-head .battery-label{display:flex;align-items:center;gap:10px}
+      .energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+      .battery-head-icon{width:26px;height:26px;fill:#ffffff !important;flex-shrink:0;opacity:0.95;filter:drop-shadow(0 0 4px rgba(255,255,255,0.4))}
+      :host([data-theme="light"]) .battery-head-icon{fill:#ffffff !important}
+      .charge-head-bolt{width:26px;height:34px;fill:#4ade80 !important;flex-shrink:0;margin-right:8px;filter:drop-shadow(0 0 6px rgba(74,222,128,0.6))}
+      :host([data-theme="light"]) .charge-head-bolt{fill:#4ade80 !important}
+      @container(max-width:700px){
+        .energy-head .soc-value,.energy-head.charging-left .soc-value{font-size:38px !important}
+        .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-size:20px !important}
+        .energy-head .battery-label span{font-size:18px !important}
+        .battery-head-icon{width:22px;height:22px}
+        .charge-head-bolt{width:22px;height:30px;margin-right:6px}
+        .quick-metrics .metric:nth-child(n+3){display:block !important}
+      }
+      .quick-metrics .metric.charge-power strong{color:#4ade80 !important}
+      :host([data-theme="light"]) .quick-metrics .metric.charge-power strong{color:#16a34a !important}
+    `;
+    themeStyle.textContent+=`.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
 `;
     themeStyle.textContent+=`.hour.driving i{background:#bbc7d8;opacity:1}.hour.parked i{background:linear-gradient(180deg,#8e8e93,#c7c7cc);opacity:1}.hour.charging i{background:#5ad46d;opacity:1}`;
     themeStyle.textContent+=`.usage-total strong{display:flex;align-items:baseline;gap:10px;white-space:nowrap}.usage-total .usage-caption{font-size:.55em;font-weight:600;color:inherit}.week-bars i{border-radius:10px 10px 3px 3px}.hour i{border-radius:7px 7px 2px 2px}.hour.charging{border-top:0;border-radius:7px 7px 0 0}.hour.charging:before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:#5ad46d;border-radius:999px}.hour em{top:-18px;left:50%;width:30px;height:38px;transform:translateX(-50%);z-index:2;line-height:0;pointer-events:none}.hour em svg{display:block;width:100%;height:100%}@container(max-width:700px){.hour em{width:22px;height:29px;top:-14px}}`;
@@ -167,6 +338,50 @@ class CarrotDashboard extends HTMLElement {
 @container(max-width:700px){.hours .charge-run-wrap{--wrap-gap:2px}}
 @container(max-width:700px){.hours .charge-run-wrap>em{width:19px;height:24px;top:-11px}}
 
+.status-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px}
+.status-group{display:flex;flex-direction:column}
+.status-group .paneltitle{padding:14px 18px;border-bottom:1px solid var(--line)}
+.status-group .paneltitle h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0;font-weight:650}
+.status-group .paneltitle h2 ha-icon{--mdc-icon-size:20px;--iron-icon-width:20px;--iron-icon-height:20px;width:20px;height:20px;color:#1260e8;display:flex;align-items:center;justify-content:center}
+:host([data-theme="dark"]) .status-group .paneltitle h2 ha-icon{color:#60a5fa}
+.status-list{padding:4px 18px 8px;flex:1}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.status-row:last-child{border-bottom:none}
+.status-label-wrap{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.status-icon{display:grid;place-items:center;width:32px;height:32px;min-width:32px;border-radius:50%;background:#edf4fe;color:#1260e8;flex-shrink:0}
+:host([data-theme="dark"]) .status-icon{background:#162235;color:#60a5fa}
+.status-icon ha-icon{--mdc-icon-size:18px;--iron-icon-width:18px;--iron-icon-height:18px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:inherit}
+.status-label{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.status-val{font-size:13px;font-weight:650;color:var(--ink);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.status-val small{font-size:11px;font-weight:normal;color:var(--muted);margin-left:3px}
+.status-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:14px;white-space:nowrap}
+.status-badge.on{background:rgba(114,223,155,.18);color:var(--green)}
+:host([data-theme="light"]) .status-badge.on{background:#e6f9ee;color:#187845}
+.status-badge.off{background:rgba(149,155,158,.18);color:var(--muted)}
+:host([data-theme="light"]) .status-badge.off{background:#eef1f3;color:#5b686e}
+.status-badge.dim{background:rgba(149,155,158,.1);color:var(--muted)}
+
+.raw-data-card{margin-top:16px;border-radius:18px}
+.raw-data-card summary{padding:14px 18px;cursor:pointer;user-select:none;list-style:none;font-size:13px;font-weight:600;color:var(--ink)}
+.raw-data-card summary::-webkit-details-marker{display:none}
+.raw-data-card[open] summary{border-bottom:1px solid var(--line)}
+.raw-summary-content{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
+.raw-summary-title{display:flex;align-items:center;gap:8px}
+.raw-summary-title ha-icon{--mdc-icon-size:18px;--iron-icon-width:18px;--iron-icon-height:18px;width:18px;height:18px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.raw-toggle-hint{font-size:11px;font-weight:normal;color:var(--muted)}
+.raw-content{padding:14px 18px 18px}
+.raw-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.raw-count{font-size:11px;color:var(--muted)}
+.copy-raw-btn{display:inline-flex;align-items:center;gap:6px;background:#202528;border:1px solid #343a3e;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .15s}
+.copy-raw-btn:hover{background:#2b3237;border-color:#485157}
+.copy-raw-btn.copied{background:rgba(114,223,155,.2);border-color:var(--green);color:var(--green)}
+:host([data-theme="light"]) .copy-raw-btn{background:#fff;border-color:var(--line);color:var(--ink)}
+:host([data-theme="light"]) .copy-raw-btn:hover{background:#f0f3f5}
+:host([data-theme="light"]) .copy-raw-btn.copied{background:#e6f9ee;border-color:#187845;color:#187845}
+.copy-raw-btn ha-icon{--mdc-icon-size:15px;--iron-icon-width:15px;--iron-icon-height:15px;width:15px;height:15px;display:flex;align-items:center;justify-content:center}
+.raw-content pre{margin:0;max-height:360px;overflow:auto;background:rgba(0,0,0,.28);border-radius:10px;padding:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.55;color:#c9d1d9}
+:host([data-theme="light"]) .raw-content pre{background:#f4f6f8;color:#24292f}
+@container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
 `;
     this.shadowRoot.append(themeStyle);
     this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{this.batteryDay=Number(b.dataset.day);this.render();});
@@ -177,29 +392,192 @@ class CarrotDashboard extends HTMLElement {
     select.onchange=()=>{this.themeMode=select.value;try{localStorage.setItem('carrot-theme-'+(this.config?.device_id||'default'),this.themeMode);}catch{}this.applyTheme();};
     this.shadowRoot.querySelector('main').append(themeControl);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
+    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;const day=tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay);if(day?.indices?.length)this.selected=day.indices[0];this.render();});
+    this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
     this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{this.selected=Number(b.dataset.trip);this.tab='trips';this.render();});
     this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=0;this.load();});
+    const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
+    if(copyBtn)copyBtn.onclick=async(e)=>{
+      e.preventDefault();e.stopPropagation();
+      const raw=JSON.stringify(v,null,2);
+      try{
+        if(navigator.clipboard&&window.isSecureContext){
+          await navigator.clipboard.writeText(raw);
+        }else{
+          const ta=document.createElement('textarea');
+          ta.value=raw;ta.style.position='fixed';ta.style.opacity='0';
+          document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
+        }
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML=`${icon('check')} <span>Copied!</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>Copy all</span>`;}},2000);
+      }catch(err){
+        copyBtn.innerHTML=`${icon('alert-circle-outline')} <span>Copy failed</span>`;
+        setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>Copy all</span>`;}},2000);
+      }
+    };
     if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
+    if (typeof window !== 'undefined' && window.ResizeObserver) {
+      if (!this._mapResizeObserver) {
+        this._mapResizeObserver = new ResizeObserver(() => {
+          if (this.miniMaps && this.miniMaps.length) {
+            this.miniMaps.forEach(m => {
+              try { m.invalidateSize(); } catch (e) {}
+            });
+          }
+        });
+      }
+      this.shadowRoot?.querySelectorAll('.mini-map').forEach(el => {
+        this._mapResizeObserver.observe(el);
+      });
+    }
     if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
   }
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
-    if(this.tab==='parking')return `<section class="panel"><div class="paneltitle parking-heading"><h2>Parking location</h2><span class="sub">${time(v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${v.parking_latitude==null?'Waiting for location':`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`}<p class="sub">Last recorded parking location</p></div></section>`;
-    if(this.tab==='vehicle')return `<h2 class="section" style="margin-top:0">Vehicle information</h2><div class="allvalues">${[
-      ['Distance this month',n(v.month_distance_km)+' km'],['Trips this month',n(v.month_trip_count,0)+'  trips'],['Battery level',n(v.soc_percent)+' %'],['Battery energy',n(v.battery_kwh)+' kWh'],['Odometer',n(v.odometer_km,0)+' km'],['Range',n(v.range_km)+' km'],['HV battery',n(v.hv_voltage)+' V'],['12V battery',n(v.aux_voltage,2)+' V'],['Estimated BMS capacity',n(v.measured_capacity_kwh)+' kWh'],['SOC calculation capacity',n(v.soc_capacity_kwh)+' kWh'],['Outside temperature',n(v.outside_temp_c)+' °C'],['Air conditioning',v.ac_on==null?'Unavailable':v.ac_on?'On':'Off'],['Blower level',n(v.blower_level,0)],['Blower control voltage',n(v.blower_volt)+' V'],['Driver seat heating',n(v.seat_heat_left,0)],['Passenger seat heating',n(v.seat_heat_right,0)],['Recirculation signal',n(v.recirc,0)],['GPS accuracy',n(v.gps_accuracy_m)+' m'],['Current speed',n(v.speed_kph)+' km/h'],['Heading',n(v.bearing_deg)+' °'],['Recorded distance',n(v.recorded_distance_km)+' km'],['Driving assistance',v.enabled==null?'Unavailable':v.enabled?'Enabled':'Disabled']].map(([l,x])=>`<div class="table-row"><span>${l}</span><b>${esc(x)}</b></div>`).join('')}</div><p class="notice">— means unavailable. Estimated BMS capacity is not battery health. SOC calculation capacity calibrates the displayed percentage. Odometer and recorded distance are different values.</p><details><summary>Show all received data</summary><pre>${esc(JSON.stringify(v,null,2))}</pre></details>`;
-    if(this.tab==='charge')return `${this.batteryHistory()}<div class="tiles">${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}${metric('Charging cost this month',n(v.month_charge_cost,0),'KRW','cash','estimated')}${metric('Slow charging (estimated)',n(v.month_slow_kwh),'kWh','power-plug')}${metric('Fast charging (estimated)',n(v.month_fast_kwh),'kWh','flash')}</div><div class="panel"><div class="paneltitle"><h2>Charging history</h2><span class="sub">Recent ${this.charges.length} items</span></div>${this.charges.length?this.charges.map(e=>`<div class="row"><span>${time(e.data.started_at)}<br>${duration(e.data.duration_s)}</span><b>${n(e.data.energy_kwh,2)} kWh<br><span>${e.data.partial?'Partial recording':'Recorded energy'}</span></b></div>`).join(''):'<div class="empty">Waiting for charging records.<br>Charging records are saved while the collector is running.</div>'}</div><p class="notice">Estimated from battery energy increases. Up to 11 kW is classified as slow charging. Estimated cost: ${n(v.month_charge_cost,0)} KRW using preset rates. No measurements are available when the vehicle is asleep or comma is off.</p>`;
+    if(this.tab==='parking'){
+      const isDriving=Boolean(v.onroad);
+      const refNow=v.measured_at||new Date().toISOString();
+      const parkDur=parkingDuration(v.parking_at,refNow);
+      let auxStatus='Normal · No discharge risk';
+      if(typeof v.aux_voltage==='number'){
+        if(v.aux_voltage<12.0)auxStatus='Warning · Low voltage';
+        else if(v.aux_voltage<12.4)auxStatus='Normal · Stable voltage';
+      }
+      const tiles=`
+        ${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh,1)} kWh stored`)}
+        ${metric('Odometer',n(v.odometer_km,0),'km','counter','Vehicle odometer')}
+        ${isDriving?metric('Current speed',n(v.speed_kph,0),'km/h','speedometer','Current speed'):metric('12V battery',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
+        ${metric('Outside temperature',n(v.outside_temp_c,1),'°C','thermometer','Ambient temperature')}
+      `;
+      const lat=isDriving?(v.latitude??v.parking_latitude):v.parking_latitude;
+      const lng=isDriving?(v.longitude??v.parking_longitude):v.parking_longitude;
+      const timeStr=isDriving?`Live update ${time(v.measured_at)}`:`Recorded ${time(v.parking_at)}`;
+      const chipHtml=isDriving
+        ?`<span class="parking-chip-badge driving"><i class="dot pulse"></i>Driving (Live)</span>`
+        :`<span class="parking-chip-badge"><i class="dot"></i>Parked · ${esc(parkDur)} ago</span>`;
+      const captionSub=isDriving
+        ?'Current vehicle position · Will be updated to new parking location when trip ends'
+        :'Last recorded parking location';
+      return `<section class="panel"><div class="paneltitle parking-heading"><div class="parking-heading-wrap"><div class="parking-heading-left"><h2>${isDriving?'Vehicle location':'Parking location'}</h2>${chipHtml}</div><span class="sub">${timeStr}</span></div></div><div class="map"></div><div class="route-caption"><b>${lat==null?'Waiting for location':`${n(lat,5)}, ${n(lng,5)}`}</b><p class="sub">${captionSub}</p></div></section><div class="tiles parking-tiles">${tiles}</div>`;
+    }
+    if(this.tab==='vehicle')return this.vehicleStatusView(v);
+    if(this.tab==='charge')return `<div class="charge-layout">${this.batteryHistory()}<div class="charge-sidebar"><div class="tiles charge-sidebar-tiles">${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}${metric('Charging cost this month',n(v.month_charge_cost,0),'KRW','cash','estimated')}${metric('Slow charging (estimated)',n(v.month_slow_kwh),'kWh','power-plug')}${metric('Fast charging (estimated)',n(v.month_fast_kwh),'kWh','flash')}</div>${this.chargeHistory()}</div></div><p class="notice">Estimated from battery energy increases. Up to 11 kW is classified as slow charging. Estimated cost: ${n(v.month_charge_cost,0)} KRW using preset rates. No measurements are available when the vehicle is asleep or comma is off.</p>`;
     const tiles=isTrip?`${metric('Distance',n(trip.distance_m==null?null:trip.distance_m/1000,2),'km','map-marker-distance')}${metric('Duration',duration(trip.duration_s),'','timer-outline')}${metric('Average speed',n(trip.duration_s?trip.distance_m/trip.duration_s*3.6:null,0),'km/h','speedometer-medium')}${metric('Top speed',n(this.maxSpeed(trip.route),0),'km/h','speedometer')}`:
-      `${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_w==null?null:v.charge_power_w/1000),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
-    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'Trip details':'Parking location'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>Low · 0 km/h</span><i class="gradient"></i><span>High · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length} route points · Start: light blue / End: blue</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'Waiting for location'}</b><div class="sub">Last parking location or trip destination</div>`}</div></section><section class="panel"><div class="paneltitle"><h2>Recent trips</h2><span class="sub">Total ${n(v.trip_count,0)} items</span></div><div class="scroll">${this.trips.length?this.trips.map((e,i)=>`<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${time(e.data.started_at||e.observed_at)}</b><small>${duration(e.data.duration_s)}</small></span><strong>${n((e.data.distance_m||0)/1000,2)} <small>km</small></strong></button>`).join(''):'<div class="empty">No saved trips.</div>'}</div><div class="pages"><button class="page" data-page="-1" ${this.offset===0?'disabled':''}>Previous</button><span class="sub">${this.offset/20+1} Page</span><button class="page" data-page="1" ${this.trips.length<20?'disabled':''}>Next</button></div></section></div>${!isTrip?`<h2 class="section">Vehicle condition</h2><div class="tiles">${metric('Outside temperature',n(v.outside_temp_c),'°C','thermometer')}${metric('12V battery',n(v.aux_voltage,2),'V','car-battery')}${metric('Air conditioning',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('Blower level',n(v.blower_level,0),'','fan')}</div>`:''}`;
+      `${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
+    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'Trip details':'Parking location'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>Low · 0 km/h</span><i class="gradient"></i><span>High · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length} route points · Start: light blue / End: blue</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'Waiting for location'}</b><div class="sub">Last parking location or trip destination</div>`}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">Vehicle condition</h2><div class="tiles">${metric('Outside temperature',n(v.outside_temp_c),'°C','thermometer')}${metric('12V battery',n(v.aux_voltage,2),'V','car-battery')}${metric('Air conditioning',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('Blower level',n(v.blower_level,0),'','fan')}</div>`:''}`;
+  }
+  vehicleStatusView(v){
+    const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
+      let valHtml;
+      if(isBadge){
+        valHtml=`<span class="status-badge ${badgeType}">${esc(val)}</span>`;
+      }else{
+        const isNone=val==='—'||val==null;
+        const uText=(!isNone&&unit)?`<small>${esc(unit)}</small>`:'';
+        valHtml=`<b class="status-val">${esc(val)}${uText}</b>`;
+      }
+      return `<div class="status-row"><div class="status-label-wrap"><span class="status-icon">${icon(ico)}</span><span class="status-label">${label}</span></div>${valHtml}</div>`;
+    };
+
+    const batteryItems=[
+      row('battery','Battery level',n(v.soc_percent),'%'),
+      row('car-electric','Range',n(v.range_km),'km'),
+      row('flash','Battery energy',n(v.battery_kwh),'kWh'),
+      row('ev-station','Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),1),'kW'),
+      ...(v.charging?[
+        row('timer-sand','Time to 80%',v.time_to_80_s!=null?shortDuration(v.time_to_80_s):'—',''),
+        row('clock-end','80% completion time',time(v.eta_80),''),
+        row('timer-sand','Time to 100%',v.time_to_100_s!=null?shortDuration(v.time_to_100_s):'—',''),
+        row('clock-end','100% completion time',time(v.eta_100),'')
+      ]:[]),
+      row('flash-outline','HV battery',n(v.hv_voltage),'V'),
+      row('car-battery','12V battery',n(v.aux_voltage,2),'V'),
+      row('battery-sync','Estimated BMS capacity',n(v.measured_capacity_kwh),'kWh'),
+      row('calculator','SOC calculation capacity',n(v.soc_capacity_kwh),'kWh')
+    ];
+
+    const drivingItems=[
+      row('counter','Odometer',n(v.odometer_km,0),'km'),
+      row('routes','Distance this month',n(v.month_distance_km),'km'),
+      row('car-multiple','Trips this month',n(v.month_trip_count,0),'trips'),
+      row('speedometer','Current speed',n(v.speed_kph),'km/h'),
+      row('compass-outline','Heading',n(v.bearing_deg),'°'),
+      row('car-cruise-control','Driving assistance',v.enabled==null?'Unavailable':v.enabled?'Enabled':'Disabled','',true,v.enabled==null?'dim':v.enabled?'on':'off'),
+      row('crosshairs-gps','GPS accuracy',n(v.gps_accuracy_m),'m'),
+      row('map-clock-outline','Recorded distance',n(v.recorded_distance_km),'km')
+    ];
+
+    const climateItems=[
+      row('thermometer','Outside temperature',n(v.outside_temp_c),'°C'),
+      row('snowflake','Air conditioning',v.ac_on==null?'Unavailable':v.ac_on?'On':'Off','',true,v.ac_on==null?'dim':v.ac_on?'on':'off'),
+      row('fan','Blower level',n(v.blower_level,0)),
+      row('fan-auto','Blower control voltage',n(v.blower_volt),'V'),
+      row('car-seat-heater','Driver seat heating',n(v.seat_heat_left,0)),
+      row('car-seat-heater','Passenger seat heating',n(v.seat_heat_right,0)),
+      row('air-filter','Recirculation signal',n(v.recirc,0))
+    ];
+
+    const group=(title,ico,items)=>`<div class="status-group panel"><div class="paneltitle"><h2>${icon(ico)}${title}</h2><span class="sub">${items.length} items</span></div><div class="status-list">${items.join('')}</div></div>`;
+
+    const fieldCount=Object.keys(v||{}).length;
+    return `<h2 class="section" style="margin-top:0">Vehicle information</h2><div class="status-groups">${group('Battery & Power','battery-charging',batteryItems)}${group('Driving & Records','steering',drivingItems)}${group('Climate & Cabin','fan',climateItems)}</div><p class="notice">— means unavailable. Estimated BMS capacity is not battery health. SOC calculation capacity calibrates the displayed percentage. Odometer and recorded distance are different values.</p><details class="raw-data-card panel"><summary><div class="raw-summary-content"><span class="raw-summary-title">${icon('code-json')} Show all received data</span><span class="raw-toggle-hint">Raw payload</span></div></summary><div class="raw-content"><div class="raw-toolbar"><span class="raw-count">Raw received payload (${fieldCount} fields)</span><button type="button" class="copy-raw-btn" aria-label="Copy all received data">${icon('content-copy')}<span>Copy all</span></button></div><pre>${esc(JSON.stringify(v,null,2))}</pre></div></details>`;
+  }
+  chargeHistory(){
+    const days=tripDays(this.charges,this._hass?.config?.time_zone);
+    if(!this.chargeDay||!days.some(d=>d.key===this.chargeDay)){
+      const today=days.find(d=>d.today)||days[days.length-1];
+      this.chargeDay=today?today.key:null;
+    }
+    const selected=days.find(d=>d.key===this.chargeDay);
+    const labels=d=>d.date.toLocaleDateString('en-US',{day:'numeric',weekday:'short',timeZone:'UTC'});
+    return `<section class="panel charge-history"><div class="paneltitle"><h2>Charging records</h2><span class="sub">Last 7 days</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} charges"><span class="trip-today charge-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} charges</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;return `<div class="row charge-row"><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeOnly(ed.started_at)}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'Fast':'Slow'}</span><span class="charge-dur">${formatDuration(ed.duration_s)}</span>${ed.merged?`<span class="merge-badge">${ed.merge_count} merged</span>`:''}</div></div></div><div class="charge-val"><strong>${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub" title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${ed.merged?`Reconnected in ${Math.max(1,Math.round((ed.merge_gap_s||0)/60))}m`:(ed.partial?'Partial data':'Recorded energy')}</span></div></div>`;}).join(''):'<div class="empty">No charges recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its charges.</div>'}</section>`;
+  }
+  tripHistory(isTrip){
+    const days=tripDays(this.trips,this._hass?.config?.time_zone);
+    if(this.tripDay&&!days.some(d=>d.key===this.tripDay))this.tripDay=null;
+    const selected=days.find(d=>d.key===this.tripDay);
+    const labels=d=>d.date.toLocaleDateString('en-US',{day:'numeric',weekday:'short',timeZone:'UTC'});
+    return `<section class="panel trip-history"><div class="paneltitle"><h2>Recent trips</h2><span class="sub">Last 7 days</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} trips"><span class="trip-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} trips</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(e.data.started_at||e.observed_at)}</b><small>${duration(e.data.duration_s)}</small></span><strong>${n((e.data.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">No trips recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its trips.</div>'}</section>`;
   }
   overview(v){
-    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on';
+    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'||Boolean(v.charging);
+    const isDriving=Boolean(v.onroad);
     const latest=this.trips[0]?.data;
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
     const status=this.vehicleStatus(v).label;
-    const power=charging?'Charging':'Not charging';
-    const powerUnit='';
-    return `<div class="cockpit"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="quick"><section class="energy ${charging?'is-charging':''}" style="--soc:${soc??0}%"><div class="energy-head"><div class="battery-label"><span>${charging?'Charging':'Battery level'}</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></section><div class="quick-metrics">${metric('Odometer',n(v.odometer_km,0),'km','counter')}${metric('Charging status',power,powerUnit,'ev-station')}${metric('Distance this month',n(v.month_distance_km),'km','routes')}${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}</div></div></div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div>`;
+    const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
+    const isFast=typeof powerKw==='number'&&powerKw>=11;
+    const chargeLabel=isFast?'Fast Charging...':'Slow Charging...';
+    const sweepSpeedClass=isFast?'fast':'slow';
+    const quickMetrics=charging
+      ?`${metric('Estimated charging power',n(powerKw,1),'kW','ev-station',isFast?'Fast charging':'Slow charging','charge-power')}`+
+       `${metric('Estimated completion',v.eta_100?timeOnly(v.eta_100):'Calculating','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' left':'100% target')}`+
+       `${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
+       `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`
+      :`${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
+       `${metric('Distance this month',n(v.month_distance_km),'km','routes')}`+
+       `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`+
+       `${metric('Charge cost this month',n(v.month_charge_cost,0),'KRW','cash','estimated')}`;
+
+    const markersHtml=charging
+      ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
+       `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
+      :'';
+
+    const sweepHtml=charging
+      ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam ${sweepSpeedClass}"></div></div></div>`
+      :(isDriving
+        ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>`
+        :'');
+
+    const energyHeadHtml=charging
+      ?`<div class="energy-head charging-left"><svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg><div class="charge-info-stack"><span class="charge-status-label">${chargeLabel}</span><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div></div>`
+      :`<div class="energy-head"><div class="battery-label"><svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg><span>Battery level</span></div><strong class="soc-value">${n(soc,0)}<small>%</small></strong></div>`;
+
+    const socState=!charging&&soc!==null?(soc<15?'is-critical soc-critical':soc<30?'is-low soc-low':''):'';
+
+    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
@@ -211,6 +589,17 @@ class CarrotDashboard extends HTMLElement {
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'Offline'};
     if(online!=='on')return {key:'unknown',label:'Checking connection'};
+    const age = value => {
+      const t = typeof value === 'string' ? Date.parse(value) : NaN;
+      return Number.isFinite(t) && t <= Date.now() ? (Date.now()-t)/1000 : null;
+    };
+    const measuredAge = age(v.measured_at);
+    const stale = v.stale === true || (measuredAge !== null && measuredAge > 180);
+    if(stale && measuredAge !== null) {
+      const elapsed = Math.floor(measuredAge / 60);
+      return {key:'stale', label:`Vehicle data delayed · ${elapsed} min ago`};
+    }
+    if(stale) return {key:'stale', label:'Vehicle data delayed'};
     const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
     if(driving)return {key:'driving',label:'Driving'};
     if(v.charging)return {key:'charging',label:'Charging'};
@@ -230,6 +619,9 @@ class CarrotDashboard extends HTMLElement {
       else if(!i&&Number.isFinite(v.parking_latitude)){const p=[v.parking_latitude,v.parking_longitude];map.setView(p,14);map.panBy([0,12],{animate:false});dot(p,'#1260e8');}
       else{this.miniMaps=this.miniMaps.filter(item=>item!==map);map.remove();node.textContent='No location data';}
     });
+    setTimeout(()=>{
+      this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
+    },100);
   }
 
   batteryHistory(){
@@ -246,8 +638,11 @@ class CarrotDashboard extends HTMLElement {
     try{
       const L=await leaflet();if(!node.isConnected)return;
       const points=route.filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
-      const parking=Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)?[v.parking_latitude,v.parking_longitude]:null;
-      if(!points.length&&!parking){node.innerHTML='<div class="empty">Waiting for valid coordinates.</div>';return;}
+      const isDriving=Boolean(v.onroad);
+      const liveCoord=(isDriving&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Math.abs(v.latitude)<=90&&Math.abs(v.longitude)<=180)?[v.latitude,v.longitude]:null;
+      const parkingCoord=(Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)&&Math.abs(v.parking_latitude)<=90&&Math.abs(v.parking_longitude)<=180)?[v.parking_latitude,v.parking_longitude]:null;
+      const targetPos=liveCoord||parkingCoord;
+      if(!points.length&&!targetPos){node.innerHTML='<div class="empty">Waiting for valid coordinates.</div>';return;}
       this.map=L.map(node,{scrollWheelZoom:false,zoomControl:true});
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(this.map);
       const marker=(pos,end,text)=>L.marker(pos,{icon:L.divIcon({className:'',html:`<div class="pin ${end?'end':''}">${text}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(this.map);
@@ -263,7 +658,7 @@ class CarrotDashboard extends HTMLElement {
           L.polyline([[a.latitude,a.longitude],[p.latitude,p.longitude]],{color,weight:6,opacity:1}).addTo(this.map);
         }
         const coords=points.map(p=>[p.latitude,p.longitude]);bounds=L.latLngBounds(coords);this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});marker(coords[0],false,'S');marker(coords.at(-1),true,'E');
-      }else{this.map.setView(parking,16);marker(parking,false,'P');bounds=L.latLngBounds([parking]);}
+      }else{this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:10px">Live</span>':'P');bounds=L.latLngBounds([targetPos]);}
       const reset=L.control({position:'bottomright'});reset.onAdd=()=>{const b=L.DomUtil.create('button','resetmap');b.textContent='⌖ Fit view';b.setAttribute('aria-label','Fit the entire route');L.DomEvent.disableClickPropagation(b);b.onclick=()=>this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});return b;};reset.addTo(this.map);
       requestAnimationFrame(()=>this.map?.invalidateSize());
     }catch(e){if(node.isConnected)node.innerHTML=`<div class="empty">${esc(e.message)}</div>`;}
