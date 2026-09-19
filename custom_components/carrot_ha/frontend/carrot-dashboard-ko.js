@@ -567,11 +567,12 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="panel trip-history"><div class="paneltitle"><h2>최근 주행</h2><span class="sub">최근 7일</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} 회 주행"><span class="trip-today">${d.today?'오늘':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} 회 주행</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(e.data.started_at||e.observed_at)}</b><small>${duration(e.data.duration_s)}</small></span><strong>${n((e.data.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">기록된 주행이 없습니다.</div>'}</div>`:'<div class="empty">날짜를 선택하면 해당 날짜의 주행 기록이 표시됩니다.</div>'}</section>`;
   }
   overview(v){
-    const charging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'||Boolean(v.charging);
-    const isDriving=Boolean(v.onroad);
+    const displayState=this.vehicleStatus(v);
+    const charging=displayState.key==='charging';
+    const isDriving=displayState.key==='driving';
     const latest=this.trips[0]?.data;
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
-    const status=this.vehicleStatus(v).label;
+    const status=displayState.label;
     const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
     const isFast=typeof powerKw==='number'&&powerKw>=11;
     const chargeLabel=isFast?'고속충전중...':'완속충전중...';
@@ -621,12 +622,12 @@ class CarrotDashboard extends HTMLElement {
     };
     const measuredAge = age(v.measured_at);
     const stale = v.stale === true || (measuredAge !== null && measuredAge > 180);
-    if(stale && measuredAge !== null) {
-      const elapsed = Math.floor(measuredAge / 60);
-      return {key:'stale', label:`차량 데이터 지연 · ${elapsed}분 전`};
-    }
-    if(stale) return {key:'stale', label:'차량 데이터 지연'};
     const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
+    if(stale) {
+      const last=driving===true?'주행':v.charging===true?'충전':driving===false?'주차':null;
+      const measured=measuredAge===null?'측정 시각 확인 불가':`측정 ${Math.floor(measuredAge/60)}분 전`;
+      return {key:'stale',label:last?`마지막 확인: ${last} · ${measured}`:`현재 상태 확인 불가 · ${measured}`};
+    }
     if(driving)return {key:'driving',label:'주행 중'};
     if(v.charging)return {key:'charging',label:'충전중'};
     return driving===false?{key:'parked',label:'주차중'}:{key:'unknown',label:'상태 확인 중'};
