@@ -211,9 +211,10 @@ class CarrotDashboard extends HTMLElement {
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'Offline'};
     if(online!=='on')return {key:'unknown',label:'Checking connection'};
-    if(v.onroad)return {key:'driving',label:'Driving'};
+    const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
+    if(driving)return {key:'driving',label:'Driving'};
     if(v.charging)return {key:'charging',label:'Charging'};
-    return v.onroad===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
+    return driving===false?{key:'parked',label:'Parked'}:{key:'unknown',label:'Checking status'};
   }
   async drawMiniMaps(v){
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];

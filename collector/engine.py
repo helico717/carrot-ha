@@ -49,7 +49,20 @@ class Engine:
         self.s.setdefault('charge_sessions',[])
         self.last_saved=0
         if self.s.get('trip'):self.s['trip']['partial']=True
-    def tick(self,now,onroad,gps=None,sampled=None,enabled=None):
+    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None):
+        comma_onroad=onroad
+        onroad=self._driving(onroad,motion)
+        self.s['vehicle'].update(comma_onroad=bool(comma_onroad),driving=onroad,
+                                 gear=motion.get('gear') if motion else None,
+                                 wheel_speed_mps=(motion.get('speed_mps') if motion and type(motion.get('speed_mps')) in (int,float) and math.isfinite(motion['speed_mps']) else None))
+        if onroad is None:
+            self.s.pop('energy_sample',None)
+            self.s.pop('charge_candidate',None)
+            if self.s.get('charge'):self.s['charge']['partial']=True
+            if self.s.get('trip'):
+                self.s['trip']['partial']=True
+                self.s['trip']['last_at']=now
+                self.s['trip'].pop('last_point',None)
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
         trip=s.get('trip')
         if onroad and not trip:
@@ -70,7 +83,7 @@ class Engine:
                     trip['last_point'],trip['last_point_at']=point,now
                     if len(trip['route'])>=720:trip['route']=trip['route'][::2]
                     trip['route'].append(point)
-        elif trip and not onroad:
+        elif trip and onroad is False:
             end=trip.get('last_at',now)
             payload={k:v for k,v in trip.items() if not k.startswith('last_')}
             payload.update(endedAt=stamp(end),durationS=round(trip['durationS']),distanceM=round(trip['distanceM'],1))
@@ -79,14 +92,14 @@ class Engine:
             s['trip']=None
         if gps:
             s['gps']=dict(gps,measured_at=stamp(now))
-            if not onroad:s['parking']=dict(gps,measured_at=stamp(now))
+            if onroad is False:s['parking']=dict(gps,measured_at=stamp(now))
         s['onroad']=onroad
         if sampled is not None:
             for key,value in sampled.items():
                 if value is not None and (not isinstance(value,float) or math.isfinite(value)):
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)
-            self._sample_energy(now, onroad, sampled.get('battery_wh'))
+            if onroad is not None:self._sample_energy(now, onroad, sampled.get('battery_wh'))
         # Expire state even when no new CAN sample arrives.
         candidate=s.get('charge_candidate')
         if candidate and now-candidate['ended_at']>=300:
@@ -100,7 +113,7 @@ class Engine:
             s.pop('charge_candidate',None)
             if not old_onroad:s.pop('energy_sample',None)
             s['vehicle'].update(charging=False,charge_power_w=0)
-        elif not fresh:
+        elif onroad is None or not fresh:
             s['vehicle'].update(charging=None,charge_power_w=None)
         else:
             s['vehicle']['charging']=bool(s.get('charge'))
@@ -111,11 +124,25 @@ class Engine:
             age=now-datetime.fromisoformat(measured).timestamp() if measured else 999999
             vehicle.update(field_measured_at=s['field_measured_at'],measured_at=measured,stale=age>120,charge_months=s['charge_months'],charge_sessions=s['charge_sessions'],parking=s.get('parking'))
             if vehicle.get('battery_wh') is not None:vehicle.update(capacity_wh=78000,soc_percent=min(100,vehicle['battery_wh']/780))
-            events.append(('/api/telemetry',{'deviceId':self.device,'updatedAt':stamp(now),'onroad':int(onroad),'ignition':int(onroad),'enabled':enabled,'gps':s.get('gps') or {},'vehicle':vehicle}))
+            events.append(('/api/telemetry',{'deviceId':self.device,'updatedAt':stamp(now),'onroad':int(onroad is True),'ignition':int(comma_onroad),'enabled':enabled,'gps':s.get('gps') or {},'vehicle':vehicle}))
             s['last_upload']=now
         if events or now-self.last_saved>=5:
             self.store.save(s,events,now);self.last_saved=now
         return events
+
+    def _driving(self, comma_onroad, motion):
+        # Only fresh, valid carState is passed by the collector. IsOnroad is
+        # comma mode, not movement. Never use stationary GPS to infer parking.
+        if motion:
+            speed=motion.get('speed_mps')
+            gear=motion.get('gear')
+            if type(speed) in (int,float) and math.isfinite(speed) and speed>=0:
+                if speed>0.1:return True
+                if gear=='park':return False
+                if gear in ('drive','reverse','sport','low','eco','manumatic'):return True
+                if gear=='neutral' and self.s.get('trip'):return True
+            return None
+        return None if comma_onroad else False
 
     def _sample_energy(self, now, onroad, wh):
         """Validate non-overlapping energy windows before committing charge totals.

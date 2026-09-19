@@ -26,6 +26,7 @@ def values(runtime):
         data['measurement_age_s'] = max(0,int(age))
         data['stale'] = bool(data.get('stale')) or age > 180
     except (ValueError,TypeError,KeyError,AttributeError): data['stale'] = True
+    if 'driving' in data:data['onroad']=data['driving']
     if data.get('onroad') is not None: data['onroad'] = bool(data['onroad'])
     from zoneinfo import ZoneInfo
     month = datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y-%m')
