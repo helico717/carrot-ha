@@ -164,6 +164,7 @@ class ProcessedQueueStore:
                     acked INTEGER NOT NULL DEFAULT 0
                 )
             """)
+        self.prune()
 
     @contextmanager
     def connect(self):
@@ -201,6 +202,7 @@ class ProcessedQueueStore:
                     status = excluded.status,
                     processed_at = excluded.processed_at
             """, (queue_id, device_id, param_name, str(requested_val), str(actual_val), status, now))
+        self.prune()
 
     def mark_acked(self, queue_ids: list[int]):
         if not queue_ids:
@@ -208,6 +210,20 @@ class ProcessedQueueStore:
         with self.connect() as db:
             placeholders = ",".join("?" for _ in queue_ids)
             db.execute(f"UPDATE processed_queue SET acked = 1 WHERE queue_id IN ({placeholders})", queue_ids)
+
+    def prune(self, max_records: int = 500, max_age_days: int = 30):
+        """Keep database tiny by pruning old/excess processed queue records."""
+        cutoff = time.time() - (max_age_days * 86400)
+        try:
+            with self.connect() as db:
+                db.execute("DELETE FROM processed_queue WHERE processed_at < ?", (cutoff,))
+                db.execute("""
+                    DELETE FROM processed_queue WHERE queue_id NOT IN (
+                        SELECT queue_id FROM processed_queue ORDER BY queue_id DESC LIMIT ?
+                    )
+                """, (max_records,))
+        except Exception as err:
+            print(f"[param_sync] prune error: {err}", flush=True)
 
 
 def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
