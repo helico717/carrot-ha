@@ -25,7 +25,7 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
         {name:'TestOffset',title:'차선 보정 테스트',descr:'설명',group:'테스트',min:0,max:100,default:0,unit:1},
         {name:'TestToggle',title:'테스트 스위치',group:'테스트',min:0,max:1,default:0,unit:1}
       ];
-      window.snapshot = {ok:true,param_queue_protocol:1,device_id:'car-a',values:{TestOffset:0,TestToggle:0},catalog:{groups:[{group:'테스트',egroup:'Test',count:2}],items_by_group:{테스트:items},unit_cycle:[1,2,5]}};
+      window.snapshot = {updated_at:'2026-09-21T05:10:13.784Z',ok:true,param_queue_protocol:1,device_id:'car-a',values:{TestOffset:0,TestToggle:0},catalog:{groups:[{group:'테스트',egroup:'Test',count:2}],items_by_group:{테스트:items},unit_cycle:[1,2,5]}};
       window.calls = []; window.queue = []; window.failWrite = false;
       window.card = document.createElement('carrot-params-card');
       card.setConfig({device_id:'car-a'}); document.body.append(card);
@@ -46,7 +46,11 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     await frame.locator('#groupList button[data-group]').last().waitFor();
     await frame.locator('#groupList button[data-group]').last().click();
     await frame.locator('#items').getByText('TestOffset', {exact:true}).waitFor();
-    console.log('PASS: real iframe renders catalog and parameter rows');
+    assert.match(await page.locator('#syncStatus').innerText(), /마지막 수신:/);
+    const receivedText = await page.locator('#syncStatus .sync-time').innerText();
+    await page.evaluate(()=>card._loadData());
+    assert.equal(await page.locator('#syncStatus .sync-time').innerText(), receivedText);
+    console.log('PASS: real iframe renders catalog and parameter rows; timestamp survives cached poll');
     const child = page.frames().find(f => f.url().includes('settings.html'));
     // Parent-window message has the same origin but the wrong source.
     await page.evaluate(() => window.postMessage({type:'carrot:param_set',requestId:'evil',name:'TestOffset',value:8},location.origin));
@@ -57,14 +61,17 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     // Write must remain unresolved until its exact queue ID is applied.
     await child.evaluate(() => {window.writeResult=null; postJson('/api/param_set',{name:'TestOffset',value:4}).then(r=>window.writeResult=r).catch(e=>window.writeResult={error:e.message});});
     await page.waitForFunction(() => queue.length===1);
+    assert.match(await page.locator('#syncStatus').innerText(), /Comma 적용 대기/);
     assert.equal(await child.evaluate(()=>window.writeResult),null);
     await page.evaluate(async () => {queue.push({id:1,param_name:'TestOffset',status:'applied'});await card._checkPendingStatus();});
     assert.equal(await child.evaluate(()=>window.writeResult),null);
     await page.evaluate(async () => {queue[0].status='applied'; snapshot.values.TestOffset=4;await card._checkPendingStatus();});
     await child.waitForFunction(()=>window.writeResult?.value===4);
+    assert.match(await page.locator('#syncStatus').innerText(), /Comma 적용 확인/);
     await page.evaluate(()=>window.failWrite=true);
     const rejected = await child.evaluate(async () => {try {await postJson('/api/param_set',{name:'TestOffset',value:9});return false;}catch(e){return e.message.includes('test rejection');}});
     assert.equal(rejected,true);
+    assert.match(await page.locator('#syncStatus').innerText(), /변경 확인 실패/);
     assert.equal(await child.evaluate(async ()=>(await getJson('/api/params_bulk')).values.TestOffset),4);
     console.log('PASS: source isolation, unsupported actions, failure propagation and exact-ID application');
     await page.evaluate(async () => {

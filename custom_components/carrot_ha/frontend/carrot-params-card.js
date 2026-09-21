@@ -29,6 +29,8 @@ class CarrotParamsCard extends HTMLElement {
     this._toastMsg = null;
     this._toastTimer = null;
     this._initialized = false;
+    this._applyStatus = null;
+    this._statusError = null;
     this._iframeReady = false;
     this._snapshotData = null;
 
@@ -43,6 +45,8 @@ class CarrotParamsCard extends HTMLElement {
     if (this._config.device_id !== config?.device_id) {
       for (const request of this._pending.values()) request.reject(new Error('장치가 변경되었습니다.'));
       this._pending.clear();
+      this._applyStatus = null;
+      this._updatedAt = null;
       this._device = this._entryId = this._snapshotData = this._catalog = null;
     }
     this._config = config || {};
@@ -77,6 +81,7 @@ class CarrotParamsCard extends HTMLElement {
     this._stopPolling();
     this._lastSnapshotFetch = 0;
     this._pollTimer = setInterval(() => {
+      this._renderHeaderStatus();
       if (!this._entryId || document.hidden) return;
       if (this._pending.size) this._checkPendingStatus();
       if (Date.now() - this._lastSnapshotFetch >= 15000) this._loadData();
@@ -107,7 +112,11 @@ class CarrotParamsCard extends HTMLElement {
       const source = event.source;
       this._setParam(msg.name, msg.value).then(
         value => source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: true, name: msg.name, value}, window.location.origin),
-        error => source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: false, error: error.message}, window.location.origin)
+        error => {
+          this._applyStatus = {tone: 'error', text: '변경 확인 실패', detail: error.message};
+          this._renderHeaderStatus();
+          source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: false, error: error.message}, window.location.origin);
+        }
       );
     } else if (msg.type === 'carrot:resize' && typeof msg.height === 'number') {
       const iframe = this.shadowRoot.getElementById('carrotSettingsFrame');
@@ -207,6 +216,7 @@ class CarrotParamsCard extends HTMLElement {
     try {
       for (const [id, req] of this._pending) {
         if (Date.now() - req.started > 100000) {
+          this._applyStatus = {tone: 'warning', text: '적용 확인 시간 초과', detail: '요청은 나중에 적용될 수 있습니다. 차량 연결 후 실제 값을 확인하세요.'};
           req.reject(new Error('차량 적용 확인 시간이 초과되었습니다. 요청은 남아 있을 수 있으므로 재조회하세요.'));
           this._pending.delete(id);
         }
@@ -214,6 +224,7 @@ class CarrotParamsCard extends HTMLElement {
       if (!this._pending.size) return;
       const ids = [...this._pending.keys()].join(',');
       const data = await this._hass.callApi('GET', `carrot_ha/v1/param_status/${encodeURIComponent(this._entryId)}?ids=${encodeURIComponent(ids)}`);
+      this._statusError = null;
       for (const item of data.queue || []) {
         const req = this._pending.get(String(item.id));
         if (!req || item.param_name !== req.name) continue;
@@ -223,6 +234,13 @@ class CarrotParamsCard extends HTMLElement {
           const actual = snapshot.values?.[req.name];
           if (actual === undefined) continue;
           this._values[req.name] = actual;
+          this._updatedAt = snapshot.updated_at || this._updatedAt;
+          const matches = Number(actual) === Number(req.value);
+          this._applyStatus = {
+            tone: matches ? 'success' : 'warning',
+            text: matches ? 'Comma 적용 확인' : '차량 값 확인 · 요청값과 다름',
+            detail: `${req.name}: 요청 ${req.value} → 차량 ${actual}. ${this._formatTimestamp(item.applied_at)}`,
+          };
           req.resolve(actual);
           this._pending.delete(String(item.id));
           this._showToast(`✓ ${req.name} 차량 적용 확인: ${actual}`);
@@ -232,6 +250,7 @@ class CarrotParamsCard extends HTMLElement {
         }
       }
     } catch (err) {
+      this._statusError = '변경 상태 조회 실패 · 재확인 중';
       this._showToast('변경 상태 조회 실패. 다음 조회에서 다시 확인합니다.');
     } finally {
       this._checkingStatus = false;
@@ -247,6 +266,8 @@ class CarrotParamsCard extends HTMLElement {
         Number(value) < Number(item.min) || Number(value) > Number(item.max)) throw new Error('현재 카탈로그에 없는 파라미터이거나 허용 범위를 벗어난 값입니다.');
     if ([...this._pending.values()].some(req => req.name === name) || this._sending.has(name)) throw new Error('이 파라미터는 차량 적용 대기 중입니다.');
     this._sending.add(name);
+    this._applyStatus = null;
+    this._renderHeaderStatus();
     const entryId = this._entryId;
     let res;
     try {
@@ -284,7 +305,38 @@ class CarrotParamsCard extends HTMLElement {
     }
   }
 
+  _formatTimestamp(value) {
+    const date = new Date(value || '');
+    if (!Number.isFinite(date.getTime())) return '수신 기록 없음';
+    return new Intl.DateTimeFormat(this._hass?.locale?.language || 'ko-KR', {
+      timeZone: this._hass?.config?.time_zone || undefined,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).format(date);
+  }
+
+  _syncStatus() {
+    if (this._sending.size) return {tone: 'warning', text: '변경 요청 전송 중'};
+    if (this._pending.size) return {tone: 'warning', text: `Comma 적용 대기 · ${this._pending.size}건`, detail: this._statusError || '차량의 적용 응답과 실제 값을 확인하고 있습니다.'};
+    if (this._applyStatus) return this._applyStatus;
+    if (this._error) return {tone: 'error', text: '수신 확인 실패', detail: this._error};
+    if (this._waitingForSync || !this._updatedAt) return {tone: 'neutral', text: '차량 데이터 수신 대기'};
+    return {tone: 'neutral', text: '차량 데이터 수신됨', detail: '로컬 당근 웹의 변경은 차량의 다음 스냅샷 동기화 후 표시됩니다.'};
+  }
+
+  _renderSyncStatus() {
+    const host = this.shadowRoot.getElementById('syncStatus');
+    if (!host) return;
+    const status = this._syncStatus();
+    const received = Date.parse(this._updatedAt || '');
+    const stale = Number.isFinite(received) && Date.now() - received > 360000;
+    host.innerHTML = `<span class="sync-badge" data-tone="${status.tone}" title="${this._escapeHtml(status.detail || status.text)}">${this._escapeHtml(status.text)}</span>
+      <span class="sync-time" title="Cloudflare가 차량 파라미터 데이터를 마지막으로 수신한 시각입니다. HA 조회 시각이 아닙니다. HA 시간대 기준입니다.">마지막 수신: ${this._escapeHtml(this._formatTimestamp(this._updatedAt))}</span>
+      ${stale || this._error ? `<span class="sync-warning">${this._error ? '최신 데이터 조회 실패' : '최근 수신 없음 · 차량 연결 확인'}</span>` : ''}`;
+  }
+
   _renderHeaderStatus() {
+    this._renderSyncStatus();
     const subEl = this.shadowRoot.getElementById('cardSubtitle');
     if (!subEl) return;
     const count = this._getAllItems().length;
@@ -594,6 +646,17 @@ class CarrotParamsCard extends HTMLElement {
           background: rgba(255, 255, 255, 0.12);
         }
 
+        .sync-status { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:0; }
+        .sync-badge { font-size:12px; font-weight:700; padding:4px 8px; border-radius:8px; background:var(--secondary-background-color,#24282d); }
+        .sync-badge[data-tone="success"] { color:var(--success-color,#168044); }
+        .sync-badge[data-tone="warning"], .sync-warning { color:var(--warning-color,#ad6800); }
+        .sync-badge[data-tone="error"] { color:var(--error-color,#c62828); }
+        .sync-time, .sync-warning { font-size:11px; }
+        .sync-time { color:var(--secondary-text-color,#8e99a4); }
+        @media (max-width:600px) {
+          .card-header { flex-wrap:wrap; gap:10px; padding:12px; }
+          .header-actions { margin-left:auto; max-width:100%; }
+        }
         /* Authentic Carrot Web Iframe Container */
         .iframe-container {
           position: relative;
@@ -651,6 +714,7 @@ class CarrotParamsCard extends HTMLElement {
             </div>
           </div>
           <div class="header-actions">
+            <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
             <button class="btn-icon" id="btnRefresh" title="새로고침">🔄</button>
           </div>
         </div>
@@ -659,7 +723,7 @@ class CarrotParamsCard extends HTMLElement {
         <div class="iframe-container">
           <iframe
             id="carrotSettingsFrame"
-            src="/carrot_ha_static/carrot_web/settings.html?v=0.6.2"
+            src="/carrot_ha_static/carrot_web/settings.html?v=0.6.3"
             allow="fullscreen"
             loading="eager"
             title="CarrotPilot Authentic Settings"
@@ -671,6 +735,7 @@ class CarrotParamsCard extends HTMLElement {
     `;
 
     this._bindEvents();
+    this._renderSyncStatus();
     const frame = this.shadowRoot.getElementById('carrotSettingsFrame');
     if (frame) {
       frame.onload = () => {
