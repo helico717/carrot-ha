@@ -1,6 +1,6 @@
 """CarrotPilot parameter synchronizer.
 
-- Syncs settings catalog and current values from Carrot server (port 7000) to Cloudflare Worker.
+- Syncs settings catalog and current values from Carrot server (port 7000) or carrot_settings.json to Cloudflare Worker.
 - Polls Cloudflare Worker for pending parameter changes requested by Home Assistant.
 - Applies requested parameter changes locally via http://127.0.0.1:7000/api/param_set (or Params()).
 - Acknowledges applied parameter changes back to Cloudflare Worker.
@@ -17,11 +17,9 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 LOCAL_SERVER_URL = "http://127.0.0.1:7000"
 
-logger = logging.getLogger("carrot_param_sync")
 
-
-def _http_request(url: str, data: dict | None = None, headers: dict | None = None, timeout: float = 10.0) -> dict | None:
-    req_headers = {"User-Agent": "CarrotHA-ParamSync/1.0.0", "Accept": "application/json"}
+def _http_request(url: str, data: dict | None = None, headers: dict | None = None, timeout: float = 10.0, verbose: bool = True) -> dict | None:
+    req_headers = {"User-Agent": "CarrotHA/0.3.0", "Accept": "application/json"}
     if headers:
         req_headers.update(headers)
 
@@ -34,30 +32,99 @@ def _http_request(url: str, data: dict | None = None, headers: dict | None = Non
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if verbose:
+            print(f"[param_sync] HTTP {exc.code} for {url}: {exc.reason}", flush=True)
+        return None
     except Exception as exc:
+        if verbose:
+            print(f"[param_sync] Request error for {url}: {exc}", flush=True)
         return None
 
 
 def fetch_local_settings_snapshot() -> dict | None:
-    """Fetch catalog and current values from local carrot server."""
-    res = _http_request(f"{LOCAL_SERVER_URL}/api/settings/snapshot", timeout=8.0)
-    if res and res.get("ok"):
-        return res
+    """Fetch catalog and current values from local carrot server or directly from file."""
+    # 1. Try local carrot_server on port 7000 (silent on failure to avoid spam)
+    try:
+        res = _http_request(f"{LOCAL_SERVER_URL}/api/settings/snapshot", timeout=4.0, verbose=False)
+        if res and res.get("ok"):
+            print("[param_sync] loaded settings snapshot from local carrot_server (:7000)", flush=True)
+            return res
+    except Exception:
+        pass
+
+    # 2. Fallback to direct carrot_settings.json reading if port 7000 is down or not responding
+    candidate_paths = [
+        Path("/data/openpilot/openpilot/selfdrive/carrot_settings.json"),
+        Path("/data/openpilot/selfdrive/carrot_settings.json"),
+        Path("/data/carrot/carrot_settings.json"),
+        Path(__file__).resolve().parent.parent / "openpilot" / "selfdrive" / "carrot_settings.json",
+    ]
+    settings_file = None
+    for p in candidate_paths:
+        if p.exists():
+            settings_file = p
+            break
+
+    if settings_file:
+        try:
+            data = json.loads(settings_file.read_text(encoding="utf-8"))
+            params_list = data.get("params", [])
+            values = {}
+
+            # Read current values directly via openpilot Params
+            try:
+                from openpilot.common.params import Params
+                p = Params()
+                for item in params_list:
+                    name = item.get("name")
+                    if name:
+                        raw = p.get(name)
+                        if raw is not None:
+                            val_str = raw.decode("utf-8", errors="ignore").strip()
+                            try:
+                                values[name] = float(val_str) if "." in val_str else int(val_str)
+                            except ValueError:
+                                values[name] = val_str
+                        else:
+                            values[name] = item.get("default", 0)
+            except Exception as e:
+                for item in params_list:
+                    if item.get("name"):
+                        values[item["name"]] = item.get("default", 0)
+
+            print(f"[param_sync] loaded {len(values)} settings from {settings_file}", flush=True)
+            return {
+                "ok": True,
+                "settings": {
+                    "categories": data.get("menu", []),
+                    "params": params_list,
+                },
+                "values": values
+            }
+        except Exception as e:
+            print(f"[param_sync] fallback read error from {settings_file}: {e}", flush=True)
+
+    print("[param_sync] WARNING: could not load settings snapshot from :7000 or file", flush=True)
     return None
 
 
 def apply_local_param(name: str, value: any) -> bool:
     """Apply parameter change via local carrot server or fallback to Params()."""
-    # 1. Try local carrot_server API (preserves validation, clamping, and change history)
-    res = _http_request(
-        f"{LOCAL_SERVER_URL}/api/param_set",
-        data={"name": name, "value": value, "source": "ha"},
-        timeout=5.0
-    )
-    if res and res.get("ok"):
-        return True
+    # 1. Try local carrot_server API
+    try:
+        res = _http_request(
+            f"{LOCAL_SERVER_URL}/api/param_set",
+            data={"name": name, "value": value, "source": "ha"},
+            timeout=4.0,
+            verbose=False
+        )
+        if res and res.get("ok"):
+            return True
+    except Exception:
+        pass
 
-    # 2. Fallback to openpilot Params() if local server is down or unreachable
+    # 2. Fallback to openpilot Params()
     try:
         from openpilot.common.params import Params
         params = Params()
@@ -86,9 +153,10 @@ def run_param_sync(config: dict):
 
     headers = {"Authorization": f"Bearer {token}"}
     last_catalog_sync = 0.0
-    CATALOG_SYNC_INTERVAL = 180.0  # Sync full catalog every 3 minutes or at boot
+    CATALOG_SYNC_INTERVAL = 180.0  # Sync full catalog every 3 minutes
 
-    print("[param_sync] starting CarrotPilot parameter sync loop", flush=True)
+    print(f"[param_sync] starting CarrotPilot parameter sync loop for device: {device_id}", flush=True)
+    print(f"[param_sync] target Cloudflare Worker: {cloud_url}", flush=True)
 
     while True:
         now = time.time()
@@ -102,6 +170,7 @@ def run_param_sync(config: dict):
                     "catalog": snapshot["settings"],
                     "values": snapshot["values"],
                 }
+                print(f"[param_sync] uploading {len(snapshot['values'])} parameters to Cloudflare...", flush=True)
                 res = _http_request(
                     f"{cloud_url}/api/settings/sync",
                     data=sync_payload,
@@ -110,13 +179,18 @@ def run_param_sync(config: dict):
                 )
                 if res and res.get("ok"):
                     last_catalog_sync = now
-                    # print(f"[param_sync] settings snapshot synced to cloud ({now})", flush=True)
+                    print(f"[param_sync] settings snapshot synced to cloud successfully! ({len(snapshot['values'])} params)", flush=True)
+                else:
+                    print(f"[param_sync] settings sync response: {res}", flush=True)
+            else:
+                print("[param_sync] no settings snapshot available to upload", flush=True)
 
         # 2. Poll for pending parameter changes from Home Assistant
         pending_res = _http_request(
             f"{cloud_url}/api/params/pending?device_id={urllib.parse.quote(device_id)}",
             headers=headers,
-            timeout=10.0
+            timeout=10.0,
+            verbose=False
         )
 
         if pending_res and pending_res.get("ok"):
@@ -130,7 +204,6 @@ def run_param_sync(config: dict):
                     param_name = item.get("param_name")
                     raw_val = item.get("param_value")
 
-                    # Parse value type if possible (int, float, bool, or str)
                     parsed_val = raw_val
                     if isinstance(raw_val, str):
                         if raw_val.lower() == "true":
@@ -164,6 +237,7 @@ def run_param_sync(config: dict):
                         headers=headers,
                         timeout=10.0
                     )
+                    print(f"[param_sync] acknowledged {len(applied_ids)} applied params to cloud", flush=True)
 
         # Poll interval: 3 seconds
         time.sleep(3)
@@ -177,8 +251,10 @@ def start_param_sync_thread(config: dict) -> threading.Thread:
 
 if __name__ == "__main__":
     conn_file = BASE / "connection.json"
+    if not conn_file.exists():
+        conn_file = Path("/data/id4-collector/connection.json")
     if conn_file.exists():
         conf = json.loads(conn_file.read_text())
         run_param_sync(conf)
     else:
-        print("connection.json not found")
+        print(f"connection.json not found at {conn_file}")

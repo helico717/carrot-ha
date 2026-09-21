@@ -11,6 +11,9 @@ class CarrotParamsCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._config = {};
     this._hass = null;
+    this._device = null;
+    this._entryId = null;
+    this._deviceId = '';
     this._catalog = null;
     this._values = {};
     this._pending = new Set();
@@ -18,22 +21,28 @@ class CarrotParamsCard extends HTMLElement {
     this._activeCategory = 'ALL';
     this._expandedParams = new Set();
     this._loading = false;
+    this._waitingForSync = false;
+    this._error = null;
     this._pollTimer = null;
     this._toastMsg = null;
     this._toastTimer = null;
+    this._initialized = false;
   }
 
   setConfig(config) {
     this._config = config || {};
     this._render();
-    this._fetchSettings();
+    if (this._hass) {
+      this._loadData();
+    }
   }
 
   set hass(hass) {
-    const prevHass = this._hass;
+    const isFirst = !this._hass && hass;
     this._hass = hass;
-    if (!prevHass && hass) {
-      this._fetchSettings();
+    if (isFirst || (!this._initialized && hass)) {
+      this._initialized = true;
+      this._loadData();
     }
   }
 
@@ -48,7 +57,7 @@ class CarrotParamsCard extends HTMLElement {
   _startPolling() {
     this._stopPolling();
     this._pollTimer = setInterval(() => {
-      if (this._pending.size > 0) {
+      if (this._pending.size > 0 && this._entryId) {
         this._checkPendingStatus();
       }
     }, 4000);
@@ -61,43 +70,62 @@ class CarrotParamsCard extends HTMLElement {
     }
   }
 
-  _getEntryId() {
-    if (this._config.entry_id) return this._config.entry_id;
-    // Auto-detect entry from carrot_ha entities or devices
-    if (this._hass && this._hass.states) {
-      for (const entityId of Object.keys(this._hass.states)) {
-        if (entityId.startsWith('sensor.carrot_ha_') || entityId.startsWith('binary_sensor.carrot_ha_')) {
-          const stateObj = this._hass.states[entityId];
-          if (stateObj.attributes && stateObj.attributes.entry_id) {
-            return stateObj.attributes.entry_id;
-          }
-        }
+  async _resolveDevice() {
+    if (this._device && this._entryId) return this._entryId;
+    try {
+      const resp = await this._hass.callApi('GET', 'carrot_ha/v1/devices');
+      const devices = resp && resp.devices ? resp.devices : [];
+      const requested = this._config?.device_id;
+      const device = devices.find(d => d.device_id === requested) || (!requested ? devices[0] : null);
+      if (device) {
+        this._device = device;
+        this._entryId = device.entry_id;
+        this._deviceId = device.device_id;
+        return this._entryId;
       }
+    } catch (err) {
+      console.warn('[carrot-params-card] devices lookup error:', err);
     }
-    return this._config.device_id || 'default';
+    return null;
   }
 
-  async _fetchSettings() {
+  async _loadData() {
     if (!this._hass) return;
-    const entryId = this._getEntryId();
     this._loading = true;
+    this._error = null;
+    this._waitingForSync = false;
     this._render();
 
     try {
-      const resp = await this._hass.fetchWithAuth(`/api/carrot_ha/v1/settings/${encodeURIComponent(entryId)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.ok) {
-          this._catalog = data.catalog || {};
-          this._values = Object.assign({}, data.values || {});
-          this._deviceId = data.device_id || '';
-          this._updatedAt = data.updated_at || '';
-        }
+      const entryId = await this._resolveDevice();
+      if (!entryId) {
+        this._error = 'Carrot HA 장치를 찾을 수 없습니다. 기기 및 서비스에서 Carrot HA가 설정되어 있는지 확인하세요.';
+        this._loading = false;
+        this._render();
+        return;
+      }
+
+      const res = await this._hass.callApi('GET', `carrot_ha/v1/settings/${encodeURIComponent(entryId)}`);
+      if (res && res.ok) {
+        this._catalog = res.catalog || {};
+        this._values = Object.assign({}, res.values || {});
+        this._deviceId = res.device_id || this._deviceId;
+        this._updatedAt = res.updated_at || '';
+        this._waitingForSync = false;
       } else {
-        console.warn('[carrot-params-card] Settings fetch failed:', resp.status);
+        if (res && (res.error === 'settings_not_found' || res.status === 404)) {
+          this._waitingForSync = true;
+        } else {
+          this._error = res?.error || res?.message || '설정을 불러오지 못했습니다.';
+        }
       }
     } catch (err) {
-      console.error('[carrot-params-card] Error fetching settings:', err);
+      const msg = err?.message || String(err);
+      if (msg.includes('404') || msg.includes('settings_not_found')) {
+        this._waitingForSync = true;
+      } else {
+        this._error = `설정 조회 오류: ${msg}`;
+      }
     } finally {
       this._loading = false;
       this._render();
@@ -105,31 +133,26 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   async _checkPendingStatus() {
-    if (!this._hass) return;
-    const entryId = this._getEntryId();
+    if (!this._hass || !this._entryId) return;
     try {
-      const resp = await this._hass.fetchWithAuth(`/api/carrot_ha/v1/param_status/${encodeURIComponent(entryId)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.ok && Array.isArray(data.queue)) {
-          const activePending = new Set();
-          for (const item of data.queue) {
-            if (item.status === 'pending') {
-              activePending.add(item.param_name);
-            } else if (this._pending.has(item.param_name) && item.status === 'applied') {
-              this._showToast(`✓ ${item.param_name} 차량 적용 완료!`);
-            }
+      const data = await this._hass.callApi('GET', `carrot_ha/v1/param_status/${encodeURIComponent(this._entryId)}`);
+      if (data && data.ok && Array.isArray(data.queue)) {
+        const activePending = new Set();
+        for (const item of data.queue) {
+          if (item.status === 'pending') {
+            activePending.add(item.param_name);
+          } else if (this._pending.has(item.param_name) && item.status === 'applied') {
+            this._showToast(`✓ ${item.param_name} 차량 적용 완료!`);
           }
-          this._pending = activePending;
-          this._render();
         }
+        this._pending = activePending;
+        this._render();
       }
     } catch (_) {}
   }
 
   async _setParam(name, value) {
-    if (!this._hass) return;
-    const entryId = this._getEntryId();
+    if (!this._hass || !this._entryId) return;
     const oldVal = this._values[name];
     this._values[name] = value;
     this._pending.add(name);
@@ -137,24 +160,22 @@ class CarrotParamsCard extends HTMLElement {
     this._showToast(`⏳ ${name}: ${value} 변경 요청 전송 중...`);
 
     try {
-      const resp = await this._hass.fetchWithAuth(`/api/carrot_ha/v1/param_set/${encodeURIComponent(entryId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, value }),
+      const res = await this._hass.callApi('POST', `carrot_ha/v1/param_set/${encodeURIComponent(this._entryId)}`, {
+        name,
+        value
       });
-      const res = await resp.json();
-      if (res.ok) {
+      if (res && res.ok) {
         this._showToast(`⏳ ${name}: 차량 대기열에 등록됨`);
       } else {
         this._values[name] = oldVal;
         this._pending.delete(name);
-        this._showToast(`❌ ${name} 변경 실패: ${res.error || '오류'}`);
+        this._showToast(`❌ ${name} 변경 실패: ${res?.error || '오류'}`);
         this._render();
       }
     } catch (err) {
       this._values[name] = oldVal;
       this._pending.delete(name);
-      this._showToast(`❌ 네트워크 오류`);
+      this._showToast(`❌ 네트워크 전송 오류`);
       this._render();
     }
   }
@@ -182,35 +203,68 @@ class CarrotParamsCard extends HTMLElement {
 
   _getAllItems() {
     if (!this._catalog) return [];
-    // If catalog has items_by_group
-    if (this._catalog.items_by_group) {
+    // 1. If catalog has items_by_group
+    if (this._catalog.items_by_group && typeof this._catalog.items_by_group === 'object') {
       const all = [];
+      const seen = new Set();
       for (const [groupName, items] of Object.entries(this._catalog.items_by_group)) {
         if (Array.isArray(items)) {
           for (const item of items) {
-            all.push({ ...item, group: item.group || groupName });
+            if (item && item.name && !seen.has(item.name)) {
+              seen.add(item.name);
+              all.push({ ...item, group: item.group || groupName });
+            }
           }
         }
       }
       return all;
     }
-    // If catalog has params array
+    // 2. If catalog has params array directly
     if (Array.isArray(this._catalog.params)) {
       return this._catalog.params;
     }
+    if (Array.isArray(this._catalog.items)) {
+      return this._catalog.items;
+    }
     return [];
+  }
+
+  _buildCategoryMap() {
+    // Map param_name -> top_level_category_id
+    const map = new Map();
+    if (!this._catalog) return map;
+
+    const categories = this._catalog.categories || this._catalog.menu;
+    if (Array.isArray(categories)) {
+      const walk = (node, topId) => {
+        if (Array.isArray(node.params)) {
+          for (const p of node.params) {
+            map.set(typeof p === 'string' ? p : p.name, topId);
+          }
+        }
+        if (Array.isArray(node.groups)) {
+          for (const child of node.groups) {
+            walk(child, topId);
+          }
+        }
+      };
+
+      for (const top of categories) {
+        const topId = top.id || top.ko || top.en;
+        walk(top, topId);
+      }
+    }
+    return map;
   }
 
   _getCategories() {
     if (!this._catalog) return [{ id: 'ALL', name: '전체' }];
     const cats = [{ id: 'ALL', name: '전체' }];
-    if (Array.isArray(this._catalog.categories)) {
-      for (const c of this._catalog.categories) {
+    const tree = this._catalog.categories || this._catalog.menu;
+
+    if (Array.isArray(tree)) {
+      for (const c of tree) {
         cats.push({ id: c.id || c.ko || c.en, name: c.ko || c.en || c.id });
-      }
-    } else if (Array.isArray(this._catalog.menu)) {
-      for (const m of this._catalog.menu) {
-        cats.push({ id: m.id || m.ko || m.en, name: m.ko || m.en || m.id });
       }
     } else if (this._catalog.items_by_group) {
       for (const g of Object.keys(this._catalog.items_by_group)) {
@@ -223,15 +277,22 @@ class CarrotParamsCard extends HTMLElement {
   _filterItems(items) {
     const query = (this._searchQuery || '').trim().toLowerCase();
     const activeCat = this._activeCategory;
+    const catMap = this._buildCategoryMap();
 
     return items.filter(item => {
       // Category filter
       if (activeCat !== 'ALL') {
-        const itemCat = (item.group || item.cgroup || item.egroup || '').toLowerCase();
-        const activeLower = activeCat.toLowerCase();
-        // Check if item belongs to active category or its sub-groups
-        const belongs = itemCat.includes(activeLower) || activeLower.includes(itemCat);
-        if (!belongs) return false;
+        const topCat = catMap.get(item.name);
+        if (topCat) {
+          if (topCat !== activeCat) return false;
+        } else {
+          // Fallback to group name match
+          const itemGroup = (item.group || item.cgroup || item.egroup || '').toLowerCase();
+          const activeLower = activeCat.toLowerCase();
+          if (!itemGroup.includes(activeLower) && !activeLower.includes(itemGroup)) {
+            return false;
+          }
+        }
       }
 
       // Search filter
@@ -637,17 +698,46 @@ class CarrotParamsCard extends HTMLElement {
           background: rgba(255, 255, 255, 0.15);
         }
 
-        /* Empty / Loading State */
-        .empty-state {
+        /* States (Loading / Empty / Sync Wait) */
+        .state-container {
           text-align: center;
-          padding: 40px 20px;
-          color: #8e99a4;
+          padding: 40px 24px;
+          color: var(--secondary-text-color, #8e99a4);
+        }
+        .state-icon {
+          font-size: 32px;
+          margin-bottom: 12px;
+        }
+        .state-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 8px;
+        }
+        .state-desc {
+          font-size: 13px;
+          line-height: 1.6;
+          max-width: 420px;
+          margin: 0 auto 16px auto;
+        }
+        .state-action-btn {
+          background: #ff7a29;
+          color: #fff;
+          border: none;
+          padding: 8px 18px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .state-action-btn:hover {
+          background: #ff8c42;
         }
         .loading-spinner {
           display: inline-block;
-          width: 24px;
-          height: 24px;
-          border: 3px solid rgba(255, 122, 41, 0.3);
+          width: 28px;
+          height: 28px;
+          border: 3px solid rgba(255, 122, 41, 0.25);
           border-radius: 50%;
           border-top-color: #ff7a29;
           animation: spin 1s ease-in-out infinite;
@@ -699,31 +789,50 @@ class CarrotParamsCard extends HTMLElement {
           </div>
         </div>
 
-        <!-- Search Bar -->
-        <div class="search-container">
-          <span class="search-icon">🔍</span>
-          <input type="text" class="search-input" id="searchInput" placeholder="파라미터 검색 (예: 오토크루즈, AlwaysLateral, 조향)..." value="${this._searchQuery}">
-          ${this._searchQuery ? '<button class="search-clear" id="searchClear">✕</button>' : ''}
-        </div>
+        ${items.length > 0 ? `
+          <!-- Search Bar -->
+          <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="파라미터 검색 (예: 오토크루즈, AlwaysLateral, 조향)..." value="${this._searchQuery}">
+            ${this._searchQuery ? '<button class="search-clear" id="searchClear">✕</button>' : ''}
+          </div>
 
-        <!-- Category Tabs -->
-        <div class="categories-bar">
-          ${categories.map(c => `
-            <div class="cat-pill ${this._activeCategory === c.id ? 'active' : ''}" data-cat="${c.id}">
-              ${c.name}
-            </div>
-          `).join('')}
-        </div>
+          <!-- Category Tabs -->
+          <div class="categories-bar">
+            ${categories.map(c => `
+              <div class="cat-pill ${this._activeCategory === c.id ? 'active' : ''}" data-cat="${c.id}">
+                ${c.name}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
 
-        <!-- Parameter List -->
+        <!-- Parameter List or Status States -->
         <div class="params-list">
-          ${this._loading && items.length === 0 ? `
-            <div class="empty-state">
+          ${this._loading ? `
+            <div class="state-container">
               <div class="loading-spinner"></div>
-              <p style="margin-top: 12px;">파라미터 스냅샷을 불러오는 중...</p>
+              <p style="margin-top: 14px;">설정 데이터를 불러오는 중...</p>
+            </div>
+          ` : this._waitingForSync ? `
+            <div class="state-container">
+              <div class="state-icon">📡</div>
+              <div class="state-title">콤마 동기화 대기 중</div>
+              <div class="state-desc">
+                아직 Cloudflare에 저장된 파라미터 스냅샷이 없습니다.<br>
+                콤마 기기에서 <b>param_sync.py</b> 또는 <b>collector.py</b>가 실행되면 파라미터 목록이 자동으로 여기에 나타납니다.
+              </div>
+              <button class="state-action-btn" id="btnRetrySync">다시 확인하기</button>
+            </div>
+          ` : this._error ? `
+            <div class="state-container">
+              <div class="state-icon">⚠️</div>
+              <div class="state-title">데이터 조회 실패</div>
+              <div class="state-desc">${this._error}</div>
+              <button class="state-action-btn" id="btnRetrySync">다시 시도</button>
             </div>
           ` : filtered.length === 0 ? `
-            <div class="empty-state">
+            <div class="state-container">
               <p>검색 결과가 없습니다.</p>
             </div>
           ` : filtered.map(item => this._renderParamCard(item)).join('')}
@@ -812,10 +921,14 @@ class CarrotParamsCard extends HTMLElement {
   _bindEvents() {
     const root = this.shadowRoot;
 
-    // Refresh
+    // Refresh / Retry
     const btnRefresh = root.getElementById('btnRefresh');
     if (btnRefresh) {
-      btnRefresh.onclick = () => this._fetchSettings();
+      btnRefresh.onclick = () => this._loadData();
+    }
+    const btnRetrySync = root.getElementById('btnRetrySync');
+    if (btnRetrySync) {
+      btnRetrySync.onclick = () => this._loadData();
     }
 
     // Search
@@ -879,7 +992,6 @@ class CarrotParamsCard extends HTMLElement {
         const current = Number(this._values[name] !== undefined ? this._values[name] : min);
         let next = current - step;
         if (next < min) next = min;
-        // round to avoid float inaccuracy
         next = Math.round(next * 1000) / 1000;
         this._setParam(name, next);
       };
