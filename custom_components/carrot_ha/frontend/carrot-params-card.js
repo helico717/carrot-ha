@@ -653,9 +653,31 @@ class CarrotParamsCard extends HTMLElement {
         .sync-badge[data-tone="error"] { color:var(--error-color,#c62828); }
         .sync-time, .sync-warning { font-size:11px; }
         .sync-time { color:var(--secondary-text-color,#8e99a4); }
+        /* A shared two-row grid prevents the status block wrapping below
+           the title on phones. Keep date/time and action status visible. */
+        .card-header {
+          display:grid;
+          grid-template-columns:minmax(0,1fr) auto 32px;
+          align-items:center;
+          column-gap:10px;
+          row-gap:2px;
+          padding:8px 12px;
+        }
+        .header-left, .header-titles, .header-actions, .sync-status { display:contents; }
+        .header-icon { display:none; }
+        .card-title { grid-area:1 / 1; font-size:14px; line-height:20px; }
+        .card-subtitle { grid-area:2 / 1; margin:0; font-size:11px; line-height:16px; display:block; }
+        .card-title, .card-subtitle { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sync-badge { grid-area:1 / 2; justify-self:end; padding:1px 6px; font-size:11px; line-height:18px; }
+        .sync-time { grid-area:2 / 2; justify-self:end; white-space:nowrap; font-size:10px; line-height:16px; }
+        .sync-warning { grid-area:3 / 1 / auto / 3; justify-self:end; font-size:10px; line-height:14px; }
+        .header-actions > .btn-icon { grid-area:1 / 3 / 3 / 4; width:32px; height:36px; padding:0; }
         @media (max-width:600px) {
-          .card-header { flex-wrap:wrap; gap:10px; padding:12px; }
-          .header-actions { margin-left:auto; max-width:100%; }
+          .card-header { padding:6px 8px; column-gap:6px; }
+          .card-title { font-size:13px; }
+          .card-subtitle { font-size:10px; }
+          .sync-badge { max-width:160px; text-align:right; }
+          .card-subtitle .pending-badge { display:none; }
         }
         /* Authentic Carrot Web Iframe Container */
         .iframe-container {
