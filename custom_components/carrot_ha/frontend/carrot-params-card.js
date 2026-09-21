@@ -217,7 +217,7 @@ class CarrotParamsCard extends HTMLElement {
           }
         }
       }
-      return all;
+      if (all.length) return all;
     }
     // 2. If catalog has params array directly
     if (Array.isArray(this._catalog.params)) {
@@ -237,13 +237,13 @@ class CarrotParamsCard extends HTMLElement {
     const categories = this._catalog.categories || this._catalog.menu;
     if (Array.isArray(categories)) {
       const walk = (node, topId) => {
-        if (Array.isArray(node.params)) {
-          for (const p of node.params) {
+        if (Array.isArray(node.params || node.items)) {
+          for (const p of (node.params || node.items)) {
             map.set(typeof p === 'string' ? p : p.name, topId);
           }
         }
-        if (Array.isArray(node.groups)) {
-          for (const child of node.groups) {
+        if (Array.isArray(node.groups || node.sections)) {
+          for (const child of (node.groups || node.sections)) {
             walk(child, topId);
           }
         }
@@ -262,7 +262,7 @@ class CarrotParamsCard extends HTMLElement {
     const cats = [{ id: 'ALL', name: '전체' }];
     const tree = this._catalog.categories || this._catalog.menu;
 
-    if (Array.isArray(tree)) {
+    if (Array.isArray(tree) && tree.length) {
       for (const c of tree) {
         cats.push({ id: c.id || c.ko || c.en, name: c.ko || c.en || c.id });
       }
@@ -289,7 +289,7 @@ class CarrotParamsCard extends HTMLElement {
           // Fallback to group name match
           const itemGroup = (item.group || item.cgroup || item.egroup || '').toLowerCase();
           const activeLower = activeCat.toLowerCase();
-          if (!itemGroup.includes(activeLower) && !activeLower.includes(itemGroup)) {
+          if (!itemGroup || (!itemGroup.includes(activeLower) && !activeLower.includes(itemGroup))) {
             return false;
           }
         }
@@ -406,7 +406,7 @@ class CarrotParamsCard extends HTMLElement {
           background: rgba(0, 0, 0, 0.25);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 10px;
-          color: #fff;
+          color: var(--primary-text-color, #e1e1e1);
           font-size: 14px;
           outline: none;
           transition: border-color 0.2s ease;
@@ -459,7 +459,7 @@ class CarrotParamsCard extends HTMLElement {
         }
         .cat-pill:hover {
           background: rgba(255, 255, 255, 0.1);
-          color: #fff;
+          color: var(--primary-text-color, #e1e1e1);
         }
         .cat-pill.active {
           background: #ff7a29;
@@ -591,7 +591,7 @@ class CarrotParamsCard extends HTMLElement {
         .step-btn {
           background: none;
           border: none;
-          color: #fff;
+          color: var(--primary-text-color, #e1e1e1);
           font-size: 16px;
           width: 32px;
           height: 32px;
@@ -711,7 +711,7 @@ class CarrotParamsCard extends HTMLElement {
         .state-title {
           font-size: 16px;
           font-weight: 700;
-          color: #fff;
+          color: var(--primary-text-color, #e1e1e1);
           margin-bottom: 8px;
         }
         .state-desc {
@@ -753,7 +753,7 @@ class CarrotParamsCard extends HTMLElement {
           left: 50%;
           transform: translateX(-50%) translateY(100px);
           background: rgba(20, 24, 30, 0.95);
-          color: #fff;
+          color: var(--primary-text-color, #e1e1e1);
           padding: 10px 20px;
           border-radius: 24px;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
@@ -779,7 +779,7 @@ class CarrotParamsCard extends HTMLElement {
             <div class="header-titles">
               <span class="card-title">CarrotPilot 파라미터</span>
               <span class="card-subtitle">
-                ${this._deviceId ? `기기: ${this._deviceId}` : '당근파일럿 원격 설정'}
+                ${this._deviceId ? `기기: ${this._deviceId} · ${items.length}개 파라미터` : '당근파일럿 원격 설정'}
                 ${this._pending.size > 0 ? `<span class="pending-badge">대기 ${this._pending.size}건</span>` : ''}
               </span>
             </div>
@@ -793,8 +793,8 @@ class CarrotParamsCard extends HTMLElement {
           <!-- Search Bar -->
           <div class="search-container">
             <span class="search-icon">🔍</span>
-            <input type="text" class="search-input" id="searchInput" placeholder="파라미터 검색 (예: 오토크루즈, AlwaysLateral, 조향)..." value="${this._searchQuery}">
-            ${this._searchQuery ? '<button class="search-clear" id="searchClear">✕</button>' : ''}
+            <input type="text" class="search-input" id="searchInput" placeholder="파라미터 검색 (예: 오토크루즈, AlwaysLateral, 조향)..." value="${this._escapeHtml(this._searchQuery)}">
+            <button class="search-clear" id="searchClear" ${this._searchQuery ? '' : 'hidden'}>✕</button>
           </div>
 
           <!-- Category Tabs -->
@@ -833,7 +833,7 @@ class CarrotParamsCard extends HTMLElement {
             </div>
           ` : filtered.length === 0 ? `
             <div class="state-container">
-              <p>검색 결과가 없습니다.</p>
+              <p>${!this._hass ? 'Home Assistant 연결을 기다리는 중입니다.' : !this._catalog ? '상단 새로고침으로 설정을 불러오세요.' : !items.length ? '파라미터 정의가 없습니다. 카탈로그 동기화 상태를 확인하세요.' : '검색 결과가 없습니다.'}</p>
             </div>
           ` : filtered.map(item => this._renderParamCard(item)).join('')}
         </div>
@@ -842,6 +842,24 @@ class CarrotParamsCard extends HTMLElement {
       </ha-card>
     `;
 
+    this._bindEvents();
+  }
+
+  _escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
+  _renderSearchResults() {
+    if (this._loading || this._error || this._waitingForSync) return;
+    const list = this.shadowRoot.querySelector('.params-list');
+    const items = this._filterItems(this._getAllItems());
+    if (list) list.innerHTML = items.length
+      ? items.map(item => this._renderParamCard(item)).join('')
+      : '<div class="state-container"><p>검색 결과가 없습니다.</p></div>';
+    const clear = this.shadowRoot.getElementById('searchClear');
+    if (clear) clear.hidden = !this._searchQuery;
     this._bindEvents();
   }
 
@@ -936,19 +954,17 @@ class CarrotParamsCard extends HTMLElement {
     if (searchInput) {
       searchInput.oninput = (e) => {
         this._searchQuery = e.target.value;
-        this._render();
-        const input = this.shadowRoot.getElementById('searchInput');
-        if (input) {
-          input.focus();
-          input.selectionStart = input.selectionEnd = input.value.length;
-        }
+        // Keep the input node alive: replacing it interrupts Korean IME composition.
+        this._renderSearchResults();
       };
     }
     const searchClear = root.getElementById('searchClear');
     if (searchClear) {
       searchClear.onclick = () => {
         this._searchQuery = '';
-        this._render();
+        searchInput.value = '';
+        this._renderSearchResults();
+        searchInput.focus();
       };
     }
 
