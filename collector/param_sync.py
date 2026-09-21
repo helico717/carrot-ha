@@ -6,9 +6,11 @@
 - Acknowledges applied parameter changes back to Cloudflare Worker.
 """
 from __future__ import annotations
+from contextlib import contextmanager
 import json
 import logging
 import math
+import sqlite3
 import threading
 import time
 import urllib.error
@@ -143,8 +145,73 @@ def apply_local_param(name: str, value: any) -> dict | None:
     return None
 
 
-def run_param_sync(config: dict):
-    """Main loop for parameter synchronization."""
+class ProcessedQueueStore:
+    """Persistent SQLite store for processed parameter change requests to guarantee idempotency."""
+
+    def __init__(self, path: Path | str):
+        self.path = str(path)
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        with self.connect() as db:
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS processed_queue (
+                    queue_id INTEGER PRIMARY KEY,
+                    device_id TEXT NOT NULL,
+                    param_name TEXT NOT NULL,
+                    requested_val TEXT NOT NULL,
+                    actual_val TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    processed_at REAL NOT NULL,
+                    acked INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+
+    @contextmanager
+    def connect(self):
+        db = sqlite3.connect(self.path, timeout=20)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    def get(self, queue_id: int) -> dict | None:
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT queue_id, param_name, actual_val, status, acked FROM processed_queue WHERE queue_id = ?",
+                (queue_id,)
+            ).fetchone()
+            if row:
+                return {
+                    "queue_id": row[0],
+                    "param_name": row[1],
+                    "actual_val": row[2],
+                    "status": row[3],
+                    "acked": bool(row[4])
+                }
+            return None
+
+    def record(self, queue_id: int, device_id: str, param_name: str, requested_val: any, actual_val: any, status: str):
+        now = time.time()
+        with self.connect() as db:
+            db.execute("""
+                INSERT INTO processed_queue (queue_id, device_id, param_name, requested_val, actual_val, status, processed_at, acked)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                ON CONFLICT(queue_id) DO UPDATE SET
+                    actual_val = excluded.actual_val,
+                    status = excluded.status,
+                    processed_at = excluded.processed_at
+            """, (queue_id, device_id, param_name, str(requested_val), str(actual_val), status, now))
+
+    def mark_acked(self, queue_ids: list[int]):
+        if not queue_ids:
+            return
+        with self.connect() as db:
+            placeholders = ",".join("?" for _ in queue_ids)
+            db.execute(f"UPDATE processed_queue SET acked = 1 WHERE queue_id IN ({placeholders})", queue_ids)
+
+
+def run_param_sync(config: dict, store: ProcessedQueueStore | None = None):
+    """Main loop for parameter synchronization with idempotency guarantee."""
     cloud_url = config.get("url", "").rstrip("/")
     token = config.get("token", "")
     device_id = config.get("device", "")
@@ -152,6 +219,9 @@ def run_param_sync(config: dict):
     if not cloud_url or not token or not device_id:
         print("[param_sync] missing connection config; aborting sync", flush=True)
         return
+
+    if store is None:
+        store = ProcessedQueueStore(BASE / "state" / "param_sync.sqlite3")
 
     headers = {"Authorization": f"Bearer {token}"}
     last_catalog_sync = 0.0
@@ -200,11 +270,28 @@ def run_param_sync(config: dict):
             if pending_list:
                 applied_ids = []
                 current_values = {}
+                any_new_applied = False
 
                 for item in pending_list:
                     item_id = item.get("id")
                     param_name = item.get("param_name")
                     raw_val = item.get("param_value")
+                    if item_id is None or not param_name:
+                        continue
+
+                    # Idempotency check: if this queue_id was already processed, do NOT re-apply
+                    existing = store.get(item_id)
+                    if existing:
+                        if existing["status"] == "applied":
+                            applied_ids.append(item_id)
+                            val = existing["actual_val"]
+                            try:
+                                val = float(val) if "." in val else int(val)
+                            except (ValueError, TypeError):
+                                pass
+                            current_values[param_name] = val
+                            print(f"[param_sync] queue item {item_id} ({param_name}) already applied ({existing['actual_val']}); skipping local write and resending ACK", flush=True)
+                        continue
 
                     parsed_val = raw_val
                     if isinstance(raw_val, str):
@@ -222,24 +309,54 @@ def run_param_sync(config: dict):
                                 parsed_val = raw_val
 
                     success = apply_local_param(param_name, parsed_val)
-                    if success:
+                    if success and "value" in success:
+                        actual_val = success["value"]
+                        store.record(item_id, device_id, param_name, parsed_val, actual_val, "applied")
                         applied_ids.append(item_id)
-                        current_values[param_name] = success["value"]
-                        print(f"[param_sync] applied param {param_name} = {parsed_val}", flush=True)
+                        current_values[param_name] = actual_val
+                        any_new_applied = True
+                        print(f"[param_sync] applied param {param_name} = {parsed_val} (verified: {actual_val})", flush=True)
+                    else:
+                        store.record(item_id, device_id, param_name, parsed_val, "", "failed")
+                        print(f"[param_sync] rejected or failed param {param_name} = {parsed_val}", flush=True)
 
                 if applied_ids:
+                    # If new parameter was applied, upload fresh snapshot immediately
+                    if any_new_applied:
+                        try:
+                            fresh_snapshot = fetch_local_settings_snapshot()
+                            if fresh_snapshot and fresh_snapshot.get("settings") and fresh_snapshot.get("values"):
+                                _http_request(
+                                    f"{cloud_url}/api/settings/sync",
+                                    data={
+                                        "device_id": device_id,
+                                        "catalog": fresh_snapshot["settings"],
+                                        "values": fresh_snapshot["values"],
+                                    },
+                                    headers=headers,
+                                    timeout=15.0,
+                                    verbose=False
+                                )
+                                last_catalog_sync = now
+                        except Exception as e:
+                            print(f"[param_sync] immediate snapshot sync error: {e}", flush=True)
+
                     ack_payload = {
                         "device_id": device_id,
                         "applied_ids": applied_ids,
                         "current_values": current_values
                     }
-                    _http_request(
+                    ack_res = _http_request(
                         f"{cloud_url}/api/params/ack",
                         data=ack_payload,
                         headers=headers,
                         timeout=10.0
                     )
-                    print(f"[param_sync] acknowledged {len(applied_ids)} applied params to cloud", flush=True)
+                    if ack_res and ack_res.get("ok"):
+                        store.mark_acked(applied_ids)
+                        print(f"[param_sync] acknowledged {len(applied_ids)} applied params to cloud successfully", flush=True)
+                    else:
+                        print(f"[param_sync] WARNING: failed to acknowledge {len(applied_ids)} params to cloud (will retry ACK on next poll)", flush=True)
 
         # Poll interval: 3 seconds
         time.sleep(3)

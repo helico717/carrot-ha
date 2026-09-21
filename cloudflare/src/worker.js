@@ -2502,6 +2502,14 @@ async function handleParamsPending(request, env) {
     const deviceId = url.searchParams.get("device_id");
     if (!deviceId) return json({ error: "missing_device_id" }, 400);
 
+    // Auto-expire pending requests older than 30 minutes to prevent applying stale commands
+    const expireThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    await env.DB.prepare(`
+      UPDATE carrot_param_queue
+      SET status = 'expired'
+      WHERE device_id = ? AND status = 'pending' AND created_at < ?
+    `).bind(deviceId, expireThreshold).run();
+
     const rows = await env.DB.prepare(`
       SELECT id, param_name, param_value, created_at
       FROM carrot_param_queue
@@ -2532,22 +2540,8 @@ async function handleParamsAck(request, env) {
       `).bind(now, deviceId, ...appliedIds).run();
     }
 
-    if (body?.current_values && typeof body.current_values === "object" && deviceId) {
-      const existing = await env.DB.prepare(`
-        SELECT values_json FROM carrot_settings_cache WHERE device_id = ?
-      `).bind(deviceId).first();
-      let updatedValues = {};
-      if (existing?.values_json) {
-        try { updatedValues = JSON.parse(existing.values_json); } catch (_) {}
-      }
-      Object.assign(updatedValues, body.current_values);
-      await env.DB.prepare(`
-        UPDATE carrot_settings_cache
-        SET values_json = ?, updated_at = ?
-        WHERE device_id = ?
-      `).bind(JSON.stringify(updatedValues), now, deviceId).run();
-    }
-
+    // Note: Parameter cache (carrot_settings_cache) is exclusively updated via
+    // /api/settings/sync snapshots from the vehicle to prevent late ACKs from overwriting fresh states.
     return json({ ok: true, acked: appliedIds.length });
   } catch (err) {
     return json({ error: "params_ack_failed", message: String(err) }, 500);
