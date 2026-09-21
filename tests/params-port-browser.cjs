@@ -96,6 +96,21 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     await frame.locator('#items').getByText('ScrollParam39',{exact:true}).waitFor({state:'attached'});
     const metrics = () => child.evaluate(() => Object.fromEntries(['pageSetting','settingScreenHost','settingScreenGroups','settingScreenItems'].map(id=>{const el=document.getElementById(id);return [id,{height:el.clientHeight,scroll:el.scrollHeight,display:getComputedStyle(el).display}]})));
     console.log('DESKTOP', await metrics());
+    for (const height of [900, 1600]) {
+      await page.setViewportSize({width:1300,height});
+      await page.waitForFunction(() => Math.abs(card.shadowRoot.querySelector('iframe').getBoundingClientRect().bottom - (innerHeight - 1)) <= 1);
+    }
+    await page.evaluate(() => card._showToast('차량 적용 대기 중'));
+    await page.waitForTimeout(350);
+    const toastPosition = await page.evaluate(() => {
+      const frame = card.shadowRoot.querySelector('iframe').getBoundingClientRect();
+      const toast = card.shadowRoot.getElementById('toast').getBoundingClientRect();
+      return {offset:toast.top-frame.top,bottom:toast.bottom,frameBottom:frame.bottom};
+    });
+    assert.ok(Math.abs(toastPosition.offset-12)<1, 'Notification must appear at the top of the settings');
+    assert.ok(toastPosition.bottom<toastPosition.frameBottom);
+    await page.setViewportSize({width:1300,height:900});
+    console.log('PASS: desktop fills viewport at normal and tall sizes; notification appears at top');
     await frame.locator('#settingScreenItems').hover();
     await page.mouse.wheel(0,1000);
     await page.waitForTimeout(300);
@@ -117,7 +132,7 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     await frame.locator('#settingScreenItems').evaluate(el=>el.scrollTop=1000);
     assert.ok(await frame.locator('#settingScreenItems').evaluate(el=>el.scrollTop)>0);
     console.log('PASS: desktop wheel and mobile visible scroll panes');
-    await page.screenshot({path:'/tmp/carrot-port-fixed.png'});
+    await page.screenshot({path:path.join(require('node:os').tmpdir(),'carrot-port-fixed.png')});
     assert.deepEqual(errors,[]);
     console.log('PASS: catalog addition/removal, Korean search, no page exceptions');
   } finally {await browser.close();}

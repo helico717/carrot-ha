@@ -35,6 +35,7 @@ class CarrotParamsCard extends HTMLElement {
     this._snapshotData = null;
 
     this._onWindowMessage = this._handleWindowMessage.bind(this);
+    this._onViewportResize = () => this._updateViewportHeight();
   }
 
   static getStubConfig() {
@@ -67,11 +68,19 @@ class CarrotParamsCard extends HTMLElement {
 
   connectedCallback() {
     window.addEventListener('message', this._onWindowMessage);
+    window.addEventListener('resize', this._onViewportResize);
+    window.visualViewport?.addEventListener('resize', this._onViewportResize);
+    this._layoutObserver = new ResizeObserver(this._onViewportResize);
+    this._layoutObserver.observe(this);
+    this._updateViewportHeight();
     this._startPolling();
   }
 
   disconnectedCallback() {
     window.removeEventListener('message', this._onWindowMessage);
+    window.removeEventListener('resize', this._onViewportResize);
+    window.visualViewport?.removeEventListener('resize', this._onViewportResize);
+    this._layoutObserver?.disconnect();
     this._stopPolling();
     for (const request of this._pending.values()) request.reject(new Error('화면 연결이 종료되었습니다. 적용 여부를 다시 확인하세요.'));
     this._pending.clear();
@@ -86,6 +95,17 @@ class CarrotParamsCard extends HTMLElement {
       if (this._pending.size) this._checkPendingStatus();
       if (Date.now() - this._lastSnapshotFetch >= 15000) this._loadData();
     }, 4000);
+  }
+
+  _updateViewportHeight() {
+    const container = this.shadowRoot.querySelector('.iframe-container');
+    if (!container || !this.isConnected) return;
+    const viewport = window.visualViewport;
+    const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+    const top = Math.max(0, container.getBoundingClientRect().top);
+    const height = Math.max(180, Math.floor(bottom - top - 1));
+    const value = `${height}px`;
+    if (container.style.height !== value) container.style.height = value;
   }
 
   _stopPolling() {
@@ -585,9 +605,8 @@ class CarrotParamsCard extends HTMLElement {
         .iframe-container {
           position: relative;
           width: 100%;
-          min-height: 360px;
-          height: clamp(360px, 80vh, 1200px);
-          height: clamp(360px, 80dvh, 1200px);
+          min-height: 180px;
+          height: calc(100dvh - 104px);
           background: #121316;
           border: none;
         }
@@ -601,10 +620,13 @@ class CarrotParamsCard extends HTMLElement {
 
         /* Toast */
         #toast {
-          position: fixed;
-          bottom: 24px;
+          position: absolute;
+          top: 12px;
           left: 50%;
-          transform: translateX(-50%) translateY(100px);
+          transform: translateX(-50%) translateY(-12px);
+          box-sizing: border-box;
+          max-width: calc(100% - 24px);
+          overflow-wrap: anywhere;
           background: rgba(18, 22, 28, 0.96);
           color: #ffffff !important;
           padding: 11px 24px;
@@ -644,14 +666,14 @@ class CarrotParamsCard extends HTMLElement {
             loading="eager"
             title="CarrotPilot Authentic Settings"
           ></iframe>
+          <div id="toast" role="status" aria-live="polite"></div>
         </div>
-
-        <div id="toast"></div>
       </ha-card>
     `;
 
     this._bindEvents();
     this._renderSyncStatus();
+    this._updateViewportHeight();
     const frame = this.shadowRoot.getElementById('carrotSettingsFrame');
     if (frame) {
       frame.onload = () => {
