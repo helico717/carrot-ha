@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-params-card.js', 'utf8');
-const context = vm.createContext({HTMLElement: class {}, customElements: {get: () => true}, console});
+const context = vm.createContext({
+  HTMLElement: class {},
+  customElements: {get: () => true},
+  console,
+  setTimeout,
+  clearTimeout,
+  setInterval,
+  clearInterval
+});
 vm.runInContext(source.replace('export default CarrotParamsCard;', 'globalThis.Card = CarrotParamsCard;'), context);
 const card = Object.create(context.Card.prototype);
 Object.assign(card, {
@@ -44,3 +52,72 @@ clear.onclick();
 assert.equal(input.value, '');
 assert.match(list.innerHTML, /PathOffset/);
 console.log('Parameter card: category, fallback, Korean input and clear checks passed');
+
+// Test 2: Iframe and postMessage bridge tests
+const iframeMessages = [];
+const mockIframe = {
+  contentWindow: {
+    postMessage(data, targetOrigin) {
+      iframeMessages.push({ data, targetOrigin });
+    }
+  },
+  style: {}
+};
+
+const bridgeCard = Object.create(context.Card.prototype);
+const apiCalls = [];
+bridgeCard._hass = {
+  callApi(method, path, body) {
+    apiCalls.push({ method, path, body });
+    return Promise.resolve({ ok: true });
+  }
+};
+bridgeCard._entryId = 'test-entry-123';
+bridgeCard._deviceId = 'test-id4';
+bridgeCard._values = { PathOffset: 0 };
+bridgeCard._pending = new Set();
+bridgeCard._snapshotData = {
+  catalog: { categories: [] },
+  values: { PathOffset: 0 },
+  device_id: 'test-id4'
+};
+bridgeCard.shadowRoot = {
+  getElementById: id => (id === 'carrotSettingsFrame' ? mockIframe : null)
+};
+
+// Test carrot:ready triggers snapshot delivery
+bridgeCard._iframeReady = false;
+bridgeCard._handleWindowMessage({ data: { type: 'carrot:ready' } });
+assert.equal(bridgeCard._iframeReady, true);
+assert.equal(iframeMessages.length, 1);
+assert.equal(iframeMessages[0].data.type, 'carrot:snapshot');
+assert.equal(iframeMessages[0].data.data.device_id, 'test-id4');
+
+// Test carrot:param_set triggers HA API call
+bridgeCard._handleWindowMessage({ data: { type: 'carrot:param_set', name: 'PathOffset', value: 5 } });
+await new Promise(r => setTimeout(r, 10));
+assert.equal(apiCalls.length, 1);
+assert.equal(apiCalls[0].method, 'POST');
+assert.equal(apiCalls[0].path, 'carrot_ha/v1/param_set/test-entry-123');
+assert.equal(apiCalls[0].body.name, 'PathOffset');
+assert.equal(apiCalls[0].body.value, 5);
+assert.equal(bridgeCard._values.PathOffset, 5);
+assert.equal(bridgeCard._pending.has('PathOffset'), true);
+
+// Test carrot:resize adjusts iframe height
+bridgeCard._handleWindowMessage({ data: { type: 'carrot:resize', height: 950 } });
+assert.equal(mockIframe.style.height, '950px');
+
+// Test _render HTML contains iframe with settings.html
+let renderedHtml = '';
+bridgeCard.shadowRoot = {
+  set innerHTML(html) { renderedHtml = html; },
+  get innerHTML() { return renderedHtml; },
+  getElementById: () => null
+};
+bridgeCard._render();
+assert.match(renderedHtml, /<iframe/);
+assert.match(renderedHtml, /\/carrot_ha_static\/carrot_web\/settings\.html/);
+
+console.log('Parameter card: iframe bridge and postMessage integration tests passed');
+

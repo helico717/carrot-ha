@@ -1,0 +1,264 @@
+<!doctype html>
+<html class="notranslate" translate="no" data-carrot-start-page="setting" data-carrot-bootstrapped="1">
+<head>
+  <meta charset="utf-8" />
+  <meta name="google" content="notranslate" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>CarrotPilot Settings</title>
+  <script>
+    (function () {
+      try {
+        var vv = window.visualViewport;
+        var h = Math.max(320, Math.round((vv && vv.height) || window.innerHeight || 0));
+        var w = Math.max(320, Math.round((vv && vv.width) || window.innerWidth || 0));
+        var t = Math.max(0, Math.round((vv && vv.offsetTop) || 0));
+        var s = document.documentElement.style;
+        s.setProperty("--app-vv-height", h + "px");
+        s.setProperty("--app-vv-width", w + "px");
+        s.setProperty("--app-vv-top", t + "px");
+        var ratio = h > 0 ? w / h : 1;
+        var wide = ratio >= 1.3 || (w >= 640 && h >= 650);
+        document.documentElement.dataset.layout = wide ? "wide" : (ratio >= 0.92 ? "square" : "tall");
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-tokens.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/tokens.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout_tokens.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/hud_card.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/base.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-system.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/components.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/settings.css" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/responsive.css" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: var(--md-surface, #121316);
+      color: var(--md-on-surface, #e2e2e6);
+      overflow-x: hidden;
+    }
+    #pageSetting {
+      display: block !important;
+      width: 100%;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .swipe-container {
+      width: 100%;
+      min-height: 100vh;
+    }
+    /* Loading overlay when waiting for parent HA card snapshot */
+    #haBridgeLoading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      color: var(--md-on-surface-variant, #9ba1a6);
+      gap: 16px;
+      font-family: inherit;
+    }
+    .ha-bridge-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255, 122, 41, 0.2);
+      border-top-color: #ff7a29;
+      border-radius: 50%;
+      animation: haBridgeSpin 0.9s linear infinite;
+    }
+    @keyframes haBridgeSpin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body class="notranslate" translate="no">
+
+  <div class="wrap swipe-container" id="swipeContainer">
+    <!-- Initial Loading State -->
+    <div id="haBridgeLoading">
+      <div class="ha-bridge-spinner"></div>
+      <div>당근파일럿 설정 로딩 중...</div>
+    </div>
+
+    <!-- ════════════ SETTING SCREEN ════════════ -->
+    <div id="pageSetting" class="page page--setting" hidden style="display:none;">
+      <div class="page-fab-layer page-fab-layer--setting">
+        <div id="settingFabMenu" class="setting-fab-menu">
+          <div id="settingFabActions" class="setting-fab-actions" role="menu" aria-labelledby="btnSettingSearch" hidden>
+            <button id="btnSettingFabProfileAdd" class="setting-fab-action" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4m-8-2V7H4V5h3V2h2v3h3v2H9v3zm8 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4"/>
+              </svg>
+              <span id="settingFabProfileAddLabel">프로필 추가</span>
+            </button>
+            <button id="btnSettingFabResetDefaults" class="setting-fab-action" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M12 5V2L7 7l5 5V9c3.31 0 6 2.69 6 6 0 1.01-.25 1.96-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 15c0-4.42-3.58-8-8-8m-6 4.74A7.93 7.93 0 0 0 4 15c0 4.42 3.58 8 8 8v-2c-3.31-0-6-2.69-6-6 0-1.01.25-1.96.7-2.8z"/>
+              </svg>
+              <span id="settingFabResetDefaultsLabel">설정 초기화</span>
+            </button>
+            <button id="btnSettingFabSearch" class="setting-fab-action" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79L19 20.49 20.49 19zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"/>
+              </svg>
+              <span id="settingFabSearchLabel">설정 검색</span>
+            </button>
+            <button id="btnSettingFabFingerprint" class="setting-fab-action" type="button" role="menuitem">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M12 2a9 9 0 0 0-9 9c0 1.4.3 2.7.9 3.9l1.8-.9A7 7 0 0 1 12 4a7 7 0 0 1 7 7c0 2.6-.6 5-1.7 7.2l1.8.9A16 16 0 0 0 21 11a9 9 0 0 0-9-9m0 4a5 5 0 0 0-5 5c0 3.1-.8 6-2.2 8.5l1.7 1A19 19 0 0 0 9 11a3 3 0 0 1 6 0c0 3.4-.9 6.6-2.5 9.4l1.7 1A21 21 0 0 0 17 11a5 5 0 0 0-5-5m0 4a1 1 0 0 0-1 1 17 17 0 0 1-2.6 9l1.7 1A19 19 0 0 0 13 11a1 1 0 0 0-1-1"/>
+              </svg>
+              <span id="settingFabFingerprintLabel">설정 코드</span>
+            </button>
+          </div>
+          <button id="btnSettingSearch" class="fab fab--round fab--icon fab--setting-search fab--setting-menu" type="button" aria-label="설정 작업" aria-expanded="false" aria-haspopup="menu" aria-controls="settingFabActions">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="setting-fab-menu-icon">
+              <path d="M5 7h14M5 12h14M5 17h14"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="page-header page-header--hidden" aria-hidden="true">
+        <h2 id="settingTitle" style="margin:0; font-size:var(--fs-headline); font-weight:700; cursor:pointer;"><span id="settingTitleText">Setting</span></h2>
+      </div>
+
+      <div class="muted mb-sm" id="settingsMeta" hidden aria-live="polite"></div>
+
+      <div id="settingScreenHost" class="screen-host">
+        <!-- Groups Screen -->
+        <div id="settingScreenGroups" class="screen">
+          <div id="settingTabBar" class="setting-tabbar" role="tablist" aria-label="Setting categories">
+            <button type="button" class="setting-tab" id="settingTabDevice" data-setting-tab="device" role="tab" aria-selected="false">
+              <span id="settingTabDeviceLabel">디바이스</span>
+            </button>
+            <button type="button" class="setting-tab is-active" id="settingTabCarrot" data-setting-tab="carrot" role="tab" aria-selected="true">
+              <span id="settingTabCarrotLabel">당근파일럿</span>
+            </button>
+          </div>
+
+          <!-- CarrotPilot Groups -->
+          <div id="carrotTabContent">
+            <form id="settingInlineSearch" class="setting-inline-search" role="search">
+              <label id="settingInlineSearchLabel" for="settingInlineSearchInput">설정 찾기</label>
+              <div class="setting-inline-search__field">
+                <input id="settingInlineSearchInput" type="search" placeholder="예: 감속, TF" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-describedby="settingInlineSearchHint" />
+                <button id="settingInlineSearchClear" type="button" aria-label="검색어 지우기" hidden>×</button>
+              </div>
+              <div id="settingInlineSearchHint" class="setting-inline-search__hint">이름·설명·분류로 검색 · 최대 20개</div>
+              <output id="settingInlineSearchStatus" class="setting-inline-search__status" aria-live="polite"></output>
+            </form>
+            <div id="groupList"></div>
+          </div>
+
+          <!-- Device tab content (hidden by default) -->
+          <div id="deviceTabContent" hidden>
+            <div id="deviceGroupList"></div>
+          </div>
+        </div>
+
+        <!-- Items Screen -->
+        <div id="settingScreenItems" class="screen hidden" style="display:none;">
+          <div class="row-between mb-sm">
+            <h3 id="itemsTitle" class="section-title" style="cursor:pointer; margin:0;">Items</h3>
+            <span class="muted" id="groupMeta">-</span>
+          </div>
+          <div id="items"></div>
+          <div id="deviceItems" hidden></div>
+        </div>
+      </div>
+
+      <button id="settingSearchBackdrop" class="setting-search-backdrop" type="button" hidden aria-label="Close search"></button>
+      <div id="settingSearchPanel" class="setting-search-panel" hidden aria-hidden="true">
+        <form id="settingSearchForm" class="setting-search-form">
+          <input id="settingSearchInput" type="text" class="setting-search-form__input" placeholder="설정 검색" autocomplete="off" />
+          <button id="btnSettingSearchSubmit" class="setting-search-form__submit" type="submit" aria-label="Search settings">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16a6.47 6.47 0 0 0 4.23-1.57l.27.28v.79L19 20.49 20.49 19zM9.5 14A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14"/>
+            </svg>
+          </button>
+        </form>
+        <div id="settingSearchResults" class="setting-search-results"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Host -->
+  <div id="appToastHost" class="app-toast-host" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Shared Modal Dialog -->
+  <div id="appDialog" class="app-dialog" hidden>
+    <button id="appDialogBackdrop" class="app-dialog__backdrop" type="button" aria-label="Close dialog"></button>
+    <div class="app-dialog__sheet" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogBody">
+      <div class="app-dialog__head">
+        <div id="appDialogTitle" class="app-dialog__title">알림</div>
+      </div>
+      <div id="appDialogBody" class="app-dialog__body">-</div>
+      <div id="appDialogChoices" class="app-dialog__choices" hidden></div>
+      <div id="appDialogInputWrap" class="app-dialog__inputWrap" hidden>
+        <input id="appDialogInput" type="text" class="input-text app-dialog__input" />
+        <div id="appDialogInputError" class="app-dialog__inputError" role="alert" hidden></div>
+      </div>
+      <div class="app-dialog__actions">
+        <button id="appDialogCopy" class="smallBtn" type="button" hidden>Copy</button>
+        <button id="appDialogDefault" class="smallBtn" type="button" hidden>기본값</button>
+        <button id="appDialogCancel" class="smallBtn" type="button">취소</button>
+        <button id="appDialogConfirm" class="smallBtn btn--filled" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden placeholder nodes to satisfy global element lookups from shared modules -->
+  <div style="display:none;" aria-hidden="true">
+    <button id="btnHome"></button>
+    <button id="btnSetting"></button>
+    <button id="btnLogs"></button>
+    <button id="btnTerminal"></button>
+    <button id="btnTools"></button>
+    <button id="btnRecordToggle"></button>
+    <button id="btnLang"></button>
+    <span id="langLabel"></span>
+    <button id="btnSettingLang"></button>
+    <button id="btnBackCar"></button>
+    <h2 id="carTitle"></h2>
+    <h3 id="modelTitle"></h3>
+    <button id="btnBackBranch"></button>
+    <h2 id="branchTitle"></h2>
+    <button id="btnBackGroups"></button>
+    <div id="pageCar"></div>
+    <div id="pageTools"></div>
+    <div id="pageLogs"></div>
+    <div id="pageTerminal"></div>
+    <div id="pageBranch"></div>
+    <div id="pageCarrot"></div>
+    <div id="toolsQuickLink"></div>
+    <div id="toolsQuickLinkTitle"></div>
+    <button id="btnToolsQuickLink"></button>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/carrot_ha_static/carrot_web/js/app.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/registry.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/ko.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/en.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/zh.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/constants.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/stream_identity.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/dom.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/utils.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/i18n.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/api.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/settings.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/setting_diff.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/activity.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/setting_form.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/viewport.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/effects.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/navigation.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/setting_page.js"></script>
+  <script src="/carrot_ha_static/carrot_web/js/ha_bridge.js"></script>
+</body>
+</html>
