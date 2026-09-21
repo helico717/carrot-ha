@@ -605,14 +605,18 @@ class CarrotParamsCard extends HTMLElement {
           bottom: 24px;
           left: 50%;
           transform: translateX(-50%) translateY(100px);
-          background: rgba(20, 24, 30, 0.95);
-          color: var(--primary-text-color, #e1e1e1);
-          padding: 10px 22px;
+          background: rgba(18, 22, 28, 0.96);
+          color: #ffffff !important;
+          padding: 11px 24px;
           border-radius: 24px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(255, 122, 41, 0.5);
+          box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 122, 41, 0.3);
+          border: 1px solid rgba(255, 122, 41, 0.7);
           font-size: 13px;
           font-weight: 600;
+          letter-spacing: -0.2px;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           pointer-events: none;
           opacity: 0;
           transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
@@ -626,9 +630,9 @@ class CarrotParamsCard extends HTMLElement {
 
       <ha-card>
         <!-- Header -->
-        <div class="card-header" data-version="0.6.5">
+        <div class="card-header" data-version="0.6.6">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
-          <button class="btn-icon" id="btnRefresh" title="파라미터 새로고침 · UI 0.6.5" aria-label="파라미터 새로고침">↻</button>
+          <button class="btn-icon" id="btnRefresh" title="파라미터 새로고침 · UI 0.6.6" aria-label="파라미터 새로고침">↻</button>
         </div>
 
         <!-- Authentic Carrot Web Embedded Iframe -->
