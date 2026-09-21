@@ -17,7 +17,8 @@ class CarrotParamsCard extends HTMLElement {
     this._deviceId = '';
     this._catalog = null;
     this._values = {};
-    this._pending = new Set();
+    this._pending = new Map();
+    this._sending = new Set();
     this._searchQuery = '';
     this._activeCategory = 'ALL';
     this._expandedParams = new Set();
@@ -39,6 +40,11 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   setConfig(config) {
+    if (this._config.device_id !== config?.device_id) {
+      for (const request of this._pending.values()) request.reject(new Error('장치가 변경되었습니다.'));
+      this._pending.clear();
+      this._device = this._entryId = this._snapshotData = this._catalog = null;
+    }
     this._config = config || {};
     this._render();
     if (this._hass) {
@@ -63,16 +69,17 @@ class CarrotParamsCard extends HTMLElement {
   disconnectedCallback() {
     window.removeEventListener('message', this._onWindowMessage);
     this._stopPolling();
+    for (const request of this._pending.values()) request.reject(new Error('화면 연결이 종료되었습니다. 적용 여부를 다시 확인하세요.'));
+    this._pending.clear();
   }
 
   _startPolling() {
     this._stopPolling();
+    this._lastSnapshotFetch = 0;
     this._pollTimer = setInterval(() => {
-      if (this._entryId) {
-        if (this._pending.size > 0) {
-          this._checkPendingStatus();
-        }
-      }
+      if (!this._entryId || document.hidden) return;
+      if (this._pending.size) this._checkPendingStatus();
+      if (Date.now() - this._lastSnapshotFetch >= 15000) this._loadData();
     }, 4000);
   }
 
@@ -84,6 +91,8 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   _handleWindowMessage(event) {
+    const frame = this.shadowRoot.getElementById('carrotSettingsFrame');
+    if (event.origin !== window.location.origin || event.source !== frame?.contentWindow) return;
     const msg = event?.data;
     if (!msg || typeof msg !== 'object') return;
 
@@ -94,10 +103,12 @@ class CarrotParamsCard extends HTMLElement {
       } else {
         this._loadData();
       }
-    } else if (msg.type === 'carrot:param_set') {
-      if (msg.name !== undefined && msg.value !== undefined) {
-        this._setParam(msg.name, msg.value);
-      }
+    } else if (msg.type === 'carrot:param_set' && typeof msg.requestId === 'string') {
+      const source = event.source;
+      this._setParam(msg.name, msg.value).then(
+        value => source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: true, name: msg.name, value}, window.location.origin),
+        error => source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: false, error: error.message}, window.location.origin)
+      );
     } else if (msg.type === 'carrot:resize' && typeof msg.height === 'number') {
       const iframe = this.shadowRoot.getElementById('carrotSettingsFrame');
       if (iframe && msg.height > 400) {
@@ -113,32 +124,10 @@ class CarrotParamsCard extends HTMLElement {
       iframe.contentWindow.postMessage({
         type: 'carrot:snapshot',
         data: this._snapshotData,
-      }, '*');
+      }, window.location.origin);
     } catch (err) {
       console.warn('[carrot-params-card] postMessage snapshot error:', err);
     }
-  }
-
-  _sendValuesUpdateToIframe(values) {
-    const iframe = this.shadowRoot.getElementById('carrotSettingsFrame');
-    if (!iframe || !iframe.contentWindow || !values) return;
-    try {
-      iframe.contentWindow.postMessage({
-        type: 'carrot:values_update',
-        values,
-      }, '*');
-    } catch (_) {}
-  }
-
-  _sendParamAppliedToIframe(name) {
-    const iframe = this.shadowRoot.getElementById('carrotSettingsFrame');
-    if (!iframe || !iframe.contentWindow || !name) return;
-    try {
-      iframe.contentWindow.postMessage({
-        type: 'carrot:param_applied',
-        name,
-      }, '*');
-    } catch (_) {}
   }
 
   async _resolveDevice() {
@@ -161,7 +150,8 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   async _loadData() {
-    if (!this._hass) return;
+    if (!this._hass || this._loading) return;
+    this._lastSnapshotFetch = Date.now();
     this._loading = true;
     this._error = null;
     this._waitingForSync = false;
@@ -212,52 +202,65 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   async _checkPendingStatus() {
-    if (!this._hass || !this._entryId) return;
+    if (!this._hass || !this._entryId || this._checkingStatus) return;
+    this._checkingStatus = true;
     try {
-      const data = await this._hass.callApi('GET', `carrot_ha/v1/param_status/${encodeURIComponent(this._entryId)}`);
-      if (data && data.ok && Array.isArray(data.queue)) {
-        const activePending = new Set();
-        for (const item of data.queue) {
-          if (item.status === 'pending') {
-            activePending.add(item.param_name);
-          } else if (this._pending.has(item.param_name) && item.status === 'applied') {
-            this._showToast(`✓ ${item.param_name} 차량 적용 완료!`);
-            this._sendParamAppliedToIframe(item.param_name);
-          }
+      for (const [id, req] of this._pending) {
+        if (Date.now() - req.started > 100000) {
+          req.reject(new Error('차량 적용 확인 시간이 초과되었습니다. 요청은 남아 있을 수 있으므로 재조회하세요.'));
+          this._pending.delete(id);
         }
-        this._pending = activePending;
-        this._renderHeaderStatus();
       }
-    } catch (_) {}
+      if (!this._pending.size) return;
+      const ids = [...this._pending.keys()].join(',');
+      const data = await this._hass.callApi('GET', `carrot_ha/v1/param_status/${encodeURIComponent(this._entryId)}?ids=${encodeURIComponent(ids)}`);
+      for (const item of data.queue || []) {
+        const req = this._pending.get(String(item.id));
+        if (!req || item.param_name !== req.name) continue;
+        if (item.status === 'applied') {
+          // Confirm against the vehicle snapshot, not a previous command with the same name.
+          const snapshot = await this._hass.callApi('GET', `carrot_ha/v1/settings/${encodeURIComponent(this._entryId)}`);
+          const actual = snapshot.values?.[req.name];
+          if (actual === undefined) continue;
+          this._values[req.name] = actual;
+          req.resolve(actual);
+          this._pending.delete(String(item.id));
+          this._showToast(`✓ ${req.name} 차량 적용 확인: ${actual}`);
+        } else if (item.status !== 'pending') {
+          req.reject(new Error(`차량이 요청을 적용하지 못했습니다: ${item.status}`));
+          this._pending.delete(String(item.id));
+        }
+      }
+    } catch (err) {
+      this._showToast('변경 상태 조회 실패. 다음 조회에서 다시 확인합니다.');
+    } finally {
+      this._checkingStatus = false;
+      this._renderHeaderStatus();
+    }
   }
 
   async _setParam(name, value) {
-    if (!this._hass || !this._entryId) return;
-    const oldVal = this._values[name];
-    this._values[name] = value;
-    this._pending.add(name);
-    this._renderHeaderStatus();
-    this._showToast(`⏳ ${name}: ${value} 변경 요청 전송 중...`);
-
+    if (!this._hass || !this._entryId) throw new Error('HA 장치 연결이 없습니다.');
+    if (this._snapshotData?.param_queue_protocol !== 1) throw new Error('Worker를 최신 버전으로 배포한 뒤 새로고침하세요. 현재 서버는 적용 확인을 지원하지 않습니다.');
+    const item = this._getAllItems().find(item => item.name === name);
+    if (!item || !Number.isFinite(Number(value)) || value === '' || value === null ||
+        Number(value) < Number(item.min) || Number(value) > Number(item.max)) throw new Error('현재 카탈로그에 없는 파라미터이거나 허용 범위를 벗어난 값입니다.');
+    if ([...this._pending.values()].some(req => req.name === name) || this._sending.has(name)) throw new Error('이 파라미터는 차량 적용 대기 중입니다.');
+    this._sending.add(name);
+    const entryId = this._entryId;
+    let res;
     try {
-      const res = await this._hass.callApi('POST', `carrot_ha/v1/param_set/${encodeURIComponent(this._entryId)}`, {
-        name,
-        value,
-      });
-      if (res && res.ok) {
-        this._showToast(`⏳ ${name}: 차량 대기열에 등록됨`);
-      } else {
-        this._values[name] = oldVal;
-        this._pending.delete(name);
-        this._showToast(`❌ ${name} 변경 실패: ${res?.error || '오류'}`);
-        this._renderHeaderStatus();
-      }
-    } catch (err) {
-      this._values[name] = oldVal;
-      this._pending.delete(name);
-      this._showToast(`❌ 네트워크 전송 오류`);
-      this._renderHeaderStatus();
+      res = await this._hass.callApi('POST', `carrot_ha/v1/param_set/${encodeURIComponent(entryId)}`, {name, value});
+    } finally {
+      this._sending.delete(name);
     }
+    if (this._entryId !== entryId || !this.isConnected) throw new Error('화면 연결이 변경되었습니다. 실제 적용 여부를 다시 확인하세요.');
+    if (!res?.ok || !res.ids?.length) throw new Error(res?.error || '변경 요청 ID를 받지 못했습니다. 적용 여부를 다시 확인하세요.');
+    this._showToast(`⏳ ${name}: 차량 적용 대기 중`);
+    return new Promise((resolve, reject) => {
+      this._pending.set(String(res.ids[0]), {name, value, resolve, reject, started: Date.now()});
+      this._renderHeaderStatus();
+    });
   }
 
   _showToast(msg) {
@@ -286,7 +289,7 @@ class CarrotParamsCard extends HTMLElement {
     if (!subEl) return;
     const count = this._getAllItems().length;
     subEl.innerHTML = `
-      ${this._deviceId ? `기기: ${this._deviceId} · ${count}개 파라미터` : '당근파일럿 원격 설정'}
+      ${this._deviceId ? `기기: ${this._escapeHtml(this._deviceId)} · ${count}개 파라미터` : '당근파일럿 원격 설정'}
       ${this._pending.size > 0 ? `<span class="pending-badge">대기 ${this._pending.size}건</span>` : ''}
     `;
   }
@@ -424,6 +427,12 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   _render() {
+    // Keep the original UI, focus, scroll and in-flight dialogs mounted.
+    if (this.shadowRoot.getElementById('carrotSettingsFrame')) {
+      this._renderHeaderStatus();
+      if (this._error) this._showToast(this._error);
+      return;
+    }
     // If waiting for first synchronization from vehicle
     if (this._waitingForSync) {
       this.shadowRoot.innerHTML = `
@@ -636,7 +645,7 @@ class CarrotParamsCard extends HTMLElement {
             <div class="header-titles">
               <span class="card-title">CarrotPilot 설정</span>
               <span class="card-subtitle" id="cardSubtitle">
-                ${this._deviceId ? `기기: ${this._deviceId} · ${items.length}개 파라미터` : '당근파일럿 원격 설정'}
+                ${this._deviceId ? `기기: ${this._escapeHtml(this._deviceId)} · ${items.length}개 파라미터` : '당근파일럿 원격 설정'}
                 ${this._pending.size > 0 ? `<span class="pending-badge">대기 ${this._pending.size}건</span>` : ''}
               </span>
             </div>
@@ -650,7 +659,7 @@ class CarrotParamsCard extends HTMLElement {
         <div class="iframe-container">
           <iframe
             id="carrotSettingsFrame"
-            src="/carrot_ha_static/carrot_web/settings.html"
+            src="/carrot_ha_static/carrot_web/settings.html?v=0.6.1"
             allow="fullscreen"
             loading="eager"
             title="CarrotPilot Authentic Settings"

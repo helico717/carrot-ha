@@ -325,7 +325,8 @@ class ParamStatusView(HomeAssistantView):
         session = async_get_clientsession(self.hass)
         try:
             async with session.get(
-                f"{base}/api/params/status?device_id={device_id}",
+                f"{base}/api/params/status",
+                params={"device_id": device_id, **({"ids": request.query["ids"]} if "ids" in request.query else {})},
                 headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json'},
                 timeout=ClientTimeout(total=10)
             ) as resp:

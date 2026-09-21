@@ -1,0 +1,33 @@
+# 0.6.1 파라미터 화면 수정 및 적용
+
+## 빈 화면 원인
+
+iframe 내부 navigation.js는 CURRENT_PAGE를 carrot로 초기화한다. 기존 브리지는 설정 데이터를 넣었지만 이 값을 setting으로 바꾸지 않아 syncSettingViewportLayout이 조기 종료했다. 헤더에는 185개가 표시되면서 내부 그룹 목록은 비는 증상을 로컬 Chrome에서 재현했다. 전용 설정 호스트에서 페이지 상태를 초기화해 해결했다.
+
+## 변경 내용
+
+- 부모/자식 모두 origin과 source를 검증한다. 발신 대상 origin에 와일드카드를 사용하지 않는다.
+- iframe을 유지하고 표시 중 약 16초 간격으로 HA의 settings를 다시 읽는다. 카탈로그가 바뀌면 원본 UI를 갱신한다. 입력/IME 조합/대화상자/변경 요청 중에는 갱신을 보류한다.
+- Worker는 생성된 대기열 ID를 반환하고 HA는 ID 목록을 전달해 해당 요청만 조회한다. 과거 동일 이름 요청을 현재 요청 완료로 오인하지 않는다.
+- 부모 응답과 차량 ack/값 재조회를 기다린 뒤에만 내부 편집 UI에 성공을 전달한다. 실패·확인 시간 초과는 오류로 전달한다. 확인 시간 초과는 요청 취소가 아니며 나중에 적용될 수 있으므로 실제 값을 재조회해야 한다.
+- 초기화/프로필/기기 설정 등 미지원 작업 버튼을 숨기고 API 요청은 명시적으로 거절한다. 즐겨찾기는 원격 저장을 지원하지 않으며 시도 시 미지원 오류를 표시한다.
+- Worker에서 카탈로그/범위를 검증하고 collector에서도 최신 차량 카탈로그를 검증한다. collector는 서버 실패 시 Params 직접 쓰기로 우회하지 않고 서버 API 적용 후 실제 값을 읽어 ack한다.
+
+## 배포 순서
+
+1. 기존 설정/토큰을 유지하며 cloudflare/src/worker.js를 배포한다. 기존 테이블을 사용하므로 이 변경에는 D1 스키마 변경이 없다.
+2. Comma의 기존 param_sync.py를 collector/param_sync.py로 교체하고 해당 프로세스를 재시작한다. 기존 수집기 실행 방식은 유지한다.
+3. custom_components/carrot_ha 폴더 전체를 HA /config/custom_components/carrot_ha/에 반영하고 HA를 재시작한다. 이번 변경은 카드 JS 두 파일만 복사해서는 충분하지 않다.
+4. 브라우저 강력 새로고침. /api/carrot_ha/frontend-version 응답은 0.6.1이어야 한다. 리소스 URL은 기존 /carrot_ha_static/carrot-dashboard.js를 유지한다.
+5. 카드에서 그룹/파라미터/검색을 확인한다. Worker 구버전이면 조회는 가능하지만 쓰기는 업데이트 안내로 거절한다.
+
+표시 카탈로그는 차량 스냅샷 업로드(기본 180초) 후 다음 HA 조회에 반영된다. 네트워크 중단 중에는 최신화를 보장하지 않는다. 실제 차량 값 변경은 사용자 의도에 맞는 값으로 별도 확인해야 한다.
+
+## 검증
+
+- tests/params-port-browser.cjs: 실제 Chrome, 가짜 HA API로 iframe 목록·항목 렌더링, 다른 source 메시지 거부, 성공 조기 반환 방지, 과거 ID 무시, 실패 전달, 새 항목 추가/삭제, 한글 검색 검증.
+- tests/params-card.test.mjs: 카탈로그/검색 헬퍼 및 메시지 격리.
+- tests/params-worker.test.mjs: 카탈로그 검증, 생성 ID 반환, ID별 상태 조회.
+- tests/test_param_sync.py: 제거/범위 외 값 거부, 실제 값 읽기, 직접 쓰기 우회 제거.
+
+실제 HA/Worker/차량에 자동 배포하거나 차량 값을 변경하지 않았다. 공개 Wiki 상세설명의 실제 인터넷 응답과 차량 LTE 종단 적용은 이 로컬 검증에 포함되지 않는다.

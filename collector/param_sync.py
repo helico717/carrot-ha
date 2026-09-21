@@ -2,11 +2,12 @@
 
 - Syncs settings catalog and current values from Carrot server (port 7000) or carrot_settings.json to Cloudflare Worker.
 - Polls Cloudflare Worker for pending parameter changes requested by Home Assistant.
-- Applies requested parameter changes locally via http://127.0.0.1:7000/api/param_set (or Params()).
+- Applies requested parameter changes locally via http://127.0.0.1:7000/api/param_set (without bypassing server validation).
 - Acknowledges applied parameter changes back to Cloudflare Worker.
 """
 import json
 import logging
+import math
 import threading
 import time
 import urllib.error
@@ -109,36 +110,36 @@ def fetch_local_settings_snapshot() -> dict | None:
     return None
 
 
-def apply_local_param(name: str, value: any) -> bool:
-    """Apply parameter change via local carrot server or fallback to Params()."""
-    # 1. Try local carrot_server API
+def apply_local_param(name: str, value: any) -> dict | None:
+    """Use the validated server API and read back the actual stored value."""
+    snapshot = _http_request(f"{LOCAL_SERVER_URL}/api/settings/snapshot", timeout=4.0, verbose=False)
+    if not snapshot or not snapshot.get("ok"):
+        return None
+    catalog = snapshot.get("settings", {})
+    items = [item for group in catalog.get("items_by_group", {}).values() for item in group]
+    definition = next((item for item in items if item.get("name") == name), None)
+    if definition is None:
+        return None
     try:
-        res = _http_request(
-            f"{LOCAL_SERVER_URL}/api/param_set",
-            data={"name": name, "value": value, "source": "ha"},
-            timeout=4.0,
-            verbose=False
-        )
-        if res and res.get("ok"):
-            return True
-    except Exception:
-        pass
-
-    # 2. Fallback to openpilot Params()
-    try:
-        from openpilot.common.params import Params
-        params = Params()
-        val_str = str(value)
-        if isinstance(value, bool):
-            params.put_bool(name, value)
-        elif isinstance(value, int) and (val_str == "0" or val_str == "1"):
-            params.put_bool(name, value == 1)
-        else:
-            params.put(name, val_str)
-        return True
-    except Exception as exc:
-        print(f"[param_sync] fallback Params().put error: {exc}", flush=True)
-        return False
+        numeric = float(value)
+        if not math.isfinite(numeric) or not float(definition["min"]) <= numeric <= float(definition["max"]):
+            return None
+    except (TypeError, ValueError, KeyError):
+        return None
+    res = _http_request(
+        f"{LOCAL_SERVER_URL}/api/param_set",
+        data={"name": name, "value": value, "source": "ha"},
+        timeout=4.0, verbose=False,
+    )
+    if not res or not res.get("ok"):
+        return None
+    actual = _http_request(
+        f"{LOCAL_SERVER_URL}/api/params_bulk?names={urllib.parse.quote(name)}",
+        timeout=4.0, verbose=False,
+    )
+    if actual and actual.get("ok") and name in actual.get("values", {}):
+        return {"value": actual["values"][name]}
+    return None
 
 
 def run_param_sync(config: dict):
@@ -222,7 +223,7 @@ def run_param_sync(config: dict):
                     success = apply_local_param(param_name, parsed_val)
                     if success:
                         applied_ids.append(item_id)
-                        current_values[param_name] = parsed_val
+                        current_values[param_name] = success["value"]
                         print(f"[param_sync] applied param {param_name} = {parsed_val}", flush=True)
 
                 if applied_ids:

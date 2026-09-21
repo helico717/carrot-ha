@@ -2434,6 +2434,7 @@ async function handleGetSettings(request, env) {
       values: JSON.parse(row.values_json || "{}"),
       updated_at: row.updated_at,
       pending_count: pendingCount,
+      param_queue_protocol: 1,
     });
   } catch (err) {
     return json({ error: "get_settings_failed", message: String(err) }, 500);
@@ -2447,6 +2448,20 @@ async function handleParamsQueue(request, env) {
     const deviceId = String(body?.device_id || "").trim();
     if (!deviceId) return json({ error: "missing_device_id" }, 400);
 
+    const cached = await env.DB.prepare('SELECT catalog_json FROM carrot_settings_cache WHERE device_id = ?').bind(deviceId).first();
+    if (!cached) return json({error: 'settings_not_found'}, 409);
+    const catalog = JSON.parse(cached.catalog_json);
+    const definitions = Object.values(catalog.items_by_group || {}).flat();
+    if (!definitions.length) definitions.push(...(catalog.params || catalog.items || []));
+    const entries = body.param_name !== undefined ? [[body.param_name, body.param_value]] : Object.entries(body.params || {});
+    if (!entries.length || entries.length > 200) return json({error: 'invalid_params_payload'}, 400);
+    for (const [name, value] of entries) {
+      const def = definitions.find(item => item.name === name);
+      if (!def || value === null || value === '' || !['number', 'string', 'boolean'].includes(typeof value) ||
+          !Number.isFinite(Number(value)) || Number(value) < Number(def.min) || Number(value) > Number(def.max)) {
+        return json({error: 'invalid_parameter', name}, 400);
+      }
+    }
     const now = new Date().toISOString();
     const statements = [];
 
@@ -2470,17 +2485,11 @@ async function handleParamsQueue(request, env) {
       return json({ error: "invalid_params_payload" }, 400);
     }
 
-    if (statements.length > 0) {
-      if (typeof env.DB.batch === "function") {
-        await env.DB.batch(statements);
-      } else {
-        for (const st of statements) {
-          await st.run();
-        }
-      }
-    }
-
-    return json({ ok: true, queued: statements.length, at: now });
+    const results = typeof env.DB.batch === 'function'
+      ? await env.DB.batch(statements)
+      : await Promise.all(statements.map(statement => statement.run()));
+    const ids = results.map(result => result.meta?.last_row_id).filter(id => id != null);
+    return json({ ok: true, queued: statements.length, ids, at: now });
   } catch (err) {
     return json({ error: "param_queue_failed", message: String(err) }, 500);
   }
@@ -2519,8 +2528,8 @@ async function handleParamsAck(request, env) {
       await env.DB.prepare(`
         UPDATE carrot_param_queue
         SET status = 'applied', applied_at = ?
-        WHERE id IN (${placeholders})
-      `).bind(now, ...appliedIds).run();
+        WHERE device_id = ? AND id IN (${placeholders})
+      `).bind(now, deviceId, ...appliedIds).run();
     }
 
     if (body?.current_values && typeof body.current_values === "object" && deviceId) {
@@ -2552,7 +2561,13 @@ async function handleParamsStatus(request, env) {
     const deviceId = url.searchParams.get("device_id");
     let query = "SELECT id, param_name, param_value, status, created_at, applied_at FROM carrot_param_queue";
     let rows;
-    if (deviceId) {
+    const idsText = url.searchParams.get('ids');
+    if (idsText) {
+      const ids = idsText.split(',');
+      if (!deviceId || ids.length > 200 || ids.some(id => !/^\d+$/.test(id))) return json({error: 'invalid_ids'}, 400);
+      query += ` WHERE device_id = ? AND id IN (${ids.map(() => '?').join(',')})`;
+      rows = await env.DB.prepare(query).bind(deviceId, ...ids).all();
+    } else     if (deviceId) {
       query += " WHERE device_id = ? ORDER BY id DESC LIMIT 20";
       rows = await env.DB.prepare(query).bind(deviceId).all();
     } else {
