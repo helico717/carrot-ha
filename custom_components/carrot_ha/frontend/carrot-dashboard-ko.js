@@ -53,14 +53,38 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.selected=0;this.chargeDay=null;}
-  setConfig(config){this.config=config;this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();this.render();}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=0;this.chargeDay=null;}
+  get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
+  loadCache(){
+    try{
+      const raw=localStorage.getItem(this.cacheKey);
+      if(!raw)return false;
+      const cached=JSON.parse(raw);
+      if(cached&&cached.v&&typeof cached.v==='object'&&Object.keys(cached.v).length){
+        this.v=cached.v;
+        if(Array.isArray(cached.trips)&&cached.trips.length)this.trips=cached.trips;
+        if(Array.isArray(cached.charges)&&cached.charges.length)this.charges=cached.charges;
+        this.isFromCache=true;
+        return true;
+      }
+    }catch(e){console.warn('Carrot HA cache load failed',e);}
+    return false;
+  }
+  saveCache(){
+    try{
+      if(!this.v||!Object.keys(this.v).length)return;
+      const cachedTrips=(this.trips||[]).slice(0,5);
+      const cachedCharges=(this.charges||[]).slice(0,10);
+      localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
+    }catch(e){console.warn('Carrot HA cache save failed',e);}
+  }
+  setConfig(config){this.config=config;this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
     this.setAttribute('data-theme',dark?'dark':'light');
   }
-  set hass(hass){const oldCharging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state;const previous=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;this._hass=hass;this.applyTheme();if(!this.initialized){this.initialized=true;this.load();}else if(oldCharging!==hass.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state||previous!==hass.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state){this.render();}}
+  set hass(hass){const oldCharging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state;const previous=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;this._hass=hass;this.applyTheme();if(!this.initialized){this.initialized=true;if(!this.v||!Object.keys(this.v).length)this.loadCache();this.load();}else if(oldCharging!==hass.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state||previous!==hass.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state){this.render();}}
   connectedCallback(){this.timer=setInterval(()=>{if(this._hass&&!document.hidden)this.load(true);},60000);}
   disconnectedCallback(){this.clearMiniMaps();clearInterval(this.timer);if(this.map){this.map.remove();this.map=null;}}
   getCardSize(){return 8;}
@@ -68,20 +92,22 @@ class CarrotDashboard extends HTMLElement {
   async load(quiet=false){
     if(this.busy)return;this.busy=true;this.error='';
     try{
-      if(!quiet)this.render();
+      if(!quiet&&(!this.v||!Object.keys(this.v).length))this.render();
       const devices=await this._hass.callApi('GET','carrot_ha/v1/devices');
       const requested=this.config?.device_id;
       this.device=devices.devices.find(d=>d.device_id===requested)||(!requested?devices.devices[0]:null);
       if(!this.device)throw Error('Carrot HA 장치를 찾지 못했습니다. 카드의 device_id를 확인하세요.');
       const id=encodeURIComponent(this.device.entry_id);
-      const [dash,trips,charges]=await Promise.all([
-        this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`),
+      const dash=await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`);
+      this.v=dash.values;this.isFromCache=false;this.saveCache();this.render();
+      const [trips,charges]=await Promise.all([
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
       const selectedStart=this.trips[this.selected]?.data?.started_at;
-      this.v=dash.values;this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
+      this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
       this.selected=Math.max(0,this.trips.findIndex(e=>e.data.started_at===selectedStart));
       if(this.selected>=this.trips.length)this.selected=0;
+      this.saveCache();
     }catch(e){this.error=e instanceof Error?e.message:'HA 조회 실패. 관리자 계정과 통합 업데이트를 확인하세요.';}
     finally{this.busy=false;this.render();}
   }
@@ -137,7 +163,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
-</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||'연결 확인 중')}<br>HA 업데이트 ${time(v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`;
+</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>HA 업데이트 ${time(v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`;
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=0;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
@@ -631,13 +657,14 @@ class CarrotDashboard extends HTMLElement {
   vehicleStatus(v){
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'오프라인'};
-    if(online!=='on')return {key:'unknown',label:'연결 확인 중'};
+    if(online!=='on'&&!this.isFromCache)return {key:'unknown',label:'연결 확인 중'};
     const isMoving=(v.speed_kph>5)||(typeof v.wheel_speed_mps==='number'&&v.wheel_speed_mps>1.5);
     const isCharging=(Boolean(v.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving;
     if(isCharging)return {key:'charging',label:'충전중'};
     const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
     if(driving)return {key:'driving',label:'주행 중'};
-    return driving===false?{key:'parked',label:'주차중'}:{key:'unknown',label:'상태 확인 중'};
+    if(driving===false)return {key:'parked',label:'주차중'};
+    return {key:'unknown',label:online==='on'?'상태 확인 중':'연결 확인 중'};
   }
   async drawMiniMaps(v){
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];
