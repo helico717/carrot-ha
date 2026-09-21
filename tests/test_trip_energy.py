@@ -264,6 +264,40 @@ class TestTripEnergy(unittest.TestCase):
         self.assertEqual(data['end_soc_percent'], 73.5)
         self.assertIn('efficiency_km_kwh', data)
 
+    def test_recalibration_with_capacity_when_wh_present(self):
+        """When battery_wh is present alongside soc_percent, capacity_kwh takes precedence."""
+        t_start = self.now
+        t_end = self.now + timedelta(seconds=900)
+        # s1: 39800 Wh, but event has 78kWh-based 51.0%
+        self.archive.put({
+            'schema': 1, 'device_id': self.device, 'event_id': 's1', 'kind': 'state',
+            'observed_at': t_start.isoformat().replace('+00:00', 'Z'),
+            'data': {'battery_wh': 39800, 'soc_percent': 51.0}
+        })
+        # s2: 28800 Wh, but event has 78kWh-based 36.9%
+        self.archive.put({
+            'schema': 1, 'device_id': self.device, 'event_id': 's2', 'kind': 'state',
+            'observed_at': t_end.isoformat().replace('+00:00', 'Z'),
+            'data': {'battery_wh': 28800, 'soc_percent': 36.9}
+        })
+        trip = self._make_trip('t1', 0, 900, 72600)
+        self.archive.put(trip)
+
+        trips = self.archive.history(self.device, 'trip', 10)
+        # Enrich with 64 kWh capacity (e.g. gauge cluster calibrated)
+        result = self.archive.enrich_trips_energy(self.device, trips, capacity_kwh=64.0)
+
+        data = result[0]['data']
+        # 39800 / 64000 = 62.1875 -> 62.2%
+        self.assertEqual(data['start_soc_percent'], 62.2)
+        # 28800 / 64000 = 45.0%
+        self.assertEqual(data['end_soc_percent'], 45.0)
+        self.assertEqual(data['start_battery_wh'], 39800.0)
+        self.assertEqual(data['end_battery_wh'], 28800.0)
+        self.assertEqual(data['energy_wh'], 11000.0)
+        # 72.6km / 11.0kWh = 6.6 km/kWh
+        self.assertEqual(data['efficiency_km_kwh'], 6.6)
+
 
 if __name__ == '__main__':
     unittest.main()

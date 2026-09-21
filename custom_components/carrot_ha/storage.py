@@ -222,7 +222,7 @@ class Archive:
                 t = _parse_ts(ts_str).timestamp()
                 if wh is not None:
                     wh_val = float(wh)
-                    soc_val = float(soc) if soc is not None else min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
+                    soc_val = min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
                 else:
                     soc_val = float(soc)
                     wh_val = (soc_val / 100.0) * (capacity_kwh * 1000)
