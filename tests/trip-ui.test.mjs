@@ -101,6 +101,87 @@ for (const [name, DashClass, durExpected] of [
   assert(htmlNoSoc.includes('class="trip-eff"'), `${name} NoSoc: Should show trip-eff`);
   assert(!htmlNoSoc.includes('00:24:54'), `${name} NoSoc: Should NOT duplicate 00:24:54 when duration text is already shown in header`);
 
+  // Test Case 4: Daily summary mode vs Specific trip mode in trips tab
+  const instTrips = new DashClass();
+  instTrips.tab = 'trips';
+  instTrips.tripDay = '2026-09-19';
+  instTrips.trips = [
+    {
+      observed_at: '2026-09-19T10:50:00Z',
+      data: {
+        started_at: '2026-09-19T10:25:00Z',
+        ended_at: '2026-09-19T10:45:00Z',
+        duration_s: 1200,
+        distance_m: 15600,
+        energy_wh: 2000,
+        efficiency_km_kwh: 7.8,
+        route: [{ speedMps: 10 }, { speedMps: 20.833 }] // max ~75 km/h
+      }
+    },
+    {
+      observed_at: '2026-09-19T14:20:00Z',
+      data: {
+        started_at: '2026-09-19T14:10:00Z',
+        ended_at: '2026-09-19T14:20:00Z',
+        duration_s: 600,
+        distance_m: 10000,
+        energy_wh: 1500,
+        efficiency_km_kwh: 6.7,
+        route: [{ speedMps: 15 }, { speedMps: 25 }] // max 90 km/h
+      }
+    }
+  ];
+
+  // (A) Daily Summary Mode (selected === null)
+  instTrips.selected = null;
+  const summaryHtml = instTrips.body(instTrips.v || {}, {}, true);
+
+  if (name === 'Korean') {
+    assert(summaryHtml.includes('>주행거리</span>'), 'Korean Summary: Missing 주행거리 metric');
+    assert(summaryHtml.includes('25.6'), 'Korean Summary: Expected total distance 25.6 km');
+    assert(summaryHtml.includes('>주행시간</span>'), 'Korean Summary: Missing 주행시간 metric');
+    assert(summaryHtml.includes('>평균전비</span>'), 'Korean Summary: Missing 평균전비 metric');
+    assert(summaryHtml.includes('7.3'), 'Korean Summary: Expected average efficiency 7.3 km/kWh');
+    assert(summaryHtml.includes('>평균속도</span>'), 'Korean Summary: Missing 평균속도 metric');
+    assert(summaryHtml.includes('51'), 'Korean Summary: Expected average speed 51 km/h');
+    assert(summaryHtml.includes('2026-09-19 주행 요약'), 'Korean Summary: Expected 2026-09-19 주행 요약 title');
+    assert(summaryHtml.includes('총 2회 주행'), 'Korean Summary: Expected 총 2회 주행 subtitle');
+  } else {
+    assert(summaryHtml.includes('>Distance</span>'), 'English Summary: Missing Distance metric');
+    assert(summaryHtml.includes('25.6'), 'English Summary: Expected total distance 25.6 km');
+    assert(summaryHtml.includes('>Duration</span>'), 'English Summary: Missing Duration metric');
+    assert(summaryHtml.includes('>Avg efficiency</span>'), 'English Summary: Missing Avg efficiency metric');
+    assert(summaryHtml.includes('7.3'), 'English Summary: Expected average efficiency 7.3 km/kWh');
+    assert(summaryHtml.includes('>Avg speed</span>'), 'English Summary: Missing Avg speed metric');
+    assert(summaryHtml.includes('51'), 'English Summary: Expected average speed 51 km/h');
+    assert(summaryHtml.includes('2026-09-19 trip summary'), 'English Summary: Expected 2026-09-19 trip summary title');
+    assert(summaryHtml.includes('2 trips total'), 'English Summary: Expected 2 trips total subtitle');
+  }
+
+  // (B) Specific Trip Mode (selected === 0)
+  instTrips.selected = 0;
+  const specificHtml = instTrips.body(instTrips.v || {}, instTrips.trips[0].data, true);
+
+  if (name === 'Korean') {
+    assert(specificHtml.includes('>주행거리</span>'), 'Korean Specific: Missing 주행거리 metric');
+    assert(specificHtml.includes('15.6'), 'Korean Specific: Expected trip distance 15.6 km');
+    assert(specificHtml.includes('>주행시간</span>'), 'Korean Specific: Missing 주행시간 metric');
+    assert(specificHtml.includes('>전비</span>'), 'Korean Specific: Missing 전비 metric');
+    assert(specificHtml.includes('7.8'), 'Korean Specific: Expected trip efficiency 7.8 km/kWh');
+    assert(specificHtml.includes('>최고속도</span>'), 'Korean Specific: Missing 최고속도 metric');
+    assert(specificHtml.includes('75'), 'Korean Specific: Expected top speed 75 km/h');
+    assert(specificHtml.includes('주행 상세'), 'Korean Specific: Expected 주행 상세 title');
+  } else {
+    assert(specificHtml.includes('>Distance</span>'), 'English Specific: Missing Distance metric');
+    assert(specificHtml.includes('15.6'), 'English Specific: Expected trip distance 15.6 km');
+    assert(specificHtml.includes('>Duration</span>'), 'English Specific: Missing Duration metric');
+    assert(specificHtml.includes('>Efficiency</span>'), 'English Specific: Missing Efficiency metric');
+    assert(specificHtml.includes('7.8'), 'English Specific: Expected trip efficiency 7.8 km/kWh');
+    assert(specificHtml.includes('>Top speed</span>'), 'English Specific: Missing Top speed metric');
+    assert(specificHtml.includes('75'), 'English Specific: Expected top speed 75 km/h');
+    assert(specificHtml.includes('Trip details'), 'English Specific: Expected Trip details title');
+  }
+
   // Assert CSS rules directly from source
   const jsSource = name === 'Korean'
     ? await readFile(new URL('../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js', import.meta.url), 'utf8')
@@ -135,4 +216,5 @@ assert(dbgSource.includes('.charge-days'), 'debug.js: missing .charge-days in in
 assert(dbgSource.includes('.trip-soc'), 'debug.js: missing .trip-soc in injectCustomStyles');
 assert(dbgSource.includes('.trip-eff'), 'debug.js: missing .trip-eff in injectCustomStyles');
 
-console.log('All Korean, English, and Debug dashboard CSS & tripHistory assertions passed successfully.');
+console.log('All Korean, English, and Debug dashboard CSS, tripHistory, and daily summary assertions passed successfully.');
+

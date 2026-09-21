@@ -53,7 +53,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=0;this.chargeDay=null;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;}
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -74,8 +74,8 @@ class CarrotDashboard extends HTMLElement {
     try{
       if(!this.v||!Object.keys(this.v).length)return;
       const cachedTrips=(this.trips||[]).slice(0,5);
-      const cachedCharges=(this.charges||[]).slice(0,10);
-      localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
+      const cachedCharges=(this.charges||[]).slice(0,5);
+      localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,saved_at:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
   setConfig(config){this.config=config;this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
@@ -103,10 +103,14 @@ class CarrotDashboard extends HTMLElement {
       const [trips,charges]=await Promise.all([
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
-      const selectedStart=this.trips[this.selected]?.data?.started_at;
+      const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
       this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
-      this.selected=Math.max(0,this.trips.findIndex(e=>e.data.started_at===selectedStart));
-      if(this.selected>=this.trips.length)this.selected=0;
+      if(selectedStart!=null){
+        const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
+        this.selected=idx!==-1?idx:null;
+      }else{
+        this.selected=null;
+      }
       this.saveCache();
     }catch(e){this.error=e instanceof Error?e.message:'HA 조회 실패. 관리자 계정과 통합 업데이트를 확인하세요.';}
     finally{this.busy=false;this.render();}
@@ -120,10 +124,13 @@ class CarrotDashboard extends HTMLElement {
       if(!this.tripDay||!days.some(d=>d.key===this.tripDay)){
         const today=days.find(d=>d.today)||days[days.length-1];
         this.tripDay=today?today.key:null;
-        if(today?.indices?.length){
-          this.selected=today.indices[0];
-        }else if(this.trips.length){
-          this.selected=0;
+        this.selected=null;
+      }
+      if(this.selected!==null){
+        const curTrip=this.trips[this.selected];
+        const dayObj=days.find(d=>d.key===this.tripDay);
+        if(!curTrip||!dayObj||!dayObj.indices.includes(this.selected)){
+          this.selected=null;
         }
       }
     }
@@ -134,8 +141,11 @@ class CarrotDashboard extends HTMLElement {
         this.chargeDay=today?today.key:null;
       }
     }
-    const v=this.v,trip=this.trips[this.selected]?.data||{},route=trip.route||[];
+    const v=this.v;
     const isTrip=this.tab==='trips';
+    const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
+    const trip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
+    const route=trip.route||[];
     const state=this.vehicleStatus(v),badge=state.label;
     this.shadowRoot.innerHTML=`<link rel="stylesheet" href="${assetBase}leaflet.css"><style>
       :host{display:block;container-type:inline-size;--ink:#f3f4f4;--muted:#959b9e;--line:#2b2e30;--orange:#ff8a18;--green:#72df9b;color:var(--ink);font-family:Inter,Pretendard,'Noto Sans KR',system-ui,sans-serif}
@@ -164,7 +174,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
 </style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>HA 업데이트 ${time(v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`;
-    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=0;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
@@ -435,10 +445,10 @@ class CarrotDashboard extends HTMLElement {
     select.onchange=()=>{this.themeMode=select.value;try{localStorage.setItem('carrot-theme-'+(this.config?.device_id||'default'),this.themeMode);}catch{}this.applyTheme();};
     this.shadowRoot.querySelector('main').append(themeControl);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
-    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;const day=tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay);if(day?.indices?.length)this.selected=day.indices[0];this.render();});
+    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;this.selected=null;this.render();});
     this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
-    this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{this.selected=Number(b.dataset.trip);this.tab='trips';this.render();});
-    this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=0;this.load();});
+    this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{const clicked=Number(b.dataset.trip);this.selected=this.selected===clicked?null:clicked;this.tab='trips';this.render();});
+    this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=null;this.load();});
     const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
     if(copyBtn)copyBtn.onclick=async(e)=>{
       e.preventDefault();e.stopPropagation();
@@ -474,7 +484,11 @@ class CarrotDashboard extends HTMLElement {
         this._mapResizeObserver.observe(el);
       });
     }
-    if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
+    if(this.shadowRoot.querySelector('.map')){
+      const dayObj=isTrip?tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay):null;
+      const dayTrips=(dayObj?.indices||[]).map(i=>this.trips[i]?.data).filter(Boolean);
+      this.drawMap(isSpecificTrip?route:[],v,(!isSpecificTrip&&isTrip)?dayTrips:[]);
+    }
   }
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
@@ -530,9 +544,66 @@ class CarrotDashboard extends HTMLElement {
       }
       return `<div class="charge-layout">${this.batteryHistory()}<div class="charge-sidebar"><div class="tiles charge-sidebar-tiles">${metric('이번 달 충전량',n(totalKwh),'kWh','battery-plus')}${metric('이번 달 충전 요금',n(costKrw,0),'원','cash','추정치')}${metric('완속 분류',n(slowKwh),'kWh','power-plug')}${metric('급속 분류',n(fastKwh),'kWh','flash')}</div>${this.chargeHistory()}</div></div><p class="notice">배터리 에너지 증가로 추정합니다. 11kW 이하를 완속으로 분류하며, 요금 ${n(costKrw,0)}원은 기본 단가 기준 추정입니다. 차량이 잠들거나 콤마 전원이 꺼지면 측정할 수 없습니다.</p>`;
     }
-    const tiles=isTrip?`${metric('주행거리',n(trip.distance_m==null?null:trip.distance_m/1000,2),'km','map-marker-distance')}${metric('주행시간',duration(trip.duration_s),'','timer-outline')}${metric('평균속도',n(trip.duration_s?trip.distance_m/trip.duration_s*3.6:null,0),'km/h','speedometer-medium')}${metric('최고속도',n(this.maxSpeed(trip.route),0),'km/h','speedometer')}`:
-      `${metric('배터리 잔량',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력 · 추정',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'충전 증가 감지':'관측값 기준')}`;
-    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'주행 상세':'주차 위치'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>저속 · 0 km/h</span><i class="gradient"></i><span>고속 · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length}개 경로 좌표 · 출발 하늘색 / 도착 파랑</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'위치 정보 대기 중'}</b><div class="sub">최근 주차 또는 마지막 주행 도착 위치</div>`}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">차량 컨디션</h2><div class="tiles">${metric('외부 온도',n(v.outside_temp_c),'°C','thermometer')}${metric('12V 배터리',n(v.aux_voltage,2),'V','car-battery')}${metric('에어컨',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('송풍 단계',n(v.blower_level,0),'','fan')}</div>`:''}`;
+    const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
+    const curTrip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
+    const days=isTrip?tripDays(this.trips,this._hass?.config?.time_zone):[];
+    const curDayObj=isTrip?days.find(d=>d.key===this.tripDay):null;
+    const dayIndices=curDayObj?.indices||[];
+    const dayTrips=dayIndices.map(i=>this.trips[i]?.data).filter(Boolean);
+
+    let tiles='';
+    if(isTrip){
+      if(isSpecificTrip){
+        const distVal=curTrip.distance_m!=null?n(curTrip.distance_m/1000,2):'—';
+        const durVal=curTrip.duration_s!=null?duration(curTrip.duration_s):'—';
+        const effVal=curTrip.efficiency_km_kwh!=null?n(curTrip.efficiency_km_kwh,1):'—';
+        const spdVal=curTrip.route?.length?n(this.maxSpeed(curTrip.route),0):'—';
+        tiles=`${metric('주행거리',distVal,'km','map-marker-distance')}`+
+              `${metric('주행시간',durVal,'','timer-outline')}`+
+              `${metric('전비',effVal,'km/kWh','leaf')}`+
+              `${metric('최고속도',spdVal,'km/h','speedometer')}`;
+      }else{
+        const totalDistM=dayTrips.reduce((acc,t)=>acc+(t.distance_m||0),0);
+        const totalDurS=dayTrips.reduce((acc,t)=>acc+(t.duration_s||0),0);
+        let distWithEnergyM=0,energyWhSum=0;
+        for(const t of dayTrips){
+          if(t.energy_wh&&t.energy_wh>0&&t.distance_m){
+            energyWhSum+=t.energy_wh;
+            distWithEnergyM+=t.distance_m;
+          }
+        }
+        const dayAvgEff=energyWhSum>0&&distWithEnergyM>0?(distWithEnergyM/1000)/(energyWhSum/1000):null;
+        const dayAvgSpeed=totalDurS>0&&totalDistM>0?(totalDistM/totalDurS)*3.6:null;
+
+        const distVal=dayTrips.length?n(totalDistM/1000,2):'—';
+        const durVal=dayTrips.length?duration(totalDurS):'—';
+        const effVal=dayAvgEff!=null?n(dayAvgEff,1):'—';
+        const spdVal=dayAvgSpeed!=null?n(dayAvgSpeed,0):'—';
+
+        tiles=`${metric('주행거리',distVal,'km','map-marker-distance')}`+
+              `${metric('주행시간',durVal,'','timer-outline')}`+
+              `${metric('평균전비',effVal,'km/kWh','leaf')}`+
+              `${metric('평균속도',spdVal,'km/h','speedometer-medium')}`;
+      }
+    }else{
+      tiles=`${metric('배터리 잔량',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력 · 추정',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'충전 증가 감지':'관측값 기준')}`;
+    }
+
+    const panelTitle=isTrip
+      ?(isSpecificTrip?'주행 상세':(this.tripDay?`${this.tripDay} 주행 요약`:'주행 요약'))
+      :'주차 위치';
+    const panelTime=isTrip
+      ?(isSpecificTrip?time(curTrip.started_at):(dayTrips.length?`총 ${dayTrips.length}회 주행`:'기록 없음'))
+      :time(v.parking_at);
+
+    const routeCaption=isTrip
+      ?(isSpecificTrip
+          ?`<div class="legend"><span>저속 · 0 km/h</span><i class="gradient"></i><span>고속 · ${n(this.maxSpeed(curTrip.route),0)} km/h</span></div><div class="sub">${time(curTrip.started_at)} → ${time(curTrip.ended_at)}<br>${(curTrip.route||[]).length}개 경로 좌표 · 출발 하늘색 / 도착 파랑</div>`
+          :`<div class="sub">${dayTrips.length?'선택된 날짜의 전체 주행 경로입니다 · 우측 목록에서 개별 주행을 선택하면 상세 정보가 표시됩니다':'해당 날짜에 기록된 주행이 없습니다'}</div>`
+        )
+      :`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'위치 정보 대기 중'}</b><div class="sub">최근 주차 또는 마지막 주행 도착 위치</div>`;
+
+    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${panelTitle}</h2><span class="sub">${panelTime}</span></div><div class="map"></div><div class="route-caption">${routeCaption}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">차량 컨디션</h2><div class="tiles">${metric('외부 온도',n(v.outside_temp_c),'°C','thermometer')}${metric('12V 배터리',n(v.aux_voltage,2),'V','car-battery')}${metric('에어컨',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('송풍 단계',n(v.blower_level,0),'','fan')}</div>`:''}`;
   }
   vehicleStatusView(v){
     const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
@@ -694,7 +765,7 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="battery-history"><h2>배터리 사용량</h2><div class="usage-total" style="color:${color}"><strong>${d.used==null?'—':n(d.used,1)+'%'}${d.used==null?'':'<small class="usage-caption">사용됨</small>'}</strong><span>${esc(d.date)}</span></div><div class="history-plot"><div class="week-bars">${bars}</div><div class="axis"><span>${max}%</span><span>${max/2}%</span><span>0%</span></div></div><p class="chart-key">최근 7일 · 날짜를 눌러 상세 보기 · 100% 초과는 노랑</p><h3>선택한 날짜의 배터리 잔량</h3><div class="history-plot"><div class="hours">${hours}</div><div class="axis"><span>100%</span><span>50%</span><span>0%</span></div></div><div class="hours-label"><span>00시</span><span>06시</span><span>12시</span><span>18시</span><span>24시</span></div><p class="chart-key"><b style="color:#5ad46d">● 충전중</b>　<span class="driving-key">● 주행 중</span>　<span class="parking-key">● 주차·마지막 확인값</span> · <span style="color:#e58a31">30% 미만</span> · <span style="color:#ed6269">15% 미만</span> · 빈 구간: 기록 없음</p><div class="usage-stats"><div>기록된 주행 시간<strong>${shortDuration(d.drive_s)}</strong></div><div>기록된 충전 시간<strong>${shortDuration(d.charge_s)}</strong></div></div><p class="chart-key">수신 ${d.received_samples??0}건 · 유효 SOC ${d.valid_samples??0}건 · 오래된 값 ${d.stale_samples??0}건 · 수집된 구간 ${shortDuration(d.covered_s)} · 사용량은 기록된 SOC 감소량의 합계이며 추정값입니다. 5분 초과 공백은 계산하지 않습니다. 회색 막대는 주차 중 측정값 또는 마지막 확인값입니다. 새 측정이 없는 시간에 유지한 값은 사용량 계산에서 제외합니다. 초록색은 해당 시간에 충전 기록이 있다는 뜻이며, 한 시간 내내 충전했다는 뜻은 아닙니다. SOC 기록이 없으면 충전 배경만 표시합니다. 주행·충전 시간은 저장된 세션 구간 기준이며 진행 중이거나 누락된 세션은 포함되지 않습니다.</p></section>`;
   }
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}
-  async drawMap(route,v){
+  async drawMap(route,v,dayTrips=[]){
     const node=this.shadowRoot.querySelector('.map');
     try{
       const L=await leaflet();if(!node.isConnected)return;
@@ -703,7 +774,8 @@ class CarrotDashboard extends HTMLElement {
       const liveCoord=(isDriving&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Math.abs(v.latitude)<=90&&Math.abs(v.longitude)<=180)?[v.latitude,v.longitude]:null;
       const parkingCoord=(Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)&&Math.abs(v.parking_latitude)<=90&&Math.abs(v.parking_longitude)<=180)?[v.parking_latitude,v.parking_longitude]:null;
       const targetPos=liveCoord||parkingCoord;
-      if(!points.length&&!targetPos){node.innerHTML='<div class="empty">유효한 위치 좌표를 기다리고 있습니다.</div>';return;}
+      const hasDayRoutes=!points.length&&dayTrips.length>0&&dayTrips.some(t=>(t.route||[]).some(p=>Number.isFinite(p.latitude)));
+      if(!points.length&&!hasDayRoutes&&!targetPos){node.innerHTML='<div class="empty">유효한 위치 좌표를 기다리고 있습니다.</div>';return;}
       this.map=L.map(node,{scrollWheelZoom:false,zoomControl:true});
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(this.map);
       const marker=(pos,end,text)=>L.marker(pos,{icon:L.divIcon({className:'',html:`<div class="pin ${end?'end':''}">${text}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(this.map);
@@ -719,7 +791,27 @@ class CarrotDashboard extends HTMLElement {
           L.polyline([[a.latitude,a.longitude],[p.latitude,p.longitude]],{color,weight:6,opacity:1}).addTo(this.map);
         }
         const coords=points.map(p=>[p.latitude,p.longitude]);bounds=L.latLngBounds(coords);this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});marker(coords[0],false,'출');marker(coords.at(-1),true,'도');
-      }else{this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:11px">차량</span>':'P');bounds=L.latLngBounds([targetPos]);}
+      }else if(hasDayRoutes){
+        const allDayCoords=[];
+        dayTrips.forEach((dt,idx)=>{
+          const tPoints=(dt.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
+          if(tPoints.length){
+            const coords=tPoints.map(p=>[p.latitude,p.longitude]);
+            allDayCoords.push(...coords);
+            L.polyline(coords,{color:'#3b82f6',weight:5,opacity:0.85}).addTo(this.map);
+            marker(coords[0],false,`${idx+1}`);
+            marker(coords.at(-1),true,'도');
+          }
+        });
+        if(allDayCoords.length){
+          bounds=L.latLngBounds(allDayCoords);
+          this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});
+        }else if(targetPos){
+          this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:11px">차량</span>':'P');bounds=L.latLngBounds([targetPos]);
+        }
+      }else{
+        this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:11px">차량</span>':'P');bounds=L.latLngBounds([targetPos]);
+      }
       const reset=L.control({position:'bottomright'});reset.onAdd=()=>{const b=L.DomUtil.create('button','resetmap');b.textContent='⌖ 전체 보기';b.setAttribute('aria-label','지도 전체 경로 보기');L.DomEvent.disableClickPropagation(b);b.onclick=()=>this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});return b;};reset.addTo(this.map);
       requestAnimationFrame(()=>this.map?.invalidateSize());
     }catch(e){if(node.isConnected)node.innerHTML=`<div class="empty">${esc(e.message)}</div>`;}

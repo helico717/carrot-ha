@@ -53,7 +53,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=0;this.chargeDay=null;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;}
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -96,17 +96,21 @@ class CarrotDashboard extends HTMLElement {
       const devices=await this._hass.callApi('GET','carrot_ha/v1/devices');
       const requested=this.config?.device_id;
       this.device=devices.devices.find(d=>d.device_id===requested)||(!requested?devices.devices[0]:null);
-      if(!this.device)throw Error('Carrot HA Device not found. Check the card device_id setting.');
+      if(!this.device)throw Error('Carrot HA device not found. Check the device_id in card configuration.');
       const id=encodeURIComponent(this.device.entry_id);
       const dash=await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`);
       this.v=dash.values;this.isFromCache=false;this.saveCache();this.render();
       const [trips,charges]=await Promise.all([
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
-      const selectedStart=this.trips[this.selected]?.data?.started_at;
+      const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
       this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
-      this.selected=Math.max(0,this.trips.findIndex(e=>e.data.started_at===selectedStart));
-      if(this.selected>=this.trips.length)this.selected=0;
+      if(selectedStart!=null){
+        const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
+        this.selected=idx!==-1?idx:null;
+      }else{
+        this.selected=null;
+      }
       this.saveCache();
     }catch(e){this.error=e instanceof Error?e.message:'HA request failed. Check your administrator account and integration version.';}
     finally{this.busy=false;this.render();}
@@ -120,10 +124,13 @@ class CarrotDashboard extends HTMLElement {
       if(!this.tripDay||!days.some(d=>d.key===this.tripDay)){
         const today=days.find(d=>d.today)||days[days.length-1];
         this.tripDay=today?today.key:null;
-        if(today?.indices?.length){
-          this.selected=today.indices[0];
-        }else if(this.trips.length){
-          this.selected=0;
+        this.selected=null;
+      }
+      if(this.selected!==null){
+        const curTrip=this.trips[this.selected];
+        const dayObj=days.find(d=>d.key===this.tripDay);
+        if(!curTrip||!dayObj||!dayObj.indices.includes(this.selected)){
+          this.selected=null;
         }
       }
     }
@@ -134,8 +141,11 @@ class CarrotDashboard extends HTMLElement {
         this.chargeDay=today?today.key:null;
       }
     }
-    const v=this.v,trip=this.trips[this.selected]?.data||{},route=trip.route||[];
+    const v=this.v;
     const isTrip=this.tab==='trips';
+    const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
+    const trip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
+    const route=trip.route||[];
     const state=this.vehicleStatus(v),badge=state.label;
     this.shadowRoot.innerHTML=`<link rel="stylesheet" href="${assetBase}leaflet.css"><style>
       :host{display:block;container-type:inline-size;--ink:#f3f4f4;--muted:#959b9e;--line:#2b2e30;--orange:#ff8a18;--green:#72df9b;color:var(--ink);font-family:Inter,Pretendard,'Noto Sans KR',system-ui,sans-serif}
@@ -164,7 +174,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
 </style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||(this.busy?'Checking connection…':'Checking connection'))}<br>HA updated ${time(v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}${this.isFromCache?' (updating…)':''}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`;
-    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=0;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
@@ -435,10 +445,10 @@ class CarrotDashboard extends HTMLElement {
     select.onchange=()=>{this.themeMode=select.value;try{localStorage.setItem('carrot-theme-'+(this.config?.device_id||'default'),this.themeMode);}catch{}this.applyTheme();};
     this.shadowRoot.querySelector('main').append(themeControl);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
-    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;const day=tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay);if(day?.indices?.length)this.selected=day.indices[0];this.render();});
+    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;this.selected=null;this.render();});
     this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
-    this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{this.selected=Number(b.dataset.trip);this.tab='trips';this.render();});
-    this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=0;this.load();});
+    this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{const clicked=Number(b.dataset.trip);this.selected=this.selected===clicked?null:clicked;this.tab='trips';this.render();});
+    this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=null;this.load();});
     const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
     if(copyBtn)copyBtn.onclick=async(e)=>{
       e.preventDefault();e.stopPropagation();
@@ -474,7 +484,11 @@ class CarrotDashboard extends HTMLElement {
         this._mapResizeObserver.observe(el);
       });
     }
-    if(this.shadowRoot.querySelector('.map'))this.drawMap(isTrip?route:[],v);
+    if(this.shadowRoot.querySelector('.map')){
+      const dayObj=isTrip?tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay):null;
+      const dayTrips=(dayObj?.indices||[]).map(i=>this.trips[i]?.data).filter(Boolean);
+      this.drawMap(isSpecificTrip?route:[],v,(!isSpecificTrip&&isTrip)?dayTrips:[]);
+    }
   }
   body(v,trip,isTrip){
     if(this.tab==='overview')return this.overview(v);
@@ -530,9 +544,66 @@ class CarrotDashboard extends HTMLElement {
       }
       return `<div class="charge-layout">${this.batteryHistory()}<div class="charge-sidebar"><div class="tiles charge-sidebar-tiles">${metric('Charged this month',n(totalKwh),'kWh','battery-plus')}${metric('Charging cost this month',n(costKrw,0),'KRW','cash','estimated')}${metric('Slow charging (estimated)',n(slowKwh),'kWh','power-plug')}${metric('Fast charging (estimated)',n(fastKwh),'kWh','flash')}</div>${this.chargeHistory()}</div></div><p class="notice">Estimated from battery energy increases. Up to 11 kW is classified as slow charging. Estimated cost: ${n(costKrw,0)} KRW using preset rates. No measurements are available when the vehicle is asleep or comma is off.</p>`;
     }
-    const tiles=isTrip?`${metric('Distance',n(trip.distance_m==null?null:trip.distance_m/1000,2),'km','map-marker-distance')}${metric('Duration',duration(trip.duration_s),'','timer-outline')}${metric('Average speed',n(trip.duration_s?trip.distance_m/trip.duration_s*3.6:null,0),'km/h','speedometer-medium')}${metric('Top speed',n(this.maxSpeed(trip.route),0),'km/h','speedometer')}`:
-      `${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
-    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${isTrip?'Trip details':'Parking location'}</h2><span class="sub">${time(isTrip?trip.started_at:v.parking_at)}</span></div><div class="map"></div><div class="route-caption">${isTrip?`<div class="legend"><span>Low · 0 km/h</span><i class="gradient"></i><span>High · ${n(this.maxSpeed(trip.route),0)} km/h</span></div><div class="sub">${time(trip.started_at)} → ${time(trip.ended_at)}<br>${(trip.route||[]).length} route points · Start: light blue / End: blue</div>`:`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'Waiting for location'}</b><div class="sub">Last parking location or trip destination</div>`}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">Vehicle condition</h2><div class="tiles">${metric('Outside temperature',n(v.outside_temp_c),'°C','thermometer')}${metric('12V battery',n(v.aux_voltage,2),'V','car-battery')}${metric('Air conditioning',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('Blower level',n(v.blower_level,0),'','fan')}</div>`:''}`;
+    const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
+    const curTrip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
+    const days=isTrip?tripDays(this.trips,this._hass?.config?.time_zone):[];
+    const curDayObj=isTrip?days.find(d=>d.key===this.tripDay):null;
+    const dayIndices=curDayObj?.indices||[];
+    const dayTrips=dayIndices.map(i=>this.trips[i]?.data).filter(Boolean);
+
+    let tiles='';
+    if(isTrip){
+      if(isSpecificTrip){
+        const distVal=curTrip.distance_m!=null?n(curTrip.distance_m/1000,2):'—';
+        const durVal=curTrip.duration_s!=null?duration(curTrip.duration_s):'—';
+        const effVal=curTrip.efficiency_km_kwh!=null?n(curTrip.efficiency_km_kwh,1):'—';
+        const spdVal=curTrip.route?.length?n(this.maxSpeed(curTrip.route),0):'—';
+        tiles=`${metric('Distance',distVal,'km','map-marker-distance')}`+
+              `${metric('Duration',durVal,'','timer-outline')}`+
+              `${metric('Efficiency',effVal,'km/kWh','leaf')}`+
+              `${metric('Top speed',spdVal,'km/h','speedometer')}`;
+      }else{
+        const totalDistM=dayTrips.reduce((acc,t)=>acc+(t.distance_m||0),0);
+        const totalDurS=dayTrips.reduce((acc,t)=>acc+(t.duration_s||0),0);
+        let distWithEnergyM=0,energyWhSum=0;
+        for(const t of dayTrips){
+          if(t.energy_wh&&t.energy_wh>0&&t.distance_m){
+            energyWhSum+=t.energy_wh;
+            distWithEnergyM+=t.distance_m;
+          }
+        }
+        const dayAvgEff=energyWhSum>0&&distWithEnergyM>0?(distWithEnergyM/1000)/(energyWhSum/1000):null;
+        const dayAvgSpeed=totalDurS>0&&totalDistM>0?(totalDistM/totalDurS)*3.6:null;
+
+        const distVal=dayTrips.length?n(totalDistM/1000,2):'—';
+        const durVal=dayTrips.length?duration(totalDurS):'—';
+        const effVal=dayAvgEff!=null?n(dayAvgEff,1):'—';
+        const spdVal=dayAvgSpeed!=null?n(dayAvgSpeed,0):'—';
+
+        tiles=`${metric('Distance',distVal,'km','map-marker-distance')}`+
+              `${metric('Duration',durVal,'','timer-outline')}`+
+              `${metric('Avg efficiency',effVal,'km/kWh','leaf')}`+
+              `${metric('Avg speed',spdVal,'km/h','speedometer-medium')}`;
+      }
+    }else{
+      tiles=`${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
+    }
+
+    const panelTitle=isTrip
+      ?(isSpecificTrip?'Trip details':(this.tripDay?`${this.tripDay} trip summary`:'Trip summary'))
+      :'Parking location';
+    const panelTime=isTrip
+      ?(isSpecificTrip?time(curTrip.started_at):(dayTrips.length?`${dayTrips.length} trips total`:'No records'))
+      :time(v.parking_at);
+
+    const routeCaption=isTrip
+      ?(isSpecificTrip
+          ?`<div class="legend"><span>Low · 0 km/h</span><i class="gradient"></i><span>High · ${n(this.maxSpeed(curTrip.route),0)} km/h</span></div><div class="sub">${time(curTrip.started_at)} → ${time(curTrip.ended_at)}<br>${(curTrip.route||[]).length} route points · Start: light blue / End: blue</div>`
+          :`<div class="sub">${dayTrips.length?'Showing all trip routes for selected date · Select an individual trip on the right for details':'No trips recorded for this date'}</div>`
+        )
+      :`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'Waiting for location'}</b><div class="sub">Last parking location or trip destination</div>`;
+
+    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${panelTitle}</h2><span class="sub">${panelTime}</span></div><div class="map"></div><div class="route-caption">${routeCaption}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">Vehicle condition</h2><div class="tiles">${metric('Outside temperature',n(v.outside_temp_c),'°C','thermometer')}${metric('12V battery',n(v.aux_voltage,2),'V','car-battery')}${metric('Air conditioning',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('Blower level',n(v.blower_level,0),'','fan')}</div>`:''}`;
   }
   vehicleStatusView(v){
     const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
@@ -694,7 +765,7 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="battery-history"><h2>Battery usage</h2><div class="usage-total" style="color:${color}"><strong>${d.used==null?'—':n(d.used,1)+'%'}${d.used==null?'':'<small class="usage-caption">used</small>'}</strong><span>${esc(d.date)}</span></div><div class="history-plot"><div class="week-bars">${bars}</div><div class="axis"><span>${max}%</span><span>${max/2}%</span><span>0%</span></div></div><p class="chart-key">Last 7 days · Select a day for details · Yellow indicates over 100%</p><h3>Battery level on selected day</h3><div class="history-plot"><div class="hours">${hours}</div><div class="axis"><span>100%</span><span>50%</span><span>0%</span></div></div><div class="hours-label"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div><p class="chart-key"><b style="color:#5ad46d">● Charging</b>　<span class="driving-key">● Driving</span>　<span class="parking-key">● Parked / last known</span> · <span style="color:#e58a31">Below 30%</span> · <span style="color:#ed6269">Below 15%</span> · Gaps: no records</p><div class="usage-stats"><div>Recorded driving time<strong>${shortDuration(d.drive_s)}</strong></div><div>Recorded charging time<strong>${shortDuration(d.charge_s)}</strong></div></div><p class="chart-key">Received ${d.received_samples??0} samples · Valid SOC ${d.valid_samples??0} samples · Stale samples ${d.stale_samples??0} samples · Recorded coverage ${shortDuration(d.covered_s)} · Usage estimates sum recorded SOC decreases, excluding gaps over 5 minutes. Gray bars show parked readings or last known values. Carried values are excluded from consumption. Green means charging occurred within the hour, not throughout it. Without SOC data, only the charging background is shown. Durations use saved sessions and exclude ongoing or missing sessions.</p></section>`;
   }
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}
-  async drawMap(route,v){
+  async drawMap(route,v,dayTrips=[]){
     const node=this.shadowRoot.querySelector('.map');
     try{
       const L=await leaflet();if(!node.isConnected)return;
@@ -703,7 +774,8 @@ class CarrotDashboard extends HTMLElement {
       const liveCoord=(isDriving&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Math.abs(v.latitude)<=90&&Math.abs(v.longitude)<=180)?[v.latitude,v.longitude]:null;
       const parkingCoord=(Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)&&Math.abs(v.parking_latitude)<=90&&Math.abs(v.parking_longitude)<=180)?[v.parking_latitude,v.parking_longitude]:null;
       const targetPos=liveCoord||parkingCoord;
-      if(!points.length&&!targetPos){node.innerHTML='<div class="empty">Waiting for valid coordinates.</div>';return;}
+      const hasDayRoutes=!points.length&&dayTrips.length>0&&dayTrips.some(t=>(t.route||[]).some(p=>Number.isFinite(p.latitude)));
+      if(!points.length&&!hasDayRoutes&&!targetPos){node.innerHTML='<div class="empty">Waiting for valid coordinates.</div>';return;}
       this.map=L.map(node,{scrollWheelZoom:false,zoomControl:true});
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(this.map);
       const marker=(pos,end,text)=>L.marker(pos,{icon:L.divIcon({className:'',html:`<div class="pin ${end?'end':''}">${text}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(this.map);
@@ -719,7 +791,27 @@ class CarrotDashboard extends HTMLElement {
           L.polyline([[a.latitude,a.longitude],[p.latitude,p.longitude]],{color,weight:6,opacity:1}).addTo(this.map);
         }
         const coords=points.map(p=>[p.latitude,p.longitude]);bounds=L.latLngBounds(coords);this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});marker(coords[0],false,'S');marker(coords.at(-1),true,'E');
-      }else{this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:10px">Live</span>':'P');bounds=L.latLngBounds([targetPos]);}
+      }else if(hasDayRoutes){
+        const allDayCoords=[];
+        dayTrips.forEach((dt,idx)=>{
+          const tPoints=(dt.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
+          if(tPoints.length){
+            const coords=tPoints.map(p=>[p.latitude,p.longitude]);
+            allDayCoords.push(...coords);
+            L.polyline(coords,{color:'#3b82f6',weight:5,opacity:0.85}).addTo(this.map);
+            marker(coords[0],false,`${idx+1}`);
+            marker(coords.at(-1),true,'E');
+          }
+        });
+        if(allDayCoords.length){
+          bounds=L.latLngBounds(allDayCoords);
+          this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});
+        }else if(targetPos){
+          this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:10px">Live</span>':'P');bounds=L.latLngBounds([targetPos]);
+        }
+      }else{
+        this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:10px">Live</span>':'P');bounds=L.latLngBounds([targetPos]);
+      }
       const reset=L.control({position:'bottomright'});reset.onAdd=()=>{const b=L.DomUtil.create('button','resetmap');b.textContent='⌖ Fit view';b.setAttribute('aria-label','Fit the entire route');L.DomEvent.disableClickPropagation(b);b.onclick=()=>this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});return b;};reset.addTo(this.map);
       requestAnimationFrame(()=>this.map?.invalidateSize());
     }catch(e){if(node.isConnected)node.innerHTML=`<div class="empty">${esc(e.message)}</div>`;}
