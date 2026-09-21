@@ -53,7 +53,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;}
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -140,6 +140,11 @@ class CarrotDashboard extends HTMLElement {
         const today=days.find(d=>d.today)||days[days.length-1];
         this.chargeDay=today?today.key:null;
       }
+      const bDays=this.v?.battery_history;
+      if(Array.isArray(bDays)&&this.chargeDay){
+        const bIdx=bDays.findIndex(x=>x.date===this.chargeDay);
+        if(bIdx!==-1)this.batteryDay=bIdx;
+      }
     }
     const v=this.v;
     const isTrip=this.tab==='trips';
@@ -174,7 +179,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
 </style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>HA 업데이트 ${time(v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`;
-    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
@@ -437,7 +442,13 @@ class CarrotDashboard extends HTMLElement {
 @container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
 `;
     this.shadowRoot.append(themeStyle);
-    this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{this.batteryDay=Number(b.dataset.day);this.render();});
+    this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{
+      const idx=Number(b.dataset.day);
+      this.batteryDay=idx;
+      const bDate=b.dataset.date||this.v?.battery_history?.[idx]?.date;
+      if(bDate)this.chargeDay=bDate;
+      this.render();
+    });
 
     const themeControl=document.createElement('label');themeControl.className='theme-control';
     themeControl.innerHTML='화면 테마 <select aria-label="화면 테마"><option value="auto">자동 · HA 테마</option><option value="light">라이트</option><option value="dark">다크</option></select>';
@@ -446,7 +457,15 @@ class CarrotDashboard extends HTMLElement {
     this.shadowRoot.querySelector('main').append(themeControl);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
     this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;this.selected=null;this.render();});
-    this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{this.chargeDay=b.dataset.chargeDay;this.render();});
+    this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{
+      this.chargeDay=b.dataset.chargeDay;
+      const bDays=this.v?.battery_history;
+      if(Array.isArray(bDays)){
+        const bIdx=bDays.findIndex(x=>x.date===this.chargeDay);
+        if(bIdx!==-1)this.batteryDay=bIdx;
+      }
+      this.render();
+    });
     this.shadowRoot.querySelectorAll('[data-trip]').forEach(b=>b.onclick=()=>{const clicked=Number(b.dataset.trip);this.selected=this.selected===clicked?null:clicked;this.tab='trips';this.render();});
     this.shadowRoot.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{this.offset=Math.max(0,this.offset+Number(b.dataset.page)*20);this.selected=null;this.load();});
     const copyBtn=this.shadowRoot.querySelector('.copy-raw-btn');
@@ -599,7 +618,7 @@ class CarrotDashboard extends HTMLElement {
     const routeCaption=isTrip
       ?(isSpecificTrip
           ?`<div class="legend"><span>저속 · 0 km/h</span><i class="gradient"></i><span>고속 · ${n(this.maxSpeed(curTrip.route),0)} km/h</span></div><div class="sub">${time(curTrip.started_at)} → ${time(curTrip.ended_at)}<br>${(curTrip.route||[]).length}개 경로 좌표 · 출발 하늘색 / 도착 파랑</div>`
-          :`<div class="sub">${dayTrips.length?'선택된 날짜의 전체 주행 경로입니다 · 우측 목록에서 개별 주행을 선택하면 상세 정보가 표시됩니다':'해당 날짜에 기록된 주행이 없습니다'}</div>`
+          :`<div class="sub">${dayTrips.length?'선택된 날짜의 전체 주행 경로입니다 · 이날 출발(하늘색) / 이날 도착(파랑) · 우측 목록에서 개별 주행을 선택하면 상세 정보가 표시됩니다':'해당 날짜에 기록된 주행이 없습니다'}</div>`
         )
       :`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'위치 정보 대기 중'}</b><div class="sub">최근 주차 또는 마지막 주행 도착 위치</div>`;
 
@@ -759,8 +778,17 @@ class CarrotDashboard extends HTMLElement {
   batteryHistory(){
     const days=this.v?.battery_history;
     if(!days?.length)return '<section class="battery-history"><h2>배터리 사용량</h2><p>시간별 기록을 불러올 수 없습니다. Carrot HA 구성요소도 함께 업데이트해 주세요.</p></section>';
-    const idx=Math.min(this.batteryDay??days.length-1,days.length-1),d=days[idx],max=Math.max(100,Math.ceil(Math.max(...days.map(x=>x.used??0))/50)*50),color=d.used>100?'#ffc247':'#479cff';
-    const bars=days.map((x,i)=>`<button data-day="${i}" aria-label="${x.date} 사용량 ${x.used??'기록 없음'}" aria-pressed="${idx===i}" style="--bar-end:${x.used>100?'#ffe480':'#65c4ff'};--bar:${idx===i?(x.used>100?'#ffc247':'#479cff'):'#626267'}"><i style="height:${(x.used??0)/max*100}%"></i><span>${new Date(x.date+'T12:00:00').toLocaleDateString('ko-KR',{weekday:'short'})}<small>${x.date.slice(5).replace('-','/')}</small></span></button>`).join('');
+    let idx=-1;
+    if(this.chargeDay){
+      idx=days.findIndex(x=>x.date===this.chargeDay);
+    }
+    if(idx===-1){
+      idx=typeof this.batteryDay==='number'?Math.min(this.batteryDay,days.length-1):days.length-1;
+    }
+    if(idx<0)idx=0;
+    this.batteryDay=idx;
+    const d=days[idx],max=Math.max(100,Math.ceil(Math.max(...days.map(x=>x.used??0))/50)*50),color=d.used>100?'#ffc247':'#479cff';
+    const bars=days.map((x,i)=>`<button data-day="${i}" data-date="${x.date}" aria-label="${x.date} 사용량 ${x.used??'기록 없음'}" aria-pressed="${idx===i}" style="--bar-end:${x.used>100?'#ffe480':'#65c4ff'};--bar:${idx===i?(x.used>100?'#ffc247':'#479cff'):'#626267'}"><i style="height:${(x.used??0)/max*100}%"></i><span>${new Date(x.date+'T12:00:00').toLocaleDateString('ko-KR',{weekday:'short'})}<small>${x.date.slice(5).replace('-','/')}</small></span></button>`).join('');
     const hours=(()=>{const runs=[];let start=null;for(let h=0;h<d.hours.length;h++){const ch=!!d.charge_hours?.[h]||!!d.hours[h]?.charging;if(ch&&start===null)start=h;if(!ch&&start!==null){runs.push([start,h-1]);start=null;}}if(start!==null)runs.push([start,d.hours.length-1]);let out='',ridx=0;for(let h=0;h<d.hours.length;h++){const x=d.hours[h],run=runs[ridx],charging=!!d.charge_hours?.[h]||!!x?.charging;if(run&&h===run[0])out+=`<div class="charge-run-wrap" style="--span:${run[1]-run[0]+1}"><em aria-hidden="true"><svg viewBox="0 0 32 40"><path d="M19 5 Q21 3 20 7 L17 17 H25 Q27 17 25 20 L13 35 Q11 37 12 33 L15 23 H7 Q5 23 7 20 Z" fill="#5ad46d" stroke="var(--bolt-outline)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg></em>`;out+=`<div title="${h}시 ${x?(x.last_known?'마지막 확인값 ':'실측 ')+Math.round(x.soc)+'%':'SOC 기록 없음'}${charging?' · 해당 시간 충전 기록 있음':''}" class="hour ${charging?'charging':x?.last_known?'last-known':x?.driving?'driving':'parked'} ${!charging&&x?(x.soc<15?'soc-critical':x.soc<30?'soc-low':''):''}">${x?`<i style="height:${x.soc}%"></i>`:''}</div>`;if(run&&h===run[1]){out+='</div>';ridx++;}}return out;})();
     return `<section class="battery-history"><h2>배터리 사용량</h2><div class="usage-total" style="color:${color}"><strong>${d.used==null?'—':n(d.used,1)+'%'}${d.used==null?'':'<small class="usage-caption">사용됨</small>'}</strong><span>${esc(d.date)}</span></div><div class="history-plot"><div class="week-bars">${bars}</div><div class="axis"><span>${max}%</span><span>${max/2}%</span><span>0%</span></div></div><p class="chart-key">최근 7일 · 날짜를 눌러 상세 보기 · 100% 초과는 노랑</p><h3>선택한 날짜의 배터리 잔량</h3><div class="history-plot"><div class="hours">${hours}</div><div class="axis"><span>100%</span><span>50%</span><span>0%</span></div></div><div class="hours-label"><span>00시</span><span>06시</span><span>12시</span><span>18시</span><span>24시</span></div><p class="chart-key"><b style="color:#5ad46d">● 충전중</b>　<span class="driving-key">● 주행 중</span>　<span class="parking-key">● 주차·마지막 확인값</span> · <span style="color:#e58a31">30% 미만</span> · <span style="color:#ed6269">15% 미만</span> · 빈 구간: 기록 없음</p><div class="usage-stats"><div>기록된 주행 시간<strong>${shortDuration(d.drive_s)}</strong></div><div>기록된 충전 시간<strong>${shortDuration(d.charge_s)}</strong></div></div><p class="chart-key">수신 ${d.received_samples??0}건 · 유효 SOC ${d.valid_samples??0}건 · 오래된 값 ${d.stale_samples??0}건 · 수집된 구간 ${shortDuration(d.covered_s)} · 사용량은 기록된 SOC 감소량의 합계이며 추정값입니다. 5분 초과 공백은 계산하지 않습니다. 회색 막대는 주차 중 측정값 또는 마지막 확인값입니다. 새 측정이 없는 시간에 유지한 값은 사용량 계산에서 제외합니다. 초록색은 해당 시간에 충전 기록이 있다는 뜻이며, 한 시간 내내 충전했다는 뜻은 아닙니다. SOC 기록이 없으면 충전 배경만 표시합니다. 주행·충전 시간은 저장된 세션 구간 기준이며 진행 중이거나 누락된 세션은 포함되지 않습니다.</p></section>`;
   }
@@ -778,7 +806,7 @@ class CarrotDashboard extends HTMLElement {
       if(!points.length&&!hasDayRoutes&&!targetPos){node.innerHTML='<div class="empty">유효한 위치 좌표를 기다리고 있습니다.</div>';return;}
       this.map=L.map(node,{scrollWheelZoom:false,zoomControl:true});
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(this.map);
-      const marker=(pos,end,text)=>L.marker(pos,{icon:L.divIcon({className:'',html:`<div class="pin ${end?'end':''}">${text}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(this.map);
+      const marker=(pos,end,text,title='')=>L.marker(pos,{title,icon:L.divIcon({className:'',html:`<div class="pin ${end?'end':''}" title="${esc(title)}">${text}</div>`,iconSize:[30,30],iconAnchor:[15,15]})}).addTo(this.map);
       let bounds;
       if(points.length){
         const max=Math.max(this.maxSpeed(points)||0,1)/3.6;
@@ -790,22 +818,27 @@ class CarrotDashboard extends HTMLElement {
           const color=Number.isFinite(speed)?`rgb(${lo.slice(1).map((c,k)=>Math.round(c+(hi[k+1]-c)*u)).join(',')})`:'#92989c';
           L.polyline([[a.latitude,a.longitude],[p.latitude,p.longitude]],{color,weight:6,opacity:1}).addTo(this.map);
         }
-        const coords=points.map(p=>[p.latitude,p.longitude]);bounds=L.latLngBounds(coords);this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});marker(coords[0],false,'출');marker(coords.at(-1),true,'도');
+        const coords=points.map(p=>[p.latitude,p.longitude]);bounds=L.latLngBounds(coords);this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});marker(coords[0],false,'출','출발');marker(coords.at(-1),true,'도','도착');
       }else if(hasDayRoutes){
+        const validTrips=dayTrips
+          .map(dt=>({dt,pts:(dt.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180)}))
+          .filter(t=>t.pts.length>0);
+        const getTime=t=>new Date(t.dt?.started_at||t.dt?.observed_at||0).getTime();
+        validTrips.sort((a,b)=>getTime(a)-getTime(b));
+
         const allDayCoords=[];
-        dayTrips.forEach((dt,idx)=>{
-          const tPoints=(dt.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
-          if(tPoints.length){
-            const coords=tPoints.map(p=>[p.latitude,p.longitude]);
-            allDayCoords.push(...coords);
-            L.polyline(coords,{color:'#3b82f6',weight:5,opacity:0.85}).addTo(this.map);
-            marker(coords[0],false,`${idx+1}`);
-            marker(coords.at(-1),true,'도');
-          }
+        validTrips.forEach(vt=>{
+          const coords=vt.pts.map(p=>[p.latitude,p.longitude]);
+          allDayCoords.push(...coords);
+          L.polyline(coords,{color:'#3b82f6',weight:5,opacity:0.85}).addTo(this.map);
         });
-        if(allDayCoords.length){
+        if(allDayCoords.length&&validTrips.length){
           bounds=L.latLngBounds(allDayCoords);
           this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});
+          const startPt=validTrips[0].pts[0];
+          const endPt=validTrips.at(-1).pts.at(-1);
+          marker([startPt.latitude,startPt.longitude],false,'출','이날 출발');
+          marker([endPt.latitude,endPt.longitude],true,'도','이날 도착');
         }else if(targetPos){
           this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:11px">차량</span>':'P');bounds=L.latLngBounds([targetPos]);
         }

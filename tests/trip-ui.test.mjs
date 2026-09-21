@@ -146,6 +146,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('51'), 'Korean Summary: Expected average speed 51 km/h');
     assert(summaryHtml.includes('2026-09-19 주행 요약'), 'Korean Summary: Expected 2026-09-19 주행 요약 title');
     assert(summaryHtml.includes('총 2회 주행'), 'Korean Summary: Expected 총 2회 주행 subtitle');
+    assert(summaryHtml.includes('이날 출발(하늘색) / 이날 도착(파랑)'), 'Korean Summary: Expected 이날 출발/이날 도착 legend');
   } else {
     assert(summaryHtml.includes('>Distance</span>'), 'English Summary: Missing Distance metric');
     assert(summaryHtml.includes('25.6'), 'English Summary: Expected total distance 25.6 km');
@@ -156,6 +157,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('51'), 'English Summary: Expected average speed 51 km/h');
     assert(summaryHtml.includes('2026-09-19 trip summary'), 'English Summary: Expected 2026-09-19 trip summary title');
     assert(summaryHtml.includes('2 trips total'), 'English Summary: Expected 2 trips total subtitle');
+    assert(summaryHtml.includes('Day start (sky blue) / Day arrival (blue)'), 'English Summary: Expected Day start/Day arrival legend');
   }
 
   // (B) Specific Trip Mode (selected === 0)
@@ -181,6 +183,53 @@ for (const [name, DashClass, durExpected] of [
     assert(specificHtml.includes('75'), 'English Specific: Expected top speed 75 km/h');
     assert(specificHtml.includes('Trip details'), 'English Specific: Expected Trip details title');
   }
+
+  // Test Case 5: Bidirectional date sync between batteryHistory and chargeHistory
+  const instCharge = new DashClass();
+  instCharge.tab = 'charge';
+  instCharge.v = {
+    battery_history: [
+      { date: '2026-09-15', used: 20, hours: [] },
+      { date: '2026-09-16', used: 0, hours: [] },
+      { date: '2026-09-17', used: 0, hours: [] },
+      { date: '2026-09-18', used: 60, hours: [] },
+      { date: '2026-09-19', used: 137, hours: [] },
+      { date: '2026-09-20', used: 30, hours: [] },
+      { date: '2026-09-21', used: 25, hours: [] }
+    ]
+  };
+  instCharge.charges = [
+    {
+      observed_at: '2026-09-19T08:00:00Z',
+      data: { started_at: '2026-09-19T07:00:00Z', energy_kwh: 25.0, duration_s: 3600 }
+    }
+  ];
+
+  // (A) Setting chargeDay selects the corresponding bar in batteryHistory
+  instCharge.chargeDay = '2026-09-19';
+  const batHtml1 = instCharge.batteryHistory();
+  const chgHtml1 = instCharge.chargeHistory();
+  assert(batHtml1.includes('data-date="2026-09-19" aria-label="2026-09-19'), `${name}: batteryHistory should render data-date for 2026-09-19`);
+  assert(batHtml1.includes('data-day="4" data-date="2026-09-19" aria-label="2026-09-19 사용량 137" aria-pressed="true"') ||
+         batHtml1.includes('data-day="4" data-date="2026-09-19" aria-label="2026-09-19 Usage 137" aria-pressed="true"'),
+         `${name}: batteryHistory bar for 2026-09-19 should have aria-pressed="true"`);
+  assert(chgHtml1.includes('data-charge-day="2026-09-19" aria-pressed="true"'), `${name}: chargeHistory button for 2026-09-19 should have aria-pressed="true"`);
+
+  // (B) Simulating click on chargeHistory day -> synchronizes batteryDay
+  instCharge.chargeDay = '2026-09-18';
+  const bIdx = instCharge.v.battery_history.findIndex(x => x.date === instCharge.chargeDay);
+  if (bIdx !== -1) instCharge.batteryDay = bIdx;
+  const batHtml2 = instCharge.batteryHistory();
+  assert(batHtml2.includes('data-day="3" data-date="2026-09-18" aria-label="2026-09-18 사용량 60" aria-pressed="true"') ||
+         batHtml2.includes('data-day="3" data-date="2026-09-18" aria-label="2026-09-18 Usage 60" aria-pressed="true"'),
+         `${name}: batteryHistory bar for 2026-09-18 should be aria-pressed="true" after chargeDay change`);
+
+  // (C) Simulating click on batteryHistory bar -> synchronizes chargeDay
+  const clickedDate = instCharge.v.battery_history[0].date; // 2026-09-15
+  instCharge.batteryDay = 0;
+  instCharge.chargeDay = clickedDate;
+  const chgHtml3 = instCharge.chargeHistory();
+  assert(chgHtml3.includes('data-charge-day="2026-09-15" aria-pressed="true"'), `${name}: chargeHistory should have 2026-09-15 aria-pressed="true" after battery bar click`);
 
   // Assert CSS rules directly from source
   const jsSource = name === 'Korean'
