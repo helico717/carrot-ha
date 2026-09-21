@@ -71,7 +71,7 @@
     CURRENT_PAGE = 'setting';
     const page = document.getElementById('pageSetting');
     page.hidden = false;
-    page.style.display = 'block';
+    page.style.removeProperty('display');
     if (!initialized) setWebLanguage('ko', {persist: false, render: false});
     if (!initialized || nextKey !== catalogKey) {
       if (typeof loadSettings !== 'function') throw new Error('설정 UI 모듈을 불러오지 못했습니다.');

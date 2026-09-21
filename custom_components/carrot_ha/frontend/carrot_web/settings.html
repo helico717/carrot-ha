@@ -22,36 +22,45 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-tokens.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/tokens.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout_tokens.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/hud_card.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/base.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-system.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/components.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/settings.css?v=0.6.1" />
-  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/responsive.css?v=0.6.1" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-tokens.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/tokens.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout_tokens.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/hud_card.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/base.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/layout.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/design-system.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/components.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/settings.css?v=0.6.2" />
+  <link rel="stylesheet" href="/carrot_ha_static/carrot_web/css/responsive.css?v=0.6.2" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
-      min-height: 100%;
+      height: 100%;
+      min-height: 0;
       background: var(--md-surface, #121316);
       color: var(--md-on-surface, #e2e2e6);
-      overflow-x: hidden;
+      overflow: hidden;
     }
     #pageSetting {
-      display: block !important;
+      /* The upstream screen host needs a bounded flex parent. A block
+         parent collapses portrait absolute panes and prevents desktop scrolling. */
+      flex-direction: column;
       width: 100%;
-      min-height: 100vh;
+      height: 100%;
+      min-height: 0;
+      min-block-size: 0;
+      overflow: hidden;
       box-sizing: border-box;
     }
+    #pageSetting:not([hidden]) { display: flex; }
     .swipe-container {
       width: 100%;
-      min-height: 100vh;
+      height: 100%;
+      min-height: 0;
     }
+    :root { --nav-bar-height: 0px; --nav-bar-height-desktop: 0px; }
     /* Loading overlay when waiting for parent HA card snapshot */
     #haBridgeLoading {
       display: flex;
@@ -240,26 +249,26 @@
   </div>
 
   <!-- Scripts -->
-  <script src="/carrot_ha_static/carrot_web/js/app.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/translations/registry.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/translations/ko.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/translations/en.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/translations/zh.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/constants.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/stream_identity.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/dom.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/utils.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/i18n.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/api.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/settings.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/setting_diff.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/activity.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/ui/setting_form.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/ui/viewport.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/ui/effects.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/ui/navigation.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/shared/ui/dialog.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/setting_page.js?v=0.6.1"></script>
-  <script src="/carrot_ha_static/carrot_web/js/ha_bridge.js?v=0.6.1"></script>
+  <script src="/carrot_ha_static/carrot_web/js/app.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/registry.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/ko.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/en.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/translations/zh.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/constants.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/stream_identity.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/dom.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/utils.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/i18n.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/api.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/settings.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/setting_diff.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/activity.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/setting_form.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/viewport.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/effects.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/navigation.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/shared/ui/dialog.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/setting_page.js?v=0.6.2"></script>
+  <script src="/carrot_ha_static/carrot_web/js/ha_bridge.js?v=0.6.2"></script>
 </body>
 </html>

@@ -598,9 +598,9 @@ class CarrotParamsCard extends HTMLElement {
         .iframe-container {
           position: relative;
           width: 100%;
-          min-height: 750px;
-          height: 80vh;
-          max-height: 1200px;
+          min-height: 360px;
+          height: clamp(360px, 80vh, 1200px);
+          height: clamp(360px, 80dvh, 1200px);
           background: #121316;
           border: none;
         }
@@ -659,7 +659,7 @@ class CarrotParamsCard extends HTMLElement {
         <div class="iframe-container">
           <iframe
             id="carrotSettingsFrame"
-            src="/carrot_ha_static/carrot_web/settings.html?v=0.6.1"
+            src="/carrot_ha_static/carrot_web/settings.html?v=0.6.2"
             allow="fullscreen"
             loading="eager"
             title="CarrotPilot Authentic Settings"
