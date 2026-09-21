@@ -17,6 +17,12 @@
 | `param_sync.py` | **[신규 추가]** | 포트 7000의 설정 스냅샷을 Cloudflare로 업로드하고, HA의 변경 요청 큐를 받아 로컬에 즉시 적용하는 모듈 |
 | `collector.py` | **[업데이트]** | 백그라운드 스레드로 `param_sync`를 자동 구동하도록 연결 |
 
+> [!IMPORTANT]
+> **파라미터 변경 안전 정책 (v0.6.1+ 반영)**:
+> `param_sync.py`는 기기의 활성 카탈로그에 존재하는 파라미터 및 허용 범위 내 값만 검증하여 수용합니다.
+> 변경 요청은 반드시 로컬 당근 웹 서버 API(`http://127.0.0.1:7000/api/param_set`)를 통해 적용되며, 적용 직후 실제 저장된 값을 다시 읽어 검증한 후 Cloudflare 큐에 완료(Ack)를 전송합니다.
+> **직접 `Params()` 쓰기 우회(Fallback)는 안전 및 정합성 보장을 위해 전면 배제**되어 있으므로 로컬 7000번 포트 서버가 정상 구동 중이어야 합니다.
+
 ---
 
 ## 2. 콤마 기기에 파일 적용하는 방법
@@ -63,9 +69,12 @@ python3 param_sync.py
 ```
 
 **정상 출력 예시:**
-```
-[param_sync] starting CarrotPilot parameter sync loop
-[param_sync] settings snapshot synced to cloud (1735689650)
+```text
+[param_sync] starting CarrotPilot parameter sync loop for device: <DEVICE_ID>
+[param_sync] target Cloudflare Worker: https://<your-worker>.workers.dev
+[param_sync] loaded settings snapshot from local carrot_server (:7000)
+[param_sync] uploading 185 parameters to Cloudflare...
+[param_sync] settings snapshot synced to cloud successfully! (185 params)
 ```
 *(확인 후 `Ctrl + C`로 종료)*
 
@@ -91,10 +100,11 @@ pkill -f "python3.*collector.py"
    ```bash
    ps aux | grep -E "collector\.py|param_sync"
    ```
-   `collector.py` 프로세스가 정상 실행 중인지 확인합니다.
+   `collector.py` 프로세스가 정상 실행 중이고 내부에서 `param_sync` 스레드가 구동되는지 확인합니다.
 
 2. **홈 어시스턴트 카드 확인**:
-   - HA 대시보드에서 `custom:carrot-params-card`를 추가합니다.
-   - 상단 카테고리 탭(주행 제어, 버튼·프리셋, 조향 등)과 파라미터들이 정상적으로 로드되는지 확인합니다.
-   - 파라미터를 클릭하여 **한글 상세 설명문(`descr`)**이 펼쳐지는지 확인합니다.
-   - 토글이나 스텝 버튼을 조작했을 때 `⏳ 대기` 상태를 거쳐 잠시 후 `✓ 적용 완료`로 바뀌는지 확인합니다.
+   - HA 대시보드에서 `custom:carrot-params-card`를 추가합니다 (대시보드 리소스 `/carrot_ha_static/carrot-dashboard.js`에 포함됨).
+   - 카드 상단에 상태 스트립(연결 상태 배지, 마지막 수신 시각, 새로고침 버튼)이 정상 표시되는지 확인합니다.
+   - 콤마의 실제 당근 웹과 동일한 카테고리 계층(주행 제어, 차선 변경, 버튼/프리셋 등), 토글 스위치, 숫자 스텝퍼, 선택 팝업 다이얼로그가 렌더링되는지 확인합니다.
+   - 항목 클릭 시 GitHub Wiki(`Settings-Catalog.json`)와 연동된 상세 Markdown 문서가 열리는지 확인합니다.
+   - 파라미터를 변경했을 때 상단 상태에 `대기 N건`이 표시되고, 콤마가 로컬 서버를 통해 변경을 적용하고 확인을 반환하면 `✓ Comma 적용 확인`으로 갱신되는지 확인합니다.

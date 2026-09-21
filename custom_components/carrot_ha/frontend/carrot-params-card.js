@@ -566,118 +566,20 @@ class CarrotParamsCard extends HTMLElement {
           flex-direction: column;
         }
 
-        /* Header */
-        .card-header {
-          padding: 14px 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: rgba(255, 255, 255, 0.02);
-          border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-        }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .header-icon {
-          font-size: 22px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          background: rgba(255, 122, 41, 0.15);
-          color: #ff7a29;
-        }
-        .header-titles {
-          display: flex;
-          flex-direction: column;
-        }
-        .card-title {
-          font-size: 16px;
-          font-weight: 700;
-          letter-spacing: -0.3px;
-          color: var(--primary-text-color, #ffffff);
-        }
-        .card-subtitle {
-          font-size: 12px;
-          color: var(--secondary-text-color, #8e99a4);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-top: 2px;
-        }
-        .pending-badge {
-          font-size: 11px;
-          background: rgba(255, 187, 0, 0.2);
-          color: #ffbb00;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-weight: 600;
-          animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-          0% { opacity: 0.6; }
-          50% { opacity: 1; }
-          100% { opacity: 0.6; }
-        }
-        .header-actions {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .btn-icon {
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: var(--primary-text-color, #e1e1e1);
-          border-radius: 8px;
-          width: 34px;
-          height: 34px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          font-size: 15px;
-          transition: all 0.2s ease;
-        }
-        .btn-icon:hover {
-          background: rgba(255, 255, 255, 0.12);
-        }
-
-        .sync-status { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:0; }
-        .sync-badge { font-size:12px; font-weight:700; padding:4px 8px; border-radius:8px; background:var(--secondary-background-color,#24282d); }
+        /* Essential status strip only; no title/device/logo rows. */
+        .card-header { display:flex; align-items:center; gap:8px; padding:4px 8px; }
+        .sync-status { flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; }
+        .sync-badge { font-size:11px; line-height:16px; font-weight:600; }
+        .sync-time { font-size:11px; line-height:16px; color:var(--secondary-text-color,#8e99a4); white-space:nowrap; }
         .sync-badge[data-tone="success"] { color:var(--success-color,#168044); }
         .sync-badge[data-tone="warning"], .sync-warning { color:var(--warning-color,#ad6800); }
         .sync-badge[data-tone="error"] { color:var(--error-color,#c62828); }
-        .sync-time, .sync-warning { font-size:11px; }
-        .sync-time { color:var(--secondary-text-color,#8e99a4); }
-        /* A shared two-row grid prevents the status block wrapping below
-           the title on phones. Keep date/time and action status visible. */
-        .card-header {
-          display:grid;
-          grid-template-columns:minmax(0,1fr) auto 32px;
-          align-items:center;
-          column-gap:10px;
-          row-gap:2px;
-          padding:8px 12px;
-        }
-        .header-left, .header-titles, .header-actions, .sync-status { display:contents; }
-        .header-icon { display:none; }
-        .card-title { grid-area:1 / 1; font-size:14px; line-height:20px; }
-        .card-subtitle { grid-area:2 / 1; margin:0; font-size:11px; line-height:16px; display:block; }
-        .card-title, .card-subtitle { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .sync-badge { grid-area:1 / 2; justify-self:end; padding:1px 6px; font-size:11px; line-height:18px; }
-        .sync-time { grid-area:2 / 2; justify-self:end; white-space:nowrap; font-size:10px; line-height:16px; }
-        .sync-warning { grid-area:3 / 1 / auto / 3; justify-self:end; font-size:10px; line-height:14px; }
-        .header-actions > .btn-icon { grid-area:1 / 3 / 3 / 4; width:32px; height:36px; padding:0; }
+        .sync-warning { font-size:10px; line-height:14px; }
+        .btn-icon { flex:0 0 40px; width:40px; height:40px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--primary-text-color,#e1e1e1); cursor:pointer; font-size:18px; }
+        .btn-icon:hover { background:var(--secondary-background-color,#24282d); }
         @media (max-width:600px) {
-          .card-header { padding:6px 8px; column-gap:6px; }
-          .card-title { font-size:13px; }
-          .card-subtitle { font-size:10px; }
-          .sync-badge { max-width:160px; text-align:right; }
-          .card-subtitle .pending-badge { display:none; }
+          .sync-status { gap:0 8px; }
+          .sync-time { flex-basis:100%; }
         }
         /* Authentic Carrot Web Iframe Container */
         .iframe-container {
@@ -724,21 +626,9 @@ class CarrotParamsCard extends HTMLElement {
 
       <ha-card>
         <!-- Header -->
-        <div class="card-header">
-          <div class="header-left">
-            <div class="header-icon">🥕</div>
-            <div class="header-titles">
-              <span class="card-title">CarrotPilot 설정</span>
-              <span class="card-subtitle" id="cardSubtitle">
-                ${this._deviceId ? `기기: ${this._escapeHtml(this._deviceId)} · ${items.length}개 파라미터` : '당근파일럿 원격 설정'}
-                ${this._pending.size > 0 ? `<span class="pending-badge">대기 ${this._pending.size}건</span>` : ''}
-              </span>
-            </div>
-          </div>
-          <div class="header-actions">
-            <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
-            <button class="btn-icon" id="btnRefresh" title="새로고침">🔄</button>
-          </div>
+        <div class="card-header" data-version="0.6.5">
+          <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
+          <button class="btn-icon" id="btnRefresh" title="파라미터 새로고침 · UI 0.6.5" aria-label="파라미터 새로고침">↻</button>
         </div>
 
         <!-- Authentic Carrot Web Embedded Iframe -->

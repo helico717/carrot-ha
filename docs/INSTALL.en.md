@@ -82,6 +82,7 @@ Save the deployed Worker HTTPS URL and all three tokens privately. Enter UPLOAD 
 ## 2. Configure HA
 
 Follow the HACS steps in the [overview](../README.en.md). Choose a device ID such as `my-buzz`; it is neither the VIN nor an HA entity ID. Use HA_LOCAL for initial registration and VIEW for the read token in options. Set your vehicle model and SOC calculation capacity.
+Adding `/carrot_ha_static/carrot-dashboard.js` as a dashboard resource automatically registers both `custom:carrot-dashboard-card` and `custom:carrot-params-card`.
 
 ## 3. Install the collector on comma
 
@@ -92,7 +93,7 @@ Park the vehicle first. SSH authentication and recovery are covered in the [Wind
 ```powershell
 Set-Location "$env:USERPROFILE\Downloads\carrot-ha-main"
 ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\param_sync.py .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
 ssh comma@192.168.43.1
 ```
 
@@ -101,7 +102,7 @@ ssh comma@192.168.43.1
 ```bash
 cd "$HOME/Downloads/carrot-ha-main"
 ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/param_sync.py collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
 ssh comma@192.168.43.1
 ```
 

@@ -5,6 +5,7 @@
 - Applies requested parameter changes locally via http://127.0.0.1:7000/api/param_set (without bypassing server validation).
 - Acknowledges applied parameter changes back to Cloudflare Worker.
 """
+from __future__ import annotations
 import json
 import logging
 import math

@@ -11,6 +11,7 @@
 - [위치 엔터티](#위치-엔터티)
 - [원본 보기와 진단 속성](#원본-보기와-진단-속성)
 - [기록 범위와 자주 생기는 오해](#기록-범위와-자주-생기는-오해)
+- [당근파일럿 파라미터 원격 튜닝 카드](#당근파일럿-파라미터-원격-튜닝-카드)
 - [설정과 관련 문서](#설정과-관련-문서)
 
 ## 값과 시간 읽는 법
@@ -316,6 +317,37 @@ HA 로컬 기록은 현재 기본값으로 상태 14일, 주행·충전 90일을
 
 시간대도 주의한다. 수집기 충전 월 원장과 HA 월 충전 선택은 한국 시간 기준이며, 최근 7일 주행·충전 날짜 그룹과 배터리 그래프는 HA 시간대를 사용한다. 개별 시각 문자열의 화면 형식은 브라우저 로캘/시간대 영향을 받을 수 있어 해외 시간대에서는 월말·자정 근처 기록을 대조해야 한다.
 
+## 당근파일럿 파라미터 원격 튜닝 카드
+
+Carrot HA v0.6+는 콤마에서 동작 중인 당근파일럿의 모든 파라미터를 홈 어시스턴트에서 원격으로 조회·조절하고, 공식 GitHub Wiki 상세 설명을 열람할 수 있는 전용 카드(`custom:carrot-params-card`)를 제공합니다.
+
+### 1. 주요 특징
+- **정통 당근 웹 인터페이스 이식**: 콤마 로컬 웹 서버(:7000)의 디자인 토큰, 카테고리 계층 트리(주행 제어, 차선 변경, 버튼/프리셋 등), 토글 스위치, 숫자 스텝퍼, 다이얼로그 팝업을 그대로 지원합니다.
+- **GitHub Wiki 연동 문서 로더**: 파라미터를 클릭하거나 안내 아이콘을 누르면 공식 GitHub Wiki(`Settings-Catalog.json`)의 상세 마크다운 문서를 안전한 AST 렌더러로 파싱하여 표시합니다.
+- **안전한 양방향 동기화**:
+  - HA에서 파라미터 수정 요청 시 Cloudflare D1 큐에 고유 요청 ID가 생성됩니다.
+  - 콤마의 `param_sync.py`가 큐를 폴링하여 차량의 활성 카탈로그 및 유효 범위를 먼저 검증합니다.
+  - 검증 완료 시 로컬 서버 API(`http://127.0.0.1:7000/api/param_set`)로 적용하고, 저장된 실제 값을 역조회하여 확인한 후 Cloudflare에 완료(Ack)를 전송합니다.
+  - **직접 `Params()` 쓰기 우회는 배제**되어 있어 파라미터 유실이나 불일치를 원천 차단합니다.
+
+### 2. 카드 설정 (Lovelace YAML)
+대시보드 리소스에 `/carrot_ha_static/carrot-dashboard.js`가 등록되어 있으면 자동으로 카드가 등록됩니다.
+
+```yaml
+type: custom:carrot-params-card
+device_id: my-meb
+```
+
+### 3. 상단 상태 배지 및 메시지
+- `연결됨` (초록): 최신 설정 스냅샷이 로드되었으며 대기 중인 변경 요청이 없습니다.
+- `대기 N건` (노랑): 변경 요청이 Cloudflare 큐에 등록되어 차량의 수신 및 적용을 기다리는 중입니다.
+- `Comma 적용 확인` (초록): 차량(콤마)이 로컬 서버를 통해 변경을 적용하고 실제 저장된 값을 검증하여 확인을 마쳤습니다.
+- `차량 값 확인 · 요청값과 다름` (노랑): 차량이 응답했으나 저장된 실제 값이 요청값과 다른 경우(경계값 보정 등).
+- `적용 확인 시간 초과` (노랑): 차량 네트워크 지연 등으로 100초 이내에 완료 응답이 오지 않은 경우(차량 재연결 시 적용될 수 있으므로 값 재조회 권장).
+- `변경 확인 실패` (빨강): 카탈로그에 없거나 허용 범위를 벗어난 값으로 검증이 거부된 경우.
+
+자세한 설정 방법은 [콤마 파라미터 설정 가이드](COMMA_PARAM_SETUP.md) 및 [파라미터 변경 안전 정책](PARAMETERS_0_6_1.md)을 참고하세요.
+
 ## 설정과 관련 문서
 
 - `device_id`: 통합과 수집기에 같은 장치 ID를 사용한다.
@@ -328,6 +360,6 @@ HA 로컬 기록은 현재 기본값으로 상태 14일, 주행·충전 90일을
 
 디버그/시뮬레이션 카드는 실제 차 상태와 구분한다. 시나리오로 만든 속도·SOC·충전 표시를 실제 수신 증거로 쓰지 않는다.
 
-관련 문서: [설치](INSTALL.md), [Windows/Mac 재설치·복구](REINSTALL.md), [언어](DASHBOARD-LANGUAGE.md), [차량 이미지](VEHICLE-IMAGE.md), [주행·충전 판단](CHARGING-MOTION.md), [충전 검증](../collector/CHARGING.md), [디버그 미리보기](DEBUG-FRESHNESS-PREVIEW.md).
+관련 문서: [설치](INSTALL.md), [Windows/Mac 재설치·복구](REINSTALL.md), [파라미터 설정 가이드](COMMA_PARAM_SETUP.md), [파라미터 아키텍처](PARAMETERS_0_6_1.md), [언어](DASHBOARD-LANGUAGE.md), [차량 이미지](VEHICLE-IMAGE.md), [주행·충전 판단](CHARGING-MOTION.md), [충전 검증](../collector/CHARGING.md), [디버그 미리보기](DEBUG-FRESHNESS-PREVIEW.md).
 
 구현 기준: [대시보드](../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js), [센서 목록](../custom_components/carrot_ha/sensors_v3.py), [이진 센서](../custom_components/carrot_ha/binary_sensor.py), [위치](../custom_components/carrot_ha/device_tracker.py), [연결 판정](../custom_components/carrot_ha/connectivity.py), [차량 가공](../custom_components/carrot_ha/vehicle.py), [충전 시간 계산](../custom_components/carrot_ha/battery.py), [배터리 이력](../custom_components/carrot_ha/battery_history.py), [수집기](../collector/engine.py).

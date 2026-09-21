@@ -80,10 +80,11 @@ npx wrangler secret put WAYON_VIEW_TOKEN
 ## 2. HA 설정
 
 README의 HACS 설치 순서로 설치합니다. 장치 ID는 본인이 정한 영문 이름(예: `my-buzz`)입니다. 차량 VIN이나 HA 엔터티 ID가 아닙니다. 최초 등록 토큰은 HA_LOCAL, 구성의 읽기 토큰은 VIEW입니다. 차량 모델과 SOC 계산 용량은 본인 차량에 맞춥니다.
+대시보드 리소스에 `/carrot_ha_static/carrot-dashboard.js`를 등록하면 `custom:carrot-dashboard-card`와 함께 당근파일럿 원격 설정 카드인 `custom:carrot-params-card`도 함께 사용 가능합니다.
 
 ## 3. 콤마에 수집기 복사
 
-주차한 상태에서 진행합니다. [복구 가이드 2~3절](REINSTALL.md#2-pc에서-ssh-접속-준비)의 **Windows PowerShell 또는 Mac 터미널** 절차로 SSH를 준비하고 수집기 파일을 `/data/id4-collector`에 복사하세요. 최초 설치에서도 같은 전송 명령을 사용합니다. Windows는 WinSCP도 사용할 수 있습니다.
+주차한 상태에서 진행합니다. [복구 가이드 2~3절](REINSTALL.md#2-pc에서-ssh-접속-준비)의 **Windows PowerShell 또는 Mac 터미널** 절차로 SSH를 준비하고 수집기 파일들(`param_sync.py` 포함)을 `/data/id4-collector`에 복사하세요. 최초 설치에서도 같은 전송 명령을 사용합니다. Windows는 WinSCP도 사용할 수 있습니다.
 
 콤마 SSH에서:
 

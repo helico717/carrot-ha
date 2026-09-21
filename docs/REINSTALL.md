@@ -151,11 +151,11 @@ ssh comma@192.168.43.1 'ls -ld /data/id4-collector'
 ```powershell
 Set-Location "$env:USERPROFILE\Downloads\carrot-ha-main"
 ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\param_sync.py .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
 ssh comma@192.168.43.1 'ls /data/id4-collector'
 ```
 
-명령은 한 줄씩 실행하고 실패 시 다음으로 넘어가지 마세요. WinSCP를 쓴다면 같은 계정·키·포트로 접속해 위 9개 파일을 `/data/id4-collector` **바로 안에** 복사해도 됩니다.
+명령은 한 줄씩 실행하고 실패 시 다음으로 넘어가지 마세요. WinSCP를 쓴다면 같은 계정·키·포트로 접속해 위 10개 파일을 `/data/id4-collector` **바로 안에** 복사해도 됩니다.
 
 ### Mac 터미널
 
@@ -164,11 +164,11 @@ ssh comma@192.168.43.1 'ls /data/id4-collector'
 ```bash
 cd "$HOME/Downloads/carrot-ha-main"
 ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/param_sync.py collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
 ssh comma@192.168.43.1 'ls /data/id4-collector'
 ```
 
-각 파일에 `100%`가 표시되고 마지막 목록에 9개 파일이 있으면 전송 완료입니다. `/data/id4-collector/collector/`처럼 한 단계 더 들어간 위치에 넣지 마세요. 파일 복사만으로 수집기가 시작되지는 않습니다.
+각 파일에 `100%`가 표시되고 마지막 목록에 10개 파일이 있으면 전송 완료입니다. `/data/id4-collector/collector/`처럼 한 단계 더 들어간 위치에 넣지 마세요. 파일 복사만으로 수집기가 시작되지는 않습니다.
 
 ## 4. 콤마에서 연결 정보 입력
 
@@ -249,17 +249,19 @@ pgrep -af '^/usr/local/venv/bin/python3 -u collector.py$'
 ```
 
 각 프로세스가 실행 중이어야 합니다. 로그는 매 샘플마다 출력되지 않습니다. `tail` 내용이 그대로여도 상태·전송 시각이 갱신되면 동작할 수 있습니다.
+또한 `collector.py`는 백그라운드 스레드로 `param_sync.py`를 함께 구동하여 로컬 당근 웹(포트 7000)의 설정 스냅샷을 Cloudflare Worker로 주기적(기본 180초)으로 동기화합니다.
 
 기어 판정 버전은 `onroad`(콤마 모드), `driving`(수집기의 주행 판정), `gear`도 표시합니다. P 정지에서 키 ON일 때 `onroad:true`, `driving:false`, `gear:"park"`가 예상되지만 Carrotpilot이 유효한 신호를 제공해야 합니다. `null`을 false로 해석하지 마세요. [판정 설명](CHARGING-MOTION.md)
 
-## 7. 서버 → HA → 대시보드 검증
+## 7. 서버 → HA → 대시보드 및 파라미터 카드 검증
 
 1. HA → 설정 → 기기 및 서비스 → Carrot HA에서 기존 Device ID, Worker 주소, **VIEW 읽기 토큰**을 확인합니다. 콤마 토큰을 재발급했다는 이유로 VIEW를 UPLOAD로 바꾸지 않습니다.
 2. HA의 클라우드 상태(`cloud_status`), 마지막 성공 동기화(`last_sync`), 장치 보고 시각(`last_received`), 차량 측정 시각(`measured_at`)을 확인합니다. 대시보드의 원본 보기 또는 개발자 도구의 해당 엔터티 상태·속성을 사용하세요. 엔터티 이름은 사용자마다 다릅니다.
 3. 보통 장치 보고 30/60초, HA 동기화 60초, 화면 조회 60초이므로 몇 분 여유를 두고 시각이 전진하는지 확인합니다. 마지막 동기화만 최신이고 측정 시각이 오래되면 차량이 잠들었거나 새 CAN 측정이 없을 수 있습니다.
 4. 차량이 깨어 있을 때 배터리·주행거리·외기온을 실제 표시와 비교합니다. `0`, `—`, 오래된 숫자가 보이는 것만으로 성공이라고 판단하지 않습니다.
-5. 정상 주행 및 충전 후 기록을 확인합니다. 충전은 에너지 증가 검증 때문에 즉시 표시되지 않을 수 있습니다. 시험을 위해 주행 중 터미널을 조작하지 마세요.
-6. 안전하게 콤마를 한 번 재부팅하고 SSH로 다시 접속해 6절 검사를 반복합니다. `install.py`를 다시 실행하지 않아도 동작해야 자동 시작까지 검증된 것입니다.
+5. 당근파일럿 파라미터 카드(`custom:carrot-params-card`)를 대시보드에 배치한 경우, 당근 웹 원본 설정 화면과 공식 Wiki 상세 설명이 정상 로드되는지 확인하고 상단 상태 스트립에 `연결됨`이 뜨는지 확인합니다.
+6. 정상 주행 및 충전 후 기록을 확인합니다. 충전은 에너지 증가 검증 때문에 즉시 표시되지 않을 수 있습니다. 시험을 위해 주행 중 터미널을 조작하지 마세요.
+7. 안전하게 콤마를 한 번 재부팅하고 SSH로 다시 접속해 6절 검사를 반복합니다. `install.py`를 다시 실행하지 않아도 동작해야 자동 시작까지 검증된 것입니다.
 
 **서버 전송은 ok인데 HA만 갱신되지 않는다면:** Device ID 불일치, HA의 VIEW 토큰/Worker 주소, HA 인터넷, 통합 로그를 확인하세요. HA가 정상 조회하는데 화면만 이전 상태라면 브라우저 캐시와 카드 설정을 확인합니다.
 
