@@ -2240,6 +2240,204 @@ async function purgeExpiredData(env, options = {}) {
   return results;
 }
 
+async function handleSettingsSync(request, env) {
+  if (!authorize(request, env, true)) return json({ error: "unauthorized" }, 401);
+  try {
+    const body = await request.json();
+    const deviceId = String(body?.device_id || "").trim();
+    if (!deviceId) return json({ error: "missing_device_id" }, 400);
+
+    const catalogJson = typeof body.catalog === "string" ? body.catalog : JSON.stringify(body.catalog || {});
+    const valuesJson = typeof body.values === "string" ? body.values : JSON.stringify(body.values || {});
+    const now = new Date().toISOString();
+
+    await env.DB.prepare(`
+      INSERT INTO carrot_settings_cache (device_id, catalog_json, values_json, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(device_id) DO UPDATE SET
+        catalog_json = excluded.catalog_json,
+        values_json = excluded.values_json,
+        updated_at = excluded.updated_at
+    `).bind(deviceId, catalogJson, valuesJson, now).run();
+
+    return json({ ok: true, updated_at: now });
+  } catch (err) {
+    return json({ error: "settings_sync_failed", message: String(err) }, 500);
+  }
+}
+
+async function handleGetSettings(request, env) {
+  if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
+  try {
+    const url = new URL(request.url);
+    const deviceId = url.searchParams.get("device_id");
+
+    let row;
+    if (deviceId) {
+      row = await env.DB.prepare(`
+        SELECT device_id, catalog_json, values_json, updated_at
+        FROM carrot_settings_cache
+        WHERE device_id = ?
+      `).bind(deviceId).first();
+    } else {
+      row = await env.DB.prepare(`
+        SELECT device_id, catalog_json, values_json, updated_at
+        FROM carrot_settings_cache
+        ORDER BY updated_at DESC LIMIT 1
+      `).first();
+    }
+
+    if (!row) {
+      return json({ ok: false, error: "settings_not_found" }, 404);
+    }
+
+    let pendingCount = 0;
+    try {
+      const pendingRow = await env.DB.prepare(`
+        SELECT COUNT(*) AS count FROM carrot_param_queue
+        WHERE device_id = ? AND status = 'pending'
+      `).bind(row.device_id).first();
+      pendingCount = pendingRow?.count || 0;
+    } catch (_) {}
+
+    return json({
+      ok: true,
+      device_id: row.device_id,
+      catalog: JSON.parse(row.catalog_json || "{}"),
+      values: JSON.parse(row.values_json || "{}"),
+      updated_at: row.updated_at,
+      pending_count: pendingCount,
+    });
+  } catch (err) {
+    return json({ error: "get_settings_failed", message: String(err) }, 500);
+  }
+}
+
+async function handleParamsQueue(request, env) {
+  if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
+  try {
+    const body = await request.json();
+    const deviceId = String(body?.device_id || "").trim();
+    if (!deviceId) return json({ error: "missing_device_id" }, 400);
+
+    const now = new Date().toISOString();
+    const statements = [];
+
+    if (body.param_name !== undefined && body.param_value !== undefined) {
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO carrot_param_queue (device_id, param_name, param_value, status, created_at)
+          VALUES (?, ?, ?, 'pending', ?)
+        `).bind(deviceId, String(body.param_name), String(body.param_value), now)
+      );
+    } else if (body.params && typeof body.params === "object") {
+      for (const [name, val] of Object.entries(body.params)) {
+        statements.push(
+          env.DB.prepare(`
+            INSERT INTO carrot_param_queue (device_id, param_name, param_value, status, created_at)
+            VALUES (?, ?, ?, 'pending', ?)
+          `).bind(deviceId, String(name), String(val), now)
+        );
+      }
+    } else {
+      return json({ error: "invalid_params_payload" }, 400);
+    }
+
+    if (statements.length > 0) {
+      if (typeof env.DB.batch === "function") {
+        await env.DB.batch(statements);
+      } else {
+        for (const st of statements) {
+          await st.run();
+        }
+      }
+    }
+
+    return json({ ok: true, queued: statements.length, at: now });
+  } catch (err) {
+    return json({ error: "param_queue_failed", message: String(err) }, 500);
+  }
+}
+
+async function handleParamsPending(request, env) {
+  if (!authorize(request, env, true)) return json({ error: "unauthorized" }, 401);
+  try {
+    const url = new URL(request.url);
+    const deviceId = url.searchParams.get("device_id");
+    if (!deviceId) return json({ error: "missing_device_id" }, 400);
+
+    const rows = await env.DB.prepare(`
+      SELECT id, param_name, param_value, created_at
+      FROM carrot_param_queue
+      WHERE device_id = ? AND status = 'pending'
+      ORDER BY id ASC LIMIT 50
+    `).bind(deviceId).all();
+
+    return json({ ok: true, pending: rows?.results || [] });
+  } catch (err) {
+    return json({ error: "params_pending_failed", message: String(err) }, 500);
+  }
+}
+
+async function handleParamsAck(request, env) {
+  if (!authorize(request, env, true)) return json({ error: "unauthorized" }, 401);
+  try {
+    const body = await request.json();
+    const deviceId = String(body?.device_id || "").trim();
+    const appliedIds = Array.isArray(body?.applied_ids) ? body.applied_ids : [];
+    const now = new Date().toISOString();
+
+    if (appliedIds.length > 0) {
+      const placeholders = appliedIds.map(() => "?").join(",");
+      await env.DB.prepare(`
+        UPDATE carrot_param_queue
+        SET status = 'applied', applied_at = ?
+        WHERE id IN (${placeholders})
+      `).bind(now, ...appliedIds).run();
+    }
+
+    if (body?.current_values && typeof body.current_values === "object" && deviceId) {
+      const existing = await env.DB.prepare(`
+        SELECT values_json FROM carrot_settings_cache WHERE device_id = ?
+      `).bind(deviceId).first();
+      let updatedValues = {};
+      if (existing?.values_json) {
+        try { updatedValues = JSON.parse(existing.values_json); } catch (_) {}
+      }
+      Object.assign(updatedValues, body.current_values);
+      await env.DB.prepare(`
+        UPDATE carrot_settings_cache
+        SET values_json = ?, updated_at = ?
+        WHERE device_id = ?
+      `).bind(JSON.stringify(updatedValues), now, deviceId).run();
+    }
+
+    return json({ ok: true, acked: appliedIds.length });
+  } catch (err) {
+    return json({ error: "params_ack_failed", message: String(err) }, 500);
+  }
+}
+
+async function handleParamsStatus(request, env) {
+  if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
+  try {
+    const url = new URL(request.url);
+    const deviceId = url.searchParams.get("device_id");
+    let query = "SELECT id, param_name, param_value, status, created_at, applied_at FROM carrot_param_queue";
+    let rows;
+    if (deviceId) {
+      query += " WHERE device_id = ? ORDER BY id DESC LIMIT 20";
+      rows = await env.DB.prepare(query).bind(deviceId).all();
+    } else {
+      query += " ORDER BY id DESC LIMIT 20";
+      rows = await env.DB.prepare(query).all();
+    }
+    return json({ ok: true, queue: rows?.results || [] });
+  } catch (err) {
+    return json({ error: "params_status_failed", message: String(err) }, 500);
+  }
+}
+
 async function handleCleanup(request, env) {
   if (!authorize(request, env, true)) return json({ error: "unauthorized" }, 401);
   const results = await purgeExpiredData(env);
@@ -2250,6 +2448,12 @@ export default {
   async fetch(request, env) {
     if (!requireBindings(env)) return json({error: "missing_cloudflare_bindings"}, 503);
     const {pathname} = new URL(request.url);
+    if (request.method === "POST" && pathname === "/api/settings/sync") return handleSettingsSync(request, env);
+    if (request.method === "GET" && pathname === "/api/settings") return handleGetSettings(request, env);
+    if (request.method === "POST" && pathname === "/api/params/queue") return handleParamsQueue(request, env);
+    if (request.method === "GET" && pathname === "/api/params/pending") return handleParamsPending(request, env);
+    if (request.method === "POST" && pathname === "/api/params/ack") return handleParamsAck(request, env);
+    if (request.method === "GET" && pathname === "/api/params/status") return handleParamsStatus(request, env);
     if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
     if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
     if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
@@ -2264,3 +2468,4 @@ export default {
     }
   }
 };
+

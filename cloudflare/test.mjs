@@ -32,5 +32,46 @@ const feed=await (await request('/api/json')).json();
 assert.equal(JSON.parse(feed.state.raw_json).vehicle.battery_wh,24050);
 assert.equal(feed.trips.length,25);
 assert.equal(feed.vehicleStatus,null);
+// Test Carrot Settings & Params
+const syncPayload = {
+  device_id: 'test-id4',
+  catalog: { menu: [{ id: 'DRIVING', ko: '주행 제어' }], params: [{ name: 'AlwaysLateral', title: '상시 조향', descr: '설명', min: 0, max: 1, default: 0 }] },
+  values: { AlwaysLateral: 0 }
+};
+assert.equal((await request('/api/settings/sync', 'upload-test', syncPayload)).status, 200);
+
+const settingsRes = await (await request('/api/settings', 'view-test')).json();
+assert.equal(settingsRes.ok, true);
+assert.equal(settingsRes.device_id, 'test-id4');
+assert.equal(settingsRes.values.AlwaysLateral, 0);
+
+// Queue a param change
+const queuePayload = { device_id: 'test-id4', param_name: 'AlwaysLateral', param_value: '1' };
+const queueRes = await (await request('/api/params/queue', 'view-test', queuePayload)).json();
+assert.equal(queueRes.ok, true);
+assert.equal(queueRes.queued, 1);
+
+// Comma fetches pending params
+const pendingRes = await (await request('/api/params/pending?device_id=test-id4', 'upload-test')).json();
+assert.equal(pendingRes.ok, true);
+assert.equal(pendingRes.pending.length, 1);
+assert.equal(pendingRes.pending[0].param_name, 'AlwaysLateral');
+assert.equal(pendingRes.pending[0].param_value, '1');
+
+// Comma acks param applied
+const ackPayload = {
+  device_id: 'test-id4',
+  applied_ids: [pendingRes.pending[0].id],
+  current_values: { AlwaysLateral: 1 }
+};
+const ackRes = await (await request('/api/params/ack', 'upload-test', ackPayload)).json();
+assert.equal(ackRes.ok, true);
+
+// Verify settings values updated
+const updatedSettings = await (await request('/api/settings', 'view-test')).json();
+assert.equal(updatedSettings.values.AlwaysLateral, 1);
+assert.equal(updatedSettings.pending_count, 0);
+
 sqlite.close();
-console.log('PASS: original telemetry/trip schema, upload/view auth, 27 trips paginated with routes, remote endpoints disabled');
+console.log('PASS: original telemetry/trip schema, upload/view auth, 27 trips paginated with routes, remote endpoints disabled, settings sync and param queue verified');
+

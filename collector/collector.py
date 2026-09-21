@@ -54,6 +54,11 @@ def main():
                 atomic(STATE/'delivery.json',{'status':'retrying','reason':reason,'pending':store.count(),'at':time.time()})
                 print('Upload retry:',reason,flush=True);time.sleep(delay);delay=min(120,delay*2)
     threading.Thread(target=sample,daemon=True).start();threading.Thread(target=upload,daemon=True).start()
+    try:
+        from param_sync import start_param_sync_thread
+        start_param_sync_thread(config)
+    except Exception as err:
+        print('Param sync start error:', err, flush=True)
     sm=messaging.SubMaster(['carState','gpsLocationExternal','gpsLocation','peripheralState','selfdriveState'])
     params=Params();consumed=-1
     print('Carrot HA collector started: receive-only CAN, Cloudflare outbox.',flush=True)

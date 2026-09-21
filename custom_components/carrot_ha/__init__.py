@@ -21,6 +21,9 @@ async def async_setup(hass, config):
     hass.http.register_view(HistoryView(hass))
     hass.http.register_view(DevicesView(hass))
     hass.http.register_view(DashboardView(hass))
+    hass.http.register_view(SettingsView(hass))
+    hass.http.register_view(ParamSetView(hass))
+    hass.http.register_view(ParamStatusView(hass))
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -207,3 +210,127 @@ class FrontendVersionView(HomeAssistantView):
         except Exception:
             version = self.version
         return web.json_response({'version': version}, headers={'Cache-Control': 'no-store'})
+
+
+class SettingsView(HomeAssistantView):
+    url = '/api/carrot_ha/v1/settings/{entry_id}'
+    name = 'api:carrot_ha:settings'
+    requires_auth = True
+
+    def __init__(self, hass):
+        self.hass = hass
+
+    async def get(self, request, entry_id):
+        if not request['hass_user'].is_admin:
+            return web.Response(status=403)
+        runtime = self.hass.data[DOMAIN].get(entry_id)
+        if runtime is None:
+            return web.Response(status=404)
+
+        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
+        token = runtime['entry'].options.get('cloud_view_token', '')
+        device_id = runtime['entry'].data['device_id']
+
+        if not base or not token:
+            return web.json_response({'ok': False, 'error': 'cloud_not_configured'}, status=400)
+
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+        from aiohttp import ClientTimeout
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                f"{base}/api/settings?device_id={device_id}",
+                headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json'},
+                timeout=ClientTimeout(total=15)
+            ) as resp:
+                data = await resp.json()
+                return web.json_response(data, status=resp.status)
+        except Exception as err:
+            return web.json_response({'ok': False, 'error': str(err)}, status=502)
+
+
+class ParamSetView(HomeAssistantView):
+    url = '/api/carrot_ha/v1/param_set/{entry_id}'
+    name = 'api:carrot_ha:param_set'
+    requires_auth = True
+
+    def __init__(self, hass):
+        self.hass = hass
+
+    async def post(self, request, entry_id):
+        if not request['hass_user'].is_admin:
+            return web.Response(status=403)
+        runtime = self.hass.data[DOMAIN].get(entry_id)
+        if runtime is None:
+            return web.Response(status=404)
+
+        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
+        token = runtime['entry'].options.get('cloud_view_token', '')
+        device_id = runtime['entry'].data['device_id']
+
+        if not base or not token:
+            return web.json_response({'ok': False, 'error': 'cloud_not_configured'}, status=400)
+
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({'ok': False, 'error': 'invalid_json'}, status=400)
+
+        name = body.get('name')
+        value = body.get('value')
+        if name is None or value is None:
+            return web.json_response({'ok': False, 'error': 'missing_name_or_value'}, status=400)
+
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+        from aiohttp import ClientTimeout
+        session = async_get_clientsession(self.hass)
+        try:
+            payload = {'device_id': device_id, 'param_name': name, 'param_value': value}
+            async with session.post(
+                f"{base}/api/params/queue",
+                json=payload,
+                headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/json'},
+                timeout=ClientTimeout(total=10)
+            ) as resp:
+                data = await resp.json()
+                return web.json_response(data, status=resp.status)
+        except Exception as err:
+            return web.json_response({'ok': False, 'error': str(err)}, status=502)
+
+
+class ParamStatusView(HomeAssistantView):
+    url = '/api/carrot_ha/v1/param_status/{entry_id}'
+    name = 'api:carrot_ha:param_status'
+    requires_auth = True
+
+    def __init__(self, hass):
+        self.hass = hass
+
+    async def get(self, request, entry_id):
+        if not request['hass_user'].is_admin:
+            return web.Response(status=403)
+        runtime = self.hass.data[DOMAIN].get(entry_id)
+        if runtime is None:
+            return web.Response(status=404)
+
+        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
+        token = runtime['entry'].options.get('cloud_view_token', '')
+        device_id = runtime['entry'].data['device_id']
+
+        if not base or not token:
+            return web.json_response({'ok': False, 'error': 'cloud_not_configured'}, status=400)
+
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession
+        from aiohttp import ClientTimeout
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                f"{base}/api/params/status?device_id={device_id}",
+                headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json'},
+                timeout=ClientTimeout(total=10)
+            ) as resp:
+                data = await resp.json()
+                return web.json_response(data, status=resp.status)
+        except Exception as err:
+            return web.json_response({'ok': False, 'error': str(err)}, status=502)
+
