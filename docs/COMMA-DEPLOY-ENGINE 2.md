@@ -1,5 +1,7 @@
 # comma 수집기 교체: 충전 감지 유지 + 주차 보고 60초 (2026-09-15)
 
+> 과거 engine.py 단독 교체 문서입니다. 현재 업데이트는 [Windows/Mac 두 파일 교체 안내](COMMA-DEPLOY-ENGINE.md), 플래싱 후 복구는 [재설치 가이드](REINSTALL.md)를 사용하세요. 아래 명령은 과거 버전 참고용입니다.
+
 이 문서는 Mac의 수정본을 comma의 `/data/id4-collector/engine.py`에 설치하는 절차입니다.
 이번 버전은 충전 감지 로직을 유지하면서 보고 조건만 원래대로 되돌립니다.
 

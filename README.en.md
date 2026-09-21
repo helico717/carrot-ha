@@ -6,6 +6,9 @@ Collect vehicle data on a comma device running Carrotpilot, store it in your own
 
 The implementation was used on an ID.4 and adapted for configurable MEB vehicles. **ID. Buzz and other MEB models, and all Carrotpilot branches, have not been validated.** Home Assistant 2026.3 or later is required. The dashboard API currently requires an HA administrator account.
 
+
+Reflashed your comma? See the [Windows/Mac collector recovery guide (Korean)](docs/REINSTALL.md), including lost credentials and end-to-end HA checks.
+
 ## Installation
 
 1. Follow the [installation guide](docs/INSTALL.en.md) to prepare your Cloudflare service and comma collector.

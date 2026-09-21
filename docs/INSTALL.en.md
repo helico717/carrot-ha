@@ -4,7 +4,11 @@
 
 This guide assumes HA is already running and you can connect to your comma device over SSH. Carrotpilot must already work on your vehicle. For a factory-reset device, install Carrotpilot following its maintainer's instructions first. A matching branch name alone does not guarantee compatibility.
 
-## 1. Prepare files on your Windows PC
+> Reset only your comma? Reuse the existing server: see the [Windows/Mac recovery guide (Korean)](REINSTALL.md).
+
+## 1. Prepare files on your computer
+
+### Windows PowerShell
 
 On GitHub choose Code → Download ZIP and extract it. Run the following PC commands in PowerShell opened in the extracted `cloudflare` folder. These instructions use Windows command syntax.
 
@@ -37,13 +41,71 @@ node -e "const c=require('node:crypto'); for(const k of ['UPLOAD','VIEW','HA_LOC
 
 Store all three privately. Enter the UPLOAD value into the first secret prompt and VIEW into the second, without the labels. HA_LOCAL is used when creating the HA integration entry. Never publish these values.
 
+### Mac Terminal
+
+Install Node.js for your Mac architecture (arm64 for Apple Silicon, x64 for Intel). Extract the repository ZIP and open Terminal in its `cloudflare` directory, for example `cd "$HOME/Downloads/carrot-ha-main/cloudflare"`.
+Run the resource creation commands only when creating a **new server**, not when restoring comma alone.
+
+```bash
+npm install
+npx wrangler login
+npx wrangler d1 create id4-ha-db
+npx wrangler kv namespace create SNAPSHOTS
+```
+Save the D1 database_id and KV id. Instead of the Windows-only setup.ps1, use a code editor to create `cloudflare/wrangler.json` with this content. Replace both YOUR_ placeholders with your actual IDs. Inspect any existing configuration before replacing it.
+
+```json
+{
+  "name": "id4-ha-cloud",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-05-14",
+  "workers_dev": true,
+  "d1_databases": [
+    {"binding": "DB", "database_name": "id4-ha-db", "database_id": "YOUR_D1_DATABASE_ID"}
+  ],
+  "kv_namespaces": [
+    {"binding": "SNAPSHOTS", "id": "YOUR_KV_NAMESPACE_ID"}
+  ]
+}
+```
+In the same cloudflare directory, execute each command separately and stop on errors.
+
+```bash
+npx wrangler d1 execute id4-ha-db --remote --file schema.sql
+npx wrangler deploy
+node -e "const c=require('node:crypto'); for(const k of ['UPLOAD','VIEW','HA_LOCAL']) console.log(k+': '+c.randomBytes(32).toString('hex'))"
+npx wrangler secret put WAYON_UPLOAD_TOKEN
+npx wrangler secret put WAYON_VIEW_TOKEN
+```
+Save the deployed Worker HTTPS URL and all three tokens privately. Enter UPLOAD at the first secret prompt and VIEW at the second; HA_LOCAL is for initial HA registration. Do not run Windows .cmd or PowerShell commands on macOS.
+
 ## 2. Configure HA
 
 Follow the HACS steps in the [overview](../README.en.md). Choose a device ID such as `my-buzz`; it is neither the VIN nor an HA entity ID. Use HA_LOCAL for initial registration and VIEW for the read token in options. Set your vehicle model and SOC calculation capacity.
 
 ## 3. Install the collector on comma
 
-Park the vehicle first. Use an SSH file transfer application such as WinSCP to copy the **contents** of `collector` into `/data/id4-collector` on comma.
+Park the vehicle first. SSH authentication and recovery are covered in the [Windows/Mac recovery guide (Korean)](REINSTALL.md). Copy the collector files using the commands below from the extracted repository root. Replace the path and IP with yours. Stop if any command fails. If a collector already exists, use the [upgrade guide](COMMA-DEPLOY-ENGINE.md) instead of overwriting running files.
+
+**Windows PowerShell:**
+
+```powershell
+Set-Location "$env:USERPROFILE\Downloads\carrot-ha-main"
+ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
+scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+ssh comma@192.168.43.1
+```
+
+**Mac Terminal:**
+
+```bash
+cd "$HOME/Downloads/carrot-ha-main"
+ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
+scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
+ssh comma@192.168.43.1
+```
+
+For a custom port, add `-p PORT` to every ssh command and `-P PORT` to every scp command. Add `-i KEY_PATH` to both if needed. Windows users can alternatively use WinSCP.
 
 In comma SSH, for a new installation:
 
@@ -73,4 +135,4 @@ ID. Buzz has not yet been validated on a real vehicle. Record the model year, ba
 
 ## Limitations
 
-Charging classification, power, and SOC are estimates. The graph may carry forward the last known value through missing periods, but excludes those carried values from consumption calculations. Automatic retention deletion is not enabled.
+Charging classification, power, and SOC are estimates. The graph may carry forward the last known value through missing periods, but excludes those carried values from consumption calculations. Records may be removed under the configured server/HA retention policies; consult the [full guide (Korean)](GUIDE.md).

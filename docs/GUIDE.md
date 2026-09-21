@@ -328,6 +328,6 @@ HA 로컬 기록은 현재 기본값으로 상태 14일, 주행·충전 90일을
 
 디버그/시뮬레이션 카드는 실제 차 상태와 구분한다. 시나리오로 만든 속도·SOC·충전 표시를 실제 수신 증거로 쓰지 않는다.
 
-관련 문서: [설치](INSTALL.md), [언어](DASHBOARD-LANGUAGE.md), [차량 이미지](VEHICLE-IMAGE.md), [주행·충전 판단](CHARGING-MOTION.md), [충전 검증](../collector/CHARGING.md), [디버그 미리보기](DEBUG-FRESHNESS-PREVIEW.md).
+관련 문서: [설치](INSTALL.md), [Windows/Mac 재설치·복구](REINSTALL.md), [언어](DASHBOARD-LANGUAGE.md), [차량 이미지](VEHICLE-IMAGE.md), [주행·충전 판단](CHARGING-MOTION.md), [충전 검증](../collector/CHARGING.md), [디버그 미리보기](DEBUG-FRESHNESS-PREVIEW.md).
 
 구현 기준: [대시보드](../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js), [센서 목록](../custom_components/carrot_ha/sensors_v3.py), [이진 센서](../custom_components/carrot_ha/binary_sensor.py), [위치](../custom_components/carrot_ha/device_tracker.py), [연결 판정](../custom_components/carrot_ha/connectivity.py), [차량 가공](../custom_components/carrot_ha/vehicle.py), [충전 시간 계산](../custom_components/carrot_ha/battery.py), [배터리 이력](../custom_components/carrot_ha/battery_history.py), [수집기](../collector/engine.py).
