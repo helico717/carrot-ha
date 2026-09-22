@@ -28,7 +28,7 @@ FIELDS = {
  'battery_kwh':('배터리 저장 에너지','kWh','mdi:battery-high','energy',1),
  'hv_voltage':('고전압 배터리 전압','V','mdi:lightning-bolt','voltage',1),
  'measured_capacity_kwh':('BMS 용량 추정','kWh','mdi:battery-heart-variant','energy',1),
- 'soc_capacity_kwh':('SOC 계산 용량','kWh','mdi:battery-cog','energy',1),
+ 'soc_capacity_kwh':('SOC 계산 용량','kWh','mdi:battery-sync','energy',1),
  'range_km':('주행가능거리','km','mdi:map-marker-distance','distance',0),
  'blower_volt':('송풍 제어 전압','V','mdi:fan','voltage',2),
  'blower_level':('송풍 단계',None,'mdi:fan',None,0),
@@ -63,7 +63,7 @@ FIELDS = {
 FIELDS.update(SENSOR_FIELDS)
 FIELDS.update({
  'month_drive_energy_kwh': ('이번 달 유효 주행 소비량', 'kWh', 'mdi:battery-minus', 'energy', 2),
- 'month_energy_coverage_percent': ('이번 달 전비 집계 거리 비율', '%', 'mdi:chart-check', None, 1),
+ 'month_energy_coverage_percent': ('이번 달 전비 집계 거리 비율', '%', 'mdi:file-chart-check-outline', None, 1),
 })
 
 async def async_setup_entry(hass,entry,async_add_entities):

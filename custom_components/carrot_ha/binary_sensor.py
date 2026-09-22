@@ -15,7 +15,7 @@ class EmergencyCharging(VehicleEntity, BinarySensorEntity):
     _attr_device_class = 'problem'
 
     def __init__(self, entry):
-        self.configure(entry, 'emergency_charging', '비상 충전 모드 추정', 'mdi:power-plug-alert')
+        self.configure(entry, 'emergency_charging', '비상 충전 모드 추정', 'mdi:power-plug-off')
 
     @property
     def is_on(self):
@@ -23,7 +23,7 @@ class EmergencyCharging(VehicleEntity, BinarySensorEntity):
 
     @property
     def icon(self):
-        return 'mdi:power-plug-alert' if self.is_on else 'mdi:power-plug-check'
+        return 'mdi:power-plug-off' if self.is_on else 'mdi:power-plug'
 
     @property
     def extra_state_attributes(self):
@@ -75,7 +75,8 @@ class Flag(VehicleEntity,BinarySensorEntity):
 
 class TelemetryFlag(Flag):
     def __init__(self, entry, key, name, device_class):
-        super().__init__(entry, key, name, 'mdi:car-info')
+        icon = 'mdi:car-door-lock' if 'lock' in key else 'mdi:car-info'
+        super().__init__(entry, key, name, icon)
         self._attr_device_class = device_class
 
     @property

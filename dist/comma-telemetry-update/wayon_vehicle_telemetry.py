@@ -249,11 +249,11 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
         result["outside_temp_c"] = float(cp.vl["Klima_Sensor_02"]["BCM1_Aussen_Temp_ungef"])
       if cp.vl_all["MEB_HVEM_01"].get("Battery_Voltage"):
         v = cp.vl["MEB_HVEM_01"]["Battery_Voltage"]
-        if v > 0:
+        if 0 < v < 800:  # 0xFFF (4095) * 0.25 = 1023.75V SNA 배제
           hv_voltage = float(v)
       if cp.vl_all["BMS_04"].get("BMS_Kapazitaet_02"):
         ah = cp.vl["BMS_04"]["BMS_Kapazitaet_02"]
-        if ah > 0:
+        if 0 < ah < 250: # 0xFE(254), 0xFF(255) SNA 배제
           capacity_ah = float(ah)
 
       # --- 공조 상태 (2026-08 실차 확인: Klima_11=bus1, Klima_12=bus0) ---
