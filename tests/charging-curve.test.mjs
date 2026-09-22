@@ -101,6 +101,35 @@ debug.state.powerKw = 7;
 debug.applyDebugTelemetry();
 assert.equal(debug.dashCard.v.emergency_charging, false);
 
+console.log('Testing Option D 3-stage smoothing and jitter suppression...');
+const t0 = 1720000000000;
+// 1. Initial 7kW charging at 50% SOC
+const initSmooth = estimateChargingTimesWithCurve(50, 7.0, 70.8, t0, 'smooth', null);
+assert.ok(initSmooth.sec100 > 0, 'Initial smooth sec100 should be calculated');
+assert.equal(initSmooth.powerSmooth, 7.0, 'Initial powerSmooth should equal raw power');
+
+// 2. BMS quantization noise: power dips to 4.8 kW 120 seconds later
+const t1 = t0 + 120000;
+const rawDip = estimateChargingTimesWithCurve(50, 4.8, 70.8, t1, 'curve');
+const smoothDip = estimateChargingTimesWithCurve(50, 4.8, 70.8, t1, 'smooth', initSmooth.smoothState);
+
+// Raw calculation causes a jump of over 2 hours (> 7000 seconds)
+const rawJumpSec = Math.abs(rawDip.sec100 - initSmooth.sec100);
+assert.ok(rawJumpSec > 7000, `Raw jump should be > 2 hours, was ${rawJumpSec}s`);
+
+// Smoothed calculation clamps ETA shift to at most slewMaxSec (180s = 3 minutes)
+const expectedNaturalCountdownSec = initSmooth.sec100 - 120;
+const smoothShiftSec = Math.abs(smoothDip.sec100 - expectedNaturalCountdownSec);
+assert.ok(smoothShiftSec <= 180, `Smoothed shift should be clamped <= 180s (3 min), was ${smoothShiftSec}s`);
+assert.ok(smoothDip.powerSmooth > 6.0 && smoothDip.powerSmooth < 7.0, 'Power EMA should smoothly filter the dip');
+
+// 3. BMS quantization noise: power surges to 8.2 kW 120 seconds later
+const t2 = t1 + 120000;
+const smoothSurge = estimateChargingTimesWithCurve(50, 8.2, 70.8, t2, 'smooth', smoothDip.smoothState);
+const expectedNaturalCountdownSec2 = smoothDip.sec100 - 120;
+const smoothShiftSec2 = Math.abs(smoothSurge.sec100 - expectedNaturalCountdownSec2);
+assert.ok(smoothShiftSec2 <= 180, `Smoothed shift on surge should be clamped <= 180s, was ${smoothShiftSec2}s`);
+
 // Check template elements
 assert.ok(source.includes('data-charger="1"'));
 assert.ok(source.includes('비상충전중'));
@@ -116,5 +145,8 @@ assert.ok(source.includes('id="effectiveIntakeVal"'));
 assert.ok(source.includes('id="inspectCharger"'));
 assert.ok(source.includes('id="inspectEffective"'));
 assert.ok(source.includes('id="inspectEmergency"'));
+assert.ok(source.includes('id="btnModelSmooth"'));
+assert.ok(source.includes('id="btnToggleNoise"'));
+assert.ok(source.includes('BMS 전력 변동 시뮬레이션'));
 
-console.log('All charging curve and EVSE preset tests passed successfully!');
+console.log('All charging curve, EVSE presets, and Option D smoothing tests passed successfully!');
