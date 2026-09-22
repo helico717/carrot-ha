@@ -30,6 +30,8 @@ def values(runtime):
     data['bearing_deg'] = int(round(gps['bearingDeg'])) if isinstance(gps.get('bearingDeg'), (int, float)) else None
     speed = gps.get('speedMps')
     data['speed_kph'] = round(speed*3.6,1) if isinstance(speed,(int,float)) else None
+    wheel_speed = data.get('wheel_speed_mps')
+    data['wheel_speed_kph'] = round(wheel_speed*3.6,1) if isinstance(wheel_speed,(int,float)) else None
     data['last_received'] = latest.get('observed_at')
     data['cloud_status'] = runtime.get('cloud_status','not_configured')
     data['last_sync'] = runtime.get('cloud_last_sync')
@@ -119,6 +121,24 @@ def values(runtime):
             data['month_charge_cost'] = 0
         if data.get('month_charge_kwh') is None:
             data['month_charge_kwh'] = 0.0
+
+    month_dist = data.get('month_distance_km') or 0.0
+    month_charge = data.get('month_charge_kwh') or 0.0
+    if isinstance(month_dist, (int, float)) and isinstance(month_charge, (int, float)) and month_charge >= 0.5:
+        data['month_efficiency_kpl'] = round(month_dist / month_charge, 2)
+    else:
+        data['month_efficiency_kpl'] = None
+
+    if data.get('range_km') is None and data.get('battery_kwh') is not None:
+        eff = data.get('month_efficiency_kpl')
+        if not (isinstance(eff, (int, float)) and 3.0 <= eff <= 9.0):
+            eff = 5.5
+            data['range_efficiency_basis'] = 'default_5.5'
+        else:
+            data['range_efficiency_basis'] = 'dynamic_monthly'
+        data['range_km'] = int(round(data['battery_kwh'] * eff))
+        data['range_estimated'] = True
+
     parking = data.get('parking') or data.get('last_trip_parking') or {}
     data.update(parking_latitude=parking.get('latitude'),parking_longitude=parking.get('longitude'),parking_at=parking.get('measured_at') or parking.get('t'))
     return data
