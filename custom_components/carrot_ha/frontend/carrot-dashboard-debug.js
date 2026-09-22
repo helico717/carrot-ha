@@ -130,6 +130,7 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
     const powerJump = Math.abs(powerKw - smoothState.powerSmooth);
     if (powerJump > SMOOTH_CONFIG.jumpResetKw) {
       powerSmooth = powerKw; // Step reset on abrupt change
+      smoothState = null;
     } else {
       powerSmooth = SMOOTH_CONFIG.alpha * powerKw + (1 - SMOOTH_CONFIG.alpha) * smoothState.powerSmooth;
     }

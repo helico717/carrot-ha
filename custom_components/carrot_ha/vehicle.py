@@ -17,13 +17,7 @@ def values(runtime):
         data['charge_power_kw'] = round(power_w / 1000, 1)
     elif data.get('charge_power_kw') is not None:
         data['charge_power_kw'] = round(data['charge_power_kw'], 1)
-
-    charging_est = estimate_charging_times(
-        data.get('battery_kwh'),
-        data.get('measured_capacity_kwh') or capacity,
-        power_w
-    )
-    data.update(charging_est)
+        power_w = int(round(data['charge_power_kw'] * 1000))
 
     if isinstance(data.get('odometer_km'), (int, float)):
         data['odometer_km'] = int(round(data['odometer_km']))
@@ -82,6 +76,27 @@ def values(runtime):
         runtime['low_power_charging_since'] = None
         data['low_power_duration_s'] = 0
         data['emergency_charging'] = False
+
+    # Charging Time Estimation (ID.4 curve & 3-stage smoothing)
+    smooth_state = runtime.get('charging_smooth_state')
+    charging_est = estimate_charging_times(
+        data.get('battery_kwh'),
+        data.get('measured_capacity_kwh') or capacity,
+        power_w,
+        base_time=ref_time,
+        smooth_state=smooth_state,
+        is_charging=is_charging
+    )
+    data.update({
+        'time_to_80_s': charging_est['time_to_80_s'],
+        'eta_80': charging_est['eta_80'],
+        'time_to_100_s': charging_est['time_to_100_s'],
+        'eta_100': charging_est['eta_100']
+    })
+    if is_charging:
+        runtime['charging_smooth_state'] = charging_est.get('smooth_state')
+    else:
+        runtime['charging_smooth_state'] = None
     try:
         from zoneinfo import ZoneInfo
         kst = ZoneInfo('Asia/Seoul')
