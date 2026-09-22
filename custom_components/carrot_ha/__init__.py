@@ -112,6 +112,7 @@ class ReceiveView(HomeAssistantView):
                 return web.Response(status=403)
             async with runtime['lock']:
                 await self.hass.async_add_executor_job(runtime['archive'].put, event)
+                runtime['summary'] = await self.hass.async_add_executor_job(runtime['archive'].overview, event['device_id'])
                 if event['kind'] == 'state':
                     from datetime import datetime
                     previous = runtime['latest']
@@ -120,6 +121,7 @@ class ReceiveView(HomeAssistantView):
                         async_dispatcher_send(self.hass, DOMAIN + runtime['entry'].entry_id)
         except (ValueError, KeyError, TypeError, OverflowError, RecursionError):
             return web.Response(status=400)
+        async_dispatcher_send(self.hass, DOMAIN + runtime['entry'].entry_id)
         return web.json_response({'accepted': event['event_id'], 'device_id': event['device_id']})
 
 class HistoryView(HomeAssistantView):

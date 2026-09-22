@@ -196,7 +196,7 @@
 | `hv_voltage` | 고전압 배터리 전압 | V | 고전압 배터리 전압. 충전 전력·잔량과 서로 다른 물리량이다. |
 | `measured_capacity_kwh` | BMS 용량 추정 | kWh | BMS 용량 Ah × 고전압 V로 계산한 추정 에너지 용량. 신호 변동이 있으며 실제 열화율/SOH가 아니다. |
 | `soc_capacity_kwh` | SOC 계산 용량 | kWh | 설정한 SOC 분모. 기본 78, 허용 범위 20~150kWh. 실측 용량이 아니다. |
-| `range_km` | 주행가능거리 | km | 공급된 주행가능거리 값. 현재 기본 CAN 샘플러는 이 필드를 생성하지 않으므로 —/미확인일 수 있다. 임의로 SOC에서 계산하지 않는다. |
+| `range_km` | 주행가능거리 | km | 공급값 우선. 없으면 유효 주행거리 20km 이상·월간 거리 커버리지 80% 이상일 때 저장 에너지 × 주행 전비로 추정. 자료 부족 시 미확인, 고정 전비 대체 없음. |
 | `blower_volt` | 송풍 제어 전압 | V | 송풍 제어 목표 전압 신호. 실제 풍량·12V 배터리 전압과 다르다. |
 | `blower_level` | 송풍 단계 | 없음 | 송풍 전압 약 1.45~14V를 0~10 단계로 환산해 제한한 값. 차량 화면의 단계와 다를 수 있다. |
 | `seat_heat_left` | 운전석 열선 단계 | 없음 | 왼쪽 좌석 열선 목표 신호의 정수 원시값. 운전석이라는 이름은 좌핸들 기준. 미수신은 미확인이고 지원 코드 범위는 차량/DBC에 따라 다르다. |
@@ -207,7 +207,7 @@
 | `wheel_speed_kph` | 실차 휠 차속 | km/h | 차량 휠 센서 wheel_speed_mps × 3.6. GPS 음영 지역(터널, 지하 등)에서도 끊김 없이 계측되는 실차 휠 속도. |
 | `gps_accuracy_m` | GPS 정확도 | m | GPS가 보고한 정확도 지표. 작은 값이 더 정밀한 위치를 시사하지만 위치 오차의 절대 보장은 아니다. |
 | `bearing_deg` | 진행 방향 | ° | GPS 진행 방향. 통상 북쪽 0°, 동쪽 90°, 남쪽 180°, 서쪽 270°. 정차 중 값은 차량 차체 방향과 다를 수 있다. |
-| `month_efficiency_kpl` | 이번 달 평균 전비 | km/kWh | 이번 달 누적 주행거리 ÷ 이번 달 누적 충전량. 충전량 0.5kWh 이상 시 산출. |
+| `month_efficiency_kpl` | 이번 달 주행 전비 추정 | km/kWh | 동일한 유효 트립의 거리 합 ÷ 배터리 순소비량 합. 충전량과 무관하며 1km·0.5kWh 이상일 때 산출. 집계 거리 비율을 함께 확인. |
 | `month_charge_kwh` | 이번 달 충전량 추정 | kWh | 이번 달 완속+급속 추정 충전량. 원장 항목이 없으면 기본 0일 수 있다. |
 | `month_slow_kwh` | 이번 달 완속 분류 충전량 | kWh | 11kW 이하인 관측 구간의 월 충전량. 물리적 AC 충전기 식별 결과가 아니다. |
 | `month_fast_kwh` | 이번 달 급속 분류 충전량 | kWh | 11kW 초과인 관측 구간의 월 충전량. 충전기 종류가 아닌 전력 기준 분류. |
@@ -366,3 +366,14 @@ device_id: my-meb
 관련 문서: [설치](INSTALL.md), [Windows/Mac 재설치·복구](REINSTALL.md), [파라미터 설정 가이드](COMMA_PARAM_SETUP.md), [파라미터 아키텍처](PARAMETERS_0_6_1.md), [언어](DASHBOARD-LANGUAGE.md), [차량 이미지](VEHICLE-IMAGE.md), [주행·충전 판단](CHARGING-MOTION.md), [충전 검증](../collector/CHARGING.md), [디버그 미리보기](DEBUG-FRESHNESS-PREVIEW.md).
 
 구현 기준: [대시보드](../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js), [센서 목록](../custom_components/carrot_ha/sensors_v3.py), [이진 센서](../custom_components/carrot_ha/binary_sensor.py), [위치](../custom_components/carrot_ha/device_tracker.py), [연결 판정](../custom_components/carrot_ha/connectivity.py), [차량 가공](../custom_components/carrot_ha/vehicle.py), [충전 시간 계산](../custom_components/carrot_ha/battery.py), [배터리 이력](../custom_components/carrot_ha/battery_history.py), [수집기](../collector/engine.py).
+
+
+### 추가 차량 상태와 콤마 헬스
+
+추가 엔터티의 신호 의미와 설치 파일 목록은 [수집 신호 검토](TELEMETRY-SIGNAL-REVIEW.md)를 참고하세요.
+도어/잠금/등화/BMS/콤마 헬스는 각 필드의 측정 시각을 기준으로 180초 후 미확인으로 바뀝니다.
+주차 중 차량이 잠든 상태에서는 마지막 잠금값을 현재 상태로 보장하지 않습니다.
+전비 산식 변경 전 HA Recorder에 저장된 통계는 자동 삭제하거나 재작성하지 않습니다.
+새 전비는 완결된 트립의 실제 Wh 기록만 사용하며, 회생으로 증가한 에너지는 음의 소비량으로 합산합니다.
+측정이 누락된 트립은 거리와 에너지를 함께 제외하고 `month_energy_coverage_percent`에 반영합니다.
+HA의 트립 에너지 집계는 별도 보관되어 원본 상태 14일 정리 후에도 유지됩니다. 이미 삭제된 원본은 복원하지 못합니다.

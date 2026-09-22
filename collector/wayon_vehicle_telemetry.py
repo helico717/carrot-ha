@@ -21,6 +21,7 @@ import requests
 
 from openpilot.cereal import messaging
 from openpilot.common.params import Params
+from telemetry_fields import OPTIONAL_MESSAGES, decode_optional
 
 CONFIG_PATH = Path(os.getenv("WAYON_CLOUD_CONFIG", "/data/wayon_cloud/config.json"))
 STATE_PATH = Path(os.getenv("WAYON_VEHICLE_STATE", "/data/wayon_cloud/vehicle_state.json"))
@@ -47,6 +48,7 @@ CHARGE_PRICE_FAST = 320.0
 
 # can 구독 소켓 (재사용)
 _CAN_SOCK = None
+_OPTIONAL_PARSERS = None
 
 
 def read_config() -> dict:
@@ -191,6 +193,24 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
     print(f"Wayon telemetry: CAN parser unavailable: {exc}", flush=True)
     return result
 
+  # Optional messages must never disable the existing battery reader on older DBCs.
+  global _OPTIONAL_PARSERS
+  if _OPTIONAL_PARSERS is None:
+    _OPTIONAL_PARSERS = []
+    supported = []
+    for message in OPTIONAL_MESSAGES:
+      try:
+        CANParser("vw_meb", [(message, 0)], 0)
+        supported.append((message, 0))
+      except Exception:
+        pass
+    if supported:
+      for bus in (0, 1):
+        try:
+          _OPTIONAL_PARSERS.append(CANParser("vw_meb", supported, bus))
+        except Exception:
+          pass
+
   # 소켓을 매번 새로 열면 첫 호출(프로세스 기동 직후)에 연결 워밍업 때문에 아무것도 못 받는다.
   # 한 번 만들어 재사용한다.
   global _CAN_SOCK
@@ -250,6 +270,18 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
           result[key] = int(cp.vl["Klima_12"][sig])
       if cp.vl_all["Klima_12"].get("KL_Umluftklappe_Status"):
         result["recirc"] = int(cp.vl["Klima_12"]["KL_Umluftklappe_Status"])
+
+      try:
+        result.update(decode_optional(cp.vl_all))
+      except Exception:
+        pass
+
+    for optional_cp in _OPTIONAL_PARSERS:
+      try:
+        optional_cp.update(frames)
+        result.update(decode_optional(optional_cp.vl_all))
+      except Exception:
+        continue
 
     # Keep sampling the bounded window so HVAC/voltage fields can arrive too.
 

@@ -1,5 +1,6 @@
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .vehicle import values
+from .telemetry import OPTIONAL_FIELDS
 
 class VehicleEntity:
     _attr_should_poll = False
@@ -19,6 +20,14 @@ class VehicleEntity:
     def data(self): return values(self.runtime)
     async def async_added_to_hass(self):
         self.async_on_remove(async_dispatcher_connect(self.hass,'carrot_ha'+self.entry.entry_id,self.async_write_ha_state))
+        if self.key in OPTIONAL_FIELDS:
+            from datetime import timedelta
+            from homeassistant.helpers.event import async_track_time_interval
+            from homeassistant.core import callback
+            @callback
+            def refresh(now):
+                self.async_write_ha_state()
+            self.async_on_remove(async_track_time_interval(self.hass, refresh, timedelta(seconds=30)))
     @property
     def extra_state_attributes(self):
         data=self.data

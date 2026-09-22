@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
 import math
+from .telemetry import OPTIONAL_FIELDS, FRESHNESS_SECONDS
 
 def values(runtime):
     latest = runtime.get('latest', {})
@@ -136,22 +137,37 @@ def values(runtime):
         if data.get('month_charge_kwh') is None:
             data['month_charge_kwh'] = 0.0
 
-    month_dist = data.get('month_distance_km') or 0.0
-    month_charge = data.get('month_charge_kwh') or 0.0
-    if isinstance(month_dist, (int, float)) and isinstance(month_charge, (int, float)) and month_charge >= 0.5:
-        data['month_efficiency_kpl'] = round(month_dist / month_charge, 2)
-    else:
-        data['month_efficiency_kpl'] = None
+    # Only matched trip distance / net battery depletion is driving efficiency.
+    distance = data.get('month_energy_distance_km')
+    energy = data.get('month_drive_energy_kwh')
+    data['month_efficiency_kpl'] = (
+        round(distance / energy, 2)
+        if type(distance) in (int, float) and type(energy) in (int, float)
+        and math.isfinite(distance) and math.isfinite(energy)
+        and distance >= 1 and energy >= 0.5 else None
+    )
 
     if data.get('range_km') is None and data.get('battery_kwh') is not None:
         eff = data.get('month_efficiency_kpl')
-        if not (isinstance(eff, (int, float)) and 3.0 <= eff <= 9.0):
-            eff = 5.5
-            data['range_efficiency_basis'] = 'default_5.5'
-        else:
-            data['range_efficiency_basis'] = 'dynamic_monthly'
-        data['range_km'] = int(round(data['battery_kwh'] * eff))
+        coverage = data.get('month_energy_coverage_percent') or 0
+        enough_data = (data.get('month_energy_distance_km') or 0) >= 20 and coverage >= 80
         data['range_estimated'] = True
+        if eff is not None and enough_data:
+            data['range_km'] = int(round(data['battery_kwh'] * eff))
+            data['range_efficiency_basis'] = 'matched_trip_energy'
+        else:
+            data['range_km'] = None
+            data['range_efficiency_basis'] = 'insufficient_trip_energy'
+
+    # Never present stale locks/doors/health as current, including older collectors.
+    for key in OPTIONAL_FIELDS:
+        stamp = (data.get('field_measured_at') or {}).get(key)
+        try:
+            field_age = (now_utc - datetime.fromisoformat(stamp.replace('Z', '+00:00'))).total_seconds()
+            if not 0 <= field_age <= FRESHNESS_SECONDS:
+                data[key] = None
+        except (ValueError, TypeError, AttributeError):
+            data[key] = None
 
     parking = data.get('parking') or data.get('last_trip_parking') or {}
     data.update(parking_latitude=parking.get('latitude'),parking_longitude=parking.get('longitude'),parking_at=parking.get('measured_at') or parking.get('t'))

@@ -8,6 +8,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 from engine import Store,Engine
+from telemetry_fields import device_health
 
 BASE=Path(__file__).resolve().parent
 STATE=BASE/'state'
@@ -59,8 +60,8 @@ def main():
         start_param_sync_thread(config)
     except Exception as err:
         print('Param sync start error:', err, flush=True)
-    sm=messaging.SubMaster(['carState','gpsLocationExternal','gpsLocation','peripheralState','selfdriveState'])
-    params=Params();consumed=-1
+    sm=messaging.SubMaster(['carState','gpsLocationExternal','gpsLocation','peripheralState','selfdriveState','deviceState'])
+    params=Params();consumed=-1;last_health=0
     print('Carrot HA collector started: receive-only CAN, Cloudflare outbox.',flush=True)
     while True:
         time.sleep(1);sm.update(0);now=time.time();mono=time.monotonic()
@@ -87,7 +88,14 @@ def main():
             car=sm['carState']
             if car.canValid:
                 motion={'gear':str(car.gearShifter),'speed_mps':float(car.vEgo)}
-        engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion)
+        diagnostics = None
+        if mono-last_health >= 10 and sm.seen.get('deviceState') and sm.valid.get('deviceState') and mono-sm.recv_time['deviceState'] < 10:
+            try:
+                diagnostics = device_health(sm['deviceState'])
+            except Exception:
+                diagnostics = None
+            last_health = mono
+        engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion,diagnostics=diagnostics)
         atomic(STATE/'status.json',{'status':'running','at':now,'onroad':engine.s['vehicle'].get('comma_onroad'),'driving':engine.s.get('onroad'),'gear':engine.s['vehicle'].get('gear'),'pending':store.count(),'can_fields':sorted((latest_sample or {}).keys()),'active_trip':bool(engine.s.get('trip'))})
 
 if __name__=='__main__':

@@ -49,7 +49,10 @@ class Engine:
         self.s.setdefault('charge_sessions',[])
         self.last_saved=0
         if self.s.get('trip'):self.s['trip']['partial']=True
-    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None):
+    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None):
+        for key, value in (diagnostics or {}).items():
+            self.s['vehicle'][key] = value
+            self.s['field_measured_at'][key] = stamp(now)
         comma_onroad=onroad
         onroad=self._driving(onroad,motion)
         self.s['vehicle'].update(comma_onroad=bool(comma_onroad),driving=onroad,
@@ -96,7 +99,7 @@ class Engine:
         s['onroad']=onroad
         if sampled is not None:
             for key,value in sampled.items():
-                if value is not None and (not isinstance(value,float) or math.isfinite(value)):
+                if (value is not None and (not isinstance(value,float) or math.isfinite(value))) or (value is None and key in ('bms_target_soc_percent', 'dcdc_temperature_c')):
                     s['vehicle'][key]=value;s['field_measured_at'][key]=stamp(now)
             if sampled:s['measured_at']=stamp(now)
             if onroad is not None:self._sample_energy(now, onroad, sampled.get('battery_wh'))

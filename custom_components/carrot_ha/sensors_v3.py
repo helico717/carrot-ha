@@ -1,6 +1,7 @@
 from datetime import datetime
 from homeassistant.components.sensor import SensorEntity
 from .entity import VehicleEntity
+from .telemetry import SENSOR_FIELDS
 
 GEAR_DISPLAY = {
     'park': 'P',
@@ -38,7 +39,7 @@ FIELDS = {
  'wheel_speed_kph':('실차 휠 차속','km/h','mdi:speedometer','speed',0),
  'gps_accuracy_m':('GPS 정확도','m','mdi:crosshairs-gps','distance',1),
  'bearing_deg':('진행 방향','°','mdi:compass',None,0),
- 'month_efficiency_kpl':('이번 달 평균 전비','km/kWh','mdi:chart-line',None,2),
+ 'month_efficiency_kpl':('이번 달 주행 전비 추정','km/kWh','mdi:chart-line',None,2),
  'month_charge_kwh':('이번 달 충전량 추정','kWh','mdi:ev-station','energy',2),
  'month_slow_kwh':('이번 달 완속 분류 충전량','kWh','mdi:power-plug','energy',2),
  'month_fast_kwh':('이번 달 급속 분류 충전량','kWh','mdi:flash','energy',2),
@@ -59,6 +60,12 @@ FIELDS = {
  'cloud_status':('클라우드 연결 상태',None,'mdi:cloud-outline',None,None),
 }
 
+FIELDS.update(SENSOR_FIELDS)
+FIELDS.update({
+ 'month_drive_energy_kwh': ('이번 달 유효 주행 소비량', 'kWh', 'mdi:battery-minus', 'energy', 2),
+ 'month_energy_coverage_percent': ('이번 달 전비 집계 거리 비율', '%', 'mdi:chart-check', None, 1),
+})
+
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()])
 
@@ -70,6 +77,8 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if precision is not None:
             self._attr_suggested_display_precision=precision
         if unit is not None and device_class not in ('monetary','energy'): self._attr_state_class='measurement'
+        if key.startswith('comma_'):
+            self._attr_entity_category = 'diagnostic'
         if key in ('month_charge_kwh','month_slow_kwh','month_fast_kwh'):self._attr_state_class='total_increasing'
     @property
     def native_value(self):
@@ -94,7 +103,15 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def extra_state_attributes(self):
         attrs=super().extra_state_attributes
-        if self.key=='gear':
+        if self.key == 'month_efficiency_kpl':
+            attrs.update(calculation='matched_trip_distance / net_battery_depletion',
+                         coverage_percent=self.data.get('month_energy_coverage_percent'),
+                         distance_km=self.data.get('month_energy_distance_km'),
+                         energy_kwh=self.data.get('month_drive_energy_kwh'),
+                         calculation_version=2)
+        elif self.key == 'bms_target_soc_percent':
+            attrs.update(source='BMS_04.BMS_Soll_SOC_HiRes', vehicle_charge_limit_verified=False)
+        elif self.key=='gear':
             attrs['raw_gear']=self.data.get('gear')
         elif self.key=='range_km':
             if self.data.get('range_estimated'):
