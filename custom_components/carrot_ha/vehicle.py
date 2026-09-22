@@ -147,6 +147,8 @@ def values(runtime):
         and distance >= 1 and energy >= 0.5 else None
     )
 
+    DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, conservative default for VW ID.4 in Korea
+
     if data.get('range_km') is None and data.get('battery_kwh') is not None:
         eff = data.get('month_efficiency_kpl')
         coverage = data.get('month_energy_coverage_percent') or 0
@@ -156,8 +158,16 @@ def values(runtime):
             data['range_km'] = int(round(data['battery_kwh'] * eff))
             data['range_efficiency_basis'] = 'matched_trip_energy'
         else:
-            data['range_km'] = None
-            data['range_efficiency_basis'] = 'insufficient_trip_energy'
+            recent = data.get('recent_efficiency_kpl')
+            if recent is not None:
+                data['range_km'] = int(round(data['battery_kwh'] * recent))
+                data['range_efficiency_basis'] = 'recent_trips'
+            elif eff is not None:
+                data['range_km'] = int(round(data['battery_kwh'] * eff))
+                data['range_efficiency_basis'] = 'low_coverage_trip_energy'
+            else:
+                data['range_km'] = int(round(data['battery_kwh'] * DEFAULT_RANGE_EFFICIENCY))
+                data['range_efficiency_basis'] = 'default_efficiency'
 
     # Never present stale locks/doors/health as current, including older collectors.
     for key in OPTIONAL_FIELDS:

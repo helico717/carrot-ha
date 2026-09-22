@@ -72,13 +72,22 @@ class TestNewSensors(unittest.TestCase):
         self.assertIsNone(res.get('month_efficiency_kpl'))
 
     def test_estimated_range_without_measured_efficiency(self):
-        # No arbitrary default efficiency when trip energy is unavailable.
+        # No trip energy at all → falls back to default efficiency (5.0 km/kWh).
         runtime = self._make_runtime({'battery_wh': 55000.0})
         res = values(runtime)
         self.assertEqual(res.get('battery_kwh'), 55.0)
-        self.assertIsNone(res.get('range_km'))
+        self.assertEqual(res.get('range_km'), 275)  # 55.0 * 5.0
         self.assertTrue(res.get('range_estimated'))
-        self.assertEqual(res.get('range_efficiency_basis'), 'insufficient_trip_energy')
+        self.assertEqual(res.get('range_efficiency_basis'), 'default_efficiency')
+
+    def test_estimated_range_with_recent_efficiency(self):
+        # Month data insufficient, but recent_efficiency available from trip_energy cache.
+        runtime = self._make_runtime({'battery_wh': 50000.0},
+            summary={'recent_efficiency_kpl': 4.8, 'recent_efficiency_trip_count': 5,
+                     'recent_efficiency_distance_km': 120.0})
+        res = values(runtime)
+        self.assertEqual(res.get('range_km'), 240)  # 50.0 * 4.8
+        self.assertEqual(res.get('range_efficiency_basis'), 'recent_trips')
 
     def test_estimated_range_with_dynamic_efficiency(self):
         # 600 km / 120 kWh consumed = 5 km/kWh, regardless of charge amount.
@@ -103,12 +112,13 @@ class TestNewSensors(unittest.TestCase):
         result = values(self._make_runtime({'month_charge_kwh': 50}, {'month_distance_km': 480.5}))
         self.assertIsNone(result['month_efficiency_kpl'])
 
-    def test_stale_door_is_unknown_even_with_fresh_battery(self):
+    def test_stale_door_retains_last_value(self):
+        # Door fields are no longer in OPTIONAL_FIELDS; they retain last-known values.
         now = datetime.now(timezone.utc)
         result = values(self._make_runtime({'door_driver_open': False,
             'measured_at': now.isoformat(),
             'field_measured_at': {'door_driver_open': (now-timedelta(seconds=181)).isoformat()}}))
-        self.assertIsNone(result['door_driver_open'])
+        self.assertIs(result['door_driver_open'], False)
         result = values(self._make_runtime({'door_driver_open': False,
             'field_measured_at': {'door_driver_open': now.isoformat()}}))
         self.assertIs(result['door_driver_open'], False)

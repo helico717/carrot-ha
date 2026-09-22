@@ -16,6 +16,7 @@ class TestOptionalTelemetry(unittest.TestCase):
                                   'Licht_Anf_01': {'BCM1_Abblendlicht_Anf': [0]}})
         self.assertIs(result['door_driver_open'], False)
         self.assertIs(result['trunk_open'], True)
+        # Lights are still decoded by the collector but HA no longer creates entities for them.
         self.assertIs(result['light_low_beam_requested'], False)
         self.assertNotIn('door_passenger_open', result)
         self.assertNotIn('hood_open', result)

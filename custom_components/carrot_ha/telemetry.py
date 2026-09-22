@@ -7,13 +7,6 @@ BINARY_FIELDS = {
     'trunk_open': ('트렁크 열림', 'opening'),
     'doors_locked_external': ('외부 잠금 상태', None),
     'doors_locked_internal': ('내부 잠금 상태', None),
-    'light_low_beam_requested': ('하향등 요청', 'light'),
-    'light_high_beam_requested': ('상향등 요청', 'light'),
-    'light_position_requested': ('미등 요청', 'light'),
-    'light_drl_requested': ('주간주행등 요청', 'light'),
-    'light_front_fog_requested': ('전방 안개등 요청', 'light'),
-    'light_rear_fog_requested': ('후방 안개등 요청', 'light'),
-    'light_reverse_requested': ('후진등 요청', 'light'),
 }
 SENSOR_FIELDS = {
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
@@ -29,5 +22,7 @@ SENSOR_FIELDS = {
     'comma_network_type': ('콤마 네트워크 종류', None, 'mdi:network', None, None),
     'comma_network_strength': ('콤마 네트워크 신호 단계', None, 'mdi:signal', None, None),
 }
-OPTIONAL_FIELDS = set(BINARY_FIELDS) | set(SENSOR_FIELDS)
+# Door/lock/trunk fields retain last-known values when the vehicle sleeps.
+# Only hardware diagnostics and BMS fields expire after FRESHNESS_SECONDS.
+OPTIONAL_FIELDS = set(SENSOR_FIELDS)
 FRESHNESS_SECONDS = 180

@@ -85,6 +85,7 @@ class Archive:
         current = [r for r in rows if _to_kst(r[0])==month]
         summary = {'trip_count':len(rows),'recorded_distance_km':round(sum(r[1] or 0 for r in rows)/1000,2),'month_trip_count':len(current),'month_distance_km':round(sum(r[1] or 0 for r in current)/1000,2)}
         summary.update(self.driving_energy_summary(device, month, kst, summary['month_distance_km']))
+        summary.update(self._recent_efficiency(device))
         trips = self.history(device,'trip',1)
         if trips:
             trip = trips[0]['data']
@@ -96,6 +97,36 @@ class Archive:
             speeds = [v for v in speeds if isinstance(v,(int,float))]
             summary['last_trip_max_kph'] = round(max(speeds)*3.6,1) if speeds else None
         return summary
+
+    def _recent_efficiency(self, device, max_trips=20, min_distance_km=5):
+        """Compute efficiency from the most recent trips with measured energy.
+
+        Uses the trip_energy cache table which persists across months.
+        Returns efficiency only when at least min_distance_km of measured data exists.
+        """
+        with self.connect() as db:
+            # Join trip_energy with events to get ordering by observed time.
+            # trip_energy rows are keyed by (device, event_id) matching events.
+            rows = db.execute(
+                """SELECT te.distance_km, te.energy_kwh
+                   FROM trip_energy te
+                   JOIN events e ON te.device = e.device AND te.id = e.id
+                   WHERE te.device = ? AND te.energy_kwh > 0 AND te.distance_km >= 1
+                   ORDER BY e.observed DESC
+                   LIMIT ?""",
+                (device, max_trips)
+            ).fetchall()
+        if not rows:
+            return {}
+        total_km = sum(r[0] for r in rows)
+        total_kwh = sum(r[1] for r in rows)
+        if total_km < min_distance_km or total_kwh < 0.5:
+            return {}
+        return {
+            'recent_efficiency_kpl': round(total_km / total_kwh, 2),
+            'recent_efficiency_trip_count': len(rows),
+            'recent_efficiency_distance_km': round(total_km, 1),
+        }
 
     def driving_energy_summary(self, device, month, tz, total_distance):
         """Persist matched trip energy independently of the 14-day raw state retention.
