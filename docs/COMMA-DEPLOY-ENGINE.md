@@ -1,3 +1,7 @@
+> 추가 차량 신호/콤마 헬스 버전은 아래의 두 파일 교체 절차만으로 업데이트할 수 없습니다.
+> `collector.py`, `engine.py`, `wayon_vehicle_telemetry.py`, 신규 `telemetry_fields.py`를 함께 배포해야 합니다.
+> [현재 파일 목록과 검증 절차](TELEMETRY-SIGNAL-REVIEW.md#설치와-검증)를 먼저 확인하세요.
+
 # 콤마 수집기 업데이트: 키 ON 충전 검증
 
 이번 버전은 `collector.py`와 `engine.py`를 함께 교체합니다. engine.py만 교체하는 과거 절차는 사용하지 마세요.

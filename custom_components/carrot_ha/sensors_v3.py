@@ -1,8 +1,21 @@
 from datetime import datetime
 from homeassistant.components.sensor import SensorEntity
 from .entity import VehicleEntity
+from .telemetry import SENSOR_FIELDS
+
+GEAR_DISPLAY = {
+    'park': 'P',
+    'drive': 'D',
+    'reverse': 'R',
+    'neutral': 'N',
+    'sport': 'S',
+    'low': 'B',
+    'eco': 'Eco',
+    'manumatic': 'M',
+}
 
 FIELDS = {
+ 'gear':('현재 기어',None,'mdi:car-shift-pattern',None,None),
  'soc_percent':('배터리 잔량','%','mdi:battery','battery',1),
  'odometer_km':('총 주행거리','km','mdi:counter','distance',0),
  'outside_temp_c':('외기 온도','°C','mdi:thermometer','temperature',1),
@@ -23,8 +36,10 @@ FIELDS = {
  'seat_heat_right':('조수석 열선 단계',None,'mdi:car-seat-heater',None,0),
  'recirc':('내기순환 신호',None,'mdi:car-windshield',None,0),
  'speed_kph':('현재 속도','km/h','mdi:speedometer','speed',0),
+ 'wheel_speed_kph':('실차 휠 차속','km/h','mdi:speedometer','speed',0),
  'gps_accuracy_m':('GPS 정확도','m','mdi:crosshairs-gps','distance',1),
  'bearing_deg':('진행 방향','°','mdi:compass',None,0),
+ 'month_efficiency_kpl':('이번 달 주행 전비 추정','km/kWh','mdi:chart-line',None,2),
  'month_charge_kwh':('이번 달 충전량 추정','kWh','mdi:ev-station','energy',2),
  'month_slow_kwh':('이번 달 완속 분류 충전량','kWh','mdi:power-plug','energy',2),
  'month_fast_kwh':('이번 달 급속 분류 충전량','kWh','mdi:flash','energy',2),
@@ -45,6 +60,12 @@ FIELDS = {
  'cloud_status':('클라우드 연결 상태',None,'mdi:cloud-outline',None,None),
 }
 
+FIELDS.update(SENSOR_FIELDS)
+FIELDS.update({
+ 'month_drive_energy_kwh': ('이번 달 유효 주행 소비량', 'kWh', 'mdi:battery-minus', 'energy', 2),
+ 'month_energy_coverage_percent': ('이번 달 전비 집계 거리 비율', '%', 'mdi:chart-check', None, 1),
+})
+
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()])
 
@@ -56,10 +77,16 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if precision is not None:
             self._attr_suggested_display_precision=precision
         if unit is not None and device_class not in ('monetary','energy'): self._attr_state_class='measurement'
+        if key.startswith('comma_'):
+            self._attr_entity_category = 'diagnostic'
         if key in ('month_charge_kwh','month_slow_kwh','month_fast_kwh'):self._attr_state_class='total_increasing'
     @property
     def native_value(self):
         value=self.data.get(self.key)
+        if self.key=='gear':
+            if not value:
+                return None
+            return GEAR_DISPLAY.get(str(value).lower(), str(value).upper())
         if self.key=='charge_power_w':
             if isinstance(value,(int,float)):
                 return round(value/1000.0, 1)
@@ -76,5 +103,20 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def extra_state_attributes(self):
         attrs=super().extra_state_attributes
-        if self.key=='soc_percent': attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',78),soc_source='energy_based_calibration')
+        if self.key == 'month_efficiency_kpl':
+            attrs.update(calculation='matched_trip_distance / net_battery_depletion',
+                         coverage_percent=self.data.get('month_energy_coverage_percent'),
+                         distance_km=self.data.get('month_energy_distance_km'),
+                         energy_kwh=self.data.get('month_drive_energy_kwh'),
+                         calculation_version=2)
+        elif self.key == 'bms_target_soc_percent':
+            attrs.update(source='BMS_04.BMS_Soll_SOC_HiRes', vehicle_charge_limit_verified=False)
+        elif self.key=='gear':
+            attrs['raw_gear']=self.data.get('gear')
+        elif self.key=='range_km':
+            if self.data.get('range_estimated'):
+                attrs['estimated']=True
+                attrs['efficiency_basis']=self.data.get('range_efficiency_basis')
+        elif self.key=='soc_percent':
+            attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',78),soc_source='energy_based_calibration')
         return attrs

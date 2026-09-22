@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 """SQLite archive with durable acknowledgements and persistent deduplication."""
 import bisect
+import math
 import sqlite3
 import json
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ class Archive:
         self.path = str(path)
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
+            db.execute('CREATE TABLE IF NOT EXISTS trip_energy (device TEXT, id TEXT, fingerprint TEXT, distance_km REAL, energy_kwh REAL, PRIMARY KEY(device,id))')
             db.execute('CREATE INDEX IF NOT EXISTS history ON events(device,observed)')
             db.execute('CREATE INDEX IF NOT EXISTS idx_events_kind_observed ON events(kind,observed)')
 
@@ -82,6 +84,7 @@ class Archive:
             except Exception: return ''
         current = [r for r in rows if _to_kst(r[0])==month]
         summary = {'trip_count':len(rows),'recorded_distance_km':round(sum(r[1] or 0 for r in rows)/1000,2),'month_trip_count':len(current),'month_distance_km':round(sum(r[1] or 0 for r in current)/1000,2)}
+        summary.update(self.driving_energy_summary(device, month, kst, summary['month_distance_km']))
         trips = self.history(device,'trip',1)
         if trips:
             trip = trips[0]['data']
@@ -93,6 +96,80 @@ class Archive:
             speeds = [v for v in speeds if isinstance(v,(int,float))]
             summary['last_trip_max_kph'] = round(max(speeds)*3.6,1) if speeds else None
         return summary
+
+    def driving_energy_summary(self, device, month, tz, total_distance):
+        """Persist matched trip energy independently of the 14-day raw state retention.
+
+        Only measured Wh within a trip are used (not SOC calibration or charging).
+        Keep signed depletion: downhill recovery must offset other trips' consumption.
+        Missing/partial/short trips reduce coverage instead of inventing consumption.
+        """
+        def timestamp(value):
+            dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if dt.tzinfo is None:
+                raise ValueError('Timezone required')
+            return dt.timestamp()
+
+        distance = energy = 0.0
+        count = 0
+        with self.connect() as db:
+            rows = db.execute("SELECT id, observed, body FROM events WHERE device=? AND kind='trip'", (device,)).fetchall()
+            for event_id, observed, body in rows:
+                if datetime.fromisoformat(observed).astimezone(tz).strftime('%Y-%m') != month:
+                    continue
+                trip = json.loads(body)['data']
+                fingerprint = json.dumps([trip.get(k) for k in ('started_at', 'ended_at', 'distance_m', 'partial')])
+                cached = db.execute('SELECT fingerprint,distance_km,energy_kwh FROM trip_energy WHERE device=? AND id=?', (device, event_id)).fetchone()
+                if cached and cached[0] != fingerprint:
+                    db.execute('DELETE FROM trip_energy WHERE device=? AND id=?', (device, event_id))
+                    cached = None
+                if cached:
+                    distance += cached[1]
+                    energy += cached[2]
+                    count += 1
+                    continue
+                try:
+                    start, end = timestamp(trip['started_at']), timestamp(trip['ended_at'])
+                    km = float(trip['distance_m']) / 1000
+                except (KeyError, ValueError, TypeError, OverflowError):
+                    continue
+                if trip.get('partial') or end-start < 300 or not math.isfinite(km) or km < 1:
+                    continue
+                # Indexed receive-time range; actual field timestamp determines eligibility.
+                lo = datetime.fromtimestamp(start, timezone.utc).isoformat()
+                hi = datetime.fromtimestamp(end+180, timezone.utc).isoformat()
+                states = db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? AND observed<=? ORDER BY observed", (device, lo, hi)).fetchall()
+                samples = {}
+                contaminated = False
+                for (state_body,) in states:
+                    state_event = json.loads(state_body)
+                    state = state_event['data']
+                    try:
+                        t = timestamp((state.get('field_measured_at') or {}).get('battery_wh') or state.get('measured_at') or state_event['observed_at'])
+                        wh = state.get('battery_wh')
+                        if type(wh) not in (int, float) or not math.isfinite(wh) or not 0 <= wh <= 150000:
+                            continue
+                        if start <= t <= end:
+                            if state.get('charging') is True or state.get('stale') is True:
+                                contaminated = True
+                            samples[t] = wh
+                    except (ValueError, TypeError, AttributeError, OverflowError):
+                        continue
+                if contaminated or len(samples) < 2:
+                    continue
+                first, last = min(samples), max(samples)
+                gaps = (first-start) + (end-last)
+                if first-start > 90 or end-last > 90 or gaps > (end-start)*0.1:
+                    continue
+                used = (samples[first]-samples[last])/1000
+                db.execute('INSERT OR REPLACE INTO trip_energy VALUES (?,?,?,?,?)', (device, event_id, fingerprint, km, used))
+                distance += km
+                energy += used
+                count += 1
+        return {'month_energy_distance_km': round(distance, 3),
+                'month_drive_energy_kwh': round(energy, 3) if count else None,
+                'month_energy_trip_count': count,
+                'month_energy_coverage_percent': round(min(100, distance/total_distance*100), 1) if total_distance > 0 else None}
 
     def cursor(self, name, value=None):
         with self.connect() as db:
@@ -108,6 +185,11 @@ class Archive:
         - charge: 90 days (covers history view)
         - slim trips older than slim_trip_days: clears route points to save 95% space while keeping summary stats.
         """
+        # Materialize current-month energy before the source samples are deleted.
+        with self.connect() as db:
+            devices = [r[0] for r in db.execute('SELECT DISTINCT device FROM events')]
+        for device in devices:
+            self.overview(device)
         counts = {'purged_state': 0, 'purged_trip': 0, 'purged_charge': 0, 'slimmed_trip': 0}
         with self.connect() as db:
             cur = db.execute(
@@ -127,6 +209,7 @@ class Archive:
                 (trip_days,)
             )
             counts['purged_trip'] = cur.rowcount
+            db.execute("DELETE FROM trip_energy WHERE NOT EXISTS (SELECT 1 FROM events WHERE events.device=trip_energy.device AND events.id=trip_energy.id AND events.kind='trip')")
 
             if slim_trip_days is not None and slim_trip_days < trip_days:
                 cur = db.execute(
@@ -203,7 +286,7 @@ class Archive:
                     json_extract(body, '$.data.soc_percent') AS soc
                 FROM events
                 WHERE device=? AND kind='state'
-                    AND observed >= ? AND observed <= ?
+                    AND julianday(observed) >= julianday(?) AND julianday(observed) <= julianday(?)
                     AND (json_extract(body, '$.data.battery_wh') IS NOT NULL
                          OR json_extract(body, '$.data.soc_percent') IS NOT NULL)
                 ORDER BY observed""",
@@ -232,6 +315,7 @@ class Archive:
         if not samples:
             return trips
 
+        samples.sort(key=lambda sample: sample[0])
         sample_times = [s[0] for s in samples]
 
         def _nearest_sample(target_ts, max_gap_s=300):

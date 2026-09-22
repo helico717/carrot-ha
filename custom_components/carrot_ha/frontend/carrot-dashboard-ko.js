@@ -706,11 +706,12 @@ class CarrotDashboard extends HTMLElement {
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
     const status=displayState.label;
     const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
+    const isEmergency=Boolean(v.emergency_charging);
     const isFast=typeof powerKw==='number'&&powerKw>=11;
-    const chargeLabel=isFast?'고속충전중...':'완속충전중...';
+    const chargeLabel=isEmergency?'비상충전중 (1kW)...':(isFast?'고속충전중...':'완속충전중...');
     const sweepSpeedClass=isFast?'fast':'slow';
     const quickMetrics=charging
-      ?`${metric('충전 전력 · 추정',n(powerKw,1),'kW','ev-station',isFast?'급속 충전':'완속 충전','charge-power')}`+
+      ?`${metric('충전 전력 · 추정',n(powerKw,1),'kW','ev-station',isEmergency?'비상 충전':(isFast?'급속 충전':'완속 충전'),'charge-power')}`+
        `${metric('예상 완료시간',v.eta_100?timeOnly(v.eta_100):'계산 중','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' 남음':'100% 목표','charge-eta')}`+
        `${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
        `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`

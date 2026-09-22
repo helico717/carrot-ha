@@ -706,11 +706,12 @@ class CarrotDashboard extends HTMLElement {
     const soc=Number.isFinite(v.soc_percent)?Math.max(0,Math.min(100,v.soc_percent)):null;
     const status=displayState.label;
     const powerKw=v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000);
+    const isEmergency=Boolean(v.emergency_charging);
     const isFast=typeof powerKw==='number'&&powerKw>=11;
-    const chargeLabel=isFast?'Fast Charging...':'Slow Charging...';
+    const chargeLabel=isEmergency?'Emergency Charging (1kW)...':(isFast?'Fast Charging...':'Slow Charging...');
     const sweepSpeedClass=isFast?'fast':'slow';
     const quickMetrics=charging
-      ?`${metric('Estimated charging power',n(powerKw,1),'kW','ev-station',isFast?'Rapid charging':'Standard charging','charge-power')}`+
+      ?`${metric('Estimated charging power',n(powerKw,1),'kW','ev-station',isEmergency?'Emergency':(isFast?'Rapid charging':'Standard charging'),'charge-power')}`+
        `${metric('Est. completion',v.eta_100?timeOnly(v.eta_100):'Calculating','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' left':'100% target','charge-eta')}`+
        `${metric('Odometer',n(v.odometer_km,0),'km','counter')}`+
        `${metric('Charged this month',n(v.month_charge_kwh),'kWh','battery-plus')}`

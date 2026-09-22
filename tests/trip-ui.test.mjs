@@ -18,6 +18,8 @@ globalThis.document = {
 };
 globalThis.customElements = { define: () => {}, get: () => false };
 
+import { tripDays } from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
+
 const { default: KoreanDashboard } = await import('../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js');
 const { default: EnglishDashboard } = await import('../custom_components/carrot_ha/frontend/carrot-dashboard-en.js');
 
@@ -185,51 +187,51 @@ for (const [name, DashClass, durExpected] of [
   }
 
   // Test Case 5: Bidirectional date sync between batteryHistory and chargeHistory
+  const todayDays = tripDays([], undefined).map(d => d.key);
+  const d0 = todayDays[0];
+  const d3 = todayDays[3];
+  const d4 = todayDays[4];
   const instCharge = new DashClass();
   instCharge.tab = 'charge';
   instCharge.v = {
-    battery_history: [
-      { date: '2026-09-15', used: 20, hours: [] },
-      { date: '2026-09-16', used: 0, hours: [] },
-      { date: '2026-09-17', used: 0, hours: [] },
-      { date: '2026-09-18', used: 60, hours: [] },
-      { date: '2026-09-19', used: 137, hours: [] },
-      { date: '2026-09-20', used: 30, hours: [] },
-      { date: '2026-09-21', used: 25, hours: [] }
-    ]
+    battery_history: todayDays.map((date, idx) => ({
+      date,
+      used: idx === 4 ? 137 : idx === 3 ? 60 : idx === 0 ? 20 : 0,
+      hours: []
+    }))
   };
   instCharge.charges = [
     {
-      observed_at: '2026-09-19T08:00:00Z',
-      data: { started_at: '2026-09-19T07:00:00Z', energy_kwh: 25.0, duration_s: 3600 }
+      observed_at: `${d4}T08:00:00Z`,
+      data: { started_at: `${d4}T07:00:00Z`, energy_kwh: 25.0, duration_s: 3600 }
     }
   ];
 
   // (A) Setting chargeDay selects the corresponding bar in batteryHistory
-  instCharge.chargeDay = '2026-09-19';
+  instCharge.chargeDay = d4;
   const batHtml1 = instCharge.batteryHistory();
   const chgHtml1 = instCharge.chargeHistory();
-  assert(batHtml1.includes('data-date="2026-09-19" aria-label="2026-09-19'), `${name}: batteryHistory should render data-date for 2026-09-19`);
-  assert(batHtml1.includes('data-day="4" data-date="2026-09-19" aria-label="2026-09-19 사용량 137" aria-pressed="true"') ||
-         batHtml1.includes('data-day="4" data-date="2026-09-19" aria-label="2026-09-19 Usage 137" aria-pressed="true"'),
-         `${name}: batteryHistory bar for 2026-09-19 should have aria-pressed="true"`);
-  assert(chgHtml1.includes('data-charge-day="2026-09-19" aria-pressed="true"'), `${name}: chargeHistory button for 2026-09-19 should have aria-pressed="true"`);
+  assert(batHtml1.includes(`data-date="${d4}" aria-label="${d4}`), `${name}: batteryHistory should render data-date for ${d4}`);
+  assert(batHtml1.includes(`data-day="4" data-date="${d4}" aria-label="${d4} 사용량 137" aria-pressed="true"`) ||
+         batHtml1.includes(`data-day="4" data-date="${d4}" aria-label="${d4} Usage 137" aria-pressed="true"`),
+         `${name}: batteryHistory bar for ${d4} should have aria-pressed="true"`);
+  assert(chgHtml1.includes(`data-charge-day="${d4}" aria-pressed="true"`), `${name}: chargeHistory button for ${d4} should have aria-pressed="true"`);
 
   // (B) Simulating click on chargeHistory day -> synchronizes batteryDay
-  instCharge.chargeDay = '2026-09-18';
+  instCharge.chargeDay = d3;
   const bIdx = instCharge.v.battery_history.findIndex(x => x.date === instCharge.chargeDay);
   if (bIdx !== -1) instCharge.batteryDay = bIdx;
   const batHtml2 = instCharge.batteryHistory();
-  assert(batHtml2.includes('data-day="3" data-date="2026-09-18" aria-label="2026-09-18 사용량 60" aria-pressed="true"') ||
-         batHtml2.includes('data-day="3" data-date="2026-09-18" aria-label="2026-09-18 Usage 60" aria-pressed="true"'),
-         `${name}: batteryHistory bar for 2026-09-18 should be aria-pressed="true" after chargeDay change`);
+  assert(batHtml2.includes(`data-day="3" data-date="${d3}" aria-label="${d3} 사용량 60" aria-pressed="true"`) ||
+         batHtml2.includes(`data-day="3" data-date="${d3}" aria-label="${d3} Usage 60" aria-pressed="true"`),
+         `${name}: batteryHistory bar for ${d3} should be aria-pressed="true" after chargeDay change`);
 
   // (C) Simulating click on batteryHistory bar -> synchronizes chargeDay
-  const clickedDate = instCharge.v.battery_history[0].date; // 2026-09-15
+  const clickedDate = instCharge.v.battery_history[0].date; // d0
   instCharge.batteryDay = 0;
   instCharge.chargeDay = clickedDate;
   const chgHtml3 = instCharge.chargeHistory();
-  assert(chgHtml3.includes('data-charge-day="2026-09-15" aria-pressed="true"'), `${name}: chargeHistory should have 2026-09-15 aria-pressed="true" after battery bar click`);
+  assert(chgHtml3.includes(`data-charge-day="${d0}" aria-pressed="true"`), `${name}: chargeHistory should have ${d0} aria-pressed="true" after battery bar click`);
 
   // Assert CSS rules directly from source
   const jsSource = name === 'Korean'

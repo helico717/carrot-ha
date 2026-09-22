@@ -1,5 +1,6 @@
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from .entity import VehicleEntity
+from .telemetry import BINARY_FIELDS
 from .connectivity import connection_status
 from datetime import timedelta
 from homeassistant.core import callback
@@ -8,6 +9,7 @@ from homeassistant.helpers.event import async_track_time_interval
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([Flag(entry,*spec) for spec in [('onroad','주행 모드','mdi:car'),('charging','충전 중 추정','mdi:ev-station'),('ac_on','에어컨 작동','mdi:snowflake'),('stale','차량 데이터 오래됨','mdi:clock-alert'),('enabled','주행 보조 활성','mdi:steering')]])
     async_add_entities([CommaConnection(entry), EmergencyCharging(entry)])
+    async_add_entities([TelemetryFlag(entry, key, *spec) for key, spec in BINARY_FIELDS.items()])
 
 class EmergencyCharging(VehicleEntity, BinarySensorEntity):
     _attr_device_class = 'problem'
@@ -69,3 +71,20 @@ class Flag(VehicleEntity,BinarySensorEntity):
     def is_on(self):
         value=self.data.get(self.key)
         return None if value is None else bool(value)
+
+
+class TelemetryFlag(Flag):
+    def __init__(self, entry, key, name, device_class):
+        super().__init__(entry, key, name, 'mdi:car-info')
+        self._attr_device_class = device_class
+
+    @property
+    def is_on(self):
+        value = self.data.get(self.key)
+        return value if type(value) is bool else None
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        attrs['source'] = 'Licht_Anf_01 (request)' if self.key.startswith('light_') else 'ZV_02'
+        return attrs

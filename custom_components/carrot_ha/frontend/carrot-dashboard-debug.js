@@ -18,9 +18,22 @@ const ID4_CHARGING_CURVE_KW = [
    59.7,  57.0,  52.7,  49.7,  46.8,  43.7,  40.6,  37.6,  34.8,  31.7  // 91-100%
 ];
 
-function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_CAPACITY, baseTimeMs = Date.now(), calcModel = 'curve') {
+// 3-Stage Hybrid Smoothing Configuration (Option D)
+const SMOOTH_CONFIG = {
+  alpha: 0.25,        // EMA power smoothing factor
+  slewMaxSec: 180,    // Maximum allowed ETA jump per update (3 minutes)
+  deadbandSec: 120,   // Deadband window: if ETA change is within +/- 2 min, maintain natural countdown
+  jumpResetKw: 25.0   // Reset EMA if power changes abruptly (e.g. unplugged or switched AC <-> DC)
+};
+
+function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_CAPACITY, baseTimeMs = Date.now(), calcModel = 'curve', smoothState = null) {
   if (typeof powerKw !== 'number' || powerKw < 0.3 || typeof currentSoc !== 'number') {
-    return { sec80: null, eta80: null, sec100: null, eta100: null, simpleSec80: null, simpleSec100: null, effectiveKw: null };
+    return {
+      sec80: null, eta80: null, sec100: null, eta100: null,
+      simpleSec80: null, simpleSec100: null, effectiveKw: null,
+      rawSec80: null, rawEta80: null, rawSec100: null, rawEta100: null,
+      powerSmooth: null, smoothState: null
+    };
   }
 
   const soc = Math.max(0, Math.min(100, currentSoc));
@@ -28,7 +41,7 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
   const currentCurveKw = ID4_CHARGING_CURVE_KW[Math.min(100, Math.max(1, Math.round(soc)))];
   const effectiveKw = soc >= 100 ? 0 : Math.min(powerKw, currentCurveKw);
 
-  // Simple linear benchmark calculation based on current intake power
+  // 1. Simple linear benchmark calculation based on current intake power
   const target80Kwh = capacityKwh * 0.8;
   const need80Kwh = Math.max(0, target80Kwh - currentKwh);
   const simplePower = Math.max(0.3, effectiveKw > 0 ? effectiveKw : powerKw);
@@ -39,19 +52,27 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
   const simpleSec100 = Math.round((need100Kwh / simplePower) * 3600);
 
   if (calcModel === 'simple') {
+    const sEta80 = new Date(baseTimeMs + simpleSec80 * 1000).toISOString();
+    const sEta100 = new Date(baseTimeMs + simpleSec100 * 1000).toISOString();
     return {
       sec80: simpleSec80,
-      eta80: new Date(baseTimeMs + simpleSec80 * 1000).toISOString(),
+      eta80: sEta80,
       sec100: simpleSec100,
-      eta100: new Date(baseTimeMs + simpleSec100 * 1000).toISOString(),
+      eta100: sEta100,
       simpleSec80,
       simpleSec100,
-      effectiveKw
+      effectiveKw,
+      rawSec80: simpleSec80,
+      rawEta80: sEta80,
+      rawSec100: simpleSec100,
+      rawEta100: sEta100,
+      powerSmooth: powerKw,
+      smoothState: null
     };
   }
 
-  // Option 1: Bottleneck Model (충전기 상한 및 커브 동시 적용)
-  const calcTimeToSoc = (targetSoc) => {
+  // Helper for numerical integration with ID.4 charging curve
+  const calcTimeToSoc = (targetSoc, inputPower) => {
     if (soc >= targetSoc) return 0;
     let totalSec = 0;
     const startInt = Math.floor(soc);
@@ -59,7 +80,7 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
 
     for (let s = startInt; s < targetInt; s++) {
       const curveVal = ID4_CHARGING_CURVE_KW[Math.min(100, s + 1)];
-      const stepKw = Math.max(0.3, Math.min(powerKw, curveVal));
+      const stepKw = Math.max(0.3, Math.min(inputPower, curveVal));
       let stepFraction = 1.0;
       if (s === startInt) {
         stepFraction = (startInt + 1) - soc;
@@ -70,7 +91,7 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
 
     if (targetSoc > targetInt) {
       const curveVal = ID4_CHARGING_CURVE_KW[Math.min(100, targetInt + 1)];
-      const stepKw = Math.max(0.3, Math.min(powerKw, curveVal));
+      const stepKw = Math.max(0.3, Math.min(inputPower, curveVal));
       const stepKwh = capacityKwh * 0.01 * (targetSoc - targetInt);
       totalSec += (stepKwh / stepKw) * 3600;
     }
@@ -78,12 +99,112 @@ function estimateChargingTimesWithCurve(currentSoc, powerKw, capacityKwh = BMS_C
     return Math.round(totalSec);
   };
 
-  const sec80 = calcTimeToSoc(80);
-  const sec100 = calcTimeToSoc(100);
-  const eta80 = new Date(baseTimeMs + sec80 * 1000).toISOString();
-  const eta100 = new Date(baseTimeMs + sec100 * 1000).toISOString();
+  // Option 1: Bottleneck Model (Raw instantaneous calculation)
+  const rawSec80 = calcTimeToSoc(80, powerKw);
+  const rawSec100 = calcTimeToSoc(100, powerKw);
+  const rawEta80 = new Date(baseTimeMs + rawSec80 * 1000).toISOString();
+  const rawEta100 = new Date(baseTimeMs + rawSec100 * 1000).toISOString();
 
-  return { sec80, eta80, sec100, eta100, simpleSec80, simpleSec100, effectiveKw };
+  if (calcModel === 'curve') {
+    return {
+      sec80: rawSec80,
+      eta80: rawEta80,
+      sec100: rawSec100,
+      eta100: rawEta100,
+      simpleSec80,
+      simpleSec100,
+      effectiveKw,
+      rawSec80,
+      rawEta80,
+      rawSec100,
+      rawEta100,
+      powerSmooth: powerKw,
+      smoothState: null
+    };
+  }
+
+  // Option D: 3-Stage Hybrid Smoothing (calcModel === 'smooth')
+  // Stage 1: Power EMA Filter
+  let powerSmooth = powerKw;
+  if (smoothState && typeof smoothState.powerSmooth === 'number' && smoothState.powerSmooth > 0) {
+    const powerJump = Math.abs(powerKw - smoothState.powerSmooth);
+    if (powerJump > SMOOTH_CONFIG.jumpResetKw) {
+      powerSmooth = powerKw; // Step reset on abrupt change
+      smoothState = null;
+    } else {
+      powerSmooth = SMOOTH_CONFIG.alpha * powerKw + (1 - SMOOTH_CONFIG.alpha) * smoothState.powerSmooth;
+    }
+  }
+
+  // Stage 2: Curve integration using EMA smoothed power
+  const smoothedRawSec80 = calcTimeToSoc(80, powerSmooth);
+  const smoothedRawSec100 = calcTimeToSoc(100, powerSmooth);
+
+  // Stage 3: Slew-rate limiter & countdown deadband
+  const applySlewRateAndDeadband = (targetSec, prevEtaMs, prevSec, lastCalcAt) => {
+    const newEtaMs = baseTimeMs + targetSec * 1000;
+    if (!prevEtaMs || !lastCalcAt || prevSec == null) {
+      return { smoothSec: targetSec, smoothEtaMs: newEtaMs };
+    }
+
+    const elapsedSec = Math.max(0, Math.round((baseTimeMs - lastCalcAt) / 1000));
+    const naturalSec = Math.max(0, prevSec - elapsedSec);
+    const deltaEtaSec = (newEtaMs - prevEtaMs) / 1000;
+
+    // Deadband check: if within +/- 120s, preserve existing ETA and natural countdown
+    if (Math.abs(deltaEtaSec) <= SMOOTH_CONFIG.deadbandSec) {
+      return {
+        smoothSec: naturalSec,
+        smoothEtaMs: prevEtaMs
+      };
+    }
+
+    // Slew-rate clamp: limit drift to +/- slewMaxSec per calculation step
+    const allowedShiftSec = Math.sign(deltaEtaSec) * Math.min(Math.abs(deltaEtaSec), SMOOTH_CONFIG.slewMaxSec);
+    const smoothEtaMs = prevEtaMs + allowedShiftSec * 1000;
+    const smoothSec = Math.max(0, Math.round((smoothEtaMs - baseTimeMs) / 1000));
+
+    return { smoothSec, smoothEtaMs };
+  };
+
+  const smooth80 = applySlewRateAndDeadband(
+    smoothedRawSec80,
+    smoothState?.eta80Ms,
+    smoothState?.sec80,
+    smoothState?.lastCalcAt
+  );
+
+  const smooth100 = applySlewRateAndDeadband(
+    smoothedRawSec100,
+    smoothState?.eta100Ms,
+    smoothState?.sec100,
+    smoothState?.lastCalcAt
+  );
+
+  const updatedSmoothState = {
+    powerSmooth,
+    lastCalcAt: baseTimeMs,
+    eta80Ms: smooth80.smoothEtaMs,
+    eta100Ms: smooth100.smoothEtaMs,
+    sec80: smooth80.smoothSec,
+    sec100: smooth100.smoothSec
+  };
+
+  return {
+    sec80: smooth80.smoothSec,
+    eta80: new Date(smooth80.smoothEtaMs).toISOString(),
+    sec100: smooth100.smoothSec,
+    eta100: new Date(smooth100.smoothEtaMs).toISOString(),
+    simpleSec80,
+    simpleSec100,
+    effectiveKw,
+    rawSec80,
+    rawEta80,
+    rawSec100,
+    rawEta100,
+    powerSmooth,
+    smoothState: updatedSmoothState
+  };
 }
 
 function generateMockBatteryHistory(currentSoc = 74, isCharging = false, isDriving = false, nowMs = Date.now()) {
@@ -244,10 +365,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
       mode: 'charging', // 'charging' | 'parked' | 'driving'
       soc: 74,
       powerKw: 11,
-      calcModel: 'curve', // 'curve' (ID.4 curve Option 1) | 'simple' (legacy linear)
+      calcModel: 'smooth', // 'smooth' (3-Stage Hybrid Smoothing) | 'curve' (Option 1: Bottleneck) | 'simple' (Linear)
+      noiseEnabled: false, // BMS quantization jitter simulation
       lang: 'ko',
       theme: 'auto'
     };
+    this.smoothState = null;
+    this._noiseTimer = null;
     this._userThemeSelected = false;
   }
 
@@ -267,7 +391,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
     this.freshnessTimer=setInterval(()=>this.applyDebugTelemetry(),30000);
   }
 
-  disconnectedCallback(){clearInterval(this.freshnessTimer);}
+  disconnectedCallback(){
+    clearInterval(this.freshnessTimer);
+    if (this._noiseTimer) {
+      clearInterval(this._noiseTimer);
+      this._noiseTimer = null;
+    }
+  }
 
   setConfig(config) {
     this.config = config || {};
@@ -298,6 +428,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
   }
 
   formatDuration(seconds) {
+    if (seconds == null) return '—';
     if (seconds <= 0) return '완료';
     const totalMins = Math.round(seconds / 60);
     const h = Math.floor(totalMins / 60);
@@ -327,14 +458,36 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const measuredAt=this.state.mode==='unknown'?null:new Date(impaired?this.scenarioAt-(this.state.mode==='stale'?2400000:this.state.mode==='offline'?600000:30000):now).toISOString();
     const receivedAt=new Date(this.state.mode==='offline'?this.scenarioAt-600000:this.state.mode==='cloud_error'?this.scenarioAt-30000:now-30000).toISOString();
 
-    // 80% & 100% calculations (ID.4 Charging Curve - Option 1: Bottleneck Model)
-    const { sec80, eta80, sec100, eta100, simpleSec80, simpleSec100, effectiveKw } = estimateChargingTimesWithCurve(
+    // Noise Simulation: If enabled during charging, simulate BMS quantization noise
+    let simulatedInputKw = this.state.powerKw;
+    let isNoisy = false;
+    if (this.state.noiseEnabled && isCharging && !impaired) {
+      isNoisy = true;
+      const isAc = this.state.powerKw <= 11;
+      const maxJitter = isAc ? 1.6 : Math.max(8.0, this.state.powerKw * 0.15);
+      const jitter = (Math.random() * 2 - 1) * maxJitter;
+      simulatedInputKw = Math.max(0.8, Number((this.state.powerKw + jitter).toFixed(1)));
+    }
+
+    if (!isCharging) {
+      this.smoothState = null;
+    }
+
+    // 80% & 100% calculations (ID.4 Charging Curve + 3-Stage Hybrid Smoothing Option D)
+    const {
+      sec80, eta80, sec100, eta100,
+      simpleSec80, simpleSec100, effectiveKw,
+      rawSec80, rawEta80, rawSec100, rawEta100,
+      powerSmooth, smoothState
+    } = estimateChargingTimesWithCurve(
       this.state.soc,
-      this.state.powerKw,
+      simulatedInputKw,
       BMS_CAPACITY,
       now,
-      this.state.calcModel || 'curve'
+      this.state.calcModel || 'smooth',
+      this.smoothState
     );
+    this.smoothState = smoothState;
 
     if (isDriving) {
       this.simulatedParkingAt = null;
@@ -383,19 +536,28 @@ export default class CarrotDebugDashboard extends HTMLElement {
     v.cloud_raw_state = {device_id:'simulated-debug',onroad:v.onroad?1:0,updated_at:receivedAt};
 
     if (isCharging) {
-      const liveKw = effectiveKw != null ? Number(effectiveKw.toFixed(1)) : this.state.powerKw;
-      v.charge_power_kw = liveKw;
-      v.charge_power_w = Math.round(liveKw * 1000);
+      const displayKw = (this.state.calcModel === 'smooth' && powerSmooth != null)
+        ? Number(Math.min(powerSmooth, ID4_CHARGING_CURVE_KW[Math.min(100, Math.max(1, Math.round(this.state.soc)))]).toFixed(1))
+        : (effectiveKw != null ? Number(effectiveKw.toFixed(1)) : simulatedInputKw);
+
+      v.charge_power_kw = displayKw;
+      v.charge_power_w = Math.round(displayKw * 1000);
       v.charger_max_kw = this.state.powerKw;
       v.time_to_80_s = this.state.soc < 80 ? sec80 : 0;
       v.eta_80 = eta80;
       v.time_to_100_s = sec100;
       v.eta_100 = eta100;
-      v.calc_model = this.state.calcModel || 'curve';
+      v.calc_model = this.state.calcModel || 'smooth';
       v.simple_sec80 = simpleSec80;
       v.simple_sec100 = simpleSec100;
-      v.effective_kw = liveKw;
-      v.emergency_charging = !impaired && (liveKw <= 1.5);
+      v.raw_sec80 = rawSec80;
+      v.raw_sec100 = rawSec100;
+      v.raw_eta80 = rawEta80;
+      v.raw_eta100 = rawEta100;
+      v.power_smooth = powerSmooth;
+      v.simulated_input_kw = simulatedInputKw;
+      v.effective_kw = displayKw;
+      v.emergency_charging = !impaired && (displayKw <= 1.5);
     } else {
       v.charge_power_kw = 0;
       v.charge_power_w = 0;
@@ -440,18 +602,21 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const chargerKw = this.state.powerKw;
     const effectiveKw = Math.min(chargerKw, curveVal);
     const isThrottled = chargerKw > curveVal;
-    const isEmergency = v.charging === true && !v.stale && (effectiveKw <= 1.5);
+    const isEmergency = v.charging === true && !v.stale && (v.effective_kw <= 1.5);
+    const isNoisy = this.state.noiseEnabled && v.charging === true && !v.stale;
 
     if (elIntake) {
       if (v.charging === true) {
         if (this.state.soc >= 100) {
           elIntake.innerHTML = '<span style="color:#94a3b8;">완충됨 (0.0 kW)</span>';
         } else if (isEmergency) {
-          elIntake.innerHTML = `<span style="color:#ef4444;font-weight:700;">${effectiveKw.toFixed(1)} kW (비상충전 모드)</span>`;
+          elIntake.innerHTML = `<span style="color:#ef4444;font-weight:700;">${(v.charge_power_kw || effectiveKw).toFixed(1)} kW (비상충전 모드)</span>`;
+        } else if (this.state.calcModel === 'smooth' && v.power_smooth != null) {
+          elIntake.innerHTML = `<span style="color:#34d399;font-weight:700;">${v.charge_power_kw.toFixed(1)} kW</span> <small style="color:#94a3b8;font-size:10.5px;">(EMA 안정화: ${v.power_smooth.toFixed(1)} kW${isNoisy ? `, 순간 입력: ${v.simulated_input_kw?.toFixed(1)}kW` : ''})</small>`;
         } else if (isThrottled) {
           elIntake.innerHTML = `<span style="color:#f59e0b;font-weight:700;">${effectiveKw.toFixed(1)} kW</span> <small style="color:#94a3b8;font-size:10.5px;">(차량 커브 ${curveVal.toFixed(1)} kW 제한)</small>`;
         } else {
-          elIntake.innerHTML = `<span style="color:#34d399;font-weight:700;">${effectiveKw.toFixed(1)} kW</span> <small style="color:#94a3b8;font-size:10.5px;">(충전기 용량 100% 수전)</small>`;
+          elIntake.innerHTML = `<span style="color:#34d399;font-weight:700;">${(v.charge_power_kw || effectiveKw).toFixed(1)} kW</span> <small style="color:#94a3b8;font-size:10.5px;">(충전기 용량 100% 수전)</small>`;
         }
       } else {
         elIntake.innerHTML = '<span style="color:#94a3b8;">0.0 kW (충전 아님)</span>';
@@ -482,7 +647,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
 
     if (elCharger) {
-      elCharger.innerHTML = v.charging === true ? `<b>${chargerKw.toFixed(1)} kW</b>` : '—';
+      if (v.charging === true) {
+        const noiseNote = isNoisy ? ` <small style="display:block;font-size:10.5px;color:#f59e0b;font-weight:normal;">(🌊 순간 노이즈 입력: ${v.simulated_input_kw?.toFixed(1)} kW)</small>` : '';
+        elCharger.innerHTML = `<b>${chargerKw.toFixed(1)} kW</b>${noiseNote}`;
+      } else {
+        elCharger.innerHTML = '—';
+      }
     }
 
     if (elEffective) {
@@ -490,11 +660,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (this.state.soc >= 100) {
           elEffective.innerHTML = '<b style="color:#94a3b8;">0.0 kW (완충)</b>';
         } else if (isEmergency) {
-          elEffective.innerHTML = `<b style="color:#ef4444;">${effectiveKw.toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#f87171;font-weight:normal;">(비상충전 감지)</small>`;
+          elEffective.innerHTML = `<b style="color:#ef4444;">${(v.charge_power_kw || effectiveKw).toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#f87171;font-weight:normal;">(비상충전 감지)</small>`;
+        } else if (this.state.calcModel === 'smooth' && v.power_smooth != null) {
+          elEffective.innerHTML = `<b style="color:#34d399;">${v.charge_power_kw.toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#34d399;font-weight:normal;">(EMA 평활화 적용${isThrottled ? ' · 커브제한' : ''})</small>`;
         } else if (isThrottled) {
           elEffective.innerHTML = `<b style="color:#f59e0b;">${effectiveKw.toFixed(1)} kW</b> <small style="display:block;font-size:10.5px;color:#94a3b8;font-weight:normal;">(커브 ${curveVal.toFixed(1)}kW 병목)</small>`;
         } else {
-          elEffective.innerHTML = `<b style="color:#34d399;">${effectiveKw.toFixed(1)} kW</b>`;
+          elEffective.innerHTML = `<b style="color:#34d399;">${(v.charge_power_kw || effectiveKw).toFixed(1)} kW</b>`;
         }
       } else {
         elEffective.innerHTML = '—';
@@ -506,9 +678,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (v.soc_percent >= 80) {
           el80.innerHTML = '<span class="text-amber-400">도달 완료 (80% 바 자동 숨김)</span>';
         } else {
-          const comp = v.simple_sec80 != null && this.state.calcModel !== 'simple' && v.simple_sec80 !== sec80
-            ? `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec80)} (${sec80 > v.simple_sec80 ? '+' : ''}${Math.round((sec80 - v.simple_sec80)/60)}분)</small>`
-            : '';
+          let comp = '';
+          if (this.state.calcModel === 'smooth' && v.raw_sec80 != null && v.raw_sec80 !== sec80) {
+            comp = `<small style="display:block;font-size:11px;font-weight:normal;color:#f59e0b;margin-top:2px">원시 순간치: ${this.formatDuration(v.raw_sec80)} (${sec80 > v.raw_sec80 ? '+' : ''}${Math.round((sec80 - v.raw_sec80)/60)}분 차이)</small>`;
+          } else if (v.simple_sec80 != null && this.state.calcModel !== 'simple' && v.simple_sec80 !== sec80) {
+            comp = `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec80)} (${sec80 > v.simple_sec80 ? '+' : ''}${Math.round((sec80 - v.simple_sec80)/60)}분)</small>`;
+          }
           el80.innerHTML = `<b>${this.formatDuration(sec80)}</b>${comp}`;
         }
       } else {
@@ -517,16 +692,27 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
     if (el100) {
       if (v.charging === true) {
-        const comp = v.simple_sec100 != null && this.state.calcModel !== 'simple' && v.simple_sec100 !== sec100
-          ? `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec100)} (${sec100 > v.simple_sec100 ? '+' : ''}${Math.round((sec100 - v.simple_sec100)/60)}분)</small>`
-          : '';
+        let comp = '';
+        if (this.state.calcModel === 'smooth' && v.raw_sec100 != null && v.raw_sec100 !== sec100) {
+          comp = `<small style="display:block;font-size:11px;font-weight:normal;color:#f59e0b;margin-top:2px">원시 순간치: ${this.formatDuration(v.raw_sec100)} (${sec100 > v.raw_sec100 ? '+' : ''}${Math.round((sec100 - v.raw_sec100)/60)}분 차이)</small>`;
+        } else if (v.simple_sec100 != null && this.state.calcModel !== 'simple' && v.simple_sec100 !== sec100) {
+          comp = `<small style="display:block;font-size:11px;font-weight:normal;color:#94a3b8;margin-top:2px">단순 선형: ${this.formatDuration(v.simple_sec100)} (${sec100 > v.simple_sec100 ? '+' : ''}${Math.round((sec100 - v.simple_sec100)/60)}분)</small>`;
+        }
         el100.innerHTML = `<b>${this.formatDuration(sec100)}</b>${comp}`;
       } else {
         el100.innerHTML = '—';
       }
     }
     if (elEta) {
-      elEta.innerHTML = v.charging === true ? `<b>${this.formatTime(eta100)}</b>` : '—';
+      if (v.charging === true) {
+        let rawEtaComp = '';
+        if (this.state.calcModel === 'smooth' && v.raw_eta100 && v.raw_eta100 !== eta100) {
+          rawEtaComp = `<small style="display:block;font-size:10.5px;color:#f59e0b;font-weight:normal;">원시 ETA: ${this.formatTime(v.raw_eta100)} (널뛰기 중)</small>`;
+        }
+        elEta.innerHTML = `<b>${this.formatTime(eta100)}</b>${rawEtaComp}`;
+      } else {
+        elEta.innerHTML = '—';
+      }
     }
     if (elSpeed) {
       if (v.charging === true) {
@@ -545,8 +731,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
     const elModel = this.shadowRoot.querySelector('#inspectModel');
     if (elModel) {
-      elModel.textContent = this.state.calcModel === 'simple' ? '기존 단순 선형' : 'ID.4 커브 (옵션 1: 병목)';
-      elModel.style.color = this.state.calcModel === 'simple' ? '#94a3b8' : '#34d399';
+      if (this.state.calcModel === 'smooth') {
+        elModel.innerHTML = '<span style="color:#34d399;font-weight:700;">⚡ ID.4 커브 + 3단계 스무딩 (안정화)</span>';
+      } else if (this.state.calcModel === 'curve') {
+        elModel.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚡ ID.4 커브 (원시값 - 널뛰기 발생)</span>';
+      } else {
+        elModel.innerHTML = '<span style="color:#94a3b8;">📏 기존 단순 선형</span>';
+      }
     }
   }
 
@@ -1008,19 +1199,29 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
-            <!-- Group 4: 충전 시간 계산 모델 -->
+            <!-- Group 4: 충전 시간 계산 모델 & 스무딩 체감 테스트 -->
             <div class="control-group">
               <div class="group-label">
-                <span>충전 시간 계산 모델 <small style="color:#9ca3af;font-weight:normal">(테스트용)</small></span>
-                <span id="calcModelVal" class="value">${this.state.calcModel === 'simple' ? '단순 선형' : 'ID.4 커브 (옵션 1)'}</span>
+                <span>충전 시간 계산 모델 & 스무딩 (체감 테스트)</span>
+                <span id="calcModelVal" class="value">${this.state.calcModel === 'simple' ? '단순 선형' : this.state.calcModel === 'curve' ? 'ID.4 커브 (원시값)' : 'ID.4 커브 + 스무딩 (방안 D)'}</span>
               </div>
               <div class="btn-group">
-                <button id="btnModelCurve" class="${this.state.calcModel !== 'simple' ? 'active charge' : ''}">⚡ ID.4 커브 (옵션 1: 병목)</button>
+                <button id="btnModelSmooth" class="${this.state.calcModel === 'smooth' || !this.state.calcModel ? 'active charge' : ''}">⚡ ID.4 커브 + 스무딩 (추천)</button>
+                <button id="btnModelCurve" class="${this.state.calcModel === 'curve' ? 'active charge' : ''}">⚡ ID.4 커브 (원시값: 널뛰기)</button>
                 <button id="btnModelSimple" class="${this.state.calcModel === 'simple' ? 'active' : ''}">📏 기존 단순 선형</button>
               </div>
-              <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4">
-                • <b>ID.4 커브 (옵션 1)</b>: 실측 속도와 ID.4 충전 커브의 병목 min(P_real, P_curve)을 1% 단위로 수치 적분하여 계산합니다.<br>
-                • <b>기존 단순 선형</b>: 잔여 용량 / 현재 속도로 단순 계산합니다.
+
+              <!-- BMS 전력 변동(노이즈) 시뮬레이션 토글 -->
+              <div style="margin-top: 8px;">
+                <button id="btnToggleNoise" class="${this.state.noiseEnabled ? 'active charge' : ''}" style="width: 100%; padding: 8px 12px; font-size: 11.5px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                  ${this.state.noiseEnabled ? '🌊 BMS 전력 변동 시뮬레이션: ON (널뛰기 발생 중)' : '🌊 BMS 전력 변동 시뮬레이션: OFF'}
+                </button>
+              </div>
+
+              <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;">
+                • <b>ID.4 커브 + 스무딩 (방안 D)</b>: 1단계 전력 EMA(α=0.25) + 2단계 커브 적분 + 3단계 ETA 슬루율(최대 ±3분 클램핑 & 2분 데드밴드)을 적용하여 1~2시간 널뛰기를 완벽히 방지합니다.<br>
+                • <b>ID.4 커브 (원시값)</b>: 매 순간 측정값으로 즉시 계산합니다. 전력 노이즈 ON 시 소요시간이 1~2시간씩 널뛰는 현상을 직접 확인할 수 있습니다.<br>
+                • <b>🌊 전력 변동 시뮬레이션</b>: 실제 BMS 샘플링 오차(완속 ±1.6kW / 급속 ±15%)를 실시간으로 발생시켜 두 모델 간의 안정성 차이를 체감합니다.
               </div>
             </div>
 
@@ -1165,6 +1366,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     if (!card.trips || card.trips.length === 0) {
       const nowMs = Date.now();
+      const d1 = new Date(nowMs - 86400000); d1.setHours(8, 30, 0, 0);
+      const d1b = new Date(nowMs - 86400000); d1b.setHours(18, 15, 0, 0);
+      const d2 = new Date(nowMs - 86400000 * 2); d2.setHours(14, 0, 0, 0);
+      const d4 = new Date(nowMs - 86400000 * 4); d4.setHours(11, 20, 0, 0);
+
       card.trips = [
         {
           observed_at: new Date(nowMs - 300000).toISOString(),
@@ -1252,6 +1458,97 @@ export default class CarrotDebugDashboard extends HTMLElement {
               { latitude: 37.5010, longitude: 127.0010, speedMps: 0 }
             ]
           }
+        },
+        // Trips for yesterday (d1)
+        {
+          observed_at: new Date(d1.getTime() + 1800000).toISOString(),
+          data: {
+            id: 'sim-trip-d1-morning',
+            started_at: d1.toISOString(),
+            ended_at: new Date(d1.getTime() + 1620000).toISOString(),
+            duration_s: 1620, // 27m
+            distance_m: 18200,
+            energy_wh: 2500,
+            efficiency_km_kwh: 7.3,
+            soc_used_percent: 3.2,
+            start_battery_wh: 65000,
+            end_battery_wh: 62500,
+            start_soc_percent: 83.0,
+            end_soc_percent: 79.8,
+            route: [
+              { latitude: 37.5100, longitude: 127.0200, speedMps: 0 },
+              { latitude: 37.5400, longitude: 127.0100, speedMps: 13.0 },
+              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
+            ]
+          }
+        },
+        {
+          observed_at: new Date(d1b.getTime() + 2000000).toISOString(),
+          data: {
+            id: 'sim-trip-d1-evening',
+            started_at: d1b.toISOString(),
+            ended_at: new Date(d1b.getTime() + 1800000).toISOString(),
+            duration_s: 1800, // 30m
+            distance_m: 19500,
+            energy_wh: 2850,
+            efficiency_km_kwh: 6.8,
+            soc_used_percent: 3.6,
+            start_battery_wh: 62000,
+            end_battery_wh: 59150,
+            start_soc_percent: 79.2,
+            end_soc_percent: 75.6,
+            route: [
+              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
+              { latitude: 37.5300, longitude: 127.0050, speedMps: 12.0 },
+              { latitude: 37.5100, longitude: 127.0200, speedMps: 0 }
+            ]
+          }
+        },
+        // Trip for 2 days ago (d2)
+        {
+          observed_at: new Date(d2.getTime() + 3500000).toISOString(),
+          data: {
+            id: 'sim-trip-d2',
+            started_at: d2.toISOString(),
+            ended_at: new Date(d2.getTime() + 3200000).toISOString(),
+            duration_s: 3200, // 53m
+            distance_m: 42000,
+            energy_wh: 6450,
+            efficiency_km_kwh: 6.5,
+            soc_used_percent: 8.2,
+            start_battery_wh: 71000,
+            end_battery_wh: 64550,
+            start_soc_percent: 91.0,
+            end_soc_percent: 82.8,
+            route: [
+              { latitude: 37.4500, longitude: 126.9500, speedMps: 0 },
+              { latitude: 37.5100, longitude: 127.0200, speedMps: 16.5 },
+              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
+            ]
+          }
+        },
+        // Trip for 4 days ago (d4)
+        {
+          observed_at: new Date(d4.getTime() + 2400000).toISOString(),
+          data: {
+            id: 'sim-trip-d4',
+            started_at: d4.toISOString(),
+            ended_at: new Date(d4.getTime() + 2100000).toISOString(),
+            duration_s: 2100, // 35m
+            distance_m: 28500,
+            energy_wh: 4070,
+            efficiency_km_kwh: 7.0,
+            soc_used_percent: 5.2,
+            start_battery_wh: 60000,
+            end_battery_wh: 55930,
+            start_soc_percent: 77.0,
+            end_soc_percent: 71.8,
+            route: [
+              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
+              { latitude: 37.6000, longitude: 127.0400, speedMps: 14.0 },
+              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
+            ]
+          }
         }
       ];
     }
@@ -1334,52 +1631,6 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (!card.v) card.v = {};
     if (!card.v.battery_history) {
       card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
-    }
-
-    // Restructure Overview tab into 2-column balanced layout on desktop while keeping mobile identical
-    if (typeof card.overview === 'function' && !card._overviewPatched) {
-      card._overviewPatched = true;
-      const origOverview = card.overview.bind(card);
-      card.overview = function(v) {
-        const html = origOverview(v);
-        try {
-          const heroStart = html.indexOf('<section class="hero');
-          const heroEnd = html.indexOf('</section><div class="quick">');
-          const energyStart = html.indexOf('<section class="energy');
-          const energyEnd = html.indexOf('</section><div class="quick-metrics">');
-          const metricsStart = html.indexOf('<div class="quick-metrics">');
-          const metricsEnd = html.indexOf('</div></div><div class="overview-links">');
-          const linksStart = html.indexOf('<div class="overview-links">');
-          const linksEnd = html.indexOf('</div><div class="mini-condition">');
-          const condStart = html.indexOf('<div class="mini-condition">');
-
-          if (heroStart !== -1 && heroEnd !== -1 && energyStart !== -1 && energyEnd !== -1 &&
-              metricsStart !== -1 && metricsEnd !== -1 && linksStart !== -1 && linksEnd !== -1 && condStart !== -1) {
-            const heroHtml = html.slice(heroStart, heroEnd + 10);
-            const energyHtml = html.slice(energyStart, energyEnd + 10);
-            const metricsHtml = html.slice(metricsStart, metricsEnd);
-            const linksHtml = html.slice(linksStart, linksEnd + 6);
-            const condHtml = html.slice(condStart);
-
-            return `
-              <div class="cockpit desktop-balanced-cockpit">
-                <div class="overview-col-visual">
-                  ${heroHtml}
-                  ${condHtml}
-                </div>
-                <div class="overview-col-telemetry">
-                  ${energyHtml}
-                  ${metricsHtml}
-                  ${linksHtml}
-                </div>
-              </div>
-            `;
-          }
-        } catch (e) {
-          console.warn('Carrot HA Debug: Overview restructuring fallback', e);
-        }
-        return html;
-      };
     }
 
     const origRender = card.render.bind(card);
@@ -2052,25 +2303,72 @@ export default class CarrotDebugDashboard extends HTMLElement {
       });
     }
 
-    // Calculation Model Toggle (Curve Option 1 vs Simple Linear)
+    // Calculation Model Toggle (Smooth vs Instant Curve vs Simple Linear)
+    const btnModelSmooth = root.querySelector('#btnModelSmooth');
     const btnModelCurve = root.querySelector('#btnModelCurve');
     const btnModelSimple = root.querySelector('#btnModelSimple');
     const calcModelVal = root.querySelector('#calcModelVal');
+    const btnToggleNoise = root.querySelector('#btnToggleNoise');
 
-    if (btnModelCurve && btnModelSimple) {
-      btnModelCurve.addEventListener('click', () => {
-        this.state.calcModel = 'curve';
-        btnModelCurve.className = 'active charge';
-        btnModelSimple.className = '';
-        if (calcModelVal) calcModelVal.textContent = 'ID.4 커브 (옵션 1)';
+    const updateModelBtns = () => {
+      if (btnModelSmooth) btnModelSmooth.className = (this.state.calcModel === 'smooth' || !this.state.calcModel) ? 'active charge' : '';
+      if (btnModelCurve) btnModelCurve.className = this.state.calcModel === 'curve' ? 'active charge' : '';
+      if (btnModelSimple) btnModelSimple.className = this.state.calcModel === 'simple' ? 'active' : '';
+      if (calcModelVal) {
+        calcModelVal.textContent = this.state.calcModel === 'simple'
+          ? '기존 단순 선형'
+          : this.state.calcModel === 'curve'
+          ? 'ID.4 커브 (원시값)'
+          : 'ID.4 커브 + 스무딩 (방안 D)';
+      }
+    };
+
+    if (btnModelSmooth) {
+      btnModelSmooth.addEventListener('click', () => {
+        this.state.calcModel = 'smooth';
+        this.smoothState = null;
+        updateModelBtns();
         this.applyDebugTelemetry();
       });
+    }
 
+    if (btnModelCurve) {
+      btnModelCurve.addEventListener('click', () => {
+        this.state.calcModel = 'curve';
+        this.smoothState = null;
+        updateModelBtns();
+        this.applyDebugTelemetry();
+      });
+    }
+
+    if (btnModelSimple) {
       btnModelSimple.addEventListener('click', () => {
         this.state.calcModel = 'simple';
-        btnModelSimple.className = 'active';
-        btnModelCurve.className = '';
-        if (calcModelVal) calcModelVal.textContent = '단순 선형';
+        this.smoothState = null;
+        updateModelBtns();
+        this.applyDebugTelemetry();
+      });
+    }
+
+    if (btnToggleNoise) {
+      btnToggleNoise.addEventListener('click', () => {
+        this.state.noiseEnabled = !this.state.noiseEnabled;
+        btnToggleNoise.className = this.state.noiseEnabled ? 'active charge' : '';
+        btnToggleNoise.textContent = this.state.noiseEnabled
+          ? '🌊 BMS 전력 변동 시뮬레이션: ON (널뛰기 발생 중)'
+          : '🌊 BMS 전력 변동 시뮬레이션: OFF';
+
+        if (this._noiseTimer) {
+          clearInterval(this._noiseTimer);
+          this._noiseTimer = null;
+        }
+        if (this.state.noiseEnabled) {
+          this._noiseTimer = setInterval(() => {
+            if (this.state.mode === 'charging') {
+              this.applyDebugTelemetry();
+            }
+          }, 2000);
+        }
         this.applyDebugTelemetry();
       });
     }
@@ -2104,7 +2402,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
         this.state.mode = 'charging';
         this.state.soc = 74;
         this.state.powerKw = 11;
-        this.state.calcModel = 'curve';
+        this.state.calcModel = 'smooth';
+        this.state.noiseEnabled = false;
+        this.smoothState = null;
+        if (this._noiseTimer) {
+          clearInterval(this._noiseTimer);
+          this._noiseTimer = null;
+        }
+        if (btnToggleNoise) {
+          btnToggleNoise.className = '';
+          btnToggleNoise.textContent = '🌊 BMS 전력 변동 시뮬레이션: OFF';
+        }
         if (socSlider) socSlider.value = 74;
         if (socVal) socVal.textContent = '74%';
         updateSocPresetUI(74);
@@ -2112,9 +2420,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (powerVal) powerVal.textContent = '11.0 kW';
         if (sliderValLabel) sliderValLabel.textContent = '11.0 kW';
         updateChargerBtns(11);
-        if (calcModelVal) calcModelVal.textContent = 'ID.4 커브 (옵션 1)';
-        if (btnModelCurve) btnModelCurve.className = 'active charge';
-        if (btnModelSimple) btnModelSimple.className = '';
+        updateModelBtns();
         updateModeBtns();
         this.applyDebugTelemetry();
       });
