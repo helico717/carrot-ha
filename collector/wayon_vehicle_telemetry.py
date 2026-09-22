@@ -227,8 +227,8 @@ def sample_vehicle_can(timeout_s: float = 6.0) -> dict:
           result["odometer_km"] = float(odo)
       if cp.vl_all["Klima_Sensor_02"].get("BCM1_Aussen_Temp_ungef"):
         result["outside_temp_c"] = float(cp.vl["Klima_Sensor_02"]["BCM1_Aussen_Temp_ungef"])
-      if cp.vl_all["MEB_HVEM_01"].get("Battery_Voltage"):
-        v = cp.vl["MEB_HVEM_01"]["Battery_Voltage"]
+      if cp.vl_all["MEB_HVEM_01"].get("Battery_Voltage_02"):
+        v = cp.vl["MEB_HVEM_01"]["Battery_Voltage_02"]
         if v > 0:
           hv_voltage = float(v)
       if cp.vl_all["BMS_04"].get("BMS_Kapazitaet_02"):
