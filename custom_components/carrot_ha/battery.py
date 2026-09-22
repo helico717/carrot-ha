@@ -1,6 +1,6 @@
-"""Display calibration and charging time estimation with ID.4 curve & 3-stage smoothing."""
+"""Display calibration and measurement-driven charging time estimation."""
 import math
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 NET_CAPACITY_KWH = 78.0
 GROSS_CAPACITY_KWH = 82.0
@@ -20,137 +20,132 @@ ID4_CHARGING_CURVE_KW = [
      59.7,  57.0,  52.7,  49.7,  46.8,  43.7,  40.6,  37.6,  34.8,  31.7   # 91-100%
 ]
 
-SMOOTH_ALPHA = 0.25         # Power EMA factor
-SMOOTH_SLEW_MAX_S = 180     # Max allowed ETA shift per update (3 minutes)
-SMOOTH_DEADBAND_S = 120     # Preserve previous ETA if change is within +/- 2 min
-SMOOTH_JUMP_RESET_KW = 25.0 # Instant reset if power changes abruptly (e.g. AC <-> DC)
+POWER_TAU_S = 120.0
+HISTORY_S = 300.0
+
 
 def calibrated_soc(energy_wh, capacity_kwh):
-    if type(energy_wh) not in (float, int) or type(capacity_kwh) not in (float, int):
+    if not _finite(energy_wh) or not _finite(capacity_kwh):
         return None
-    if not math.isfinite(energy_wh) or not math.isfinite(capacity_kwh) or energy_wh < 0 or not 20 <= capacity_kwh <= 150:
+    if energy_wh < 0 or not 20 <= capacity_kwh <= 150:
         return None
     return round(min(100, energy_wh / (capacity_kwh * 1000) * 100), 1)
 
-def estimate_charging_times(battery_kwh, measured_capacity_kwh, charge_power_w, base_time=None, smooth_state=None, is_charging=True):
-    """Estimate remaining seconds and completion timestamp for 80% and 100% charging using ID.4 curve and 3-stage smoothing."""
-    if not is_charging:
-        return {'time_to_80_s': None, 'eta_80': None, 'time_to_100_s': None, 'eta_100': None, 'smooth_state': None}
-    if not isinstance(charge_power_w, (int, float)) or charge_power_w < 300:
-        return {'time_to_80_s': None, 'eta_80': None, 'time_to_100_s': None, 'eta_100': None, 'smooth_state': None}
-    if not isinstance(battery_kwh, (int, float)) or not isinstance(measured_capacity_kwh, (int, float)):
-        return {'time_to_80_s': None, 'eta_80': None, 'time_to_100_s': None, 'eta_100': None, 'smooth_state': None}
-    if battery_kwh < 0 or measured_capacity_kwh <= 0:
-        return {'time_to_80_s': None, 'eta_80': None, 'time_to_100_s': None, 'eta_100': None, 'smooth_state': None}
 
+def _finite(value):
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def estimate_charging_times(battery_kwh, measured_capacity_kwh, charge_power_w,
+                            base_time=None, smooth_state=None, is_charging=True):
+    """Estimate from unique measurement times and net battery energy.
+
+    measured_capacity_kwh is retained as an API name for compatibility; callers
+    must pass the same configured capacity used by displayed SOC, never Ah * V.
+    State is immutable to callers. Re-reading a measurement cannot train it.
+    """
+    empty = dict(time_to_80_s=None, eta_80=None, time_to_100_s=None,
+                 eta_100=None, smooth_state=None)
+    capacity = measured_capacity_kwh
+    if (not is_charging or not all(_finite(x) for x in
+            (battery_kwh, capacity, charge_power_w)) or
+            not 20 <= capacity <= 150 or not 0 <= battery_kwh <= capacity or
+            charge_power_w < 300):
+        return empty
     now = base_time or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
+    t = now.timestamp()
+    soc = battery_kwh / capacity * 100
+    power = charge_power_w / 1000
+    previous = smooth_state
+    if previous and previous.get('capacity') != capacity:
+        previous = None
+    if previous:
+        dt = t - previous['last_calc_ts']
+        if dt <= 0:
+            return dict(previous['result'], smooth_state=previous)
+        if dt > 600:
+            previous = None
+    if previous:
+        dt = t - previous['last_calc_ts']
+        delta = battery_kwh - previous['energy']
+        # Reject implausible steps, including CAN sentinel/reinitialization jumps.
+        if delta < -0.05 or delta * 3600 / dt > 250:
+            return empty
+        if abs(power - previous['last_power']) > 25:
+            previous = None
 
-    power_kw = charge_power_w / 1000.0
-    soc = min(100.0, max(0.0, (battery_kwh / measured_capacity_kwh) * 100.0))
-
-    if soc >= 100.0:
-        now_iso = now.isoformat()
-        return {
-            'time_to_80_s': 0,
-            'eta_80': now_iso,
-            'time_to_100_s': 0,
-            'eta_100': now_iso,
-            'smooth_state': None
-        }
-
-    now_ts = now.timestamp()
-    if smooth_state and isinstance(smooth_state.get('last_calc_ts'), (int, float)):
-        if abs(now_ts - smooth_state['last_calc_ts']) > 600:
-            smooth_state = None
-
-    # Stage 1: Power EMA Filter
-    power_smooth = power_kw
-    if smooth_state and isinstance(smooth_state.get('power_smooth'), (int, float)) and smooth_state['power_smooth'] > 0:
-        prev_p = smooth_state['power_smooth']
-        if abs(power_kw - prev_p) > SMOOTH_JUMP_RESET_KW:
-            power_smooth = power_kw
-            smooth_state = None
-        else:
-            power_smooth = SMOOTH_ALPHA * power_kw + (1.0 - SMOOTH_ALPHA) * prev_p
-
-    # Stage 2: ID.4 Curve Bottleneck Numerical Integration
-    def calc_time_to_soc(target_soc, p_in):
-        if soc >= target_soc:
-            return 0
-        total_sec = 0.0
-        start_int = int(math.floor(soc))
-        target_int = int(math.floor(target_soc))
-        for s in range(start_int, target_int):
-            curve_val = ID4_CHARGING_CURVE_KW[min(100, s + 1)]
-            step_kw = max(0.3, min(p_in, curve_val))
-            step_frac = (start_int + 1 - soc) if s == start_int else 1.0
-            step_kwh = measured_capacity_kwh * 0.01 * step_frac
-            total_sec += (step_kwh / step_kw) * 3600.0
-
-        if target_soc > target_int:
-            curve_val = ID4_CHARGING_CURVE_KW[min(100, target_int + 1)]
-            step_kw = max(0.3, min(p_in, curve_val))
-            step_kwh = measured_capacity_kwh * 0.01 * (target_soc - target_int)
-            total_sec += (step_kwh / step_kw) * 3600.0
-
-        return int(round(total_sec))
-
-    raw_sec80 = calc_time_to_soc(80.0, power_smooth) if soc < 80.0 else 0
-    raw_sec100 = calc_time_to_soc(100.0, power_smooth)
-
-    # Stage 3: Slew-Rate Limiter & Countdown Deadband
-    def apply_slew_and_deadband(target_sec, prev_eta_ts, prev_sec, last_calc_ts):
-        new_eta_ts = now_ts + target_sec
-        if prev_eta_ts is None or last_calc_ts is None or prev_sec is None:
-            return target_sec, new_eta_ts
-
-        elapsed_sec = max(0.0, now_ts - last_calc_ts)
-        natural_sec = max(0, int(round(prev_sec - elapsed_sec)))
-        delta_eta_sec = new_eta_ts - prev_eta_ts
-
-        # Deadband: within +/- 120s, preserve existing ETA and natural countdown
-        if abs(delta_eta_sec) <= SMOOTH_DEADBAND_S:
-            return natural_sec, prev_eta_ts
-
-        # Slew-rate clamp: limit drift to +/- 180s per update
-        sign = 1.0 if delta_eta_sec > 0 else -1.0
-        allowed_shift = sign * min(abs(delta_eta_sec), float(SMOOTH_SLEW_MAX_S))
-        smooth_eta_ts = prev_eta_ts + allowed_shift
-        smooth_sec = max(0, int(round(smooth_eta_ts - now_ts)))
-        return smooth_sec, smooth_eta_ts
-
-    prev_80_ts = smooth_state.get('eta_80_ts') if smooth_state else None
-    prev_80_sec = smooth_state.get('sec80') if smooth_state else None
-    prev_100_ts = smooth_state.get('eta_100_ts') if smooth_state else None
-    prev_100_sec = smooth_state.get('sec100') if smooth_state else None
-    last_calc_ts = smooth_state.get('last_calc_ts') if smooth_state else None
-
-    if soc >= 80.0:
-        sec80 = 0
-        eta80_ts = now_ts
+    dt = t - previous['last_calc_ts'] if previous else 0
+    history = list(previous['history']) if previous else []
+    history = [x for x in history if t - x[0] <= HISTORY_S]
+    history.append((t, battery_kwh, power))
+    # Prefer an actual multi-minute net energy slope to another filter stacked
+    # on top of the collector's 90-240 second power estimate.
+    span = t - history[0][0]
+    gain = battery_kwh - history[0][1]
+    if span >= 180 and gain > 0:
+        effective = max(0.3, min(250, gain * 3600 / span))
+    elif previous:
+        alpha = -math.expm1(-dt / POWER_TAU_S)
+        effective = previous['power_smooth'] + alpha * (power - previous['power_smooth'])
     else:
-        sec80, eta80_ts = apply_slew_and_deadband(raw_sec80, prev_80_ts, prev_80_sec, last_calc_ts)
-    sec100, eta100_ts = apply_slew_and_deadband(raw_sec100, prev_100_ts, prev_100_sec, last_calc_ts)
+        effective = power
 
-    updated_state = {
-        'power_smooth': power_smooth,
-        'last_calc_ts': now_ts,
-        'eta_80_ts': eta80_ts,
-        'eta_100_ts': eta100_ts,
-        'sec80': sec80,
-        'sec100': sec100
-    }
+    # Only extrapolate a taper actually observed over multiple measurements.
+    # This is evidence of slowing, not an AC/DC classification by instant power.
+    slope = 0.0
+    soc_span = (battery_kwh - history[0][1]) / capacity * 100
+    if (span >= 180 and soc_span >= 2 and len(history) >= 4 and
+            max(x[2] for x in history) > 22 and
+            all(b[2] <= a[2] * 1.05 for a, b in zip(history, history[1:])) and
+            power < history[0][2] * 0.9):
+        slope = max(-0.08, math.log(power / history[0][2]) / soc_span)
+        # A trailing average lags a sustained taper; anchor to latest power.
+        effective = min(effective, power)
 
-    eta_80 = datetime.fromtimestamp(eta80_ts, timezone.utc).isoformat()
-    eta_100 = datetime.fromtimestamp(eta100_ts, timezone.utc).isoformat()
+    def duration(target):
+        if soc >= target:
+            return 0
+        seconds = 0.0
+        curve_now = ID4_CHARGING_CURVE_KW[min(100, max(1, math.ceil(soc)))]
+        for step in range(math.floor(soc), target):
+            end = step + 1
+            fraction = end - max(soc, step)
+            curve = ID4_CHARGING_CURVE_KW[end]
+            # Limit empirical extrapolation to the next 10 percentage points;
+            # beyond that retain the reference curve's relative decline.
+            future = effective * math.exp(slope * min(10, end - soc))
+            if slope < 0:
+                future = min(future, effective * min(1, curve / curve_now))
+            kw = max(0.3, min(future, curve))
+            seconds += capacity * 0.01 * fraction / kw * 3600
+        return max(1, round(seconds))
 
-    return {
-        'time_to_80_s': sec80,
-        'eta_80': eta_80,
-        'time_to_100_s': sec100,
-        'eta_100': eta_100,
-        'smooth_state': updated_state
-    }
-
+    result = {}
+    raw_durations = {}
+    for target in (80, 100):
+        raw = duration(target)
+        raw_durations[target] = raw
+        eta = t + raw
+        if raw and previous:
+            old_eta = previous['eta_' + str(target) + '_ts']
+            shift = eta - old_eta
+            # Bounded in elapsed time, never in number of UI reads. Near the
+            # target, let measurements win instead of counting down to false 0.
+            if raw > 120:
+                if abs(shift) <= min(120, raw * 0.1):
+                    eta = old_eta
+                else:
+                    limit = 3 * dt
+                    eta = old_eta + max(-limit, min(limit, shift))
+            eta = max(t + 1, eta)
+        result['time_to_' + str(target) + '_s'] = max(1, round(eta - t)) if raw else 0
+        result['eta_' + str(target)] = datetime.fromtimestamp(eta, timezone.utc).isoformat()
+    state = dict(capacity=capacity, energy=battery_kwh, last_calc_ts=t,
+                 last_power=power, power_smooth=effective, history=history,
+                 eta_80_ts=datetime.fromisoformat(result['eta_80']).timestamp(),
+                 eta_100_ts=datetime.fromisoformat(result['eta_100']).timestamp(),
+                 raw_durations=raw_durations, taper_slope=slope,
+                 result=dict(result)) if soc < 100 else None
+    return dict(result, smooth_state=state)

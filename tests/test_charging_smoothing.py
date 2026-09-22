@@ -147,5 +147,116 @@ class TestChargingSmoothing(unittest.TestCase):
         self.assertIsNone(v3['time_to_80_s'])
         self.assertIsNone(runtime.get('charging_smooth_state'))
 
+class TestChargingRegression(unittest.TestCase):
+    setUp = TestChargingSmoothing.setUp
+    def runtime(self, wh=60650, measured_capacity=72157):
+        return {
+            'entry': type('Entry', (), {'options': {'soc_capacity_kwh': 78.0}}),
+            'latest': {'observed_at': self.base_time.isoformat(), 'data': {
+                'battery_wh': wh, 'measured_capacity_wh': measured_capacity,
+                'charging': True, 'charge_power_w': 27987,
+                'measured_at': self.base_time.isoformat(), 'stale': False}},
+            'summary': {}}
+
+    def test_recorded_capacity_mismatch(self):
+        runtime = self.runtime()
+        first = values(runtime)
+        self.assertEqual(first['soc_percent'], 77.8)
+        self.assertGreater(first['time_to_80_s'], 0)
+        runtime['latest']['data']['measured_capacity_wh'] = 100518
+        second = values(runtime)
+        self.assertEqual(first['eta_80'], second['eta_80'])
+        self.assertEqual(first['eta_100'], second['eta_100'])
+
+    def test_reads_do_not_train_and_countdown_uses_wall_time(self):
+        runtime = self.runtime()
+        first = values(runtime)
+        state = runtime['charging_smooth_state']
+        MockDateTime.current_time += timedelta(seconds=30)
+        for _ in range(50):
+            result = values(runtime)
+            self.assertIs(runtime['charging_smooth_state'], state)
+            self.assertEqual(result['eta_100'], first['eta_100'])
+        self.assertEqual(result['time_to_100_s'], first['time_to_100_s'] - 30)
+
+    def test_stale_battery_field_overrides_fresh_other_fields(self):
+        runtime = self.runtime()
+        runtime['latest']['data']['field_measured_at'] = {
+            'battery_wh': (self.base_time - timedelta(seconds=181)).isoformat()}
+        self.assertIsNone(values(runtime)['time_to_100_s'])
+        self.assertIsNone(runtime['charging_smooth_state'])
+
+    def test_future_measurement_and_stopped_clear_prediction(self):
+        runtime = self.runtime()
+        values(runtime)
+        runtime['latest']['data']['measured_at'] = (self.base_time + timedelta(seconds=30)).isoformat()
+        self.assertIsNone(values(runtime)['time_to_100_s'])
+        runtime = self.runtime()
+        values(runtime)
+        runtime['latest']['data']['charging'] = False
+        self.assertIsNone(values(runtime)['time_to_100_s'])
+
+    def test_invalid_energy_and_nonfinite(self):
+        for wh in (102350, float('nan'), float('inf'), -1):
+            self.assertIsNone(values(self.runtime(wh=wh))['time_to_100_s'])
+        for power in (float('nan'), float('inf'), True):
+            self.assertIsNone(estimate_charging_times(39, 78, power)['time_to_100_s'])
+
+    def test_energy_not_rounded_to_target(self):
+        result = values(self.runtime(wh=62375))
+        self.assertGreater(result['time_to_80_s'], 0)
+
+    def test_near_target_never_false_zero(self):
+        first = estimate_charging_times(77.99, 78, 7000, base_time=self.base_time)
+        second = estimate_charging_times(77.99, 78, 7000,
+            base_time=self.base_time + timedelta(seconds=60), smooth_state=first['smooth_state'])
+        self.assertGreater(second['time_to_100_s'], 0)
+
+    def test_implausible_energy_step(self):
+        first = estimate_charging_times(39, 78, 7000, base_time=self.base_time)
+        second = estimate_charging_times(50, 78, 7000,
+            base_time=self.base_time + timedelta(seconds=30), smooth_state=first['smooth_state'])
+        self.assertIsNone(second['time_to_100_s'])
+
+    def test_observed_taper_lengthens_prediction(self):
+        state = None
+        for i, power in enumerate((40000, 36000, 33000, 30000, 27000)):
+            energy = 54.6 + i * 0.55
+            result = estimate_charging_times(energy, 78, power,
+                base_time=self.base_time + timedelta(seconds=i*60), smooth_state=state)
+            state = result['smooth_state']
+        baseline = estimate_charging_times(energy, 78, power, base_time=self.base_time)
+        # Compare the physical estimate without display slew from earlier samples.
+        self.assertLessEqual(state['power_smooth'], power / 1000)
+        self.assertGreater(state['raw_durations'][100], baseline['time_to_100_s'])
+
+    def test_filter_uses_elapsed_time_not_sample_count(self):
+        initial = estimate_charging_times(39, 78, 7000, base_time=self.base_time)
+        powers = []
+        for interval in (30, 60):
+            state = initial['smooth_state']
+            for elapsed in range(interval, 121, interval):
+                result = estimate_charging_times(39, 78, 6000,
+                    base_time=self.base_time + timedelta(seconds=elapsed), smooth_state=state)
+                state = result['smooth_state']
+            powers.append(state['power_smooth'])
+        self.assertAlmostEqual(*powers)
+
+    def test_old_measurement_cannot_rewind_model(self):
+        initial = estimate_charging_times(39, 78, 7000, base_time=self.base_time)
+        old = estimate_charging_times(38, 78, 6000,
+            base_time=self.base_time - timedelta(seconds=60), smooth_state=initial['smooth_state'])
+        self.assertIs(old['smooth_state'], initial['smooth_state'])
+        self.assertEqual(old['eta_100'], initial['eta_100'])
+
+    def test_constant_rate_ac_energy_slope(self):
+        state = None
+        for i in range(6):
+            result = estimate_charging_times(39 + i*0.1, 78, 6000,
+                base_time=self.base_time + timedelta(seconds=i*60), smooth_state=state)
+            state = result['smooth_state']
+        self.assertAlmostEqual(state['power_smooth'], 6)
+        self.assertAlmostEqual(result['time_to_100_s'], (78-39.5)/6*3600, delta=120)
+
 if __name__ == '__main__':
     unittest.main()

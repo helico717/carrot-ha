@@ -1,14 +1,17 @@
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
+import math
 
 def values(runtime):
     latest = runtime.get('latest', {})
     data = dict(latest.get('data', {}))
     data.update(runtime.get('summary', {}))
     capacity = runtime['entry'].options.get('soc_capacity_kwh', 78.0)
-    if data.get('battery_wh') is not None:
+    if type(data.get('battery_wh')) in (int, float) and math.isfinite(data['battery_wh']) and data['battery_wh'] >= 0:
         data['soc_percent'] = calibrated_soc(data['battery_wh'], capacity)
         data['battery_kwh'] = round(data['battery_wh'] / 1000, 1)
+    else:
+        data['battery_kwh'] = None
     for source, target in [('measured_capacity_wh','measured_capacity_kwh'),('capacity_wh','capacity_kwh')]:
         if isinstance(data.get(source), (int,float)): data[target] = round(data[source] / 1000, 1)
     data['soc_capacity_kwh'] = round(capacity, 1)
@@ -79,26 +82,37 @@ def values(runtime):
         data['low_power_duration_s'] = 0
         data['emergency_charging'] = False
 
-    # Charging Time Estimation (ID.4 curve & 3-stage smoothing)
-    smooth_state = runtime.get('charging_smooth_state')
+    # Train once per battery measurement, not once per sensor/UI property read.
+    battery_wh = data.get('battery_wh')
+    stamp = (data.get('field_measured_at') or {}).get('battery_wh') or data.get('measured_at')
+    try:
+        measured_time = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+        if measured_time.tzinfo is None:
+            measured_time = measured_time.replace(tzinfo=timezone.utc)
+        age_s = (now_utc - measured_time).total_seconds()
+        estimate_valid = not is_stale and 0 <= age_s <= 180
+    except (ValueError, TypeError, AttributeError):
+        measured_time = now_utc
+        estimate_valid = False
     charging_est = estimate_charging_times(
-        data.get('battery_kwh'),
-        data.get('measured_capacity_kwh') or capacity,
+        battery_wh / 1000 if type(battery_wh) in (int, float) else None,
+        capacity,
         power_w,
-        base_time=ref_time,
-        smooth_state=smooth_state,
-        is_charging=is_charging
+        base_time=measured_time,
+        smooth_state=runtime.get('charging_smooth_state'),
+        is_charging=is_charging and estimate_valid
     )
-    data.update({
-        'time_to_80_s': charging_est['time_to_80_s'],
-        'eta_80': charging_est['eta_80'],
-        'time_to_100_s': charging_est['time_to_100_s'],
-        'eta_100': charging_est['eta_100']
-    })
-    if is_charging:
-        runtime['charging_smooth_state'] = charging_est.get('smooth_state')
-    else:
-        runtime['charging_smooth_state'] = None
+    runtime['charging_smooth_state'] = charging_est['smooth_state']
+    for target in (80, 100):
+        seconds_key = f'time_to_{target}_s'
+        eta_key = f'eta_{target}'
+        seconds = charging_est[seconds_key]
+        eta = charging_est[eta_key]
+        # Reads may advance the display countdown but never the model state.
+        if seconds is not None and seconds > 0:
+            seconds = max(1, round((datetime.fromisoformat(eta) - now_utc).total_seconds()))
+        data[seconds_key] = seconds
+        data[eta_key] = eta
     try:
         from zoneinfo import ZoneInfo
         kst = ZoneInfo('Asia/Seoul')
