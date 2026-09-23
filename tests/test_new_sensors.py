@@ -1,14 +1,17 @@
 import unittest
+from enum import Enum
 import importlib.util
 import types
 import sys
 from datetime import datetime, timezone, timedelta
 
 # Create dummy package modules so relative imports work without homeassistant
-for mod_name in ['homeassistant', 'homeassistant.components', 'homeassistant.components.sensor', 'homeassistant.helpers', 'homeassistant.helpers.dispatcher']:
+for mod_name in ['homeassistant', 'homeassistant.components', 'homeassistant.components.sensor', 'homeassistant.const', 'homeassistant.helpers', 'homeassistant.helpers.dispatcher']:
     m = types.ModuleType(mod_name)
     if mod_name == 'homeassistant.components.sensor':
         m.SensorEntity = type('SensorEntity', (), {})
+    elif mod_name == 'homeassistant.const':
+        m.EntityCategory = Enum('EntityCategory', {'DIAGNOSTIC': 'diagnostic'})
     elif mod_name == 'homeassistant.helpers.dispatcher':
         m.async_dispatcher_connect = lambda *args, **kwargs: None
     sys.modules[mod_name] = m
@@ -146,6 +149,19 @@ class TestNewSensors(unittest.TestCase):
             self.assertIs(result['trunk_open'], True)
             self.assertEqual(result['bms_mode'], 'ac_charging')
             self.assertEqual(result['comma_cpu_temperature_c'], 63)
+
+    def test_diagnostics_use_category_enum_and_comma_device(self):
+        from homeassistant.const import EntityCategory
+        from custom_components.carrot_ha.sensors_v3 import FIELDS, VehicleSensor
+        entry = self._make_runtime({})['entry']
+        keys = [key for key in FIELDS if key.startswith('comma_')]
+        self.assertEqual(len(keys), 9)
+        for key in keys + ['bms_target_soc_percent']:
+            sensor = VehicleSensor(entry, key, *FIELDS[key])
+            self.assertIs(sensor._attr_entity_category, EntityCategory.DIAGNOSTIC)
+            if key.startswith('comma_'):
+                self.assertEqual(sensor._attr_device_info['identifiers'],
+                                 {('carrot_ha', 'test-id_comma')})
 
     def test_gear_mapping(self):
         from custom_components.carrot_ha.sensors_v3 import GEAR_DISPLAY

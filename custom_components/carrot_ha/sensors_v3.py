@@ -1,5 +1,6 @@
 from datetime import datetime
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import SENSOR_FIELDS
 
@@ -76,7 +77,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
             self._attr_suggested_display_precision=precision
         if unit is not None and device_class not in ('monetary','energy'): self._attr_state_class='measurement'
         if key.startswith('comma_') or key == 'bms_target_soc_percent':
-            self._attr_entity_category = 'diagnostic'
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if key in ('month_charge_kwh','month_slow_kwh','month_fast_kwh'):self._attr_state_class='total_increasing'
     @property
     def native_value(self):
