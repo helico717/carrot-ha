@@ -392,29 +392,32 @@ class CarrotDashboard extends HTMLElement {
       .quick-metrics .metric.charge-eta strong{font-size:21px;font-weight:750;letter-spacing:-0.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .quick-metrics .metric.charge-eta .hint{font-size:11px;font-weight:550;color:#94a3b8;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       :host([data-theme="light"]) .quick-metrics .metric.charge-eta .hint{color:#64748b}
-      .quick-metrics .metric.lock-metric{display:flex;flex-direction:column;justify-content:space-between;position:relative;border-radius:16px;min-width:0}
-      .quick-metrics .metric.lock-metric .label{font-size:11.5px;color:var(--muted);margin-bottom:2px}
-      .quick-metrics .metric.lock-metric .lock-val-row{display:flex;align-items:center;gap:9px;margin:2px 0}
-      .quick-metrics .metric.lock-metric .lock-icon-badge{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;flex-shrink:0}
-      .quick-metrics .metric.lock-metric .lock-icon-badge ha-icon{display:flex !important;--mdc-icon-size:20px;width:20px;height:20px}
-      .quick-metrics .metric.lock-metric .lock-val{font-size:22px;font-weight:800;letter-spacing:-0.5px;line-height:1}
-      .quick-metrics .metric.lock-metric .hint{font-size:11px;font-weight:500;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-      .metric.lock-metric.is-locked .lock-icon-badge{background:rgba(255,255,255,0.06);color:#94a3b8}
-      :host([data-theme="light"]) .metric.lock-metric.is-locked .lock-icon-badge{background:#f1f5f9;color:#64748b}
-      .metric.lock-metric.is-locked .lock-val,.metric.lock-metric.is-locked .locked-text{color:var(--ink)}
-      .metric.lock-metric.is-locked .hint{color:var(--muted)}
-      .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge{background:rgba(34,197,94,0.18);color:#22c55e}
-      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge{background:#dcfce7;color:#16a34a}
-      .metric.lock-metric.mode-charging.is-unlocked .lock-val,.metric.lock-metric.mode-charging.is-unlocked .unlocked-text{color:#22c55e}
-      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-val,:host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .unlocked-text{color:#16a34a}
-      .metric.lock-metric.mode-charging.is-unlocked .hint{color:#4ade80}
-      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .hint{color:#15803d}
-      .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge{background:rgba(59,130,246,0.18);color:#3b82f6}
-      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge{background:#dbeafe;color:#2563eb}
-      .metric.lock-metric.mode-parked.is-unlocked .lock-val,.metric.lock-metric.mode-parked.is-unlocked .unlocked-text{color:#3b82f6}
-      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-val,:host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .unlocked-text{color:#2563eb}
-      .metric.lock-metric.mode-parked.is-unlocked .hint{color:#60a5fa}
-      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .hint{color:#1d4ed8}
+      .quick-metrics .metric.lock-metric{display:flex !important;flex-direction:column !important;justify-content:space-between !important;position:relative !important;overflow:hidden !important;border-radius:16px;min-width:0;transition:all 0.25s ease !important;cursor:default !important}
+      .quick-metrics .metric.lock-metric ha-icon{display:inline-flex !important;width:18px !important;height:18px !important;--mdc-icon-size:18px !important}
+      .quick-metrics .metric.lock-metric .label{font-size:11.5px !important;color:var(--muted) !important;margin-bottom:2px !important;display:block !important}
+      .quick-metrics .metric.lock-metric .lock-val-row{display:flex !important;align-items:center !important;gap:9px !important;margin:2px 0 6px !important}
+      .quick-metrics .metric.lock-metric .lock-icon-badge{width:32px !important;height:32px !important;border-radius:50% !important;display:flex !important;align-items:center !important;justify-content:center !important;flex-shrink:0 !important;margin:0 !important;padding:0 !important;line-height:0 !important;box-sizing:border-box !important;transition:all 0.2s ease !important}
+      .quick-metrics .metric.lock-metric .lock-icon-badge ha-icon{display:flex !important;align-items:center !important;justify-content:center !important;width:18px !important;height:18px !important;--mdc-icon-size:18px !important;margin:0 !important;padding:0 !important;line-height:0 !important;transform:translateY(0.75px) !important}
+      .quick-metrics .metric.lock-metric .lock-icon-badge ha-icon svg,.quick-metrics .metric.lock-metric .lock-icon-badge svg{display:block !important;width:18px !important;height:18px !important;margin:0 auto !important;padding:0 !important}
+      .quick-metrics .metric.lock-metric .lock-val{font-size:22px !important;font-weight:800 !important;letter-spacing:-0.4px !important;line-height:1.2 !important;display:inline-block !important;margin:0 !important}
+      .quick-metrics .metric.lock-metric .hint{font-size:11px !important;font-weight:550 !important;margin-top:4px !important;line-height:1.3 !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}
+      .metric.lock-metric.is-locked .lock-icon-badge{background:rgba(255,255,255,0.08) !important;color:var(--ink,#ffffff) !important;border:1px solid rgba(255,255,255,0.12) !important}
+      :host([data-theme="light"]) .metric.lock-metric.is-locked .lock-icon-badge{background:rgba(0,0,0,0.06) !important;color:#0f172a !important;border:1px solid rgba(0,0,0,0.08) !important}
+      .metric.lock-metric.is-locked .lock-val,.metric.lock-metric.is-locked .locked-text{color:var(--ink,#ffffff) !important}
+      :host([data-theme="light"]) .metric.lock-metric.is-locked .lock-val,:host([data-theme="light"]) .metric.lock-metric.is-locked .locked-text{color:#0f172a !important}
+      .metric.lock-metric.is-locked .hint{color:var(--muted) !important}
+      .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge{background:rgba(16,185,129,0.16) !important;color:#34d399 !important;border:1px solid rgba(52,211,153,0.35) !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge{background:#dcfce7 !important;color:#15803d !important;border:1px solid rgba(22,163,74,0.35) !important}
+      .metric.lock-metric.mode-charging.is-unlocked .lock-val,.metric.lock-metric.mode-charging.is-unlocked .unlocked-text{color:#34d399 !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-val,:host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .unlocked-text{color:#15803d !important}
+      .metric.lock-metric.mode-charging.is-unlocked .hint{color:#34d399 !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .hint{color:#15803d !important}
+      .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge{background:rgba(56,189,248,0.16) !important;color:#38bdf8 !important;border:1px solid rgba(56,189,248,0.35) !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge{background:#e0f2fe !important;color:#0284c7 !important;border:1px solid rgba(2,132,199,0.35) !important}
+      .metric.lock-metric.mode-parked.is-unlocked .lock-val,.metric.lock-metric.mode-parked.is-unlocked .unlocked-text{color:#38bdf8 !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-val,:host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .unlocked-text{color:#0284c7 !important}
+      .metric.lock-metric.mode-parked.is-unlocked .hint{color:#38bdf8 !important}
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .hint{color:#0284c7 !important}
     `;
     themeStyle.textContent+=`.battery-history{padding:20px;margin-bottom:16px}.usage-total{padding:8px 0 14px}.usage-total strong{font-size:36px}.usage-total span{font-size:14px}.week-bars{height:110px}.week-bars button{justify-content:center}.week-bars i{max-width:42px}.hours{height:110px}.battery-history h3{margin-top:16px}.usage-stats{margin-top:12px;padding-top:12px}.usage-stats strong{font-size:22px}.chart-key{margin-bottom:10px}
 `;

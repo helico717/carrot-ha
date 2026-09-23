@@ -128,4 +128,22 @@ assert.ok(enContent.includes('Charged this month'), 'English card must have Char
 assert.ok(enContent.includes('Total Odometer'), 'English card must have Total Odometer');
 assert.ok(enContent.includes('Charge cost this month'), 'English card must have Charge cost this month');
 
-console.log('PASS: All Range Candidate 3, bug fixes, and English localization assertions passed successfully!');
+// 8. Verify Lock Icon Badge alignment and centering across all dashboards
+const manifestPath = path.resolve('custom_components/carrot_ha/manifest.json');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+assert.equal(manifest.version, '0.6.10', 'manifest.json version must be 0.6.10');
+
+for (const [name, content] of [['Korean', koContent], ['English', enContent], ['Debug', debugContent]]) {
+  assert.ok(
+    /\.lock-icon-badge\s*\{[^}]*width:\s*32px\s*!important;[^}]*height:\s*32px\s*!important;[^}]*border-radius:\s*50%\s*!important/s.test(content),
+    `${name} dashboard must have circular 32px .lock-icon-badge`
+  );
+  assert.ok(
+    /\.lock-icon-badge\s+ha-icon\s*\{[^}]*display:\s*flex\s*!important;[^}]*align-items:\s*center\s*!important;[^}]*justify-content:\s*center\s*!important;[^}]*margin:\s*0\s*!important/s.test(content),
+    `${name} dashboard must properly reset margin and center ha-icon in .lock-icon-badge`
+  );
+}
+
+console.log('PASS: All Range Candidate 3, lock icon centering, bug fixes, and English localization assertions passed successfully!');
+
+
