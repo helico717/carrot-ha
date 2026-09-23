@@ -369,8 +369,16 @@ export default class CarrotDebugDashboard extends HTMLElement {
       noiseEnabled: false, // BMS quantization jitter simulation
       lang: 'ko',
       theme: 'auto',
-      candidate: 1, // 1 | 2 | 3 | 4 | 5
-      doors_locked: true // true (잠김) | false (열림/미잠김)
+      candidate: 1, // 1 | 2 | 3 | 4 | 5 (lock candidate)
+      rangeCandidate: 1, // 1 | 2 | 3 | 4 | 5 (estimated range candidate)
+      doors_locked: true, // true (잠김) | false (열림/미잠김)
+      doors: {
+        driver: false,         // 운전석 도어
+        passenger: false,      // 조수석 도어
+        rear_driver: false,    // 운전석 뒤 도어
+        rear_passenger: false, // 조수석 뒤 도어
+        trunk: false           // 트렁크
+      }
     };
     this.smoothState = null;
     this._noiseTimer = null;
@@ -532,9 +540,28 @@ export default class CarrotDebugDashboard extends HTMLElement {
       parking_longitude: 126.9780,
       parking_at: this.simulatedParkingAt || new Date(this.scenarioAt).toISOString(),
       latitude: 37.5665,
-      longitude: 126.9780,
-      doors_locked: this.state.doors_locked !== false
+      longitude: 126.9780
     };
+
+    const openDoorsList = [];
+    if (this.state.doors?.driver) openDoorsList.push('운전석 도어');
+    if (this.state.doors?.passenger) openDoorsList.push('조수석 도어');
+    if (this.state.doors?.rear_driver) openDoorsList.push('운전석 뒤 도어');
+    if (this.state.doors?.rear_passenger) openDoorsList.push('조수석 뒤 도어');
+    if (this.state.doors?.trunk) openDoorsList.push('트렁크');
+
+    const anyDoorOpen = openDoorsList.length > 0;
+    const isLocked = !anyDoorOpen && (this.state.doors_locked !== false);
+    v.doors_locked = isLocked;
+    v.open_doors = openDoorsList;
+    v.door_driver_open = !!this.state.doors?.driver;
+    v.door_passenger_open = !!this.state.doors?.passenger;
+    v.door_rear_driver_open = !!this.state.doors?.rear_driver;
+    v.door_rear_passenger_open = !!this.state.doors?.rear_passenger;
+    v.trunk_open = !!this.state.doors?.trunk;
+
+    // sensor.id_4_estimated_range_km (approx 4.6km per 1% SOC on ID.4 77kWh)
+    v.estimated_range_km = Math.round(this.state.soc * 4.6);
 
     v.cloud_raw_state = {device_id:'simulated-debug',onroad:v.onroad?1:0,updated_at:receivedAt};
 
@@ -600,7 +627,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
     if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
-    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v, doors_locked: this.state.doors_locked !== false, candidate: this.state.candidate || 1};
+    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v, doors_locked: isLocked, open_doors: openDoorsList, candidate: this.state.candidate || 1, range_candidate: this.state.rangeCandidate || 1, estimated_range_km: v.estimated_range_km};
     this.dashCard.busy = false;
     this.dashCard.render();
     this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
@@ -1168,7 +1195,54 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <button id="btnLockTrue" class="${this.state.doors_locked !== false ? 'active' : ''}">🔒 도어 잠김 (정상)</button>
                 <button id="btnLockFalse" class="${this.state.doors_locked === false ? 'active charge' : ''}" style="${this.state.doors_locked === false ? 'background:#dc2626;border-color:#ef4444;' : ''}">🔓 도어 열림/미잠김 (경고)</button>
               </div>
-              <div class="charger-section-title" style="margin-top:6px;">🎨 프론트엔드 UI 수정 후보 선택</div>
+
+              <!-- 가상 개별 도어 개폐 제어 (실제 5개 도어 엔터티 반영) -->
+              <div class="charger-section-title" style="margin-top:8px;">🚪 가상 개별 도어 개폐 제어 (5개 도어)</div>
+              <div class="door-toggle-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(80px, 1fr));gap:6px;margin-bottom:6px;">
+                <button class="door-btn ${this.state.doors?.driver ? 'door-open' : ''}" data-door="driver">
+                  <span class="door-state-icon">${this.state.doors?.driver ? '🔴' : '⚪'}</span>
+                  <span>운전석</span>
+                </button>
+                <button class="door-btn ${this.state.doors?.passenger ? 'door-open' : ''}" data-door="passenger">
+                  <span class="door-state-icon">${this.state.doors?.passenger ? '🔴' : '⚪'}</span>
+                  <span>조수석</span>
+                </button>
+                <button class="door-btn ${this.state.doors?.rear_driver ? 'door-open' : ''}" data-door="rear_driver">
+                  <span class="door-state-icon">${this.state.doors?.rear_driver ? '🔴' : '⚪'}</span>
+                  <span>운전석 뒤</span>
+                </button>
+                <button class="door-btn ${this.state.doors?.rear_passenger ? 'door-open' : ''}" data-door="rear_passenger">
+                  <span class="door-state-icon">${this.state.doors?.rear_passenger ? '🔴' : '⚪'}</span>
+                  <span>조수석 뒤</span>
+                </button>
+                <button class="door-btn ${this.state.doors?.trunk ? 'door-open' : ''}" data-door="trunk">
+                  <span class="door-state-icon">${this.state.doors?.trunk ? '🔴' : '⚪'}</span>
+                  <span>트렁크</span>
+                </button>
+              </div>
+              <div class="btn-group" style="margin-bottom: 8px;">
+                <button id="btnAllDoorsClose" class="preset-btn" style="flex:1;">✓ 모든 도어 닫기</button>
+                <button id="btnAllDoorsOpen" class="preset-btn" style="flex:1;">⚠️ 모든 도어 열기</button>
+              </div>
+
+              <!-- 주행가능거리 표시 방법 후보 선택 -->
+              <div class="charger-section-title" style="margin-top:12px;">⚡ 배터리 카드 주행가능거리 표기 후보 선택 (sensor.id_4_estimated_range_km)</div>
+              <div class="btn-group" id="rangeCandidateBtns">
+                <button data-range-candidate="1" class="${(this.state.rangeCandidate || 1) === 1 ? 'active' : ''}">후보 1<small>인라인 슬래시</small></button>
+                <button data-range-candidate="2" class="${this.state.rangeCandidate === 2 ? 'active' : ''}">후보 2<small>우측 독립 캡슐</small></button>
+                <button data-range-candidate="3" class="${this.state.rangeCandidate === 3 ? 'active' : ''}">후보 3<small>하단 서브텍스트</small></button>
+                <button data-range-candidate="4" class="${this.state.rangeCandidate === 4 ? 'active' : ''}">후보 4<small>상단 헤더 칩</small></button>
+                <button data-range-candidate="5" class="${this.state.rangeCandidate === 5 ? 'active' : ''}">후보 5<small>계기판 듀얼 캡슐</small></button>
+              </div>
+              <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;margin-bottom:10px;">
+                • <b>후보 1 (인라인 슬래시)</b>: SOC 옆에 <code>| 340 km</code> 구분선과 함께 배치 (가장 단정하고 컴팩트)<br>
+                • <b>후보 2 (우측 독립 캡슐)</b>: 카드 우측 끝에 <code>주행 가능 340 km</code> 글래스 배지 독립 배치 (좌우 시각 밸런스)<br>
+                • <b>후보 3 (하단 서브텍스트)</b>: SOC 숫자 바로 아래에 <code>약 340 km 주행 가능</code> 서브텍스트 (계층적 가독성)<br>
+                • <b>후보 4 (상단 헤더 칩)</b>: 상단 상태 라벨 옆에 <code>[🔋 340 km]</code> 인라인 칩 배치 (메인 영역 100% 여유)<br>
+                • <b>후보 5 (계기판 듀얼 캡슐)</b>: 최신 EV 계기판 스타일의 <code>[ ⚡ 340 km ]</code> 전용 캡슐 결합 (모빌리티 완성도)
+              </div>
+
+              <div class="charger-section-title" style="margin-top:6px;">🎨 프론트엔드 UI 수정 후보 선택 (잠금 카드)</div>
               <div class="btn-group">
                 <button data-candidate="1" class="${(this.state.candidate || 1) === 1 ? 'active' : ''}">후보 1<small>클래식 서클</small></button>
                 <button data-candidate="2" class="${this.state.candidate === 2 ? 'active' : ''}">후보 2<small>볼드 실드</small></button>
@@ -1731,15 +1805,27 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const chargeLabel = isEmergency ? '비상충전중 (1kW)...' : (isFast ? '고속충전중...' : '완속충전중...');
       const sweepSpeedClass = isFast ? 'fast' : 'slow';
 
-      const isLocked = this.state.doors_locked !== false;
+      const openDoors = v.open_doors || [];
+      const isLocked = v.doors_locked !== false && openDoors.length === 0;
       const candidate = this.state.candidate || 1;
 
       // 1. Lock Status Card Renderer (Candidate 1 ~ 5)
-      const renderLockMetric = (locked, isChargingMode, c = 1) => {
+      const renderLockMetric = (locked, isChargingMode, doorsList = [], c = 1) => {
         const modeClass = isChargingMode ? 'mode-charging' : 'mode-parked';
         const lockClass = locked ? 'is-locked' : 'is-unlocked';
-        const hintText = locked ? '모든 도어 닫힘 및 잠김' : '도어 열림';
         const statusText = locked ? '잠김' : '열림';
+
+        let hintText = '';
+        if (locked) {
+          hintText = '모든 도어 닫힘 및 잠김';
+        } else if (!doorsList || doorsList.length === 0) {
+          hintText = '도어 열림';
+        } else if (doorsList.length === 1) {
+          hintText = `${doorsList[0]} 열림`;
+        } else {
+          // 2개 이상의 도어가 열려있다면: (열려있는 도어 이름 1개) 외 (열려있는 도어 개수)개 열림
+          hintText = `${doorsList[0]} 외 ${doorsList.length - 1}개 열림`;
+        }
 
         if (c === 1) {
           return `
@@ -1902,11 +1988,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const sessionCostSub = `+${n(sessionKwh, 1)} kWh (추정)`;
 
       const quickMetrics = charging
-        ? `${renderLockMetric(isLocked, true, candidate)}` +
+        ? `${renderLockMetric(isLocked, true, openDoors, candidate)}` +
           `${metric(etaCardTitle, etaCardMainVal, '', 'clock-end', etaCardSubText, 'charge-eta')}` +
           `${metric('실시간 충전금액', n(sessionCost, 0), '원', 'cash', sessionCostSub, 'charge-cost')}` +
           `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}`
-        : `${renderLockMetric(isLocked, false, candidate)}` +
+        : `${renderLockMetric(isLocked, false, openDoors, candidate)}` +
           `${metric('총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
           `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}` +
           `${metric('이번 달 충전요금', n(v.month_charge_cost, 0), '원', 'cash', '(추정)')}`;
@@ -1920,26 +2006,207 @@ export default class CarrotDebugDashboard extends HTMLElement {
         ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam ${sweepSpeedClass}"></div></div></div>`
         : (isDriving ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>` : '');
 
-      const energyHeadHtml = charging
-        ? `<div class="energy-head charging-left">
-            <div class="charge-head-main">
-              <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
-              <div class="charge-info-stack">
-                <div class="charge-status-line">
-                  <span class="charge-status-label">${chargeLabel}</span>
-                  ${powerKw != null ? `<span class="charge-power-tag ${isFast ? 'fast' : 'slow'}">${n(powerKw, 1)} kW</span>` : ''}
+      const rangeKm = typeof v.estimated_range_km === 'number' && Number.isFinite(v.estimated_range_km)
+        ? v.estimated_range_km
+        : Math.round((soc ?? 0) * 4.6);
+      const rc = this.state.rangeCandidate || 1;
+
+      const renderEnergyHead = (isChargingMode, isDrivingMode, socVal, cLabel, pKw, fast, rKm, rCand) => {
+        const rangeNum = typeof rKm === 'number' && Number.isFinite(rKm) ? rKm : '—';
+        const powerTag = pKw != null ? `<span class="charge-power-tag ${fast ? 'fast' : 'slow'}">${n(pKw, 1)} kW</span>` : '';
+        const batteryIconSvg = `<svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>`;
+        const driveModeIcon = isDrivingMode ? '🛣️' : '🔋';
+
+        if (isChargingMode) {
+          if (rCand === 1) {
+            return `
+              <div class="energy-head charging-left range-c1">
+                <div class="charge-head-main">
+                  <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+                  <div class="charge-info-stack">
+                    <div class="charge-status-line">
+                      <span class="charge-status-label">${cLabel}</span>
+                      ${powerTag}
+                    </div>
+                    <div class="soc-row-inline">
+                      <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                      <span class="range-inline-c1">
+                        <span class="range-sep">|</span>
+                        <span class="range-val">${rangeNum}</span>
+                        <span class="range-unit">km</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+              </div>`;
+          }
+          if (rCand === 2) {
+            return `
+              <div class="energy-head charging-left range-c2">
+                <div class="charge-head-main">
+                  <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+                  <div class="charge-info-stack">
+                    <div class="charge-status-line">
+                      <span class="charge-status-label">${cLabel}</span>
+                      ${powerTag}
+                    </div>
+                    <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                  </div>
+                </div>
+                <div class="range-capsule-c2">
+                  <span class="rc-label">주행 가능</span>
+                  <div class="rc-val"><b>${rangeNum}</b><small>km</small></div>
+                </div>
+              </div>`;
+          }
+          if (rCand === 3) {
+            return `
+              <div class="energy-head charging-left range-c3">
+                <div class="charge-head-main">
+                  <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+                  <div class="charge-info-stack">
+                    <div class="charge-status-line">
+                      <span class="charge-status-label">${cLabel}</span>
+                      ${powerTag}
+                    </div>
+                    <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                    <div class="range-sub-c3">
+                      <span class="rs-dot"></span>
+                      <span>예상 주행가능거리 <b>${rangeNum} km</b></span>
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+          }
+          if (rCand === 4) {
+            return `
+              <div class="energy-head charging-left range-c4">
+                <div class="charge-head-main">
+                  <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+                  <div class="charge-info-stack">
+                    <div class="charge-status-line">
+                      <span class="charge-status-label">${cLabel}</span>
+                      ${powerTag}
+                      <span class="range-chip-c4">
+                        <svg viewBox="0 0 24 24" class="rc-chip-icon"><path d="M12 2C6.48 2 2 6.48 2 12c0 3.54 1.84 6.66 4.64 8.44.33.21.76.19 1.05-.07.31-.28.37-.73.17-1.08A7.95 7.95 0 0 1 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.76-1.4 5.2-3.53 6.65-.33.23-.42.67-.23 1.03.19.36.63.5 1 .32C19.78 18.23 22 15.38 22 12c0-5.52-4.48-10-10-10zm-1 5.5v5.09c-.6.35-1 .99-1 1.74 0 1.1.9 2 2 2s2-.9 2-2c0-.75-.4-1.39-1-1.74V7.5c0-.28-.22-.5-.5-.5s-.5.22-.5.5z"/></svg>
+                        <b>${rangeNum}</b> km
+                      </span>
+                    </div>
+                    <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                  </div>
+                </div>
+              </div>`;
+          }
+          // Candidate 5: Instrument Twin Gauge Pill
+          return `
+            <div class="energy-head charging-left range-c5">
+              <div class="charge-head-main">
+                <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+                <div class="charge-info-stack">
+                  <div class="charge-status-line">
+                    <span class="charge-status-label">${cLabel}</span>
+                    ${powerTag}
+                  </div>
+                  <div class="soc-twin-row-c5">
+                    <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                    <div class="range-twin-c5">
+                      <span class="rt-icon">⚡</span>
+                      <div class="rt-stack">
+                        <span class="rt-top">주행가능</span>
+                        <span class="rt-num"><b>${rangeNum}</b><small>km</small></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>`
-        : `<div class="energy-head">
+            </div>`;
+        }
+
+        // Non-charging Mode (Parked / Driving)
+        if (rCand === 1) {
+          return `
+            <div class="energy-head range-c1">
+              <div class="battery-label">
+                ${batteryIconSvg}
+                <span>배터리 잔량</span>
+              </div>
+              <div class="soc-row-inline">
+                <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                <span class="range-inline-c1">
+                  <span class="range-sep">|</span>
+                  <span class="range-val">${rangeNum}</span>
+                  <span class="range-unit">km</span>
+                </span>
+              </div>
+            </div>`;
+        }
+        if (rCand === 2) {
+          return `
+            <div class="energy-head range-c2">
+              <div class="battery-label">
+                ${batteryIconSvg}
+                <span>배터리 잔량</span>
+              </div>
+              <div class="right-stack-c2">
+                <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                <div class="range-capsule-c2">
+                  <span class="rc-label">주행 가능</span>
+                  <div class="rc-val"><b>${rangeNum}</b><small>km</small></div>
+                </div>
+              </div>
+            </div>`;
+        }
+        if (rCand === 3) {
+          return `
+            <div class="energy-head range-c3">
+              <div class="battery-label">
+                ${batteryIconSvg}
+                <span>배터리 잔량</span>
+              </div>
+              <div class="soc-stack-c3">
+                <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+                <div class="range-sub-c3">
+                  <span class="rs-dot"></span>
+                  <span>주행가능거리 약 <b>${rangeNum} km</b></span>
+                </div>
+              </div>
+            </div>`;
+        }
+        if (rCand === 4) {
+          return `
+            <div class="energy-head range-c4">
+              <div class="battery-label">
+                ${batteryIconSvg}
+                <span>배터리 잔량</span>
+                <span class="range-chip-c4">
+                  <svg viewBox="0 0 24 24" class="rc-chip-icon"><path d="M12 2C6.48 2 2 6.48 2 12c0 3.54 1.84 6.66 4.64 8.44.33.21.76.19 1.05-.07.31-.28.37-.73.17-1.08A7.95 7.95 0 0 1 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.76-1.4 5.2-3.53 6.65-.33.23-.42.67-.23 1.03.19.36.63.5 1 .32C19.78 18.23 22 15.38 22 12c0-5.52-4.48-10-10-10zm-1 5.5v5.09c-.6.35-1 .99-1 1.74 0 1.1.9 2 2 2s2-.9 2-2c0-.75-.4-1.39-1-1.74V7.5c0-.28-.22-.5-.5-.5s-.5.22-.5.5z"/></svg>
+                  <b>${rangeNum}</b> km
+                </span>
+              </div>
+              <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+            </div>`;
+        }
+        // Candidate 5: Instrument Twin Gauge Pill
+        return `
+          <div class="energy-head range-c5">
             <div class="battery-label">
-              <svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>
+              ${batteryIconSvg}
               <span>배터리 잔량</span>
             </div>
-            <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+            <div class="soc-twin-row-c5">
+              <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
+              <div class="range-twin-c5">
+                <span class="rt-icon">${driveModeIcon}</span>
+                <div class="rt-stack">
+                  <span class="rt-top">주행가능</span>
+                  <span class="rt-num"><b>${rangeNum}</b><small>km</small></span>
+                </div>
+              </div>
+            </div>
           </div>`;
+      };
+
+      const energyHeadHtml = renderEnergyHead(charging, isDriving, soc, chargeLabel, powerKw, isFast, rangeKm, rc);
 
       const socState = !charging && soc !== null ? (soc < 15 ? 'is-critical soc-critical' : soc < 30 ? 'is-low soc-low' : '') : '';
 
@@ -2645,6 +2912,203 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
       }
 
+      /* === Battery Card Range Candidates (Candidate 1 ~ 5) === */
+
+      /* Candidate 1: Inline Divider beside SOC */
+      .soc-row-inline {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 6px !important;
+        flex-wrap: wrap !important;
+      }
+      .range-inline-c1 {
+        display: inline-flex !important;
+        align-items: baseline !important;
+        font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        color: rgba(255, 255, 255, 0.92) !important;
+      }
+      .range-inline-c1 .range-sep {
+        font-size: 22px !important;
+        font-weight: 300 !important;
+        color: rgba(255, 255, 255, 0.35) !important;
+        margin: 0 4px !important;
+      }
+      .range-inline-c1 .range-val {
+        font-size: 22px !important;
+        font-weight: 750 !important;
+        letter-spacing: -0.4px !important;
+        font-variant-numeric: tabular-nums !important;
+        color: #ffffff !important;
+      }
+      .range-inline-c1 .range-unit {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.75) !important;
+        margin-left: 2px !important;
+      }
+
+      /* Candidate 2: Right-Aligned Capsule Badge */
+      .energy-head.range-c2 {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+      }
+      .right-stack-c2 {
+        display: flex !important;
+        align-items: center !important;
+        gap: 14px !important;
+      }
+      .range-capsule-c2 {
+        background: rgba(0, 0, 0, 0.35) !important;
+        border: 1px solid rgba(255, 255, 255, 0.22) !important;
+        border-radius: 12px !important;
+        padding: 5px 12px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-end !important;
+        backdrop-filter: blur(8px) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+        flex-shrink: 0 !important;
+      }
+      .range-capsule-c2 .rc-label {
+        font-size: 10.5px !important;
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+        letter-spacing: -0.2px !important;
+        line-height: 1.1 !important;
+      }
+      .range-capsule-c2 .rc-val {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 2px !important;
+      }
+      .range-capsule-c2 .rc-val b {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        letter-spacing: -0.3px !important;
+        font-variant-numeric: tabular-nums !important;
+      }
+      .range-capsule-c2 .rc-val small {
+        font-size: 11.5px !important;
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.75) !important;
+      }
+
+      /* Candidate 3: Under-SOC Subtitle Line */
+      .soc-stack-c3 {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-end !important;
+      }
+      .range-sub-c3 {
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        margin-top: 4px !important;
+        font-size: 12px !important;
+        color: rgba(255, 255, 255, 0.85) !important;
+        font-weight: 550 !important;
+        letter-spacing: -0.2px !important;
+      }
+      .range-sub-c3 .rs-dot {
+        width: 5px !important;
+        height: 5px !important;
+        border-radius: 50% !important;
+        background: #34d399 !important;
+        display: inline-block !important;
+      }
+      .energy:not(.is-charging) .range-sub-c3 .rs-dot {
+        background: #38bdf8 !important;
+      }
+      .range-sub-c3 b {
+        font-weight: 750 !important;
+        color: #ffffff !important;
+      }
+
+      /* Candidate 4: Header Inline Status Chip */
+      .range-chip-c4 {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        padding: 2px 8px !important;
+        border-radius: 6px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        background: rgba(0, 0, 0, 0.35) !important;
+        border: 1px solid rgba(255, 255, 255, 0.22) !important;
+        color: #ffffff !important;
+        margin-left: 6px !important;
+      }
+      .range-chip-c4 .rc-chip-icon {
+        width: 13px !important;
+        height: 13px !important;
+        fill: #ffffff !important;
+        opacity: 0.85 !important;
+      }
+      .range-chip-c4 b {
+        font-weight: 800 !important;
+        font-variant-numeric: tabular-nums !important;
+      }
+
+      /* Candidate 5: Instrument Twin Gauge Pill */
+      .soc-twin-row-c5 {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+      }
+      .range-twin-c5 {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 7px !important;
+        background: rgba(0, 0, 0, 0.38) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 10px !important;
+        padding: 4px 10px !important;
+        backdrop-filter: blur(6px) !important;
+      }
+      .range-twin-c5 .rt-icon {
+        font-size: 15px !important;
+        line-height: 1 !important;
+      }
+      .range-twin-c5 .rt-stack {
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      .range-twin-c5 .rt-top {
+        font-size: 9.5px !important;
+        color: rgba(255, 255, 255, 0.65) !important;
+        line-height: 1 !important;
+        letter-spacing: -0.2px !important;
+      }
+      .range-twin-c5 .rt-num {
+        display: flex !important;
+        align-items: baseline !important;
+        gap: 2px !important;
+        line-height: 1.15 !important;
+      }
+      .range-twin-c5 .rt-num b {
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        color: #ffffff !important;
+        font-variant-numeric: tabular-nums !important;
+      }
+      .range-twin-c5 .rt-num small {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: rgba(255, 255, 255, 0.75) !important;
+      }
+
+      @container (max-width: 380px) {
+        .range-inline-c1 .range-val { font-size: 18px !important; }
+        .range-inline-c1 .range-sep { font-size: 18px !important; }
+        .range-capsule-c2 .rc-val b { font-size: 16px !important; }
+        .range-sub-c3 { font-size: 11px !important; }
+        .range-chip-c4 { font-size: 11px !important; padding: 1.5px 6px !important; }
+        .range-twin-c5 .rt-num b { font-size: 14.5px !important; }
+      }
+
       /* Lock Metric Card General */
       .quick-metrics .metric.lock-metric {
         display: flex !important;
@@ -2677,11 +3141,35 @@ export default class CarrotDebugDashboard extends HTMLElement {
         width: 32px !important;
         height: 32px !important;
         border-radius: 50% !important;
-        display: inline-flex !important;
+        display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         flex-shrink: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 0 !important;
+        box-sizing: border-box !important;
         transition: all 0.2s ease !important;
+      }
+      .quick-metrics .metric.lock-metric .lock-icon-badge ha-icon {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 18px !important;
+        height: 18px !important;
+        --mdc-icon-size: 18px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 0 !important;
+        transform: translateY(0.75px) !important;
+      }
+      .quick-metrics .metric.lock-metric .lock-icon-badge ha-icon svg,
+      .quick-metrics .metric.lock-metric .lock-icon-badge svg {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
       }
       .quick-metrics .metric.lock-metric .lock-val {
         font-size: 22px !important;
@@ -2702,58 +3190,121 @@ export default class CarrotDebugDashboard extends HTMLElement {
         text-overflow: ellipsis !important;
       }
 
-      /* Point Colors: Charging Mode = Green (#34d399 / #15803d) */
-      .metric.lock-metric.mode-charging.is-locked .lock-icon-badge {
+      /* Locked State (잠겨있을 경우): 다른 카드의 중요한 텍스트 색상과 동일 */
+      .metric.lock-metric.is-locked .lock-icon-badge {
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: var(--ink, #ffffff) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.is-locked .lock-icon-badge {
+        background: rgba(0, 0, 0, 0.06) !important;
+        color: #0f172a !important;
+        border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      }
+      .metric.lock-metric.is-locked .lock-val,
+      .metric.lock-metric.is-locked .locked-text {
+        color: var(--ink, #ffffff) !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.is-locked .lock-val,
+      :host([data-theme="light"]) .metric.lock-metric.is-locked .locked-text {
+        color: #0f172a !important;
+      }
+      .metric.lock-metric.is-locked .hint {
+        color: var(--muted) !important;
+      }
+
+      /* Unlocked / Door Open (열려있음 일 경우): 충전중(초록)/주차중(파랑) 포인트 색상 */
+      .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge {
         background: rgba(16, 185, 129, 0.16) !important;
         color: #34d399 !important;
+        border: 1px solid rgba(52, 211, 153, 0.35) !important;
       }
-      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-locked .lock-icon-badge {
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-icon-badge {
         background: #dcfce7 !important;
         color: #15803d !important;
+        border: 1px solid rgba(22, 163, 74, 0.35) !important;
       }
-      .metric.lock-metric.mode-charging.is-locked .locked-text {
+      .metric.lock-metric.mode-charging.is-unlocked .lock-val,
+      .metric.lock-metric.mode-charging.is-unlocked .unlocked-text {
         color: #34d399 !important;
       }
-      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-locked .locked-text {
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .lock-val,
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .unlocked-text {
+        color: #15803d !important;
+      }
+      .metric.lock-metric.mode-charging.is-unlocked .hint {
+        color: #34d399 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-unlocked .hint {
         color: #15803d !important;
       }
 
-      /* Point Colors: Parked Mode = Blue (#38bdf8 / #0284c7) */
-      .metric.lock-metric.mode-parked.is-locked .lock-icon-badge {
+      .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge {
         background: rgba(56, 189, 248, 0.16) !important;
         color: #38bdf8 !important;
+        border: 1px solid rgba(56, 189, 248, 0.35) !important;
       }
-      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-locked .lock-icon-badge {
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-icon-badge {
         background: #e0f2fe !important;
         color: #0284c7 !important;
+        border: 1px solid rgba(2, 132, 199, 0.35) !important;
       }
-      .metric.lock-metric.mode-parked.is-locked .locked-text {
+      .metric.lock-metric.mode-parked.is-unlocked .lock-val,
+      .metric.lock-metric.mode-parked.is-unlocked .unlocked-text {
         color: #38bdf8 !important;
       }
-      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-locked .locked-text {
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .lock-val,
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .unlocked-text {
+        color: #0284c7 !important;
+      }
+      .metric.lock-metric.mode-parked.is-unlocked .hint {
+        color: #38bdf8 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-unlocked .hint {
         color: #0284c7 !important;
       }
 
-      /* Warning: Unlocked / Door Open = Red (#f87171 / #dc2626) */
-      .metric.lock-metric.is-unlocked .lock-icon-badge {
-        background: rgba(239, 68, 68, 0.18) !important;
-        color: #f87171 !important;
+      /* Virtual Door Controls in Debug Panel */
+      .door-toggle-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6px !important;
+        margin-bottom: 6px !important;
       }
-      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .lock-icon-badge {
+      .door-btn {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        padding: 7px 10px !important;
+        font-size: 12px !important;
+        font-weight: 650 !important;
+        background: #21262d !important;
+        color: #c9d1d9 !important;
+        border: 1px solid #30363d !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+      }
+      .door-btn:hover {
+        background: #30363d !important;
+        color: #fff !important;
+      }
+      .door-btn.door-open {
+        background: rgba(239, 68, 68, 0.22) !important;
+        color: #fca5a5 !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.25) !important;
+      }
+      :host([data-theme="light"]) .door-btn {
+        background: #f1f5f9 !important;
+        color: #334155 !important;
+        border-color: #cbd5e1 !important;
+      }
+      :host([data-theme="light"]) .door-btn.door-open {
         background: #fee2e2 !important;
-        color: #dc2626 !important;
-      }
-      .metric.lock-metric.is-unlocked .unlocked-text {
-        color: #f87171 !important;
-      }
-      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .unlocked-text {
-        color: #dc2626 !important;
-      }
-      .metric.lock-metric.is-unlocked .hint {
-        color: #f87171 !important;
-      }
-      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .hint {
-        color: #dc2626 !important;
+        color: #b91c1c !important;
+        border-color: #f87171 !important;
       }
 
       /* Candidate 2: Bold Security Shield & High Visibility */
@@ -2769,13 +3320,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
         --mdc-icon-size: 26px !important;
       }
       .metric.lock-metric.c2.is-locked ha-icon {
-        color: #38bdf8 !important;
+        color: var(--ink, #ffffff) !important;
       }
       :host([data-theme="light"]) .metric.lock-metric.c2.is-locked ha-icon {
-        color: #0284c7 !important;
+        color: #0f172a !important;
       }
-      .metric.lock-metric.c2.is-unlocked ha-icon {
-        color: #f87171 !important;
+      .metric.lock-metric.c2.mode-charging.is-unlocked ha-icon {
+        color: #34d399 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c2.mode-charging.is-unlocked ha-icon {
+        color: #15803d !important;
+      }
+      .metric.lock-metric.c2.mode-parked.is-unlocked ha-icon {
+        color: #38bdf8 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c2.mode-parked.is-unlocked ha-icon {
+        color: #0284c7 !important;
       }
       .metric.lock-metric.c2 .lock-val {
         font-size: 23px !important;
@@ -2794,10 +3354,16 @@ export default class CarrotDebugDashboard extends HTMLElement {
         width: 5px;
       }
       .metric.lock-metric.c3 .accent-stripe.locked {
+        background: rgba(255, 255, 255, 0.25);
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c3 .accent-stripe.locked {
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .metric.lock-metric.c3.mode-charging .accent-stripe.unlocked {
         background: linear-gradient(180deg, #10b981 0%, #059669 100%);
       }
-      .metric.lock-metric.c3 .accent-stripe.unlocked {
-        background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      .metric.lock-metric.c3.mode-parked .accent-stripe.unlocked {
+        background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
       }
       .metric.lock-metric.c3 .lock-top-meta {
         display: flex;
@@ -2806,10 +3372,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
         margin-bottom: 6px;
       }
       .metric.lock-metric.c3.is-locked .lock-top-meta ha-icon {
+        color: var(--ink, #ffffff);
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c3.is-locked .lock-top-meta ha-icon {
+        color: #0f172a;
+      }
+      .metric.lock-metric.c3.mode-charging.is-unlocked .lock-top-meta ha-icon {
         color: #34d399;
       }
-      .metric.lock-metric.c3.is-unlocked .lock-top-meta ha-icon {
-        color: #f87171;
+      :host([data-theme="light"]) .metric.lock-metric.c3.mode-charging.is-unlocked .lock-top-meta ha-icon {
+        color: #15803d;
+      }
+      .metric.lock-metric.c3.mode-parked.is-unlocked .lock-top-meta ha-icon {
+        color: #38bdf8;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c3.mode-parked.is-unlocked .lock-top-meta ha-icon {
+        color: #0284c7;
       }
 
       /* Candidate 4: Glassmorphism & Status Pill */
@@ -2838,20 +3416,28 @@ export default class CarrotDebugDashboard extends HTMLElement {
         letter-spacing: 0.3px;
       }
       .metric.lock-metric.c4 .status-pill.locked {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--ink, #ffffff);
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c4 .status-pill.locked {
+        background: rgba(0, 0, 0, 0.06);
+        color: #0f172a;
+      }
+      .metric.lock-metric.c4.mode-charging .status-pill.unlocked {
         background: rgba(16, 185, 129, 0.2);
         color: #34d399;
       }
-      :host([data-theme="light"]) .metric.lock-metric.c4 .status-pill.locked {
+      :host([data-theme="light"]) .metric.lock-metric.c4.mode-charging .status-pill.unlocked {
         background: #dcfce7;
         color: #15803d;
       }
-      .metric.lock-metric.c4 .status-pill.unlocked {
-        background: rgba(239, 68, 68, 0.2);
-        color: #f87171;
+      .metric.lock-metric.c4.mode-parked .status-pill.unlocked {
+        background: rgba(56, 189, 248, 0.2);
+        color: #38bdf8;
       }
-      :host([data-theme="light"]) .metric.lock-metric.c4 .status-pill.unlocked {
-        background: #fee2e2;
-        color: #b91c1c;
+      :host([data-theme="light"]) .metric.lock-metric.c4.mode-parked .status-pill.unlocked {
+        background: #e0f2fe;
+        color: #0284c7;
       }
 
       /* Candidate 5: High-Contrast Alert Guard */
@@ -3122,27 +3708,70 @@ export default class CarrotDebugDashboard extends HTMLElement {
       });
     });
 
-    // Door lock toggles
+    // Door lock and virtual door toggles
     const btnLockTrue = root.querySelector('#btnLockTrue');
     const btnLockFalse = root.querySelector('#btnLockFalse');
     const lockVal = root.querySelector('#lockStatusVal');
 
+    const updateDoorsUI = () => {
+      const doors = this.state.doors || {};
+      const doorKeys = ['driver', 'passenger', 'rear_driver', 'rear_passenger', 'trunk'];
+      doorKeys.forEach(k => {
+        const btn = root.querySelector(`.door-btn[data-door="${k}"]`);
+        if (btn) {
+          const isOpen = !!doors[k];
+          btn.className = `door-btn ${isOpen ? 'door-open' : ''}`;
+          const iconSpan = btn.querySelector('.door-state-icon');
+          if (iconSpan) iconSpan.textContent = isOpen ? '🔴' : '⚪';
+        }
+      });
+      updateLockUI();
+    };
+
     const updateLockUI = () => {
-      const isLocked = this.state.doors_locked !== false;
+      const anyDoorOpen = Object.values(this.state.doors || {}).some(Boolean);
+      const isLocked = !anyDoorOpen && (this.state.doors_locked !== false);
       if (btnLockTrue) btnLockTrue.className = isLocked ? 'active' : '';
       if (btnLockFalse) {
         btnLockFalse.className = !isLocked ? 'active charge' : '';
         btnLockFalse.style = !isLocked ? 'background:#dc2626;border-color:#ef4444;' : '';
       }
       if (lockVal) {
-        lockVal.textContent = isLocked ? '🔒 잠김 (정상)' : '🔓 열림 (경고)';
+        if (anyDoorOpen) {
+          const openCount = Object.values(this.state.doors || {}).filter(Boolean).length;
+          lockVal.textContent = `🔓 열림 (도어 ${openCount}개 열림)`;
+        } else {
+          lockVal.textContent = isLocked ? '🔒 잠김 (정상)' : '🔓 열림 (경고)';
+        }
       }
     };
+
+    // Range candidate buttons binding
+    const updateRangeCandidateBtns = () => {
+      root.querySelectorAll('#rangeCandidateBtns [data-range-candidate]').forEach(btn => {
+        const rc = Number(btn.dataset.rangeCandidate);
+        btn.className = (this.state.rangeCandidate || 1) === rc ? 'active' : '';
+      });
+    };
+    root.querySelectorAll('#rangeCandidateBtns [data-range-candidate]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.state.rangeCandidate = Number(btn.dataset.rangeCandidate);
+        updateRangeCandidateBtns();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    });
 
     if (btnLockTrue) {
       btnLockTrue.addEventListener('click', () => {
         this.state.doors_locked = true;
-        updateLockUI();
+        // When locking, close open doors if any
+        if (this.state.doors) {
+          Object.keys(this.state.doors).forEach(k => this.state.doors[k] = false);
+        }
+        updateDoorsUI();
         this.applyDebugTelemetry();
         if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
           window.__updatePreviewToolbar(this.state);
@@ -3160,13 +3789,64 @@ export default class CarrotDebugDashboard extends HTMLElement {
       });
     }
 
+    // Door toggle buttons
+    root.querySelectorAll('.door-btn[data-door]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const doorKey = btn.dataset.door;
+        if (!this.state.doors) this.state.doors = {};
+        this.state.doors[doorKey] = !this.state.doors[doorKey];
+        if (this.state.doors[doorKey]) {
+          // If a door is open, vehicle is unlocked
+          this.state.doors_locked = false;
+        }
+        updateDoorsUI();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    });
+
+    const btnAllDoorsClose = root.querySelector('#btnAllDoorsClose');
+    if (btnAllDoorsClose) {
+      btnAllDoorsClose.addEventListener('click', () => {
+        if (!this.state.doors) this.state.doors = {};
+        Object.keys(this.state.doors).forEach(k => this.state.doors[k] = false);
+        this.state.doors_locked = true;
+        updateDoorsUI();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    }
+
+    const btnAllDoorsOpen = root.querySelector('#btnAllDoorsOpen');
+    if (btnAllDoorsOpen) {
+      btnAllDoorsOpen.addEventListener('click', () => {
+        if (!this.state.doors) this.state.doors = {};
+        Object.keys(this.state.doors).forEach(k => this.state.doors[k] = true);
+        this.state.doors_locked = false;
+        updateDoorsUI();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    }
+
     // Expose method so preview toolbar can sync this component
     this.__syncFromExternal = (newState) => {
       if (typeof newState.candidate === 'number') this.state.candidate = newState.candidate;
+      if (typeof newState.rangeCandidate === 'number') this.state.rangeCandidate = newState.rangeCandidate;
       if (typeof newState.doors_locked === 'boolean') this.state.doors_locked = newState.doors_locked;
+      if (newState.doors && typeof newState.doors === 'object') {
+        this.state.doors = { ...this.state.doors, ...newState.doors };
+      }
       if (typeof newState.mode === 'string') this.state.mode = newState.mode;
       updateCandidateBtns();
-      updateLockUI();
+      updateRangeCandidateBtns();
+      updateDoorsUI();
       updateModeBtns();
       this.applyDebugTelemetry();
     };
