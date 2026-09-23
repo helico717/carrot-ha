@@ -1,6 +1,7 @@
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .vehicle import values
 from .telemetry import OPTIONAL_FIELDS
+from .entity_migration import ESTIMATED_OBJECT_IDS, comma_device_info
 
 class VehicleEntity:
     _attr_should_poll = False
@@ -10,8 +11,10 @@ class VehicleEntity:
         self._attr_name, self._attr_icon = name, icon
         self._attr_unique_id = entry.data['device_id'] + '_' + key
         legacy = {'soc_percent':'battery','odometer_km':'odometer','outside_temp_c':'outside_temperature','aux_voltage':'auxiliary_voltage','charge_power_w':'estimated_charging_power'}
-        self._object_id = legacy.get(key,key)
+        self._object_id = ESTIMATED_OBJECT_IDS.get(key, legacy.get(key,key))
         self._attr_device_info = {'identifiers':{('carrot_ha',entry.data['device_id'])},'name':entry.title,'manufacturer':'Volkswagen','model':entry.options.get('vehicle_model','Volkswagen MEB')}
+        if key.startswith('comma_'):
+            self._attr_device_info = comma_device_info(entry)
     @property
     def suggested_object_id(self): return self._object_id
     @property

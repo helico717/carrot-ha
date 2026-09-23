@@ -41,6 +41,8 @@ async def async_setup_entry(hass, entry):
     latest = await hass.async_add_executor_job(archive.latest, entry.data['device_id'])
     hass.data[DOMAIN][entry.entry_id] = {'entry': entry, 'archive': archive, 'lock': asyncio.Lock(), 'latest': latest}
     hass.data[DOMAIN][entry.entry_id]['summary'] = await hass.async_add_executor_job(archive.overview, entry.data['device_id'])
+    from .entity_migration import migrate_entities
+    migrate_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, ['sensor','binary_sensor','device_tracker'])
     entry.async_on_unload(entry.add_update_listener(_options_updated))
     from datetime import timedelta

@@ -7,7 +7,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_time_interval
 
 async def async_setup_entry(hass,entry,async_add_entities):
-    async_add_entities([Flag(entry,*spec) for spec in [('onroad','주행 모드','mdi:car'),('charging','충전 중 추정','mdi:ev-station'),('ac_on','에어컨 작동','mdi:snowflake'),('stale','차량 데이터 오래됨','mdi:clock-alert'),('enabled','주행 보조 활성','mdi:steering')]])
+    async_add_entities([Flag(entry,*spec) for spec in [('onroad','주행 모드','mdi:car'),('charging','충전 중 (추정)','mdi:ev-station'),('ac_on','에어컨 작동','mdi:snowflake'),('stale','차량 데이터 오래됨','mdi:clock-alert'),('enabled','주행 보조 활성','mdi:steering')]])
     async_add_entities([CommaConnection(entry), EmergencyCharging(entry)])
     async_add_entities([TelemetryFlag(entry, key, *spec) for key, spec in BINARY_FIELDS.items()])
 
@@ -15,7 +15,7 @@ class EmergencyCharging(VehicleEntity, BinarySensorEntity):
     _attr_device_class = 'problem'
 
     def __init__(self, entry):
-        self.configure(entry, 'emergency_charging', '비상 충전 모드 추정', 'mdi:power-plug-off')
+        self.configure(entry, 'emergency_charging', '비상 충전 모드 (추정)', 'mdi:power-plug-off')
 
     @property
     def is_on(self):

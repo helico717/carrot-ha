@@ -639,7 +639,7 @@ class CarrotDashboard extends HTMLElement {
 
     const batteryItems=[
       row('battery','Battery level',n(v.soc_percent),'%'),
-      row('car-electric','Range',n(v.range_km),'km'),
+      row('car-electric','Range (estimated)',n(v.range_km),'km'),
       row('flash','Battery energy',n(v.battery_kwh),'kWh'),
       row('ev-station','Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),1),'kW'),
       ...(v.charging?[

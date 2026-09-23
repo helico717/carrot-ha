@@ -20,16 +20,16 @@ FIELDS = {
  'odometer_km':('총 주행거리','km','mdi:counter','distance',0),
  'outside_temp_c':('외기 온도','°C','mdi:thermometer','temperature',1),
  'aux_voltage':('12V 배터리 전압','V','mdi:car-battery','voltage',2),
- 'charge_power_w':('충전 전력 추정','kW','mdi:ev-station','power',1),
- 'time_to_80_s':('80% 충전 남은시간','s','mdi:timer-sand','duration',0),
- 'eta_80':('80% 충전 완료시각',None,'mdi:clock-end','timestamp',None),
- 'time_to_100_s':('100% 충전 남은시간','s','mdi:timer-sand','duration',0),
- 'eta_100':('100% 충전 완료시각',None,'mdi:clock-end','timestamp',None),
+ 'charge_power_w':('충전 전력 (추정)','kW','mdi:ev-station','power',1),
+ 'time_to_80_s':('80% 충전 남은시간 (추정)','s','mdi:timer-sand','duration',0),
+ 'eta_80':('80% 충전 완료시각 (추정)',None,'mdi:clock-end','timestamp',None),
+ 'time_to_100_s':('100% 충전 남은시간 (추정)','s','mdi:timer-sand','duration',0),
+ 'eta_100':('100% 충전 완료시각 (추정)',None,'mdi:clock-end','timestamp',None),
  'battery_kwh':('배터리 저장 에너지','kWh','mdi:battery-high','energy',1),
  'hv_voltage':('고전압 배터리 전압','V','mdi:lightning-bolt','voltage',1),
- 'measured_capacity_kwh':('BMS 용량 추정','kWh','mdi:battery-heart-variant','energy',1),
+ 'measured_capacity_kwh':('BMS 용량 (추정)','kWh','mdi:battery-heart-variant','energy',1),
  'soc_capacity_kwh':('SOC 계산 용량','kWh','mdi:battery-sync','energy',1),
- 'range_km':('주행가능거리','km','mdi:map-marker-distance','distance',0),
+ 'range_km':('주행가능거리 (추정)','km','mdi:map-marker-distance','distance',0),
  'blower_volt':('송풍 제어 전압','V','mdi:fan','voltage',2),
  'blower_level':('송풍 단계',None,'mdi:fan',None,0),
  'seat_heat_left':('운전석 열선 단계',None,'mdi:car-seat-heater',None,0),
@@ -39,11 +39,11 @@ FIELDS = {
  'wheel_speed_kph':('실차 휠 차속','km/h','mdi:speedometer','speed',0),
  'gps_accuracy_m':('GPS 정확도','m','mdi:crosshairs-gps','distance',1),
  'bearing_deg':('진행 방향','°','mdi:compass',None,0),
- 'month_efficiency_kpl':('이번 달 주행 전비 추정','km/kWh','mdi:chart-line',None,2),
- 'month_charge_kwh':('이번 달 충전량 추정','kWh','mdi:ev-station','energy',2),
- 'month_slow_kwh':('이번 달 완속 분류 충전량','kWh','mdi:power-plug','energy',2),
- 'month_fast_kwh':('이번 달 급속 분류 충전량','kWh','mdi:flash','energy',2),
- 'month_charge_cost':('이번 달 충전요금 추정','KRW','mdi:cash','monetary',0),
+ 'month_efficiency_kpl':('이번 달 주행 전비 (추정)','km/kWh','mdi:chart-line',None,2),
+ 'month_charge_kwh':('이번 달 충전량 (추정)','kWh','mdi:ev-station','energy',2),
+ 'month_slow_kwh':('이번 달 완속 분류 충전량 (추정)','kWh','mdi:power-plug','energy',2),
+ 'month_fast_kwh':('이번 달 급속 분류 충전량 (추정)','kWh','mdi:flash','energy',2),
+ 'month_charge_cost':('이번 달 충전요금 (추정)','KRW','mdi:cash','monetary',0),
  'trip_count':('저장된 주행 횟수',None,'mdi:format-list-bulleted',None,0),
  'recorded_distance_km':('기록된 누적 거리','km','mdi:routes','distance',2),
  'month_trip_count':('이번 달 주행 횟수',None,'mdi:calendar-check',None,0),
@@ -61,10 +61,8 @@ FIELDS = {
 }
 
 FIELDS.update(SENSOR_FIELDS)
-FIELDS.update({
- 'month_drive_energy_kwh': ('이번 달 유효 주행 소비량', 'kWh', 'mdi:battery-minus', 'energy', 2),
- 'month_energy_coverage_percent': ('이번 달 전비 집계 거리 비율', '%', 'mdi:file-chart-check-outline', None, 1),
-})
+# Internal quality/energy inputs remain attributes of monthly efficiency.
+FIELDS.pop('bms_mode', None)
 
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()])
@@ -77,7 +75,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if precision is not None:
             self._attr_suggested_display_precision=precision
         if unit is not None and device_class not in ('monetary','energy'): self._attr_state_class='measurement'
-        if key.startswith('comma_'):
+        if key.startswith('comma_') or key == 'bms_target_soc_percent':
             self._attr_entity_category = 'diagnostic'
         if key in ('month_charge_kwh','month_slow_kwh','month_fast_kwh'):self._attr_state_class='total_increasing'
     @property

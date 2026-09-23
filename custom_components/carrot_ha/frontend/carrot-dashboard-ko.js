@@ -561,7 +561,7 @@ class CarrotDashboard extends HTMLElement {
         if (fastKwh == null) fastKwh = hasCharges ? Math.round(fSum * 10) / 10 : 0.0;
         if (totalKwh == null) totalKwh = hasCharges ? Math.round((sSum + fSum) * 10) / 10 : 0.0;
       }
-      return `<div class="charge-layout">${this.batteryHistory()}<div class="charge-sidebar"><div class="tiles charge-sidebar-tiles">${metric('이번 달 충전량',n(totalKwh),'kWh','battery-plus')}${metric('이번 달 충전 요금',n(costKrw,0),'원','cash','추정치')}${metric('완속 분류',n(slowKwh),'kWh','power-plug')}${metric('급속 분류',n(fastKwh),'kWh','flash')}</div>${this.chargeHistory()}</div></div><p class="notice">배터리 에너지 증가로 추정합니다. 11kW 이하를 완속으로 분류하며, 요금 ${n(costKrw,0)}원은 기본 단가 기준 추정입니다. 차량이 잠들거나 콤마 전원이 꺼지면 측정할 수 없습니다.</p>`;
+      return `<div class="charge-layout">${this.batteryHistory()}<div class="charge-sidebar"><div class="tiles charge-sidebar-tiles">${metric('이번 달 충전량',n(totalKwh),'kWh','battery-plus')}${metric('이번 달 충전 요금',n(costKrw,0),'원','cash','(추정)')}${metric('완속 분류',n(slowKwh),'kWh','power-plug')}${metric('급속 분류',n(fastKwh),'kWh','flash')}</div>${this.chargeHistory()}</div></div><p class="notice">배터리 에너지 증가로 추정합니다. 11kW 이하를 완속으로 분류하며, 요금 ${n(costKrw,0)}원은 기본 단가 기준 추정입니다. 차량이 잠들거나 콤마 전원이 꺼지면 측정할 수 없습니다.</p>`;
     }
     const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
     const curTrip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
@@ -605,7 +605,7 @@ class CarrotDashboard extends HTMLElement {
               `${metric('평균속도',spdVal,'km/h','speedometer-medium')}`;
       }
     }else{
-      tiles=`${metric('배터리 잔량',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력 · 추정',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'충전 증가 감지':'관측값 기준')}`;
+      tiles=`${metric('배터리 잔량',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력 (추정)',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'충전 증가 감지':'관측값 기준')}`;
     }
 
     const panelTitle=isTrip
@@ -639,7 +639,7 @@ class CarrotDashboard extends HTMLElement {
 
     const batteryItems=[
       row('battery','배터리 잔량',n(v.soc_percent),'%'),
-      row('car-electric','주행가능거리',n(v.range_km),'km'),
+      row('car-electric','주행가능거리 (추정)',n(v.range_km),'km'),
       row('flash','배터리 에너지',n(v.battery_kwh),'kWh'),
       row('ev-station','충전 전력 (추정)',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),1),'kW'),
       ...(v.charging?[
@@ -650,7 +650,7 @@ class CarrotDashboard extends HTMLElement {
       ]:[]),
       row('flash-outline','고전압 배터리',n(v.hv_voltage),'V'),
       row('car-battery','12V 배터리',n(v.aux_voltage,2),'V'),
-      row('battery-sync','BMS 용량 추정',n(v.measured_capacity_kwh),'kWh'),
+      row('battery-sync','BMS 용량 (추정)',n(v.measured_capacity_kwh),'kWh'),
       row('calculator','SOC 계산 용량',n(v.soc_capacity_kwh),'kWh')
     ];
 
@@ -711,14 +711,14 @@ class CarrotDashboard extends HTMLElement {
     const chargeLabel=isEmergency?'비상충전중 (1kW)...':(isFast?'고속충전중...':'완속충전중...');
     const sweepSpeedClass=isFast?'fast':'slow';
     const quickMetrics=charging
-      ?`${metric('충전 전력 · 추정',n(powerKw,1),'kW','ev-station',isEmergency?'비상 충전':(isFast?'급속 충전':'완속 충전'),'charge-power')}`+
+      ?`${metric('충전 전력 (추정)',n(powerKw,1),'kW','ev-station',isEmergency?'비상 충전':(isFast?'급속 충전':'완속 충전'),'charge-power')}`+
        `${metric('예상 완료시간',v.eta_100?timeOnly(v.eta_100):'계산 중','','clock-end',v.time_to_100_s!=null?chargeDuration(v.time_to_100_s)+' 남음':'100% 목표','charge-eta')}`+
        `${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
        `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`
       :`${metric('총 주행거리',n(v.odometer_km,0),'km','counter')}`+
        `${metric('이번 달 주행',n(v.month_distance_km),'km','routes')}`+
        `${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}`+
-       `${metric('이번 달 충전요금',n(v.month_charge_cost,0),'원','cash','추정치')}`;
+       `${metric('이번 달 충전요금',n(v.month_charge_cost,0),'원','cash','(추정)')}`;
 
     const markersHtml=charging
       ?`${(soc==null||soc<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
