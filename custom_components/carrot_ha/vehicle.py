@@ -97,14 +97,18 @@ def values(runtime):
         if session_start_wh is None or battery_wh < session_start_wh:
             session_start_wh = battery_wh
             runtime['charge_session_start_wh'] = session_start_wh
+            runtime['charge_session_fast'] = False
         session_kwh = max(0.0, round((battery_wh - session_start_wh) / 1000.0, 2))
-        is_fast_charge = isinstance(power_kw, (int, float)) and power_kw > 11
+        if isinstance(power_kw, (int, float)) and power_kw > 11:
+            runtime['charge_session_fast'] = True
+        is_fast_charge = bool(runtime.get('charge_session_fast', False))
         unit_price = 320 if is_fast_charge else 280
         data['session_charge_kwh'] = session_kwh
         data['session_charge_cost'] = int(round(session_kwh * unit_price))
         data['session_charge_price'] = unit_price
     else:
         runtime['charge_session_start_wh'] = None
+        runtime['charge_session_fast'] = False
         data['session_charge_kwh'] = None
         data['session_charge_cost'] = None
         data['session_charge_price'] = None

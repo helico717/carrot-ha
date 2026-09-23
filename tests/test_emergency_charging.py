@@ -121,12 +121,32 @@ class TestEmergencyCharging(unittest.TestCase):
         v2 = values(runtime2)
         self.assertFalse(v2['emergency_charging'])
 
-    def test_unplugged(self):
-        # Charging stopped
-        runtime = self._make_runtime(charging=False, power_w=0, elapsed_s=0)
+    def test_charge_session_cost_monotonicity(self):
+        # 1. Start charging at 50kW fast charging: 50,000 Wh -> 60,000 Wh (+10 kWh)
+        runtime = self._make_runtime(charging=True, power_w=50000, elapsed_s=0)
+        runtime['latest']['data']['battery_wh'] = 50000
+        values(runtime)
+
+        runtime['latest']['data']['battery_wh'] = 60000
+        self._set_elapsed(runtime, 600)
         v = values(runtime)
-        self.assertFalse(v['emergency_charging'])
-        self.assertEqual(v['low_power_duration_s'], 0)
+        self.assertEqual(v['session_charge_kwh'], 10.0)
+        self.assertEqual(v['session_charge_price'], 320)
+        self.assertEqual(v['session_charge_cost'], 3200)
+
+        # 2. Power drops to 0W (or 7kW <= 11kW) during taper or pause; cost must NOT drop to 2800!
+        runtime['latest']['data']['charge_power_w'] = 0
+        self._set_elapsed(runtime, 660)
+        v2 = values(runtime)
+        self.assertEqual(v2['session_charge_kwh'], 10.0)
+        self.assertEqual(v2['session_charge_price'], 320)
+        self.assertEqual(v2['session_charge_cost'], 3200)
+
+        # 3. Charging completes / unplugged
+        runtime['latest']['data']['charging'] = False
+        v3 = values(runtime)
+        self.assertIsNone(v3['session_charge_kwh'])
+        self.assertIsNone(v3['session_charge_cost'])
 
 if __name__ == '__main__':
     unittest.main()

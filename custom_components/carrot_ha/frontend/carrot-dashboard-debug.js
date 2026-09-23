@@ -1,7 +1,7 @@
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
-const BMS_CAPACITY = 70.8; // kWh (ID.4 BMS pack capacity)
+const BMS_CAPACITY = 78.0; // kWh (ID.4 BMS pack capacity baseline)
 
 // 2023 VW ID.4 Pro S AWD Theoretical Charging Curve (1% - 100% in kW)
 const ID4_CHARGING_CURVE_KW = [
@@ -351,6 +351,9 @@ export function debugDisplay(raw, now = Date.now(), lastGood = null) {
   // Freshness changes only the status label, never the recorded measurements.
   const recorded = !live && lastGood ? lastGood : raw;
   const values = {...recorded, simulated:true, display_state:key, stale,
+    doors_locked: recorded.doors_locked,
+    open_doors: recorded.open_doors,
+    estimated_range_km: recorded.estimated_range_km,
     measurement_age_s:measured, last_confirmed_state:raw.last_confirmed_state, last_confirmed_at:raw.last_confirmed_at, connection_state:connection,
     telemetry_age_s:telemetry, sync_age_s:sync};
   return values;
@@ -370,7 +373,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       lang: 'ko',
       theme: 'auto',
       candidate: 1, // 1 | 2 | 3 | 4 | 5 (lock candidate)
-      rangeCandidate: 1, // 1 | 2 | 3 | 4 | 5 (estimated range candidate)
+      rangeCandidate: 3, // 1 | 2 | 3 | 4 | 5 (estimated range candidate, default C3)
       doors_locked: true, // true (잠김) | false (열림/미잠김)
       doors: {
         driver: false,         // 운전석 도어
@@ -529,7 +532,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       odometer_km: 76233,
       month_distance_km: 1248,
       month_charge_kwh: 155.9,
-      month_charge_cost: 43650,
+      month_charge_cost: 48068,
       month_slow_kwh: 45.5,
       month_fast_kwh: 110.4,
       outside_temp_c: 24,
@@ -560,23 +563,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
     v.door_rear_passenger_open = !!this.state.doors?.rear_passenger;
     v.trunk_open = !!this.state.doors?.trunk;
 
-    // sensor.id_4_estimated_range_km (approx 4.6km per 1% SOC on ID.4 77kWh)
+    // sensor.id_4_estimated_range_km (approx 4.6km per 1% SOC on ID.4 78kWh)
     v.estimated_range_km = Math.round(this.state.soc * 4.6);
 
     v.cloud_raw_state = {device_id:'simulated-debug',onroad:v.onroad?1:0,updated_at:receivedAt};
 
     if (isCharging) {
-      const displayKw = (this.state.calcModel === 'smooth' && powerSmooth != null)
-        ? Number(Math.min(powerSmooth, ID4_CHARGING_CURVE_KW[Math.min(100, Math.max(1, Math.round(this.state.soc)))]).toFixed(1))
-        : (effectiveKw != null ? Number(effectiveKw.toFixed(1)) : simulatedInputKw);
+      const displayKw = (this.state.soc >= 100)
+        ? 0.0
+        : ((this.state.calcModel === 'smooth' && powerSmooth != null)
+          ? Number(Math.min(powerSmooth, ID4_CHARGING_CURVE_KW[Math.min(100, Math.max(1, Math.round(this.state.soc)))]).toFixed(1))
+          : (effectiveKw != null ? Number(effectiveKw.toFixed(1)) : simulatedInputKw));
 
       v.charge_power_kw = displayKw;
       v.charge_power_w = Math.round(displayKw * 1000);
       v.charger_max_kw = this.state.powerKw;
-      v.time_to_80_s = this.state.soc < 80 ? sec80 : 0;
+      v.time_to_80_s = Math.round(this.state.soc) < 80 ? sec80 : 0;
       v.eta_80 = eta80;
-      v.time_to_100_s = sec100;
-      v.eta_100 = eta100;
+      v.time_to_100_s = this.state.soc >= 100 ? 0 : sec100;
+      v.eta_100 = this.state.soc >= 100 ? new Date().toISOString() : eta100;
       v.calc_model = this.state.calcModel || 'smooth';
       v.simple_sec80 = simpleSec80;
       v.simple_sec100 = simpleSec100;
@@ -591,14 +596,18 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
       // Real-time Charging Session Energy & Cost (280 KRW/kWh slow <=11kW, 320 KRW/kWh fast >11kW)
       if (this.chargeSessionStartKwh == null || this.chargeSessionStartMode !== 'charging') {
-        this.chargeSessionStartKwh = Math.max(0, currentKwh - 18.2);
+        this.chargeSessionStartKwh = currentKwh;
         this.chargeSessionStartMode = 'charging';
+        this.chargeSessionFast = false;
       }
       if (currentKwh < this.chargeSessionStartKwh) {
         this.chargeSessionStartKwh = currentKwh;
       }
+      if (displayKw > 11) {
+        this.chargeSessionFast = true;
+      }
       const sessionChargedKwh = Number((currentKwh - this.chargeSessionStartKwh).toFixed(2));
-      const isFastCharge = typeof displayKw === 'number' && displayKw > 11;
+      const isFastCharge = Boolean(this.chargeSessionFast);
       const unitPrice = isFastCharge ? 320 : 280;
       const sessionCost = Math.round(sessionChargedKwh * unitPrice);
 
@@ -608,6 +617,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     } else {
       this.chargeSessionStartKwh = null;
       this.chargeSessionStartMode = null;
+      this.chargeSessionFast = false;
       v.session_charge_kwh = null;
       v.session_charge_cost = null;
       v.session_charge_price = null;
@@ -627,7 +637,16 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
     if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
-    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v, doors_locked: isLocked, open_doors: openDoorsList, candidate: this.state.candidate || 1, range_candidate: this.state.rangeCandidate || 1, estimated_range_km: v.estimated_range_km};
+    this.dashCard.v = {
+      ...displayed,
+      battery_history: batteryHistory,
+      debug_raw: v,
+      doors_locked: displayed.doors_locked ?? isLocked,
+      open_doors: displayed.open_doors ?? openDoorsList,
+      estimated_range_km: displayed.estimated_range_km ?? v.estimated_range_km,
+      candidate: this.state.candidate || 1,
+      range_candidate: this.state.rangeCandidate || 3
+    };
     this.dashCard.busy = false;
     this.dashCard.render();
     this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
@@ -1758,19 +1777,27 @@ export default class CarrotDebugDashboard extends HTMLElement {
       card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
     }
 
+    const tz = this._hass?.config?.time_zone;
     const esc = val => String(val ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    const n = (val, digits = 1) => typeof val === 'number' && Number.isFinite(val) ? val.toLocaleString('ko-KR', { maximumFractionDigits: digits }) : '—';
-    const time = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '기록 없음';
-    const timeOnly = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '기록 없음';
+    const n = (val, digits = 1) => typeof val === 'number' && Number.isFinite(val) ? val.toLocaleString(isEn ? 'en-GB' : 'ko-KR', { maximumFractionDigits: digits }) : '—';
+    const time = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }) : (isEn ? 'No records' : '기록 없음');
+    const timeOnly = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }) : (isEn ? 'No records' : '기록 없음');
     const formatEtaCompletion = val => {
-      if (!val) return '계산 중';
+      if (!val) return isEn ? 'Calculating' : '계산 중';
       const targetDate = new Date(val);
       if (Number.isNaN(targetDate.getTime())) return '—';
       const now = new Date();
       const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
       const dayDiff = Math.round((targetMidnight - todayMidnight) / 86400000);
-      const timeStr = targetDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      const timeStr = targetDate.toLocaleTimeString(isEn ? 'en-GB' : 'ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined });
+      if (isEn) {
+        let dayPrefix = '';
+        if (dayDiff === 1) dayPrefix = 'Tomorrow ';
+        else if (dayDiff === 2) dayPrefix = 'In 2 days ';
+        else if (dayDiff > 2) dayPrefix = `${targetDate.toLocaleDateString('en-GB', { month: 'short', day: 'numeric', timeZone: tz || undefined })} `;
+        return `${dayPrefix}Done at ${timeStr}`;
+      }
       let dayPrefix = '';
       if (dayDiff === 1) dayPrefix = '내일 ';
       else if (dayDiff === 2) dayPrefix = '모레 ';
@@ -1779,14 +1806,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
     };
     const chargeDuration = s => {
       if (typeof s !== 'number' || !Number.isFinite(s)) return '—';
-      if (s <= 0) return '완료';
+      if (s <= 0) return isEn ? 'Done' : '완료';
+      if (s < 60) return isEn ? '< 1 min' : '1분 미만';
       const totalMins = Math.round(s / 60);
       const h = Math.floor(totalMins / 60);
       const m = totalMins % 60;
+      if (isEn) {
+        if (h === 0) return `${m}m`;
+        return m === 0 ? `${h}h` : `${h}h ${m}m`;
+      }
       if (h === 0) return `${m}분`;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     };
-    const shortDuration = val => typeof val === 'number' ? (Math.floor(val / 3600) ? Math.floor(val / 3600) + '시간 ' : '') + Math.floor(val / 60) % 60 + '분' : '—';
+    const shortDuration = val => {
+      if (typeof val !== 'number') return '—';
+      const h = Math.floor(val / 3600);
+      const m = Math.floor(val / 60) % 60;
+      if (isEn) return (h ? h + ' h ' : '') + m + ' min';
+      return (h ? h + '시간 ' : '') + m + '분';
+    };
     const icon = name => `<ha-icon icon="mdi:${name}"></ha-icon>`;
     const metric = (label, val, unit, ico, sub = '', cls = '') =>
       `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(val)}<small>${esc(unit)}</small></strong>${sub ? `<span class="hint">${esc(sub)}</span>` : ''}</div>`;
@@ -1801,11 +1839,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const status = displayState.label;
       const powerKw = v.charge_power_kw ?? (v.charge_power_w == null ? null : v.charge_power_w / 1000);
       const isEmergency = Boolean(v.emergency_charging);
-      const isFast = typeof powerKw === 'number' && powerKw >= 11;
-      const chargeLabel = isEmergency ? '비상충전중 (1kW)...' : (isFast ? '고속충전중...' : '완속충전중...');
+      const isFast = typeof powerKw === 'number' && powerKw > 11;
+      const chargeLabel = isEmergency
+        ? (powerKw ? (isEn ? `Emergency Charging (${n(powerKw, 1)}kW)...` : `비상충전중 (${n(powerKw, 1)}kW)...`) : (isEn ? 'Emergency Charging...' : '비상충전중...'))
+        : (isFast ? (isEn ? 'Fast Charging...' : '고속충전중...') : (isEn ? 'Slow Charging...' : '완속충전중...'));
       const sweepSpeedClass = isFast ? 'fast' : 'slow';
 
-      const openDoors = v.open_doors || [];
+      const rawDoors = v.open_doors || [];
+      const openDoors = rawDoors.map(d => {
+        if (!isEn) return d;
+        if (d.includes('운전석 뒤')) return 'Rear driver door';
+        if (d.includes('운전석')) return 'Driver door';
+        if (d.includes('조수석 뒤') || d.includes('동승석 뒤')) return 'Rear passenger door';
+        if (d.includes('조수석') || d.includes('동승석')) return 'Passenger door';
+        if (d.includes('트렁크')) return 'Trunk';
+        return d;
+      });
       const isLocked = v.doors_locked !== false && openDoors.length === 0;
       const candidate = this.state.candidate || 1;
 
@@ -1813,24 +1862,24 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const renderLockMetric = (locked, isChargingMode, doorsList = [], c = 1) => {
         const modeClass = isChargingMode ? 'mode-charging' : 'mode-parked';
         const lockClass = locked ? 'is-locked' : 'is-unlocked';
-        const statusText = locked ? '잠김' : '열림';
+        const statusText = locked ? (isEn ? 'Locked' : '잠김') : (isEn ? 'Unlocked' : '열림');
+        const lockLabel = isEn ? 'Vehicle Lock Status' : '차량 잠금 상태';
 
         let hintText = '';
         if (locked) {
-          hintText = '모든 도어 닫힘 및 잠김';
+          hintText = isEn ? 'All doors closed & locked' : '모든 도어 닫힘 및 잠김';
         } else if (!doorsList || doorsList.length === 0) {
-          hintText = '도어 열림';
+          hintText = isEn ? 'Door open' : '도어 열림';
         } else if (doorsList.length === 1) {
-          hintText = `${doorsList[0]} 열림`;
+          hintText = isEn ? `${doorsList[0]} open` : `${doorsList[0]} 열림`;
         } else {
-          // 2개 이상의 도어가 열려있다면: (열려있는 도어 이름 1개) 외 (열려있는 도어 개수)개 열림
-          hintText = `${doorsList[0]} 외 ${doorsList.length - 1}개 열림`;
+          hintText = isEn ? `${doorsList[0]} +${doorsList.length - 1} open` : `${doorsList[0]} 외 ${doorsList.length - 1}개 열림`;
         }
 
         if (c === 1) {
           return `
             <div class="metric lock-metric c1 ${modeClass} ${lockClass}">
-              <span class="label">차량 잠금 상태</span>
+              <span class="label">${lockLabel}</span>
               <div class="lock-val-row">
                 <div class="lock-icon-badge">
                   <ha-icon icon="${locked ? 'mdi:lock' : 'mdi:lock-open-variant'}"></ha-icon>
@@ -1843,7 +1892,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (c === 2) {
           return `
             <div class="metric lock-metric c2 ${modeClass} ${lockClass}">
-              <span class="label">차량 잠금 상태</span>
+              <span class="label">${lockLabel}</span>
               <div class="lock-val-row">
                 <div class="lock-icon-badge">
                   <ha-icon icon="${locked ? 'mdi:shield-check' : 'mdi:shield-alert'}"></ha-icon>
@@ -1856,7 +1905,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (c === 3) {
           return `
             <div class="metric lock-metric c3 ${modeClass} ${lockClass}">
-              <span class="label">차량 잠금 상태</span>
+              <span class="label">${lockLabel}</span>
               <div class="lock-val-row">
                 <div class="lock-icon-badge">
                   <ha-icon icon="${locked ? 'mdi:car-door-lock' : 'mdi:car-door'}"></ha-icon>
@@ -1869,7 +1918,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (c === 4) {
           return `
             <div class="metric lock-metric c4 ${modeClass} ${lockClass}">
-              <span class="label">차량 잠금 상태</span>
+              <span class="label">${lockLabel}</span>
               <div class="lock-val-row">
                 <div class="lock-icon-badge">
                   <ha-icon icon="${locked ? 'mdi:lock-check' : 'mdi:lock-alert'}"></ha-icon>
@@ -1881,7 +1930,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         }
         return `
           <div class="metric lock-metric c5 ${modeClass} ${lockClass}">
-            <span class="label">차량 잠금 상태</span>
+            <span class="label">${lockLabel}</span>
             <div class="lock-val-row">
               <div class="lock-icon-badge">
                 <ha-icon icon="${locked ? 'mdi:lock' : 'mdi:alert'}"></ha-icon>
@@ -1895,7 +1944,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       // 2. Battery Power Readout Renderer (Candidate 1 ~ 5)
       const renderBatteryPower = (pKw, fast, emergency, c) => {
         const pVal = typeof pKw === 'number' ? pKw.toFixed(1) : '—';
-        const typeLabel = emergency ? '비상' : (fast ? '급속' : '완속');
+        const typeLabel = emergency ? (isEn ? 'Emergency' : '비상') : (fast ? (isEn ? 'Fast' : '급속') : (isEn ? 'Slow' : '완속'));
         if (c === 1) {
           return `
             <div class="charge-power-badge cp-c1">
@@ -1916,7 +1965,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                   <span class="cp-num">${pVal}</span>
                   <small class="cp-unit">kW</small>
                 </div>
-                <span class="cp-sub-label">${emergency ? '비상 충전' : (fast ? '고속 급속' : '표준 완속')}</span>
+                <span class="cp-sub-label">${emergency ? (isEn ? 'Emergency' : '비상 충전') : (fast ? (isEn ? 'Fast Charge' : '고속 급속') : (isEn ? 'Standard' : '표준 완속'))}</span>
               </div>
             </div>`;
         }
@@ -1933,7 +1982,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         if (c === 4) {
           return `
             <div class="charge-power-badge cp-c4">
-              <span class="cp-title">인입 충전 전력</span>
+              <span class="cp-title">${isEn ? 'Intake Power' : '인입 충전 전력'}</span>
               <div class="cp-main">
                 <span class="cp-val">${pVal}</span>
                 <small>kW</small>
@@ -1953,23 +2002,18 @@ export default class CarrotDebugDashboard extends HTMLElement {
       };
 
       // 3. Quick Metrics: 4 Cards
-      // - Charging: [Lock, ETA, Total Odometer, Month Charge kWh]
-      //   ETA Card:
-      //   - If SOC < 80%: Title '80%까지 걸리는 시간', Main: duration to 80% (chargeDuration), Sub: completion time (with '내일' if tomorrow)
-      //   - If SOC >= 80%: Title '100%까지 걸리는 시간', Main: duration to 100% (chargeDuration), Sub: completion time (with '내일' if tomorrow)
-      // - Parked: [Lock, Total Odometer, Month Charge kWh, Month Charge Cost] (replaces Month Distance)
-      const isUnder80 = soc == null || soc < 80;
+      const isUnder80 = soc == null || Math.round(soc) < 80;
       const targetPercent = isUnder80 ? 80 : 100;
-      const etaCardTitle = `${targetPercent}%까지 걸리는 시간`;
+      const etaCardTitle = isEn ? `Time to ${targetPercent}%` : `${targetPercent}%까지 걸리는 시간`;
       const targetSec = isUnder80 ? v.time_to_80_s : v.time_to_100_s;
       const targetEta = isUnder80 ? v.eta_80 : v.eta_100;
 
-      let etaCardMainVal = '계산 중';
-      let etaCardSubText = `${targetPercent}% 목표`;
+      let etaCardMainVal = isEn ? 'Calculating' : '계산 중';
+      let etaCardSubText = isEn ? `${targetPercent}% target` : `${targetPercent}% 목표`;
       if (typeof targetSec === 'number' && Number.isFinite(targetSec)) {
         if (targetSec <= 0) {
-          etaCardMainVal = '완료';
-          etaCardSubText = '충전 완료';
+          etaCardMainVal = isEn ? 'Done' : '완료';
+          etaCardSubText = isEn ? 'Charging complete' : '충전 완료';
         } else {
           etaCardMainVal = chargeDuration(targetSec);
           etaCardSubText = formatEtaCompletion(targetEta);
@@ -1977,25 +2021,26 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
 
       // Real-time Charging Session Cost (Card 3 in Charging Mode)
-      // Unit price standard: 11kW or less = 280 KRW/kWh (slow), over 11kW = 320 KRW/kWh (fast)
       const sessionKwh = typeof v.session_charge_kwh === 'number'
         ? v.session_charge_kwh
-        : (v.charge_energy_kwh ?? (card.charges?.[0]?.data?.energy_kwh ?? 18.2));
+        : (typeof v.charge_energy_kwh === 'number' ? v.charge_energy_kwh : 0.0);
       const sessionUnitPrice = isFast ? 320 : 280;
       const sessionCost = typeof v.session_charge_cost === 'number'
         ? v.session_charge_cost
         : Math.round(sessionKwh * sessionUnitPrice);
-      const sessionCostSub = `+${n(sessionKwh, 1)} kWh (추정)`;
+      const sessionCostSub = `+${n(sessionKwh, 1)} kWh ${isEn ? '(est.)' : '(추정)'}`;
+      const costUnit = isEn ? 'KRW' : '원';
 
       const quickMetrics = charging
         ? `${renderLockMetric(isLocked, true, openDoors, candidate)}` +
           `${metric(etaCardTitle, etaCardMainVal, '', 'clock-end', etaCardSubText, 'charge-eta')}` +
-          `${metric('실시간 충전금액', n(sessionCost, 0), '원', 'cash', sessionCostSub, 'charge-cost')}` +
-          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}`
+          `${metric(isEn ? 'Real-time Charge Cost' : '실시간 충전금액', n(sessionCost, 0), costUnit, 'cash', sessionCostSub, 'charge-cost')}` +
+          `${metric(isEn ? 'Charged this month' : '이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}`
         : `${renderLockMetric(isLocked, false, openDoors, candidate)}` +
-          `${metric('총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
-          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}` +
-          `${metric('이번 달 충전요금', n(v.month_charge_cost, 0), '원', 'cash', '(추정)')}`;
+          `${metric(isEn ? 'Total Odometer' : '총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
+          `${metric(isEn ? 'Charged this month' : '이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}` +
+          `${metric(isEn ? 'Charge cost this month' : '이번 달 충전요금', n(v.month_charge_cost, 0), costUnit, 'cash', isEn ? '(est.)' : '(추정)')}`;
+
 
       const markersHtml = charging
         ? `${(soc == null || soc < 80) ? `<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>` : ''}` +
@@ -2054,7 +2099,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                   </div>
                 </div>
                 <div class="range-capsule-c2">
-                  <span class="rc-label">주행 가능</span>
+                  <span class="rc-label">${isEn ? 'Driving range' : '주행 가능'}</span>
                   <div class="rc-val"><b>${rangeNum}</b><small>km</small></div>
                 </div>
               </div>`;
@@ -2071,8 +2116,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                     </div>
                     <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
                     <div class="range-sub-c3">
-                      <span class="rs-dot"></span>
-                      <span>예상 주행가능거리 <b>${rangeNum} km</b></span>
+                      <span>${isEn ? 'Est. driving range' : '예상 주행가능거리'} <b>${rangeNum} km</b></span>
                     </div>
                   </div>
                 </div>
@@ -2112,7 +2156,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                     <div class="range-twin-c5">
                       <span class="rt-icon">⚡</span>
                       <div class="rt-stack">
-                        <span class="rt-top">주행가능</span>
+                        <span class="rt-top">${isEn ? 'Range' : '주행가능'}</span>
                         <span class="rt-num"><b>${rangeNum}</b><small>km</small></span>
                       </div>
                     </div>
@@ -2128,7 +2172,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <div class="energy-head range-c1">
               <div class="battery-label">
                 ${batteryIconSvg}
-                <span>배터리 잔량</span>
+                <span>${isEn ? 'Battery level' : '배터리 잔량'}</span>
               </div>
               <div class="soc-row-inline">
                 <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
@@ -2145,12 +2189,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <div class="energy-head range-c2">
               <div class="battery-label">
                 ${batteryIconSvg}
-                <span>배터리 잔량</span>
+                <span>${isEn ? 'Battery level' : '배터리 잔량'}</span>
               </div>
               <div class="right-stack-c2">
                 <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
                 <div class="range-capsule-c2">
-                  <span class="rc-label">주행 가능</span>
+                  <span class="rc-label">${isEn ? 'Driving range' : '주행 가능'}</span>
                   <div class="rc-val"><b>${rangeNum}</b><small>km</small></div>
                 </div>
               </div>
@@ -2161,13 +2205,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <div class="energy-head range-c3">
               <div class="battery-label">
                 ${batteryIconSvg}
-                <span>배터리 잔량</span>
+                <span>${isEn ? 'Battery level' : '배터리 잔량'}</span>
               </div>
               <div class="soc-stack-c3">
                 <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
                 <div class="range-sub-c3">
-                  <span class="rs-dot"></span>
-                  <span>주행가능거리 약 <b>${rangeNum} km</b></span>
+                  <span>${isEn ? 'Est. driving range' : '주행가능거리 약'} <b>${rangeNum} km</b></span>
                 </div>
               </div>
             </div>`;
@@ -2177,7 +2220,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <div class="energy-head range-c4">
               <div class="battery-label">
                 ${batteryIconSvg}
-                <span>배터리 잔량</span>
+                <span>${isEn ? 'Battery level' : '배터리 잔량'}</span>
                 <span class="range-chip-c4">
                   <svg viewBox="0 0 24 24" class="rc-chip-icon"><path d="M12 2C6.48 2 2 6.48 2 12c0 3.54 1.84 6.66 4.64 8.44.33.21.76.19 1.05-.07.31-.28.37-.73.17-1.08A7.95 7.95 0 0 1 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8c0 2.76-1.4 5.2-3.53 6.65-.33.23-.42.67-.23 1.03.19.36.63.5 1 .32C19.78 18.23 22 15.38 22 12c0-5.52-4.48-10-10-10zm-1 5.5v5.09c-.6.35-1 .99-1 1.74 0 1.1.9 2 2 2s2-.9 2-2c0-.75-.4-1.39-1-1.74V7.5c0-.28-.22-.5-.5-.5s-.5.22-.5.5z"/></svg>
                   <b>${rangeNum}</b> km
@@ -2191,14 +2234,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
           <div class="energy-head range-c5">
             <div class="battery-label">
               ${batteryIconSvg}
-              <span>배터리 잔량</span>
+              <span>${isEn ? 'Battery level' : '배터리 잔량'}</span>
             </div>
             <div class="soc-twin-row-c5">
               <strong class="soc-value">${n(socVal, 0)}<small>%</small></strong>
               <div class="range-twin-c5">
                 <span class="rt-icon">${driveModeIcon}</span>
                 <div class="rt-stack">
-                  <span class="rt-top">주행가능</span>
+                  <span class="rt-top">${isEn ? 'Range' : '주행가능'}</span>
                   <span class="rt-num"><b>${rangeNum}</b><small>km</small></span>
                 </div>
               </div>
@@ -2217,9 +2260,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ${card.vehicleImage()}
           </section>
           <div class="mini-condition">
-            <span>외기 <b>${n(v.outside_temp_c)}°C</b></span>
+            <span>${isEn ? 'Outside' : '외기'} <b>${n(v.outside_temp_c)}°C</b></span>
             <span>12V <b>${n(v.aux_voltage, 1)}V</b></span>
-            <span>공조 <b>${v.ac_on == null ? '—' : v.ac_on ? 'ON' : 'OFF'}</b></span>
+            <span>${isEn ? 'Climate' : '공조'} <b>${v.ac_on == null ? '—' : v.ac_on ? 'ON' : 'OFF'}</b></span>
           </div>
         </div>
         <div class="overview-col-telemetry">
@@ -2229,13 +2272,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
           <div class="quick-metrics">${quickMetrics}</div>
           <div class="overview-links">
             <button class="shortcut" data-tab="parking">
-              <span><b>주차 위치</b><small>${v.parking_latitude == null ? '위치 수신 대기' : time(v.parking_at)}</small></span>
-              <em>지도 →</em>
+              <span><b>${isEn ? 'Parking location' : '주차 위치'}</b><small>${v.parking_latitude == null ? (isEn ? 'Waiting for location' : '위치 수신 대기') : time(v.parking_at, tz)}</small></span>
+              <em>${isEn ? 'Map →' : '지도 →'}</em>
               <div class="mini-map parking-mini"></div>
             </button>
             <button class="shortcut" data-tab="trips">
-              <span><b>최근 주행</b><small>${latest ? n(latest.distance_m == null ? null : latest.distance_m / 1000, 2) + ' km' : '기록 없음'}</small><small>${latest ? shortDuration(latest.duration_s) : '새 주행 기록을 기다립니다'}</small></span>
-              <em>보기 →</em>
+              <span><b>${isEn ? 'Recent trips' : '최근 주행'}</b><small>${latest ? n(latest.distance_m == null ? null : latest.distance_m / 1000, 2) + ' km' : (isEn ? 'No records' : '기록 없음')}</small><small>${latest ? shortDuration(latest.duration_s) : (isEn ? 'Waiting for a new trip' : '새 주행 기록을 기다립니다')}</small></span>
+              <em>${isEn ? 'View →' : '보기 →'}</em>
               <div class="mini-map trip-mini"></div>
             </button>
           </div>
@@ -3005,26 +3048,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
       .range-sub-c3 {
         display: flex !important;
         align-items: center !important;
-        gap: 5px !important;
+        gap: 4px !important;
         margin-top: 4px !important;
         font-size: 12px !important;
-        color: rgba(255, 255, 255, 0.85) !important;
+        color: #ffffff !important;
         font-weight: 550 !important;
         letter-spacing: -0.2px !important;
       }
-      .range-sub-c3 .rs-dot {
-        width: 5px !important;
-        height: 5px !important;
-        border-radius: 50% !important;
-        background: #34d399 !important;
-        display: inline-block !important;
-      }
-      .energy:not(.is-charging) .range-sub-c3 .rs-dot {
-        background: #38bdf8 !important;
+      .range-sub-c3 span,
+      .range-sub-c3 b,
+      :host([data-theme="light"]) .energy-head .range-sub-c3,
+      :host([data-theme="light"]) .energy-head .range-sub-c3 span,
+      :host([data-theme="light"]) .energy-head .range-sub-c3 b {
+        color: #ffffff !important;
       }
       .range-sub-c3 b {
         font-weight: 750 !important;
-        color: #ffffff !important;
       }
 
       /* Candidate 4: Header Inline Status Chip */
