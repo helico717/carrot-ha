@@ -42,10 +42,23 @@ async def sync(hass, runtime):
                     if not previous or datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')) >= datetime.fromisoformat(previous['observed_at'].replace('Z', '+00:00')):
                         runtime['latest'] = event
             async_dispatcher_send(hass, 'carrot_ha' + entry.entry_id)
+
+    async def archive_history(feed):
+        """Store historical telemetry in DB without updating runtime['latest'].
+
+        When a device reconnects after being offline, buffered telemetry
+        arrives oldest-first.  Updating runtime['latest'] for each record
+        would cause the dashboard to replay stale vehicle states.
+        """
+        for event in parse_feed(feed, entry.data['device_id']):
+            async with runtime['lock']:
+                await hass.async_add_executor_job(runtime['archive'].put_cloud, event)
+
     try:
         feed = await get('/api/json')
         await save({'state': feed.get('state')})
         cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
+        history_ingested = False
         while True:
             try:
                 history = await get(f'/api/telemetry-history?after={cursor}&limit=20')
@@ -57,10 +70,18 @@ async def sync(hass, runtime):
             runtime['history_supported'] = True
             for item in history['events']:
                 payload = json.loads(item['raw_json'])
-                await save({'state':{'device_id':payload['deviceId'],'updated_at':payload['updatedAt'],'onroad':payload.get('onroad'),'raw_json':payload}})
+                await archive_history({'state':{'device_id':payload['deviceId'],'updated_at':payload['updatedAt'],'onroad':payload.get('onroad'),'raw_json':payload}})
                 cursor = item['sequence']
                 await hass.async_add_executor_job(runtime['archive'].cursor,'telemetry',cursor)
+                history_ingested = True
             if not history['has_more']:break
+        if history_ingested:
+            db_latest = await hass.async_add_executor_job(runtime['archive'].latest, entry.data['device_id'])
+            if db_latest:
+                previous = runtime['latest']
+                if not previous or datetime.fromisoformat(db_latest['observed_at'].replace('Z', '+00:00')) >= datetime.fromisoformat(previous['observed_at'].replace('Z', '+00:00')):
+                    runtime['latest'] = db_latest
+            async_dispatcher_send(hass, 'carrot_ha' + entry.entry_id)
         offset = count = 0
         while True:
             feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
