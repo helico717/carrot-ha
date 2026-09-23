@@ -34,6 +34,10 @@ class Store:
                 db.execute('INSERT OR IGNORE INTO outbox VALUES (?,?,?,?)',(identity,path,json.dumps(payload,allow_nan=False),now))
     def first(self):
         with self.connect() as db:return db.execute('SELECT id,path,body FROM outbox ORDER BY created,rowid LIMIT 1').fetchone()
+    def latest_telemetry(self):
+        """Prioritize a snapshot without deleting any of the historical backlog."""
+        with self.connect() as db:
+            return db.execute("SELECT id,path,body FROM outbox WHERE path='/api/telemetry' ORDER BY created DESC,rowid DESC LIMIT 1").fetchone()
     def acknowledge(self,key):
         with self.connect() as db:db.execute('DELETE FROM outbox WHERE id=?',(key,))
     def count(self):

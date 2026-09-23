@@ -26,6 +26,9 @@ def main():
     from openpilot.common.params import Params
     import wayon_vehicle_telemetry as reference
     store=Store(STATE/'collector.sqlite3');engine=Engine(store,config['device'])
+    # On restart, publish a newly observed snapshot before draining old records.
+    engine.s.pop('last_upload', None)
+    first_snapshot=threading.Event()
     sample_lock=threading.Lock();latest_sample={};sample_version=0
     def sample():
         nonlocal latest_sample,sample_version
@@ -36,12 +39,15 @@ def main():
             except Exception as error:print('CAN sample:',type(error).__name__,flush=True)
             time.sleep(26)
     def upload():
+        first_snapshot.wait()
         delay=2
+        prefer_latest=True
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self,*args,**kwargs):return None
         opener=urllib.request.build_opener(NoRedirect)
         while True:
-            row=store.first()
+            # Alternate live snapshots and FIFO history so neither can starve.
+            row=(store.latest_telemetry() if prefer_latest else None) or store.first()
             if not row:time.sleep(2);continue
             key,path,body=row
             try:
@@ -49,8 +55,11 @@ def main():
                 with opener.open(request,timeout=30) as response:ack=json.load(response)
                 if ack.get('ok') is not True or (path=='/api/trips' and ack.get('id')!=json.loads(body)['id']):raise ValueError('Invalid acknowledgement')
                 store.acknowledge(key);delay=2
+                prefer_latest=not prefer_latest
                 atomic(STATE/'delivery.json',{'status':'ok','at':time.time(),'path':path,'pending':store.count()})
             except Exception as error:
+                # Retry connectivity with the newest available snapshot.
+                prefer_latest=True
                 reason=type(error).__name__+(' HTTP '+str(error.code) if isinstance(error,urllib.error.HTTPError) else '')
                 atomic(STATE/'delivery.json',{'status':'retrying','reason':reason,'pending':store.count(),'at':time.time()})
                 print('Upload retry:',reason,flush=True);time.sleep(delay);delay=min(120,delay*2)
@@ -95,7 +104,8 @@ def main():
             except Exception:
                 diagnostics = None
             last_health = mono
-        engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion,diagnostics=diagnostics)
+        events=engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion,diagnostics=diagnostics)
+        if any(path == '/api/telemetry' for path, _ in events):first_snapshot.set()
         atomic(STATE/'status.json',{'status':'running','at':now,'onroad':engine.s['vehicle'].get('comma_onroad'),'driving':engine.s.get('onroad'),'gear':engine.s['vehicle'].get('gear'),'pending':store.count(),'can_fields':sorted((latest_sample or {}).keys()),'active_trip':bool(engine.s.get('trip'))})
 
 if __name__=='__main__':

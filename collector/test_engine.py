@@ -18,6 +18,24 @@ class ChargingTests(unittest.TestCase):
                                 sampled={'battery_wh':wh} if wh is not None else None,
                                 motion={'gear':'drive','speed_mps':10} if onroad else None)
 
+    def test_priority_snapshot_preserves_fifo_backlog(self):
+        self.tick(0)
+        self.tick(60)
+        self.tick(120)
+        oldest = self.store.first()
+        newest = self.store.latest_telemetry()
+        self.assertNotEqual(oldest[0], newest[0])
+        self.assertEqual(self.store.count(), 3)
+        self.store.acknowledge(newest[0])
+        self.assertEqual(self.store.first(), oldest)
+        self.store.acknowledge(oldest[0])
+        self.assertEqual(self.store.count(), 1)
+
+    def test_priority_snapshot_does_not_select_trip(self):
+        self.store.save({}, [('/api/trips', {'id': 'trip'})], self.base)
+        self.assertIsNone(self.store.latest_telemetry())
+        self.assertEqual(self.store.first()[0], 'trip')
+
     def test_false_positive_and_missing_measurements(self):
         self.tick(0,17450)
         self.tick(119.628622,17475)
