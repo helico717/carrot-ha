@@ -46,6 +46,8 @@ class MigrationTest(unittest.TestCase):
     def test_migration_and_repeat(self):
         registry = Registry({
             'range_km': 'sensor.id_4_range_km',
+            'doors_locked_external': 'binary_sensor.id_4_doors_locked_external',
+            'doors_locked_internal': 'binary_sensor.id_4_doors_locked_internal',
             'comma_cpu_temperature_c': 'sensor.id_4_comma_cpu_temperature_c',
             'comma_online': 'binary_sensor.id_4_comma_online',
             **{key: 'sensor.id_4_' + key for key in migration.REMOVED_SENSORS}})

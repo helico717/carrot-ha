@@ -35,7 +35,8 @@ def migrate_entities(hass, entry):
         if entity.platform != DOMAIN or not entity.unique_id.startswith(prefix):
             continue
         key = entity.unique_id[len(prefix):]
-        if entity.domain == 'sensor' and key in REMOVED_SENSORS:
+        if (entity.domain == 'sensor' and key in REMOVED_SENSORS) or (
+                entity.domain == 'binary_sensor' and key in {'doors_locked_external', 'doors_locked_internal'}):
             registry.async_remove(entity.entity_id)
             continue
         updates = {}

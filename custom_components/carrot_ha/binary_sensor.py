@@ -87,5 +87,11 @@ class TelemetryFlag(Flag):
     @property
     def extra_state_attributes(self):
         attrs = super().extra_state_attributes
+        if self.key == 'doors_locked':
+            attrs.update(external=self.data.get('doors_locked_external'),
+                         internal=self.data.get('doors_locked_internal'),
+                         external_measured_at=(self.data.get('field_measured_at') or {}).get('doors_locked_external'),
+                         internal_measured_at=(self.data.get('field_measured_at') or {}).get('doors_locked_internal'),
+                         calculation='external OR internal; last reported values retained')
         attrs['source'] = 'Licht_Anf_01 (request)' if self.key.startswith('light_') else 'ZV_02'
         return attrs

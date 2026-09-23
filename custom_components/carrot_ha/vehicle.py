@@ -1,5 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
+from .charging_power import charging_power
+from .telemetry import combined_lock_state
 import math
 from .telemetry import OPTIONAL_FIELDS, FRESHNESS_SECONDS
 
@@ -48,9 +50,14 @@ def values(runtime):
     if 'driving' in data:data['onroad']=data['driving']
     if data.get('onroad') is not None: data['onroad'] = bool(data['onroad'])
 
+    data['doors_locked'] = combined_lock_state(data)
+    power_w = charging_power(data, runtime, datetime.now(timezone.utc))
+
     # Emergency Charging Detection (ID.4 imperfect plug connection -> ~1kW emergency charging)
     # Condition: not stale, charging, and charge_power <= 1.5kW for >= 300 seconds (5 minutes)
-    power_kw = data.get('charge_power_kw')
+    # Display holding must not create evidence for the low-power alarm.
+    raw_power = data.get('charge_power_raw_w')
+    power_kw = raw_power / 1000 if type(raw_power) in (int, float) else None
     is_charging = bool(data.get('charging'))
     is_stale = bool(data.get('stale'))
     is_low_power = is_charging and isinstance(power_kw, (int, float)) and power_kw <= 1.5
@@ -98,7 +105,9 @@ def values(runtime):
     charging_est = estimate_charging_times(
         battery_wh / 1000 if type(battery_wh) in (int, float) else None,
         capacity,
-        power_w,
+        # A held display value is not a new power measurement.
+        # Keep ETA training independent of display holding (including expiry).
+        raw_power,
         base_time=measured_time,
         smooth_state=runtime.get('charging_smooth_state'),
         is_charging=is_charging and estimate_valid

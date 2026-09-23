@@ -158,6 +158,31 @@ class TestChargingRegression(unittest.TestCase):
                 'measured_at': self.base_time.isoformat(), 'stale': False}},
             'summary': {}}
 
+    def test_display_hold_does_not_train_eta(self):
+        runtime = self.runtime(wh=39000)
+        runtime['latest']['data']['charge_power_w'] = 1500
+        first = values(runtime)
+        self.assertIsNotNone(first['eta_80'])
+        self.assertIsNotNone(first['eta_100'])
+        for elapsed in (60, 120, 180):
+            MockDateTime.current_time = self.base_time + timedelta(seconds=elapsed)
+            runtime['latest']['data'].update(
+                measured_at=MockDateTime.current_time.isoformat(), charge_power_w=0)
+            result = values(runtime)
+            self.assertEqual(result['charge_power_w'], 1500)
+            self.assertEqual(result['charge_power_source'], 'held_last_positive')
+            self.assertIsNone(result['eta_80'])
+            self.assertIsNone(result['eta_100'])
+            self.assertIsNone(runtime['charging_smooth_state'])
+        # Recovery uses the newly reported lower rate, not the held 1.5 kW.
+        MockDateTime.current_time = self.base_time + timedelta(seconds=240)
+        runtime['latest']['data'].update(measured_at=MockDateTime.current_time.isoformat(),
+                                       charge_power_w=750, battery_wh=39050)
+        result = values(runtime)
+        self.assertAlmostEqual(runtime['charging_smooth_state']['power_smooth'], 0.75)
+        self.assertGreater(result['time_to_80_s'], first['time_to_80_s'])
+        self.assertGreater(result['time_to_100_s'], first['time_to_100_s'])
+
     def test_recorded_capacity_mismatch(self):
         runtime = self.runtime()
         first = values(runtime)

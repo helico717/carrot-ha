@@ -5,8 +5,7 @@ BINARY_FIELDS = {
     'door_rear_driver_open': ('운전석 뒤 도어 열림', 'door'),
     'door_rear_passenger_open': ('조수석 뒤 도어 열림', 'door'),
     'trunk_open': ('트렁크 열림', 'opening'),
-    'doors_locked_external': ('외부 잠금 상태', None),
-    'doors_locked_internal': ('내부 잠금 상태', None),
+    'doors_locked': ('차량 잠김 상태', None),
 }
 SENSOR_FIELDS = {
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
@@ -26,3 +25,17 @@ SENSOR_FIELDS = {
 # Only hardware diagnostics and BMS fields expire after FRESHNESS_SECONDS.
 OPTIONAL_FIELDS = set(SENSOR_FIELDS)
 FRESHNESS_SECONDS = 180
+
+
+def combined_lock_state(data):
+    """Combine last reported modes without expiring parked-vehicle values.
+
+    Individual timestamps are diagnostic only: CAN may stop while parked.
+    """
+    keys = ('doors_locked_external', 'doors_locked_internal')
+    states = [data.get(key) for key in keys]
+    if any(value is True for value in states):
+        return True
+    if all(value is False for value in states):
+        return False
+    return None

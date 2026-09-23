@@ -101,7 +101,12 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def extra_state_attributes(self):
         attrs=super().extra_state_attributes
-        if self.key == 'month_efficiency_kpl':
+        if self.key == 'charge_power_w':
+            attrs.update(raw_power_w=self.data.get('charge_power_raw_w'),
+                         source=self.data.get('charge_power_source'),
+                         hold_age_s=self.data.get('charge_power_hold_age_s'),
+                         hold_limit_s=self.data.get('charge_power_hold_limit_s'))
+        elif self.key == 'month_efficiency_kpl':
             attrs.update(calculation='matched_trip_distance / net_battery_depletion',
                          coverage_percent=self.data.get('month_energy_coverage_percent'),
                          distance_km=self.data.get('month_energy_distance_km'),
