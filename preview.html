@@ -167,6 +167,167 @@
       justify-content: center;
       vertical-align: middle;
     }
+
+    /* Candidate Showcase Bar */
+    .candidate-bar {
+      background: #0d1117;
+      border-bottom: 1px solid #30363d;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+    }
+
+    .candidate-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .bar-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #7ee787;
+      white-space: nowrap;
+    }
+
+    .candidate-btns {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .c-btn {
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .c-btn:hover {
+      background: #21262d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+
+    .c-btn.active {
+      background: #238636;
+      border-color: #2ea043;
+      color: #ffffff;
+      box-shadow: 0 1px 6px rgba(35, 134, 54, 0.4);
+    }
+
+    .candidate-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .mode-toggles {
+      display: flex;
+      background: #161b22;
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      gap: 3px;
+    }
+
+    .mode-btn {
+      background: transparent;
+      border: 0;
+      color: #8b949e;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn.active {
+      background: #1f6feb;
+      color: #fff;
+    }
+
+    .lock-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .lock-toggle-btn.locked {
+      background: #065f46;
+      color: #6ee7b7;
+      border-color: #059669;
+      box-shadow: 0 1px 4px rgba(6, 95, 70, 0.4);
+    }
+
+    .lock-toggle-btn.unlocked {
+      background: #7f1d1d;
+      color: #fca5a5;
+      border-color: #dc2626;
+      box-shadow: 0 1px 6px rgba(220, 38, 38, 0.4);
+      animation: alert-flash 1.5s infinite;
+    }
+
+    @keyframes alert-flash {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+
+    .candidate-desc-bar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.5;
+    }
+
+    .desc-badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .desc-text b {
+      color: #f0f6fc;
+    }
+
+    .desc-text code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #34d399;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -194,6 +355,37 @@
       <div class="width-indicator" id="widthLabel">1280px</div>
     </div>
   </header>
+
+  <!-- Lock & Candidate Showcase Toolbar -->
+  <div class="candidate-bar">
+    <div class="candidate-bar-left">
+      <span class="bar-title">🔒 UI 후보 선택:</span>
+      <div class="candidate-btns" id="candidateBtns">
+        <button class="c-btn active" data-candidate="1">후보 1: 클래식 서클</button>
+        <button class="c-btn" data-candidate="2">후보 2: 볼드 실드</button>
+        <button class="c-btn" data-candidate="3">후보 3: 스마트 도어</button>
+        <button class="c-btn" data-candidate="4">후보 4: 글래스 칩</button>
+        <button class="c-btn" data-candidate="5">후보 5: 하이 콘트라스트</button>
+      </div>
+    </div>
+    <div class="candidate-bar-right">
+      <div class="mode-toggles">
+        <button class="mode-btn active" id="btnModeCharging">⚡ 충전중 모드</button>
+        <button class="mode-btn" id="btnModeParked">🅿️ 주차중 모드</button>
+      </div>
+      <button class="lock-toggle-btn locked" id="btnGlobalLockToggle">
+        <span id="globalLockIcon">🔒</span>
+        <span id="globalLockLabel">차량 잠김 (정상)</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="candidate-desc-bar" id="candidateDescBar">
+    <div class="desc-badge" id="descBadge">현재 후보 1</div>
+    <div class="desc-text" id="candidateDescText">
+      <b>[후보 1: 클래식 서클 & 소프트 배지]</b> 좌측 상단 카드에 단정한 원형 아이콘과 부드러운 텍스트를 배치합니다. 충전중에는 배터리 카드 우측에 <code>⚡ 11.0 kW</code> 알약 칩이 표시되며, 주차중에는 이번달 주행이 제거되고 <b>우측 상단에 총 주행거리</b>가 정돈됩니다.
+    </div>
+  </div>
 
   <main class="preview-stage">
     <div class="frame-container" id="frameContainer">
@@ -234,7 +426,15 @@
       'clock-end': '<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14h-2v-6h2zm5 0h-2v-6h2z"/>',
       'timer-sand': '<path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5l-4-4V4h8v3.5l-4 4z"/>',
       'check': '<path d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z"/>',
-      'content-copy': '<path d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>'
+      'content-copy': '<path d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>',
+      'lock': '<path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5 5 5 0 0 1 5 5v2h1m-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z"/>',
+      'lock-open': '<path d="M18 10V8a6 6 0 0 0-12 0H8a4 4 0 0 1 8 0v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V12a2 2 0 0 0-2-2h-2m-6 7a2 2 0 1 1 2-2 2 2 0 0 1-2 2z"/>',
+      'lock-open-variant': '<path d="M18 10V8a6 6 0 0 0-12 0H8a4 4 0 0 1 8 0v2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V12a2 2 0 0 0-2-2h-2m-6 7a2 2 0 1 1 2-2 2 2 0 0 1-2 2z"/>',
+      'shield-check': '<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4m-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>',
+      'shield-alert': '<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4m-1 6h2v6h-2V7m0 8h2v2h-2v-2z"/>',
+      'car-door-lock': '<path d="M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9l4 4v6m-4-1a1 1 0 1 0 1 1 1 1 0 0 0-1-1m-2-7H6v4h7V6z"/>',
+      'car-door': '<path d="M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9l4 4v6m-4-1a1 1 0 1 0 1 1 1 1 0 0 0-1-1m-2-7H6v4h7V6z"/>',
+      'alert': '<path d="M13 14h-2v-4h2m0 8h-2v-2h2M1 21h22L12 2 1 21z"/>'
     };
 
     class HaIcon extends HTMLElement {
@@ -487,6 +687,120 @@
         widthLabel.textContent = `${container.clientWidth}px`;
       }
     });
+
+    // 4. Candidate Showcase Controls
+    const CANDIDATE_DESCRIPTIONS = {
+      1: {
+        badge: '현재 후보 1 (사용자 지정)',
+        html: '<b>[후보 1: 통합 간결형 (유저 맞춤)]</b> 상단에 <code>차량 잠금 상태</code> 라벨, 중앙에 원형 아이콘과 단정한 <code>잠김 / 열림</code> 텍스트를 배치하고 하단에는 <code>모든 도어 닫힘 및 잠김</code> / <code>도어 열림</code> 2가지 상태만 표기합니다. 포인트 색상은 <b>충전중(초록색)</b>, <b>주차중(파랑색)</b> 배터리 색상과 1:1 일치하며, <b>충전 전력(11.0 kW)은 SOC 바로 위 충전 상태 텍스트 옆에 겹침 없이 인라인 배치</b>됩니다.'
+      },
+      2: {
+        badge: '현재 후보 2',
+        html: '<b>[후보 2: 볼드 실드 스타일]</b> 보안 실드(방패) 아이콘 기반으로 상단 라벨, 중앙 실드+텍스트, 하단 2가지 도어 상태를 표시하며 충전중(초록색), 주차중(파랑색) 포인트 컬러를 유지합니다.'
+      },
+      3: {
+        badge: '현재 후보 3',
+        html: '<b>[후보 3: 스마트 도어 스타일]</b> 자동차 도어 아이콘과 함께 통일된 메트릭 구조를 따르며 충전중/주차중 테마 컬러와 연동됩니다.'
+      },
+      4: {
+        badge: '현재 후보 4',
+        html: '<b>[후보 4: 체크 락 스타일]</b> 자물쇠 체크 아이콘과 함께 통일된 메트릭 구조를 따르며 충전중/주차중 테마 컬러와 연동됩니다.'
+      },
+      5: {
+        badge: '현재 후보 5',
+        html: '<b>[후보 5: 경고 가드 스타일]</b> 자물쇠 및 경고 아이콘과 함께 통일된 메트릭 구조를 따르며 미잠김 시 레드 경고를 강조합니다.'
+      }
+    };
+
+    const cButtons = document.querySelectorAll('#candidateBtns .c-btn');
+    const descBadge = document.getElementById('descBadge');
+    const descText = document.getElementById('candidateDescText');
+    const btnModeCharging = document.getElementById('btnModeCharging');
+    const btnModeParked = document.getElementById('btnModeParked');
+    const btnGlobalLockToggle = document.getElementById('btnGlobalLockToggle');
+    const globalLockIcon = document.getElementById('globalLockIcon');
+    const globalLockLabel = document.getElementById('globalLockLabel');
+
+    function syncPreviewToolbar(state) {
+      if (!state) return;
+      const currentCand = state.candidate || 1;
+      cButtons.forEach(b => {
+        const c = Number(b.dataset.candidate);
+        b.classList.toggle('active', c === currentCand);
+      });
+      if (CANDIDATE_DESCRIPTIONS[currentCand]) {
+        if (descBadge) descBadge.textContent = CANDIDATE_DESCRIPTIONS[currentCand].badge;
+        if (descText) descText.innerHTML = CANDIDATE_DESCRIPTIONS[currentCand].html;
+      }
+
+      const isCharging = state.mode === 'charging';
+      btnModeCharging?.classList.toggle('active', isCharging);
+      btnModeParked?.classList.toggle('active', !isCharging && state.mode === 'parked');
+
+      const isLocked = state.doors_locked !== false;
+      if (btnGlobalLockToggle) {
+        btnGlobalLockToggle.className = `lock-toggle-btn ${isLocked ? 'locked' : 'unlocked'}`;
+        if (globalLockIcon) globalLockIcon.textContent = isLocked ? '🔒' : '🔓';
+        if (globalLockLabel) globalLockLabel.textContent = isLocked ? '차량 잠김 (정상)' : '차량 열림 (경고)';
+      }
+    }
+    window.__updatePreviewToolbar = syncPreviewToolbar;
+
+    cButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cand = Number(btn.dataset.candidate);
+        if (debugCard) {
+          debugCard.state.candidate = cand;
+          debugCard.applyDebugTelemetry();
+          if (debugCard.__syncFromExternal) {
+            debugCard.__syncFromExternal({ candidate: cand });
+          }
+          syncPreviewToolbar(debugCard.state);
+        }
+      });
+    });
+
+    btnModeCharging?.addEventListener('click', () => {
+      if (debugCard) {
+        debugCard.state.mode = 'charging';
+        debugCard.applyDebugTelemetry();
+        if (debugCard.__syncFromExternal) {
+          debugCard.__syncFromExternal({ mode: 'charging' });
+        }
+        syncPreviewToolbar(debugCard.state);
+      }
+    });
+
+    btnModeParked?.addEventListener('click', () => {
+      if (debugCard) {
+        debugCard.state.mode = 'parked';
+        debugCard.applyDebugTelemetry();
+        if (debugCard.__syncFromExternal) {
+          debugCard.__syncFromExternal({ mode: 'parked' });
+        }
+        syncPreviewToolbar(debugCard.state);
+      }
+    });
+
+    btnGlobalLockToggle?.addEventListener('click', () => {
+      if (debugCard) {
+        const nextLock = debugCard.state.doors_locked === false;
+        debugCard.state.doors_locked = nextLock;
+        debugCard.applyDebugTelemetry();
+        if (debugCard.__syncFromExternal) {
+          debugCard.__syncFromExternal({ doors_locked: nextLock });
+        }
+        syncPreviewToolbar(debugCard.state);
+      }
+    });
+
+    // Initial check when debugCard is ready
+    const initTimer = setInterval(() => {
+      if (debugCard && debugCard.state) {
+        clearInterval(initTimer);
+        syncPreviewToolbar(debugCard.state);
+      }
+    }, 100);
   </script>
 </body>
 </html>

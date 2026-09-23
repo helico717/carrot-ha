@@ -21,7 +21,8 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  let reqPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+  const hostHeader = req.headers.host || `localhost:${PORT}`;
+  let reqPath = decodeURIComponent(new URL(req.url, `http://${hostHeader}`).pathname);
   if (reqPath === '/' || reqPath === '') reqPath = '/preview.html';
 
   const filePath = path.join(ROOT, reqPath.replace(/^\//, ''));
@@ -50,6 +51,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Carrot HA Live Preview Server running at http://localhost:${PORT}/preview.html`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Carrot HA Live Preview Server running at:`);
+  console.log(`  - http://localhost:${PORT}/preview.html`);
+  console.log(`  - http://127.0.0.1:${PORT}/preview.html`);
 });

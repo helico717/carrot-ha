@@ -368,7 +368,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       calcModel: 'smooth', // 'smooth' (3-Stage Hybrid Smoothing) | 'curve' (Option 1: Bottleneck) | 'simple' (Linear)
       noiseEnabled: false, // BMS quantization jitter simulation
       lang: 'ko',
-      theme: 'auto'
+      theme: 'auto',
+      candidate: 1, // 1 | 2 | 3 | 4 | 5
+      doors_locked: true // true (잠김) | false (열림/미잠김)
     };
     this.smoothState = null;
     this._noiseTimer = null;
@@ -530,7 +532,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
       parking_longitude: 126.9780,
       parking_at: this.simulatedParkingAt || new Date(this.scenarioAt).toISOString(),
       latitude: 37.5665,
-      longitude: 126.9780
+      longitude: 126.9780,
+      doors_locked: this.state.doors_locked !== false
     };
 
     v.cloud_raw_state = {device_id:'simulated-debug',onroad:v.onroad?1:0,updated_at:receivedAt};
@@ -558,7 +561,29 @@ export default class CarrotDebugDashboard extends HTMLElement {
       v.simulated_input_kw = simulatedInputKw;
       v.effective_kw = displayKw;
       v.emergency_charging = !impaired && (displayKw <= 1.5);
+
+      // Real-time Charging Session Energy & Cost (280 KRW/kWh slow <=11kW, 320 KRW/kWh fast >11kW)
+      if (this.chargeSessionStartKwh == null || this.chargeSessionStartMode !== 'charging') {
+        this.chargeSessionStartKwh = Math.max(0, currentKwh - 18.2);
+        this.chargeSessionStartMode = 'charging';
+      }
+      if (currentKwh < this.chargeSessionStartKwh) {
+        this.chargeSessionStartKwh = currentKwh;
+      }
+      const sessionChargedKwh = Number((currentKwh - this.chargeSessionStartKwh).toFixed(2));
+      const isFastCharge = typeof displayKw === 'number' && displayKw > 11;
+      const unitPrice = isFastCharge ? 320 : 280;
+      const sessionCost = Math.round(sessionChargedKwh * unitPrice);
+
+      v.session_charge_kwh = sessionChargedKwh;
+      v.session_charge_cost = sessionCost;
+      v.session_charge_price = unitPrice;
     } else {
+      this.chargeSessionStartKwh = null;
+      this.chargeSessionStartMode = null;
+      v.session_charge_kwh = null;
+      v.session_charge_cost = null;
+      v.session_charge_price = null;
       v.charge_power_kw = 0;
       v.charge_power_w = 0;
       v.charger_max_kw = 0;
@@ -575,7 +600,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
     if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
-    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v};
+    this.dashCard.v = {...displayed, battery_history: batteryHistory, debug_raw: v, doors_locked: this.state.doors_locked !== false, candidate: this.state.candidate || 1};
     this.dashCard.busy = false;
     this.dashCard.render();
     this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
@@ -1128,9 +1153,35 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 ${DEBUG_MODES.map(item=>`<button data-mode="${item.mode}" class="${this.state.mode===item.mode?(item.mode==='charging'?'active charge':'active'):''}">${item[this.state.lang==='en'?'en':'ko']}</button>`).join('')}
               </div>
               <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4">
-                • <b>충전중</b>: 80/100% 마커, 완속(<11kW)/고속(≥11kW) 문구 및 속도 분기, 충전전력/ETA 상단 배치<br>
-                • <b>주행중</b>: 에너지 방전 역방향 스윕 애니메이션, 4개 운행 카드 표시<br>
-                • <b>주차중</b>: 정적 배터리 바, 4개 운행 카드 표시 (주행거리 → 이번달 주행 → 충전량 → 충전요금)
+                • <b>충전중</b>: 배터리 바에 충전 전력(11.0 kW) 표시, 좌측 상단 잠금 카드, ETA/누적거리/이번달 충전량 배치<br>
+                • <b>주차중</b>: 좌측 상단 잠금 카드, <b>우측 상단 총 주행거리</b> (이번달 주행 제거), 충전량/충전요금 배치
+              </div>
+            </div>
+
+            <!-- Group Lock & Candidate: 차량 잠금 상태 & UI 디자인 후보 5종 -->
+            <div class="control-group">
+              <div class="group-label">
+                <span>차량 잠금 상태 & UI 디자인 후보 (5종)</span>
+                <span class="value" id="lockStatusVal">${this.state.doors_locked !== false ? '🔒 잠김 (정상)' : '🔓 열림 (경고)'}</span>
+              </div>
+              <div class="btn-group" style="margin-bottom: 8px;">
+                <button id="btnLockTrue" class="${this.state.doors_locked !== false ? 'active' : ''}">🔒 도어 잠김 (정상)</button>
+                <button id="btnLockFalse" class="${this.state.doors_locked === false ? 'active charge' : ''}" style="${this.state.doors_locked === false ? 'background:#dc2626;border-color:#ef4444;' : ''}">🔓 도어 열림/미잠김 (경고)</button>
+              </div>
+              <div class="charger-section-title" style="margin-top:6px;">🎨 프론트엔드 UI 수정 후보 선택</div>
+              <div class="btn-group">
+                <button data-candidate="1" class="${(this.state.candidate || 1) === 1 ? 'active' : ''}">후보 1<small>클래식 서클</small></button>
+                <button data-candidate="2" class="${this.state.candidate === 2 ? 'active' : ''}">후보 2<small>볼드 실드</small></button>
+                <button data-candidate="3" class="${this.state.candidate === 3 ? 'active' : ''}">후보 3<small>스마트 도어</small></button>
+                <button data-candidate="4" class="${this.state.candidate === 4 ? 'active' : ''}">후보 4<small>글래스 칩</small></button>
+                <button data-candidate="5" class="${this.state.candidate === 5 ? 'active' : ''}">후보 5<small>하이 콘트라스트</small></button>
+              </div>
+              <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;">
+                • <b>후보 1</b>: 클래식 서클 아이콘 + 소프트 알약 배지 (가장 단정하고 일체감 우수)<br>
+                • <b>후보 2</b>: 대형 보안 실드(방패) + 볼드 타이포그래피 (시인성 최상)<br>
+                • <b>후보 3</b>: 스마트 커넥티드 도어 + 좌측 액센트 컬러 라인<br>
+                • <b>후보 4</b>: 글래스모피즘 반투명 카드 + 듀얼 상태 칩 (LOCKED/UNLOCKED)<br>
+                • <b>후보 5</b>: 미잠김 시 카드 전체 붉은색 경고 발광 (하이 콘트라스트 알림)
               </div>
             </div>
 
@@ -1632,6 +1683,298 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (!card.v.battery_history) {
       card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
     }
+
+    const esc = val => String(val ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const n = (val, digits = 1) => typeof val === 'number' && Number.isFinite(val) ? val.toLocaleString('ko-KR', { maximumFractionDigits: digits }) : '—';
+    const time = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '기록 없음';
+    const timeOnly = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '기록 없음';
+    const formatEtaCompletion = val => {
+      if (!val) return '계산 중';
+      const targetDate = new Date(val);
+      if (Number.isNaN(targetDate.getTime())) return '—';
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+      const dayDiff = Math.round((targetMidnight - todayMidnight) / 86400000);
+      const timeStr = targetDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      let dayPrefix = '';
+      if (dayDiff === 1) dayPrefix = '내일 ';
+      else if (dayDiff === 2) dayPrefix = '모레 ';
+      else if (dayDiff > 2) dayPrefix = `${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일 `;
+      return `${dayPrefix}${timeStr} 완료`;
+    };
+    const chargeDuration = s => {
+      if (typeof s !== 'number' || !Number.isFinite(s)) return '—';
+      if (s <= 0) return '완료';
+      const totalMins = Math.round(s / 60);
+      const h = Math.floor(totalMins / 60);
+      const m = totalMins % 60;
+      if (h === 0) return `${m}분`;
+      return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
+    };
+    const shortDuration = val => typeof val === 'number' ? (Math.floor(val / 3600) ? Math.floor(val / 3600) + '시간 ' : '') + Math.floor(val / 60) % 60 + '분' : '—';
+    const icon = name => `<ha-icon icon="mdi:${name}"></ha-icon>`;
+    const metric = (label, val, unit, ico, sub = '', cls = '') =>
+      `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(val)}<small>${esc(unit)}</small></strong>${sub ? `<span class="hint">${esc(sub)}</span>` : ''}</div>`;
+
+    card.overview = (v) => {
+      const displayState = card.vehicleStatus(v);
+      const charging = displayState.key === 'charging';
+      const isDriving = displayState.key === 'driving';
+      const isParked = !charging && !isDriving;
+      const latest = card.trips?.[0]?.data;
+      const soc = Number.isFinite(v.soc_percent) ? Math.max(0, Math.min(100, v.soc_percent)) : null;
+      const status = displayState.label;
+      const powerKw = v.charge_power_kw ?? (v.charge_power_w == null ? null : v.charge_power_w / 1000);
+      const isEmergency = Boolean(v.emergency_charging);
+      const isFast = typeof powerKw === 'number' && powerKw >= 11;
+      const chargeLabel = isEmergency ? '비상충전중 (1kW)...' : (isFast ? '고속충전중...' : '완속충전중...');
+      const sweepSpeedClass = isFast ? 'fast' : 'slow';
+
+      const isLocked = this.state.doors_locked !== false;
+      const candidate = this.state.candidate || 1;
+
+      // 1. Lock Status Card Renderer (Candidate 1 ~ 5)
+      const renderLockMetric = (locked, isChargingMode, c = 1) => {
+        const modeClass = isChargingMode ? 'mode-charging' : 'mode-parked';
+        const lockClass = locked ? 'is-locked' : 'is-unlocked';
+        const hintText = locked ? '모든 도어 닫힘 및 잠김' : '도어 열림';
+        const statusText = locked ? '잠김' : '열림';
+
+        if (c === 1) {
+          return `
+            <div class="metric lock-metric c1 ${modeClass} ${lockClass}">
+              <span class="label">차량 잠금 상태</span>
+              <div class="lock-val-row">
+                <div class="lock-icon-badge">
+                  <ha-icon icon="${locked ? 'mdi:lock' : 'mdi:lock-open-variant'}"></ha-icon>
+                </div>
+                <strong class="lock-val ${locked ? 'locked-text' : 'unlocked-text'}">${statusText}</strong>
+              </div>
+              <span class="hint">${hintText}</span>
+            </div>`;
+        }
+        if (c === 2) {
+          return `
+            <div class="metric lock-metric c2 ${modeClass} ${lockClass}">
+              <span class="label">차량 잠금 상태</span>
+              <div class="lock-val-row">
+                <div class="lock-icon-badge">
+                  <ha-icon icon="${locked ? 'mdi:shield-check' : 'mdi:shield-alert'}"></ha-icon>
+                </div>
+                <strong class="lock-val ${locked ? 'locked-text' : 'unlocked-text'}">${statusText}</strong>
+              </div>
+              <span class="hint">${hintText}</span>
+            </div>`;
+        }
+        if (c === 3) {
+          return `
+            <div class="metric lock-metric c3 ${modeClass} ${lockClass}">
+              <span class="label">차량 잠금 상태</span>
+              <div class="lock-val-row">
+                <div class="lock-icon-badge">
+                  <ha-icon icon="${locked ? 'mdi:car-door-lock' : 'mdi:car-door'}"></ha-icon>
+                </div>
+                <strong class="lock-val ${locked ? 'locked-text' : 'unlocked-text'}">${statusText}</strong>
+              </div>
+              <span class="hint">${hintText}</span>
+            </div>`;
+        }
+        if (c === 4) {
+          return `
+            <div class="metric lock-metric c4 ${modeClass} ${lockClass}">
+              <span class="label">차량 잠금 상태</span>
+              <div class="lock-val-row">
+                <div class="lock-icon-badge">
+                  <ha-icon icon="${locked ? 'mdi:lock-check' : 'mdi:lock-alert'}"></ha-icon>
+                </div>
+                <strong class="lock-val ${locked ? 'locked-text' : 'unlocked-text'}">${statusText}</strong>
+              </div>
+              <span class="hint">${hintText}</span>
+            </div>`;
+        }
+        return `
+          <div class="metric lock-metric c5 ${modeClass} ${lockClass}">
+            <span class="label">차량 잠금 상태</span>
+            <div class="lock-val-row">
+              <div class="lock-icon-badge">
+                <ha-icon icon="${locked ? 'mdi:lock' : 'mdi:alert'}"></ha-icon>
+              </div>
+              <strong class="lock-val ${locked ? 'locked-text' : 'unlocked-text'}">${statusText}</strong>
+            </div>
+            <span class="hint">${hintText}</span>
+          </div>`;
+      };
+
+      // 2. Battery Power Readout Renderer (Candidate 1 ~ 5)
+      const renderBatteryPower = (pKw, fast, emergency, c) => {
+        const pVal = typeof pKw === 'number' ? pKw.toFixed(1) : '—';
+        const typeLabel = emergency ? '비상' : (fast ? '급속' : '완속');
+        if (c === 1) {
+          return `
+            <div class="charge-power-badge cp-c1">
+              <div class="cp-pill">
+                <span class="cp-bolt">⚡</span>
+                <span class="cp-num">${pVal}</span>
+                <span class="cp-unit">kW</span>
+                <span class="cp-tag ${fast ? 'fast' : 'slow'}">${typeLabel}</span>
+              </div>
+            </div>`;
+        }
+        if (c === 2) {
+          return `
+            <div class="charge-power-badge cp-c2">
+              <div class="cp-divider"></div>
+              <div class="cp-stack">
+                <div class="cp-num-row">
+                  <span class="cp-num">${pVal}</span>
+                  <small class="cp-unit">kW</small>
+                </div>
+                <span class="cp-sub-label">${emergency ? '비상 충전' : (fast ? '고속 급속' : '표준 완속')}</span>
+              </div>
+            </div>`;
+        }
+        if (c === 3) {
+          return `
+            <div class="charge-power-badge cp-c3">
+              <div class="cp-neon-chip">
+                <span class="cp-icon">⚡</span>
+                <span class="cp-text">${pVal} kW</span>
+                <span class="cp-badge">${typeLabel}</span>
+              </div>
+            </div>`;
+        }
+        if (c === 4) {
+          return `
+            <div class="charge-power-badge cp-c4">
+              <span class="cp-title">인입 충전 전력</span>
+              <div class="cp-main">
+                <span class="cp-val">${pVal}</span>
+                <small>kW</small>
+                <span class="cp-speed">${typeLabel}</span>
+              </div>
+            </div>`;
+        }
+        return `
+          <div class="charge-power-badge cp-c5">
+            <div class="cp-gauge">
+              <span class="cp-glow">⚡</span>
+              <strong class="cp-digital">${pVal}</strong>
+              <small class="cp-kw">kW</small>
+              <span class="cp-pill-type">${typeLabel}</span>
+            </div>
+          </div>`;
+      };
+
+      // 3. Quick Metrics: 4 Cards
+      // - Charging: [Lock, ETA, Total Odometer, Month Charge kWh]
+      //   ETA Card:
+      //   - If SOC < 80%: Title '80%까지 걸리는 시간', Main: duration to 80% (chargeDuration), Sub: completion time (with '내일' if tomorrow)
+      //   - If SOC >= 80%: Title '100%까지 걸리는 시간', Main: duration to 100% (chargeDuration), Sub: completion time (with '내일' if tomorrow)
+      // - Parked: [Lock, Total Odometer, Month Charge kWh, Month Charge Cost] (replaces Month Distance)
+      const isUnder80 = soc == null || soc < 80;
+      const targetPercent = isUnder80 ? 80 : 100;
+      const etaCardTitle = `${targetPercent}%까지 걸리는 시간`;
+      const targetSec = isUnder80 ? v.time_to_80_s : v.time_to_100_s;
+      const targetEta = isUnder80 ? v.eta_80 : v.eta_100;
+
+      let etaCardMainVal = '계산 중';
+      let etaCardSubText = `${targetPercent}% 목표`;
+      if (typeof targetSec === 'number' && Number.isFinite(targetSec)) {
+        if (targetSec <= 0) {
+          etaCardMainVal = '완료';
+          etaCardSubText = '충전 완료';
+        } else {
+          etaCardMainVal = chargeDuration(targetSec);
+          etaCardSubText = formatEtaCompletion(targetEta);
+        }
+      }
+
+      // Real-time Charging Session Cost (Card 3 in Charging Mode)
+      // Unit price standard: 11kW or less = 280 KRW/kWh (slow), over 11kW = 320 KRW/kWh (fast)
+      const sessionKwh = typeof v.session_charge_kwh === 'number'
+        ? v.session_charge_kwh
+        : (v.charge_energy_kwh ?? (card.charges?.[0]?.data?.energy_kwh ?? 18.2));
+      const sessionUnitPrice = isFast ? 320 : 280;
+      const sessionCost = typeof v.session_charge_cost === 'number'
+        ? v.session_charge_cost
+        : Math.round(sessionKwh * sessionUnitPrice);
+      const sessionCostSub = `+${n(sessionKwh, 1)} kWh (추정)`;
+
+      const quickMetrics = charging
+        ? `${renderLockMetric(isLocked, true, candidate)}` +
+          `${metric(etaCardTitle, etaCardMainVal, '', 'clock-end', etaCardSubText, 'charge-eta')}` +
+          `${metric('실시간 충전금액', n(sessionCost, 0), '원', 'cash', sessionCostSub, 'charge-cost')}` +
+          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}`
+        : `${renderLockMetric(isLocked, false, candidate)}` +
+          `${metric('총 주행거리', n(v.odometer_km, 0), 'km', 'counter')}` +
+          `${metric('이번 달 충전량', n(v.month_charge_kwh), 'kWh', 'battery-plus')}` +
+          `${metric('이번 달 충전요금', n(v.month_charge_cost, 0), '원', 'cash', '(추정)')}`;
+
+      const markersHtml = charging
+        ? `${(soc == null || soc < 80) ? `<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>` : ''}` +
+          `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
+        : '';
+
+      const sweepHtml = charging
+        ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam ${sweepSpeedClass}"></div></div></div>`
+        : (isDriving ? `<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>` : '');
+
+      const energyHeadHtml = charging
+        ? `<div class="energy-head charging-left">
+            <div class="charge-head-main">
+              <svg viewBox="0 0 24 24" class="charge-head-bolt"><path d="M7 2v11h3v9l7-12h-4l3-8z"/></svg>
+              <div class="charge-info-stack">
+                <div class="charge-status-line">
+                  <span class="charge-status-label">${chargeLabel}</span>
+                  ${powerKw != null ? `<span class="charge-power-tag ${isFast ? 'fast' : 'slow'}">${n(powerKw, 1)} kW</span>` : ''}
+                </div>
+                <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+              </div>
+            </div>
+          </div>`
+        : `<div class="energy-head">
+            <div class="battery-label">
+              <svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>
+              <span>배터리 잔량</span>
+            </div>
+            <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+          </div>`;
+
+      const socState = !charging && soc !== null ? (soc < 15 ? 'is-critical soc-critical' : soc < 30 ? 'is-low soc-low' : '') : '';
+
+      return `<div class="cockpit desktop-balanced-cockpit">
+        <div class="overview-col-visual">
+          <section class="hero">
+            <div class="hero-copy"><h2>${esc(status).replace('\n', '<br>')}</h2></div>
+            ${card.vehicleImage()}
+          </section>
+          <div class="mini-condition">
+            <span>외기 <b>${n(v.outside_temp_c)}°C</b></span>
+            <span>12V <b>${n(v.aux_voltage, 1)}V</b></span>
+            <span>공조 <b>${v.ac_on == null ? '—' : v.ac_on ? 'ON' : 'OFF'}</b></span>
+          </div>
+        </div>
+        <div class="overview-col-telemetry">
+          <section class="energy ${charging ? 'is-charging' : ''} ${isDriving ? 'is-driving' : ''} ${socState}" style="--soc:${soc ?? 0}%">
+            ${sweepHtml}${markersHtml}${energyHeadHtml}
+          </section>
+          <div class="quick-metrics">${quickMetrics}</div>
+          <div class="overview-links">
+            <button class="shortcut" data-tab="parking">
+              <span><b>주차 위치</b><small>${v.parking_latitude == null ? '위치 수신 대기' : time(v.parking_at)}</small></span>
+              <em>지도 →</em>
+              <div class="mini-map parking-mini"></div>
+            </button>
+            <button class="shortcut" data-tab="trips">
+              <span><b>최근 주행</b><small>${latest ? n(latest.distance_m == null ? null : latest.distance_m / 1000, 2) + ' km' : '기록 없음'}</small><small>${latest ? shortDuration(latest.duration_s) : '새 주행 기록을 기다립니다'}</small></span>
+              <em>보기 →</em>
+              <div class="mini-map trip-mini"></div>
+            </button>
+          </div>
+        </div>
+      </div>`;
+    };
 
     const origRender = card.render.bind(card);
     card.render = () => {
@@ -2211,6 +2554,534 @@ export default class CarrotDebugDashboard extends HTMLElement {
           display: block !important;
         }
       }
+
+      /* === Vehicle Lock Metric & Charging Power Badges === */
+      .energy-head.charging-left {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 16px !important;
+      }
+      .charge-head-main {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+      }
+      .charge-info-stack {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+      }
+      .charge-status-line {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+        margin-bottom: 2px !important;
+      }
+      .charge-power-tag {
+        display: inline-flex !important;
+        align-items: center !important;
+        font-family: Inter, Pretendard, sans-serif !important;
+        font-size: 12.5px !important;
+        font-weight: 750 !important;
+        letter-spacing: -0.2px !important;
+        padding: 2px 8px !important;
+        border-radius: 6px !important;
+        line-height: 1.2 !important;
+        background: rgba(0, 0, 0, 0.35) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.22) !important;
+      }
+      .charge-power-tag.fast,
+      .charge-power-tag.slow {
+        background: rgba(0, 0, 0, 0.35) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.22) !important;
+      }
+      :host([data-theme="light"]) .charge-power-tag,
+      :host([data-theme="light"]) .charge-power-tag.fast,
+      :host([data-theme="light"]) .charge-power-tag.slow {
+        background: rgba(0, 0, 0, 0.35) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.22) !important;
+      }
+
+      /* Charging ETA Metric Card */
+      .quick-metrics .metric.charge-eta {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        min-width: 0 !important;
+      }
+      .quick-metrics .metric.charge-eta strong {
+        font-size: 21px !important;
+        font-weight: 750 !important;
+        letter-spacing: -0.4px !important;
+        line-height: 1.25 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .quick-metrics .metric.charge-eta .hint {
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        color: #94a3b8 !important;
+        margin-top: 6px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.3 !important;
+      }
+      :host([data-theme="light"]) .quick-metrics .metric.charge-eta .hint {
+        color: #64748b !important;
+      }
+      @container (max-width: 380px) {
+        .quick-metrics .metric.charge-eta strong {
+          font-size: 18px !important;
+        }
+        .quick-metrics .metric.charge-eta .hint {
+          font-size: 10px !important;
+        }
+      }
+
+      /* Lock Metric Card General */
+      .quick-metrics .metric.lock-metric {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        position: relative !important;
+        overflow: hidden !important;
+        transition: all 0.25s ease !important;
+        cursor: default !important;
+      }
+      .quick-metrics .metric.lock-metric ha-icon {
+        display: inline-flex !important;
+        width: 18px !important;
+        height: 18px !important;
+        --mdc-icon-size: 18px !important;
+      }
+      .quick-metrics .metric.lock-metric .label {
+        font-size: 12px !important;
+        color: var(--muted) !important;
+        margin-bottom: 6px !important;
+        display: block !important;
+      }
+      .quick-metrics .metric.lock-metric .lock-val-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 9px !important;
+        margin: 2px 0 6px !important;
+      }
+      .quick-metrics .metric.lock-metric .lock-icon-badge {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        transition: all 0.2s ease !important;
+      }
+      .quick-metrics .metric.lock-metric .lock-val {
+        font-size: 22px !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.4px !important;
+        line-height: 1.2 !important;
+        display: inline-block !important;
+        margin: 0 !important;
+      }
+      .quick-metrics .metric.lock-metric .hint {
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        color: var(--muted) !important;
+        margin-top: 4px !important;
+        line-height: 1.3 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+
+      /* Point Colors: Charging Mode = Green (#34d399 / #15803d) */
+      .metric.lock-metric.mode-charging.is-locked .lock-icon-badge {
+        background: rgba(16, 185, 129, 0.16) !important;
+        color: #34d399 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-locked .lock-icon-badge {
+        background: #dcfce7 !important;
+        color: #15803d !important;
+      }
+      .metric.lock-metric.mode-charging.is-locked .locked-text {
+        color: #34d399 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-charging.is-locked .locked-text {
+        color: #15803d !important;
+      }
+
+      /* Point Colors: Parked Mode = Blue (#38bdf8 / #0284c7) */
+      .metric.lock-metric.mode-parked.is-locked .lock-icon-badge {
+        background: rgba(56, 189, 248, 0.16) !important;
+        color: #38bdf8 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-locked .lock-icon-badge {
+        background: #e0f2fe !important;
+        color: #0284c7 !important;
+      }
+      .metric.lock-metric.mode-parked.is-locked .locked-text {
+        color: #38bdf8 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.mode-parked.is-locked .locked-text {
+        color: #0284c7 !important;
+      }
+
+      /* Warning: Unlocked / Door Open = Red (#f87171 / #dc2626) */
+      .metric.lock-metric.is-unlocked .lock-icon-badge {
+        background: rgba(239, 68, 68, 0.18) !important;
+        color: #f87171 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .lock-icon-badge {
+        background: #fee2e2 !important;
+        color: #dc2626 !important;
+      }
+      .metric.lock-metric.is-unlocked .unlocked-text {
+        color: #f87171 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .unlocked-text {
+        color: #dc2626 !important;
+      }
+      .metric.lock-metric.is-unlocked .hint {
+        color: #f87171 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.is-unlocked .hint {
+        color: #dc2626 !important;
+      }
+
+      /* Candidate 2: Bold Security Shield & High Visibility */
+      .metric.lock-metric.c2 .lock-header-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .metric.lock-metric.c2 ha-icon {
+        width: 26px !important;
+        height: 26px !important;
+        --mdc-icon-size: 26px !important;
+      }
+      .metric.lock-metric.c2.is-locked ha-icon {
+        color: #38bdf8 !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c2.is-locked ha-icon {
+        color: #0284c7 !important;
+      }
+      .metric.lock-metric.c2.is-unlocked ha-icon {
+        color: #f87171 !important;
+      }
+      .metric.lock-metric.c2 .lock-val {
+        font-size: 23px !important;
+        letter-spacing: -0.6px !important;
+      }
+
+      /* Candidate 3: Smart Mobility Door & Left Accent Stripe */
+      .metric.lock-metric.c3 {
+        padding-left: 20px !important;
+      }
+      .metric.lock-metric.c3 .accent-stripe {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 5px;
+      }
+      .metric.lock-metric.c3 .accent-stripe.locked {
+        background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+      }
+      .metric.lock-metric.c3 .accent-stripe.unlocked {
+        background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+      }
+      .metric.lock-metric.c3 .lock-top-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .metric.lock-metric.c3.is-locked .lock-top-meta ha-icon {
+        color: #34d399;
+      }
+      .metric.lock-metric.c3.is-unlocked .lock-top-meta ha-icon {
+        color: #f87171;
+      }
+
+      /* Candidate 4: Glassmorphism & Status Pill */
+      .metric.lock-metric.c4 {
+        background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)) !important;
+        border-color: rgba(255,255,255,0.12) !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c4 {
+        background: linear-gradient(145deg, #ffffff, #f1f5f9) !important;
+        border-color: #cbd5e1 !important;
+      }
+      .metric.lock-metric.c4 .glass-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .metric.lock-metric.c4 .status-pill {
+        font-size: 10.5px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        letter-spacing: 0.3px;
+      }
+      .metric.lock-metric.c4 .status-pill.locked {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c4 .status-pill.locked {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .metric.lock-metric.c4 .status-pill.unlocked {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c4 .status-pill.unlocked {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+
+      /* Candidate 5: High-Contrast Alert Guard */
+      .metric.lock-metric.c5.is-unlocked {
+        background: linear-gradient(145deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.08)) !important;
+        border: 1.5px solid rgba(239, 68, 68, 0.55) !important;
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.18) !important;
+      }
+      :host([data-theme="light"]) .metric.lock-metric.c5.is-unlocked {
+        background: linear-gradient(145deg, #fff1f2, #ffe4e6) !important;
+        border-color: #f87171 !important;
+      }
+      .metric.lock-metric.c5 .safety-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .metric.lock-metric.c5 .safety-icon-circle {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .metric.lock-metric.c5 .safety-icon-circle.safe {
+        background: rgba(16, 185, 129, 0.2);
+        color: #34d399;
+      }
+      .metric.lock-metric.c5 .safety-icon-circle.danger {
+        background: rgba(239, 68, 68, 0.3);
+        color: #f87171;
+      }
+
+      /* Battery Card Charging Power Badges */
+      .charge-power-badge {
+        display: inline-flex;
+        align-items: center;
+      }
+
+      /* Battery Power Candidate 1: Classic Translucent Pill */
+      .charge-power-badge.cp-c1 .cp-pill {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        padding: 6px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      .charge-power-badge.cp-c1 .cp-bolt {
+        font-size: 15px;
+        color: #34d399;
+      }
+      .charge-power-badge.cp-c1 .cp-num {
+        font-family: Inter, Pretendard, sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1;
+      }
+      .charge-power-badge.cp-c1 .cp-unit {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .charge-power-badge.cp-c1 .cp-tag {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 6px;
+        margin-left: 2px;
+      }
+      .charge-power-badge.cp-c1 .cp-tag.fast {
+        background: rgba(56, 189, 248, 0.25);
+        color: #7dd3fc;
+        border: 1px solid rgba(56, 189, 248, 0.4);
+      }
+      .charge-power-badge.cp-c1 .cp-tag.slow {
+        background: rgba(251, 191, 36, 0.25);
+        color: #fde68a;
+        border: 1px solid rgba(251, 191, 36, 0.4);
+      }
+
+      /* Battery Power Candidate 2: Divider Stack */
+      .charge-power-badge.cp-c2 {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .charge-power-badge.cp-c2 .cp-divider {
+        width: 1px;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+      .charge-power-badge.cp-c2 .cp-stack {
+        display: flex;
+        flex-direction: column;
+      }
+      .charge-power-badge.cp-c2 .cp-num-row {
+        display: flex;
+        align-items: baseline;
+        gap: 3px;
+      }
+      .charge-power-badge.cp-c2 .cp-num {
+        font-family: Inter, Pretendard, sans-serif;
+        font-size: 26px;
+        font-weight: 850;
+        color: #ffffff;
+        line-height: 1;
+      }
+      .charge-power-badge.cp-c2 .cp-unit {
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .charge-power-badge.cp-c2 .cp-sub-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+        margin-top: 3px;
+      }
+
+      /* Battery Power Candidate 3: Neon Chip */
+      .charge-power-badge.cp-c3 .cp-neon-chip {
+        background: rgba(16, 185, 129, 0.18);
+        border: 1px solid rgba(52, 211, 153, 0.5);
+        box-shadow: 0 0 10px rgba(52, 211, 153, 0.25);
+        border-radius: 12px;
+        padding: 6px 12px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .charge-power-badge.cp-c3 .cp-text {
+        font-family: Inter, Pretendard, sans-serif;
+        font-size: 21px;
+        font-weight: 800;
+        color: #6ee7b7;
+      }
+      .charge-power-badge.cp-c3 .cp-badge {
+        font-size: 10.5px;
+        font-weight: 700;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      /* Battery Power Candidate 4: Telemetry Card Header */
+      .charge-power-badge.cp-c4 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 6px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+      .charge-power-badge.cp-c4 .cp-title {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 2px;
+      }
+      .charge-power-badge.cp-c4 .cp-main {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+      .charge-power-badge.cp-c4 .cp-val {
+        font-family: Inter, Pretendard, sans-serif;
+        font-size: 23px;
+        font-weight: 800;
+        color: #fff;
+      }
+      .charge-power-badge.cp-c4 .cp-speed {
+        font-size: 11px;
+        font-weight: 600;
+        color: #38bdf8;
+        margin-left: 4px;
+      }
+
+      /* Battery Power Candidate 5: Digital Instrument Gauge */
+      .charge-power-badge.cp-c5 .cp-gauge {
+        background: rgba(0, 0, 0, 0.45);
+        border: 1.5px solid rgba(52, 211, 153, 0.4);
+        border-radius: 14px;
+        padding: 7px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .charge-power-badge.cp-c5 .cp-glow {
+        color: #34d399;
+        font-size: 17px;
+      }
+      .charge-power-badge.cp-c5 .cp-digital {
+        font-family: Inter, Pretendard, sans-serif;
+        font-size: 24px;
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: -0.5px;
+      }
+      .charge-power-badge.cp-c5 .cp-kw {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .charge-power-badge.cp-c5 .cp-pill-type {
+        font-size: 11px;
+        font-weight: 700;
+        background: #059669;
+        color: #fff;
+        padding: 2px 7px;
+        border-radius: 6px;
+        margin-left: 5px;
+      }
+
+      /* Mobile adjustment for battery bar power badges */
+      @container (max-width: 700px) {
+        .energy-head.charging-left {
+          flex-direction: column !important;
+          align-items: flex-start !important;
+          gap: 10px !important;
+        }
+        .charge-power-badge {
+          align-self: flex-start !important;
+        }
+      }
     `;
   }
 
@@ -2228,7 +3099,77 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.state.mode=button.dataset.mode;
       updateModeBtns();
       this.applyDebugTelemetry();
+      if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+        window.__updatePreviewToolbar(this.state);
+      }
     }));
+
+    // Candidate buttons binding
+    const updateCandidateBtns = () => {
+      root.querySelectorAll('[data-candidate]').forEach(btn => {
+        const c = Number(btn.dataset.candidate);
+        btn.className = (this.state.candidate || 1) === c ? 'active' : '';
+      });
+    };
+    root.querySelectorAll('[data-candidate]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.state.candidate = Number(btn.dataset.candidate);
+        updateCandidateBtns();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    });
+
+    // Door lock toggles
+    const btnLockTrue = root.querySelector('#btnLockTrue');
+    const btnLockFalse = root.querySelector('#btnLockFalse');
+    const lockVal = root.querySelector('#lockStatusVal');
+
+    const updateLockUI = () => {
+      const isLocked = this.state.doors_locked !== false;
+      if (btnLockTrue) btnLockTrue.className = isLocked ? 'active' : '';
+      if (btnLockFalse) {
+        btnLockFalse.className = !isLocked ? 'active charge' : '';
+        btnLockFalse.style = !isLocked ? 'background:#dc2626;border-color:#ef4444;' : '';
+      }
+      if (lockVal) {
+        lockVal.textContent = isLocked ? '🔒 잠김 (정상)' : '🔓 열림 (경고)';
+      }
+    };
+
+    if (btnLockTrue) {
+      btnLockTrue.addEventListener('click', () => {
+        this.state.doors_locked = true;
+        updateLockUI();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    }
+    if (btnLockFalse) {
+      btnLockFalse.addEventListener('click', () => {
+        this.state.doors_locked = false;
+        updateLockUI();
+        this.applyDebugTelemetry();
+        if (typeof window !== 'undefined' && window.__updatePreviewToolbar) {
+          window.__updatePreviewToolbar(this.state);
+        }
+      });
+    }
+
+    // Expose method so preview toolbar can sync this component
+    this.__syncFromExternal = (newState) => {
+      if (typeof newState.candidate === 'number') this.state.candidate = newState.candidate;
+      if (typeof newState.doors_locked === 'boolean') this.state.doors_locked = newState.doors_locked;
+      if (typeof newState.mode === 'string') this.state.mode = newState.mode;
+      updateCandidateBtns();
+      updateLockUI();
+      updateModeBtns();
+      this.applyDebugTelemetry();
+    };
 
     // SOC Slider & Preset Dropdown
     const socSlider = root.querySelector('#socSlider');

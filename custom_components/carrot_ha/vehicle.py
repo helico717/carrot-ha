@@ -90,8 +90,26 @@ def values(runtime):
         data['low_power_duration_s'] = 0
         data['emergency_charging'] = False
 
-    # Train once per battery measurement, not once per sensor/UI property read.
+    # Real-time charging session energy & cost (280 KRW/kWh slow <=11kW, 320 KRW/kWh fast >11kW)
     battery_wh = data.get('battery_wh')
+    if is_charging and type(battery_wh) in (int, float) and battery_wh > 0:
+        session_start_wh = runtime.get('charge_session_start_wh')
+        if session_start_wh is None or battery_wh < session_start_wh:
+            session_start_wh = battery_wh
+            runtime['charge_session_start_wh'] = session_start_wh
+        session_kwh = max(0.0, round((battery_wh - session_start_wh) / 1000.0, 2))
+        is_fast_charge = isinstance(power_kw, (int, float)) and power_kw > 11
+        unit_price = 320 if is_fast_charge else 280
+        data['session_charge_kwh'] = session_kwh
+        data['session_charge_cost'] = int(round(session_kwh * unit_price))
+        data['session_charge_price'] = unit_price
+    else:
+        runtime['charge_session_start_wh'] = None
+        data['session_charge_kwh'] = None
+        data['session_charge_cost'] = None
+        data['session_charge_price'] = None
+
+    # Train once per battery measurement, not once per sensor/UI property read.
     stamp = (data.get('field_measured_at') or {}).get('battery_wh') or data.get('measured_at')
     try:
         measured_time = datetime.fromisoformat(stamp.replace('Z', '+00:00'))
