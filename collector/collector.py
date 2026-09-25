@@ -104,7 +104,7 @@ def main():
             except Exception:
                 diagnostics = None
             last_health = mono
-        events=engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion,diagnostics=diagnostics)
+        events=engine.tick(now,params.get_bool('IsOnroad'),gps,sampled,enabled,motion=motion,diagnostics=diagnostics,monotonic_now=mono)
         if any(path == '/api/telemetry' for path, _ in events):first_snapshot.set()
         atomic(STATE/'status.json',{'status':'running','at':now,'onroad':engine.s['vehicle'].get('comma_onroad'),'driving':engine.s.get('onroad'),'gear':engine.s['vehicle'].get('gear'),'pending':store.count(),'can_fields':sorted((latest_sample or {}).keys()),'active_trip':bool(engine.s.get('trip'))})
 

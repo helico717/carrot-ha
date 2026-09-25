@@ -2294,6 +2294,16 @@ async function handleRecordedTrip(request,env) {
   if(response.status===200 && payload.id && typeof payload.partial==="boolean") {
     await env.DB.prepare("INSERT INTO trip_quality VALUES (?,?) ON CONFLICT(id) DO UPDATE SET partial=excluded.partial").bind(payload.id,payload.partial?1:0).run();
   }
+  if(response.status===200 && payload.id) {
+    if (["can_speed", "odometer_gap_recovery", "legacy_gps"].includes(payload.distanceSource)) {
+      const q=payload.distanceQuality||{};
+      const quality={complete:q.complete===true,estimated:q.estimated===true};
+      await env.DB.prepare("INSERT INTO trip_distance_quality VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET source=excluded.source,quality_json=excluded.quality_json")
+        .bind(payload.id,payload.distanceSource,JSON.stringify(quality)).run();
+    } else {
+      await env.DB.prepare("DELETE FROM trip_distance_quality WHERE id=?").bind(payload.id).run();
+    }
+  }
   return response;
 }
 async function handleTripsWithQuality(request,env,pathname) {
@@ -2303,6 +2313,11 @@ async function handleTripsWithQuality(request,env,pathname) {
   for(const trip of (body.trips||[body])) {
     const quality=await env.DB.prepare("SELECT partial FROM trip_quality WHERE id=?").bind(trip.id).first();
     if(quality)trip.partial=Boolean(quality.partial);
+    const distance=await env.DB.prepare("SELECT source,quality_json FROM trip_distance_quality WHERE id=?").bind(trip.id).first();
+    if(distance) {
+      trip.distance_source=distance.source;
+      trip.distance_quality=JSON.parse(distance.quality_json);
+    }
   }
   return json(body);
 }

@@ -626,7 +626,7 @@ class CarrotDashboard extends HTMLElement {
     let tiles='';
     if(isTrip){
       if(isSpecificTrip){
-        const distVal=curTrip.distance_m!=null?n(curTrip.distance_m/1000,2):'—';
+        const distVal=curTrip.distance_m!=null?(curTrip.distance_estimated?'≈ ':'')+n(curTrip.distance_m/1000,2):'—';
         const durVal=curTrip.duration_s!=null?duration(curTrip.duration_s):'—';
         const effVal=curTrip.efficiency_km_kwh!=null?n(curTrip.efficiency_km_kwh,1):'—';
         const spdVal=curTrip.route?.length?n(this.maxSpeed(curTrip.route),0):'—';
@@ -639,7 +639,7 @@ class CarrotDashboard extends HTMLElement {
         const totalDurS=dayTrips.reduce((acc,t)=>acc+(t.duration_s||0),0);
         let distWithEnergyM=0,energyWhSum=0;
         for(const t of dayTrips){
-          if(t.energy_wh&&t.energy_wh>0&&t.distance_m){
+          if(Number.isFinite(t.energy_wh)&&t.distance_m>0){
             energyWhSum+=t.energy_wh;
             distWithEnergyM+=t.distance_m;
           }
@@ -647,7 +647,7 @@ class CarrotDashboard extends HTMLElement {
         const dayAvgEff=energyWhSum>0&&distWithEnergyM>0?(distWithEnergyM/1000)/(energyWhSum/1000):null;
         const dayAvgSpeed=totalDurS>0&&totalDistM>0?(totalDistM/totalDurS)*3.6:null;
 
-        const distVal=dayTrips.length?n(totalDistM/1000,2):'—';
+        const distVal=dayTrips.length?(dayTrips.some(t=>t.distance_estimated)?'≈ ':'')+n(totalDistM/1000,2):'—';
         const durVal=dayTrips.length?duration(totalDurS):'—';
         const effVal=dayAvgEff!=null?n(dayAvgEff,1):'—';
         const spdVal=dayAvgSpeed!=null?n(dayAvgSpeed,0):'—';
@@ -749,7 +749,7 @@ class CarrotDashboard extends HTMLElement {
     const selected=days.find(d=>d.key===this.tripDay);
     const labels=d=>d.date.getUTCDate()+'일('+['일','월','화','수','목','금','토'][d.date.getUTCDay()]+')';
     const capacity=(this.v&&this.v.soc_capacity_kwh)||78.0;
-    return `<section class="panel trip-history"><div class="paneltitle"><h2>최근 주행</h2><span class="sub">최근 7일</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} 회 주행"><span class="trip-today">${d.today?'오늘':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} 회 주행</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];const ed=e?.data||{};const durText=tripDurationKo(ed.duration_s);const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):(ed.start_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.start_battery_wh/(capacity*1000)*100))):null);const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):(ed.end_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.end_battery_wh/(capacity*1000)*100))):null);const hasSoc=startSoc!=null&&endSoc!=null;const effHtml=ed.efficiency_km_kwh!=null?`<span class="trip-eff">${n(ed.efficiency_km_kwh,1)} km/kWh</span>`:'';const socHtml=hasSoc?`<span class="trip-soc">${icon(batteryIconName(startSoc))} ${startSoc}% → ${endSoc}%</span>`:(!effHtml&&!durText?`<small>${duration(ed.duration_s)}</small>`:'');return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(ed.started_at||e.observed_at)}${durText?`<span class="trip-dur">${durText}</span>`:''}</b>${socHtml}${effHtml}</span><strong>${n((ed.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">기록된 주행이 없습니다.</div>'}</div>`:'<div class="empty">날짜를 선택하면 해당 날짜의 주행 기록이 표시됩니다.</div>'}</section>`;
+    return `<section class="panel trip-history"><div class="paneltitle"><h2>최근 주행</h2><span class="sub">최근 7일</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} 회 주행"><span class="trip-today">${d.today?'오늘':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} 회 주행</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];const ed=e?.data||{};const durText=tripDurationKo(ed.duration_s);const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):(ed.start_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.start_battery_wh/(capacity*1000)*100))):null);const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):(ed.end_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.end_battery_wh/(capacity*1000)*100))):null);const hasSoc=startSoc!=null&&endSoc!=null;const effHtml=ed.efficiency_km_kwh!=null?`<span class="trip-eff">${n(ed.efficiency_km_kwh,1)} km/kWh</span>`:'';const socHtml=hasSoc?`<span class="trip-soc">${icon(batteryIconName(startSoc))} ${startSoc}% → ${endSoc}%</span>`:(!effHtml&&!durText?`<small>${duration(ed.duration_s)}</small>`:'');return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(ed.started_at||e.observed_at)}${durText?`<span class="trip-dur">${durText}</span>`:''}</b>${socHtml}${effHtml}${ed.distance_estimated?'<span class="trip-eff">거리 보정 · 추정</span>':''}</span><strong>${n((ed.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">기록된 주행이 없습니다.</div>'}</div>`:'<div class="empty">날짜를 선택하면 해당 날짜의 주행 기록이 표시됩니다.</div>'}</section>`;
   }
   overview(v){
     const tz = this._hass?.config?.time_zone;

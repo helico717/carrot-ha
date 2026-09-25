@@ -52,13 +52,18 @@ class Engine:
         self.s.setdefault('charge_months',{})
         self.s.setdefault('charge_sessions',[])
         self.last_saved=0
-        if self.s.get('trip'):self.s['trip']['partial']=True
-    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None):
+        if self.s.get('trip'):
+            self.s['trip']['partial']=True
+            self.s['trip'].pop('last_motion', None)
+            self.s['trip'].pop('last_clock', None)
+            self.s['trip']['distance_complete'] = False
+    def tick(self,now,onroad,gps=None,sampled=None,enabled=None,motion=None,diagnostics=None,monotonic_now=None):
         for key, value in (diagnostics or {}).items():
             self.s['vehicle'][key] = value
             self.s['field_measured_at'][key] = stamp(now)
         comma_onroad=onroad
         onroad=self._driving(onroad,motion)
+        self.s['field_measured_at']['wheel_speed_mps']=stamp(now)
         self.s['vehicle'].update(comma_onroad=bool(comma_onroad),driving=onroad,
                                  gear=motion.get('gear') if motion else None,
                                  wheel_speed_mps=(motion.get('speed_mps') if motion and type(motion.get('speed_mps')) in (int,float) and math.isfinite(motion['speed_mps']) else None))
@@ -70,31 +75,69 @@ class Engine:
                 self.s['trip']['partial']=True
                 self.s['trip']['last_at']=now
                 self.s['trip'].pop('last_point',None)
+                self.s['trip'].pop('last_motion',None)
+                self.s['trip']['distance_complete']=False
         events=[];s=self.s;changed=onroad!=s.get('onroad');old_onroad=s.get('onroad')
         trip=s.get('trip')
         if onroad and not trip:
-            trip=s['trip']={'id':str(uuid.uuid4()),'deviceId':self.device,'startedAt':stamp(now),'durationS':0,'distanceM':0,'route':[],'last_at':now,'partial':old_onroad is None}
+            trip=s['trip']={'id':str(uuid.uuid4()),'deviceId':self.device,'startedAt':stamp(now),'durationS':0,'distanceM':0,'route':[],'last_at':now,'partial':old_onroad is None,'distance_complete':True,'distance_source':'can_speed'}
         if trip and onroad:
-            dt=now-trip['last_at'];trip['last_at']=now
-            if 0<=dt<=20:trip['durationS']+=dt
-            else:trip['partial']=True
+            clock = now if monotonic_now is None else monotonic_now
+            dt = clock-trip.get('last_clock', clock)
+            wall_dt = now-trip['last_at']
+            trip['last_clock']=clock
+            trip['last_at']=now
+            if 0 <= dt <= 20:
+                trip['durationS'] += dt
+            else:
+                trip['partial']=True
+            speed = motion.get('speed_mps') if motion else None
+            valid_speed = type(speed) in (int,float) and math.isfinite(speed) and 0 <= speed <= 70
+            previous_speed = trip.get('last_motion')
+            if valid_speed and previous_speed is not None and 0 < dt <= 3:
+                trip['distanceM'] += (previous_speed+speed)*0.5*dt
+            elif wall_dt > 0 and (previous_speed is None or dt > 3 or not valid_speed):
+                trip['distance_complete']=False
+            trip['last_motion'] = speed if valid_speed else None
+            # Fresh, quantized odometer anchors validate/recover recorder outages.
+            odo = (sampled or {}).get('odometer_km')
+            if type(odo) in (int,float) and math.isfinite(odo) and odo >= 0:
+                trip.setdefault('odometer_start', {'km':odo,'at':now})
+                old_odo = trip.get('odometer_end')
+                if old_odo and (odo < old_odo['km'] or (odo-old_odo['km'])*1000 > max(2000,(now-old_odo['at'])*70)):
+                    trip['odometer_invalid']=True
+                trip['odometer_end']={'km':odo,'at':now}
             if gps and now-trip.get('last_point_at',0)>=5:
                 point=dict(gps,t=stamp(now));previous=trip.get('last_point')
                 if previous:
                     d=distance(previous,point)
                     interval=max(1,now-trip.get('last_point_at',now))
                     if d>max(100,interval*70):point=None
-                    elif interval <= 20:trip['distanceM']+=d
-                    else:trip['partial']=True
+                    # GPS is a map trace only. Tunnel gaps never gate CAN distance.
                 if point:
                     trip['last_point'],trip['last_point_at']=point,now
                     if len(trip['route'])>=720:trip['route']=trip['route'][::2]
                     trip['route'].append(point)
         elif trip and onroad is False:
             end=trip.get('last_at',now)
-            payload={k:v for k,v in trip.items() if not k.startswith('last_')}
+            source = trip.get('distance_source', 'legacy_gps')
+            a,b = trip.get('odometer_start'),trip.get('odometer_end')
+            if not trip.get('distance_complete') and a and b and not trip.get('odometer_invalid'):
+                odo_m = (b['km']-a['km'])*1000
+                start = datetime.fromisoformat(trip['startedAt']).timestamp()
+                if (a['at']-start <= 35 and end-b['at'] <= 35 and end > start
+                        and odo_m >= 5000 and odo_m >= trip['distanceM']-2000
+                        and odo_m <= (end-start)*70):
+                    trip['distanceM']=odo_m
+                    source='odometer_gap_recovery'
+            payload={k:trip[k] for k in ('id','deviceId','startedAt','durationS','distanceM','route','partial')}
+            payload['distanceSource']=source
+            payload['distanceQuality']={'complete':bool(trip.get('distance_complete')),
+                                        'estimated':source=='odometer_gap_recovery',
+                                        'odometerStart':a,'odometerEnd':b}
+            if not trip.get('distance_complete'):payload['partial']=True
             payload.update(endedAt=stamp(end),durationS=round(trip['durationS']),distanceM=round(trip['distanceM'],1))
-            if payload['distanceM']>=100 and len(payload['route'])>=2:events.append(('/api/trips',payload))
+            if payload['distanceM']>=100:events.append(('/api/trips',payload))
             if trip.get('last_point'):s['parking']=dict(trip['last_point'],measured_at=stamp(end))
             s['trip']=None
         if gps:

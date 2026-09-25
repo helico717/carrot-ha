@@ -154,3 +154,10 @@ CREATE TABLE IF NOT EXISTS carrot_param_queue (
 CREATE INDEX IF NOT EXISTS carrot_param_queue_device_pending_idx
   ON carrot_param_queue(device_id, status, id ASC);
 
+
+-- Source/quality metadata for CAN-based trip distance. No historical row rewrites.
+CREATE TABLE IF NOT EXISTS trip_distance_quality (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  quality_json TEXT NOT NULL
+);

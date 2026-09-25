@@ -33,7 +33,8 @@ def parse_feed(feed, device_id):
             route = json.loads(route)
         data = {'started_at': trip.get('started_at'), 'ended_at': trip['ended_at'],
                 'duration_s': trip.get('duration_s'), 'distance_m': trip.get('distance_m'),
-                'route': route, 'partial':trip.get('partial'), 'cloud_raw_trip': trip}
+                'route': route, 'partial':trip.get('partial'), 'cloud_raw_trip': trip,
+                'distance_source':trip.get('distance_source'), 'distance_quality':trip.get('distance_quality')}
         fix_session_start(data)
         events.append(envelope(device_id, 'trip', trip['id'], trip['ended_at'], data))
     return events

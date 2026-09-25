@@ -7,13 +7,16 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from .protocol import validate
+from . import trip_repair
 
 class Archive:
     def __init__(self, path):
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = str(path)
+        self._derived_ready = set()
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
+            db.execute('CREATE TABLE IF NOT EXISTS trip_derivations (device TEXT, id TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE TABLE IF NOT EXISTS trip_energy (device TEXT, id TEXT, fingerprint TEXT, distance_km REAL, energy_kwh REAL, PRIMARY KEY(device,id))')
             db.execute('CREATE INDEX IF NOT EXISTS history ON events(device,observed)')
             db.execute('CREATE INDEX IF NOT EXISTS idx_events_kind_observed ON events(kind,observed)')
@@ -37,7 +40,22 @@ class Archive:
                 return False
             observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (event['device_id'], event['event_id'], observed, event['kind'], body))
+        self._derived_ready.discard(event['device_id'])
         return True
+
+    def _ensure_derivations(self, device):
+        if device not in self._derived_ready:
+            with self.connect() as db:
+                trip_repair.refresh(db, device)
+            self._derived_ready.add(device)
+
+    def repair_trips(self, device):
+        """Explicit backfill; source events remain byte-for-byte unchanged."""
+        self._derived_ready.discard(device)
+        self._ensure_derivations(device)
+        with self.connect() as db:
+            return [dict(id=key, **json.loads(body)) for key,body in db.execute(
+                'SELECT id,body FROM trip_derivations WHERE device=?', (device,))]
 
     def latest(self, device):
         with self.connect() as db:
@@ -53,6 +71,7 @@ class Archive:
         with self.connect() as db:
             db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body',
                        (event['device_id'], event['event_id'], observed, event['kind'], body))
+        self._derived_ready.discard(event['device_id'])
 
     def history(self, device, kind, limit=100, offset=0, since=None):
         if kind not in ('state', 'trip', 'charge') or not 1 <= limit <= 500 or offset < 0:
@@ -67,9 +86,16 @@ class Archive:
                 rows = db.execute('SELECT body FROM events WHERE device=? AND kind=? ORDER BY observed DESC, rowid DESC LIMIT ? OFFSET ?', (device, kind, limit, offset)).fetchall()
             else:
                 rows = db.execute("SELECT body FROM events WHERE device=? AND kind=? AND julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) >= julianday(?) ORDER BY julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) DESC, rowid DESC LIMIT ? OFFSET ?", (device, kind, since, limit, offset)).fetchall()
-        return [json.loads(row[0]) for row in rows]
+        events = [json.loads(row[0]) for row in rows]
+        if kind == 'trip':
+            self._ensure_derivations(device)
+            with self.connect() as db:
+                derived = {key:json.loads(body) for key,body in db.execute('SELECT id,body FROM trip_derivations WHERE device=?',(device,))}
+            events = [trip_repair.apply(event, derived.get(event['event_id'])) for event in events]
+        return events
 
     def overview(self, device):
+        self._ensure_derivations(device)
         try:
             from zoneinfo import ZoneInfo
             kst = ZoneInfo('Asia/Seoul')
@@ -78,7 +104,7 @@ class Archive:
             kst = timezone(timedelta(hours=9))
         month = datetime.now(kst).strftime('%Y-%m')
         with self.connect() as db:
-            rows = db.execute("SELECT observed,json_extract(body,'$.data.distance_m') FROM events WHERE device=? AND kind='trip'",(device,)).fetchall()
+            rows = db.execute("SELECT e.observed,COALESCE(json_extract(d.body,'$.distance_m'),json_extract(e.body,'$.data.distance_m')) FROM events e LEFT JOIN trip_derivations d ON e.device=d.device AND e.id=d.id WHERE e.device=? AND e.kind='trip'",(device,)).fetchall()
         def _to_kst(ts):
             try: return datetime.fromisoformat(ts).astimezone(kst).strftime('%Y-%m')
             except Exception: return ''
@@ -150,11 +176,24 @@ class Archive:
                     continue
                 trip = json.loads(body)['data']
                 fingerprint = json.dumps([trip.get(k) for k in ('started_at', 'ended_at', 'distance_m', 'partial')])
+                derived_row = db.execute('SELECT body FROM trip_derivations WHERE device=? AND id=?',(device,event_id)).fetchone()
+                derived = json.loads(derived_row[0]) if derived_row else None
+                trip_repair.apply({'data':trip}, derived)
                 cached = db.execute('SELECT fingerprint,distance_km,energy_kwh FROM trip_energy WHERE device=? AND id=?', (device, event_id)).fetchone()
                 if cached and cached[0] != fingerprint:
-                    db.execute('DELETE FROM trip_energy WHERE device=? AND id=?', (device, event_id))
-                    cached = None
+                    # A distance-only revision must not destroy retained measured kWh.
+                    before, after = json.loads(cached[0]), json.loads(fingerprint)
+                    if before[:2] == after[:2] and before[3:] == after[3:]:
+                        cached = (fingerprint, float(trip.get('distance_m') or 0)/1000, cached[2])
+                        db.execute('UPDATE trip_energy SET fingerprint=?,distance_km=? WHERE device=? AND id=?',
+                                   (fingerprint,cached[1],device,event_id))
+                    else:
+                        db.execute('DELETE FROM trip_energy WHERE device=? AND id=?', (device, event_id))
+                        cached = None
                 if cached:
+                    effective_km = float(trip.get('distance_m') or 0)/1000
+                    db.execute('UPDATE trip_energy SET distance_km=? WHERE device=? AND id=?',(effective_km,device,event_id))
+                    cached = (cached[0], effective_km, cached[2])
                     distance += cached[1]
                     energy += cached[2]
                     count += 1
@@ -163,6 +202,13 @@ class Archive:
                     start, end = timestamp(trip['started_at']), timestamp(trip['ended_at'])
                     km = float(trip['distance_m']) / 1000
                 except (KeyError, ValueError, TypeError, OverflowError):
+                    continue
+                if trip.get('energy_verified_for_summary') and end-start >= 300 and math.isfinite(km) and km >= 1:
+                    used = trip['energy_wh']/1000
+                    db.execute('INSERT OR REPLACE INTO trip_energy VALUES (?,?,?,?,?)',(device,event_id,fingerprint,km,used))
+                    distance += km
+                    energy += used
+                    count += 1
                     continue
                 if trip.get('partial') or end-start < 300 or not math.isfinite(km) or km < 1:
                     continue
@@ -216,11 +262,17 @@ class Archive:
         - charge: 90 days (covers history view)
         - slim trips older than slim_trip_days: clears route points to save 95% space while keeping summary stats.
         """
-        # Materialize current-month energy before the source samples are deleted.
+        # Preserve derivations and energy for every retained month before raw purge.
         with self.connect() as db:
             devices = [r[0] for r in db.execute('SELECT DISTINCT device FROM events')]
         for device in devices:
-            self.overview(device)
+            self._ensure_derivations(device)
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo('Asia/Seoul')
+            with self.connect() as db:
+                dates = db.execute("SELECT observed FROM events WHERE device=? AND kind='trip'",(device,)).fetchall()
+            for month in {datetime.fromisoformat(r[0]).astimezone(tz).strftime('%Y-%m') for r in dates}:
+                self.driving_energy_summary(device, month, tz, 0)
         counts = {'purged_state': 0, 'purged_trip': 0, 'purged_charge': 0, 'slimmed_trip': 0}
         with self.connect() as db:
             cur = db.execute(
@@ -241,6 +293,8 @@ class Archive:
             )
             counts['purged_trip'] = cur.rowcount
             db.execute("DELETE FROM trip_energy WHERE NOT EXISTS (SELECT 1 FROM events WHERE events.device=trip_energy.device AND events.id=trip_energy.id AND events.kind='trip')")
+
+            db.execute("DELETE FROM trip_derivations WHERE NOT EXISTS (SELECT 1 FROM events e WHERE e.device=trip_derivations.device AND e.id=trip_derivations.id AND e.kind='trip')")
 
             if slim_trip_days is not None and slim_trip_days < trip_days:
                 cur = db.execute(
@@ -275,6 +329,10 @@ class Archive:
         """
         if not trips:
             return trips
+        for trip in trips:
+            data = trip.get('data', {})
+            if data.get('energy_verified'):
+                self._format_trip_energy(data, capacity_kwh)
 
         # Collect all trip time boundaries to determine query range
         boundaries = []
@@ -369,6 +427,8 @@ class Archive:
         # Enrich each trip
         for trip in trips:
             data = trip.get('data', {})
+            if data.get('energy_verified'):
+                continue
             started = data.get('started_at')
             ended = data.get('ended_at')
             if not started or not ended:
@@ -394,3 +454,11 @@ class Archive:
 
         return trips
 
+
+    @staticmethod
+    def _format_trip_energy(data, capacity_kwh):
+        for boundary in ('start', 'end'):
+            data[boundary+'_soc_percent'] = round(min(100,max(0,data[boundary+'_battery_wh']/(capacity_kwh*1000)*100)),1)
+        data['soc_used_percent'] = round(data['energy_wh']/(capacity_kwh*1000)*100,1)
+        if data['energy_wh'] > 0 and data.get('distance_m',0) > 0:
+            data['efficiency_km_kwh'] = round(data['distance_m']/data['energy_wh'],1)
