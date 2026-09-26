@@ -1,10 +1,10 @@
-import {mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js', 'utf8');
-const context = vm.createContext({mergeConsecutiveTrips, tripTimeline,
+const context = vm.createContext({DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline,
   HTMLElement: class {},
   Date,
   console

@@ -1,3 +1,4 @@
+from .battery import DEFAULT_SOC_CAPACITY_KWH
 from datetime import datetime
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory
@@ -127,5 +128,5 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                     attrs['recent_efficiency_trip_count'] = self.data.get('recent_efficiency_trip_count')
                     attrs['recent_efficiency_distance_km'] = self.data.get('recent_efficiency_distance_km')
         elif self.key=='soc_percent':
-            attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',78),soc_source='energy_based_calibration')
+            attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
         return attrs

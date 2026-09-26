@@ -1,3 +1,4 @@
+from .battery import DEFAULT_SOC_CAPACITY_KWH
 from contextlib import contextmanager
 """SQLite archive with durable acknowledgements and persistent deduplication."""
 import bisect
@@ -350,7 +351,7 @@ class Archive:
         finally:
             conn.close()
 
-    def enrich_trips_energy(self, device, trips, capacity_kwh=78.0):
+    def enrich_trips_energy(self, device, trips, capacity_kwh=DEFAULT_SOC_CAPACITY_KWH):
         """Enrich trip events with energy consumption data from nearby state events.
 
         For each trip, finds the nearest battery_wh readings around the start and
@@ -493,7 +494,7 @@ class Archive:
         if data['energy_wh'] > 0 and data.get('distance_m',0) > 0:
             data['efficiency_km_kwh'] = round(data['distance_m']/data['energy_wh'],1)
 
-    def enrich_charges_soc(self, device, charges, capacity_kwh=78.0):
+    def enrich_charges_soc(self, device, charges, capacity_kwh=DEFAULT_SOC_CAPACITY_KWH):
         """Enrich charge events with start/end SoC and charged percentage.
 
         For each charge, finds the nearest state events within +/- 5 minutes

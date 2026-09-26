@@ -1,9 +1,9 @@
-import {mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js','utf8');
-const context=vm.createContext({mergeConsecutiveTrips, tripTimeline, HTMLElement:class {},Date,console});
+const context=vm.createContext({DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline, HTMLElement:class {},Date,console});
 vm.runInContext(source.replace(/^import .*;\r?\n/m, '').replace('export const DEBUG_FRESHNESS','const DEBUG_FRESHNESS').replace('export const DEBUG_MODES','const DEBUG_MODES').replace('export function debugDisplay','function debugDisplay').replace('export default class CarrotDebugDashboard','class CarrotDebugDashboard')+'\nglobalThis.api={debugDisplay,CarrotDebugDashboard,DEBUG_MODES};',context);
 const {debugDisplay,CarrotDebugDashboard}=context.api;
 const now=Date.now(), stamp=seconds=>new Date(now-seconds*1000).toISOString();

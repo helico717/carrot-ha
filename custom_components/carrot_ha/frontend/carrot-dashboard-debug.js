@@ -1,8 +1,8 @@
-import {mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
-const BMS_CAPACITY = 78.0; // kWh (ID.4 BMS pack capacity baseline)
+const BMS_CAPACITY = DEFAULT_SOC_CAPACITY_KWH; // Shared display calibration, not nominal pack capacity
 
 // 2023 VW ID.4 Pro S AWD Theoretical Charging Curve (1% - 100% in kW)
 const ID4_CHARGING_CURVE_KW = [

@@ -95,6 +95,19 @@ class TestChargeSocEnrichment(unittest.TestCase):
         self.assertEqual(data.get('soc_charged_percent'), 21.0)
         self.assertTrue(data.get('soc_retroactive_estimated'))
 
+    def test_default_capacity_matches_64kwh_graph_and_trip(self):
+        self.archive.put(self._make_state('s1', 0, 42.8, 33400))
+        self.archive.put(self._make_state('s2', 3600, 82.8, 64550))
+        charge = self._make_charge('c1', 0, 3600, 31.15, 3600)
+        data = self.archive.enrich_charges_soc(self.device, [charge])[0]['data']
+        self.assertEqual(data['start_soc_percent'], 52.2)
+        self.assertEqual(data['end_soc_percent'], 100.0)
+        trip = {'data': {'started_at': charge['data']['started_at'],
+                         'ended_at': charge['data']['ended_at'], 'distance_m': 1000}}
+        td = self.archive.enrich_trips_energy(self.device, [trip])[0]['data']
+        self.assertEqual(td['start_soc_percent'], data['start_soc_percent'])
+        self.assertEqual(td['end_soc_percent'], data['end_soc_percent'])
+
     def test_empty_and_graceful(self):
         self.assertEqual(self.archive.enrich_charges_soc(self.device, []), [])
         no_times = [{'data': {'energy_kwh': 10.0}}]

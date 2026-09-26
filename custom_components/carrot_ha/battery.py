@@ -2,6 +2,7 @@
 import math
 from datetime import datetime, timezone
 
+DEFAULT_SOC_CAPACITY_KWH = 64.0
 NET_CAPACITY_KWH = 78.0
 GROSS_CAPACITY_KWH = 82.0
 

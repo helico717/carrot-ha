@@ -1,3 +1,4 @@
+from .battery import DEFAULT_SOC_CAPACITY_KWH
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -23,7 +24,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain='carrot_ha'):
 
 class BatteryOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
-        schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', 78.0)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
+        schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
                              vol.Optional('cloud_url', default=self.config_entry.options.get('cloud_url', '')): str,
                              vol.Optional('cloud_view_token', default=self.config_entry.options.get('cloud_view_token', '')): str})
         errors = {}

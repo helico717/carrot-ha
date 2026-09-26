@@ -1,4 +1,4 @@
-import {tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';
@@ -684,10 +684,14 @@ class CarrotDashboard extends HTMLElement {
     }
     const isSpecificTrip=isTrip&&this.selected!==null&&Boolean(this.trips[this.selected]);
     const curTrip=isSpecificTrip?(this.trips[this.selected]?.data||{}):{};
-    const days=isTrip?tripDays(this.trips,this._hass?.config?.time_zone):[];
+    // API trips already contain distance repairs. Display merging must not
+    // change which measured trips contribute to the daily totals.
+    const summaryTrips=this._rawTrips?.length?this._rawTrips:this.trips.flatMap(e=>
+      e.data?.merge_parts?.length?e.data.merge_parts.map(data=>({...e,data})):[e]);
+    const days=isTrip?tripDays(summaryTrips,this._hass?.config?.time_zone):[];
     const curDayObj=isTrip?days.find(d=>d.key===this.tripDay):null;
     const dayIndices=curDayObj?.indices||[];
-    const dayTrips=dayIndices.map(i=>this.trips[i]?.data).filter(Boolean);
+    const dayTrips=dayIndices.map(i=>summaryTrips[i]?.data).filter(Boolean);
 
     let tiles='';
     if(isTrip){
@@ -705,7 +709,7 @@ class CarrotDashboard extends HTMLElement {
         const totalDurS=dayTrips.reduce((acc,t)=>acc+(t.duration_s||0),0);
         let distWithEnergyM=0,energyWhSum=0;
         for(const t of dayTrips){
-          if(Number.isFinite(t.energy_wh)&&t.distance_m>0){
+          if(!t.energy_rejected&&Number.isFinite(t.energy_wh)&&t.distance_m>0){
             energyWhSum+=t.energy_wh;
             distWithEnergyM+=t.distance_m;
           }
@@ -822,7 +826,7 @@ class CarrotDashboard extends HTMLElement {
     const selected = days.find(d => d.key === this.tripDay);
     const dayIndices = selected ? selected.indices : [];
     const labels = d => d.date.getUTCDate() + '일(' + ['일','월','화','수','목','금','토'][d.date.getUTCDay()] + ')';
-    const capacity = (this.v && this.v.soc_capacity_kwh) || 78.0;
+    const capacity = (this.v && this.v.soc_capacity_kwh) || DEFAULT_SOC_CAPACITY_KWH;
 
     const daysHtml = days.map(d => `
       <button class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 

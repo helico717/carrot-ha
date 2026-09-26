@@ -82,3 +82,32 @@ test('all dashboards retain explicit pagination with a selected trip', () => {
     assert.equal(card._tripPage, 2);
   }
 });
+
+
+test('daily summary uses repaired source trips regardless of display merging', () => {
+  const raw = [trip('08:00','08:30', {duration_s:1800, distance_m:18000,
+    distance_raw_m:12000, distance_estimated:true, energy_wh:3000}),
+    trip('08:40','09:00', {duration_s:1200, energy_wh:undefined, energy_rejected:true}),
+    trip('12:00','12:20', {duration_s:1200, energy_wh:2500})];
+  for (const Class of [Korean, English]) {
+    const card = new Class();
+    card.tab = 'trips';
+    card._hass = {config:{time_zone:'Asia/Seoul'}};
+    card._rawTrips = raw;
+    card.trips = raw;
+    card.tripDay = day;
+    card.selected = null;
+    // Extract the four metric values, excluding the history list and its badges.
+    const values = () => [...card.body({}, {}, true).matchAll(/<strong>(.*?)<\/strong>/g)].slice(0,4).map(m=>m[1]);
+    const separate = values();
+    assert.match(separate[0], /38/);
+    assert.match(separate[2], /5[.,]1/);
+    assert.match(separate[3], /33/);
+    card.trips = mergeConsecutiveTrips(raw,'Asia/Seoul');
+    assert.equal(card.trips.length, 2);
+    assert.deepEqual(values(), separate);
+    // Cached/display-only records can recover original parts as well.
+    card._rawTrips = [];
+    assert.deepEqual(values(), separate);
+  }
+});

@@ -1,3 +1,4 @@
+from .battery import DEFAULT_SOC_CAPACITY_KWH
 import asyncio
 import hmac
 import json
@@ -149,12 +150,12 @@ class HistoryView(HomeAssistantView):
         except ValueError:
             return web.Response(status=400)
         if kind == 'trip' and rows:
-            capacity = runtime['entry'].options.get('soc_capacity_kwh', 78.0)
+            capacity = runtime['entry'].options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)
             rows = await self.hass.async_add_executor_job(
                 runtime['archive'].enrich_trips_energy,
                 runtime['entry'].data['device_id'], rows, capacity)
         elif kind == 'charge' and rows:
-            capacity = runtime['entry'].options.get('soc_capacity_kwh', 78.0)
+            capacity = runtime['entry'].options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)
             rows = await self.hass.async_add_executor_job(
                 runtime['archive'].enrich_charges_soc,
                 runtime['entry'].data['device_id'], rows, capacity)
@@ -194,7 +195,7 @@ class DashboardView(HomeAssistantView):
         registry=er.async_get(self.hass)
         data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online','emergency_charging')}
         data['vehicle_model']=runtime['entry'].options.get('vehicle_model','Volkswagen MEB')
-        data['battery_history']=await self.hass.async_add_executor_job(history,runtime['archive'],runtime['entry'].data['device_id'],runtime['entry'].options.get('soc_capacity_kwh',78.0),self.hass.config.time_zone)
+        data['battery_history']=await self.hass.async_add_executor_job(history,runtime['archive'],runtime['entry'].data['device_id'],runtime['entry'].options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),self.hass.config.time_zone)
         return web.json_response({'device_id':runtime['entry'].data['device_id'],'values':data})
 
 

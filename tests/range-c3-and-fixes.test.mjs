@@ -1,4 +1,4 @@
-import {mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,8 +59,8 @@ assert.ok(
 
 // 3. Verify ID.4 BMS capacity baseline is 78.0 kWh
 assert.ok(
-  debugContent.includes('const BMS_CAPACITY = 78.0;'),
-  'Debug dashboard must define BMS_CAPACITY = 78.0 baseline'
+  debugContent.includes('const BMS_CAPACITY = DEFAULT_SOC_CAPACITY_KWH;'),
+  'Debug dashboard must use the shared SOC capacity baseline'
 );
 
 // 4. Verify phantom 18.2kWh fallback is removed
@@ -75,7 +75,7 @@ assert.ok(
 
 // 5. Verify offline lastGood preserves lock, open_doors, and estimated_range_km
 import vm from 'node:vm';
-const vmContext = vm.createContext({mergeConsecutiveTrips, tripTimeline,  HTMLElement: class {}, Date, console });
+const vmContext = vm.createContext({DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline,  HTMLElement: class {}, Date, console });
 vm.runInContext(
   debugContent
     .replace(/^import .*;\r?\n/m, '')

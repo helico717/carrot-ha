@@ -1,3 +1,4 @@
+export const DEFAULT_SOC_CAPACITY_KWH = 64.0;
 // Use the Home Assistant timezone for both date labels and trip grouping.
 export function tripDateKey(value, timeZone) {
   const date = new Date(value);

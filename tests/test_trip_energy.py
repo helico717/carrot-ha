@@ -144,7 +144,7 @@ class TestTripEnergy(unittest.TestCase):
         self.assertEqual(data['energy_wh'], -2000.0)
         self.assertNotIn('efficiency_km_kwh', data)
         # SOC used should be negative
-        self.assertAlmostEqual(data['soc_used_percent'], -2.6, places=1)
+        self.assertAlmostEqual(data['soc_used_percent'], -3.1, places=1)
 
     def test_short_trip_small_energy(self):
         """Short trip with very small energy change should still calculate."""
@@ -237,7 +237,7 @@ class TestTripEnergy(unittest.TestCase):
         data = result[0]['data']
         self.assertEqual(data['energy_wh'], 500.0)
         self.assertNotIn('efficiency_km_kwh', data)
-        self.assertAlmostEqual(data['soc_used_percent'], 0.6, places=1)
+        self.assertAlmostEqual(data['soc_used_percent'], 0.8, places=1)
 
     def test_soc_percent_direct_enrichment(self):
         """Trip with state events containing soc_percent should enrich start/end SOC."""
