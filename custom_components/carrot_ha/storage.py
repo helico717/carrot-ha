@@ -293,8 +293,12 @@ class Archive:
             devices = [r[0] for r in db.execute('SELECT DISTINCT device FROM events')]
         for device in devices:
             self._ensure_derivations(device)
-            from zoneinfo import ZoneInfo
-            tz = ZoneInfo('Asia/Seoul')
+            try:
+                from zoneinfo import ZoneInfo
+                tz = ZoneInfo('Asia/Seoul')
+            except Exception:
+                from datetime import timezone, timedelta
+                tz = timezone(timedelta(hours=9))
             with self.connect() as db:
                 dates = db.execute("SELECT observed FROM events WHERE device=? AND kind='trip'",(device,)).fetchall()
             for month in {datetime.fromisoformat(r[0]).astimezone(tz).strftime('%Y-%m') for r in dates}:
@@ -488,3 +492,117 @@ class Archive:
         data['soc_used_percent'] = round(data['energy_wh']/(capacity_kwh*1000)*100,1)
         if data['energy_wh'] > 0 and data.get('distance_m',0) > 0:
             data['efficiency_km_kwh'] = round(data['distance_m']/data['energy_wh'],1)
+
+    def enrich_charges_soc(self, device, charges, capacity_kwh=78.0):
+        """Enrich charge events with start/end SoC and charged percentage.
+
+        For each charge, finds the nearest state events within +/- 5 minutes
+        around started_at and ended_at. If state events are unavailable (e.g. past 14 days),
+        estimates charged percentage from energy_kwh and vehicle capacity.
+        """
+        if not charges:
+            return charges
+
+        boundaries = []
+        for charge in charges:
+            data = charge.get('data', {}) if isinstance(charge, dict) else {}
+            for key in ('started_at', 'ended_at'):
+                ts = data.get(key)
+                if ts:
+                    boundaries.append(ts)
+
+        def _parse_ts(ts):
+            return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone(timezone.utc)
+
+        parsed = []
+        for b in boundaries:
+            try:
+                parsed.append(_parse_ts(b))
+            except (ValueError, TypeError):
+                continue
+
+        samples = []
+        sample_times = []
+        if parsed:
+            from datetime import timedelta
+            min_time = (min(parsed) - timedelta(minutes=5)).isoformat()
+            max_time = (max(parsed) + timedelta(minutes=5)).isoformat()
+
+            with self.connect() as db:
+                rows = db.execute(
+                    """SELECT
+                        COALESCE(
+                            json_extract(body, '$.data.field_measured_at.soc_percent'),
+                            json_extract(body, '$.data.field_measured_at.battery_wh'),
+                            observed
+                        ) AS ts,
+                        json_extract(body, '$.data.soc_percent') AS soc,
+                        json_extract(body, '$.data.battery_wh') AS wh
+                    FROM events
+                    WHERE device=? AND kind='state'
+                        AND julianday(observed) >= julianday(?) AND julianday(observed) <= julianday(?)
+                        AND (json_extract(body, '$.data.soc_percent') IS NOT NULL
+                             OR json_extract(body, '$.data.battery_wh') IS NOT NULL)
+                    ORDER BY observed""",
+                    (device, min_time, max_time)
+                ).fetchall()
+
+            for ts_str, soc, wh in rows:
+                if soc is None and wh is None:
+                    continue
+                try:
+                    t = _parse_ts(ts_str).timestamp()
+                    if soc is not None:
+                        soc_val = float(soc)
+                    else:
+                        wh_val = float(wh)
+                        soc_val = min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
+                    samples.append((t, soc_val))
+                except (ValueError, TypeError):
+                    continue
+
+            samples.sort(key=lambda s: s[0])
+            sample_times = [s[0] for s in samples]
+
+        def _nearest_soc(target_ts, max_gap_s=300):
+            if not samples:
+                return None
+            try:
+                t = _parse_ts(target_ts).timestamp()
+            except (ValueError, TypeError):
+                return None
+            idx = bisect.bisect_left(sample_times, t)
+            best_soc = None
+            best_gap = max_gap_s + 1
+            for i in (idx - 1, idx):
+                if 0 <= i < len(samples):
+                    gap = abs(samples[i][0] - t)
+                    if gap < best_gap:
+                        best_soc = samples[i][1]
+                        best_gap = gap
+            return best_soc if best_gap <= max_gap_s else None
+
+        for charge in charges:
+            data = charge.get('data', {}) if isinstance(charge, dict) else {}
+            started = data.get('started_at')
+            ended = data.get('ended_at')
+
+            start_soc = _nearest_soc(started) if started else None
+            end_soc = _nearest_soc(ended) if ended else None
+
+            if start_soc is not None and end_soc is not None:
+                data['start_soc_percent'] = round(min(100.0, max(0.0, start_soc)), 1)
+                data['end_soc_percent'] = round(min(100.0, max(0.0, end_soc)), 1)
+                data['soc_charged_percent'] = round(max(0.0, data['end_soc_percent'] - data['start_soc_percent']), 1)
+                data['soc_retroactive_estimated'] = False
+            elif data.get('energy_kwh'):
+                try:
+                    kwh = float(data['energy_kwh'])
+                    if capacity_kwh > 0:
+                        est_gain = round((kwh / capacity_kwh) * 100, 1)
+                        data['soc_charged_percent'] = est_gain
+                        data['soc_retroactive_estimated'] = True
+                except (ValueError, TypeError):
+                    pass
+
+        return charges

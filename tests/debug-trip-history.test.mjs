@@ -102,8 +102,8 @@ test('Carrot HA Debug Dashboard: Trip History & 30-min Merge enhancements', asyn
   assert(html.includes('다음 페이지'), 'Should render 다음 페이지 button');
 
   // 4. Test day with 9 trips (Day 2) pagination
-  // Set tripDay to day 2
-  const day2Key = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  const day2Trip = card.trips.find(t => t.data?.id?.startsWith('t2-'));
+  const day2Key = card._getTripDateKey ? card._getTripDateKey(day2Trip.data.started_at) : (day2Trip.data.started_at.slice(0, 10));
   card.tripDay = day2Key;
   card._tripPage = 1;
   const htmlDay2 = card.tripHistory(true);

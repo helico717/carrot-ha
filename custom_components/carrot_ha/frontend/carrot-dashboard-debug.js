@@ -1749,31 +1749,43 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
     if (!card.charges || card.charges.length === 0) {
       const nowMs = Date.now();
-      const d1 = new Date(nowMs - 86400000); d1.setHours(1, 0, 0, 0);
+      const d0_pm = new Date(); d0_pm.setHours(14, 15, 0, 0);
+      const d0_am = new Date(); d0_am.setHours(9, 30, 0, 0);
+      const d1 = new Date(nowMs - 86400000); d1.setHours(13, 0, 0, 0);
       const d2 = new Date(nowMs - 86400000 * 2); d2.setHours(13, 0, 0, 0);
       const d4 = new Date(nowMs - 86400000 * 4); d4.setHours(2, 0, 0, 0);
       const d5 = new Date(nowMs - 86400000 * 5); d5.setHours(20, 0, 0, 0);
-      const d6 = new Date(nowMs - 86400000 * 6); d6.setHours(1, 0, 0, 0);
+      const d6 = new Date(nowMs - 86400000 * 6); d6.setHours(20, 10, 0, 0);
       card.charges = [
         {
-          id: 'sim-charge-today',
-          observed_at: new Date(nowMs - 3600000).toISOString(),
+          id: 'sim-charge-today-pm',
+          observed_at: new Date(d0_pm.getTime() + 13500000).toISOString(),
           data: {
-            started_at: new Date(nowMs - 7200000).toISOString(),
-            ended_at: new Date(nowMs - 3600000).toISOString(),
-            energy_kwh: 18.2,
-            duration_s: 3600,
+            started_at: d0_pm.toISOString(),
+            ended_at: new Date(d0_pm.getTime() + 13500000).toISOString(),
+            energy_kwh: 43.68,
+            duration_s: 13500,
+            start_soc_percent: 24,
+            end_soc_percent: 80,
+            soc_charged_percent: 56,
             partial: false
           }
         },
         {
-          id: 'sim-charge-d1',
-          observed_at: new Date(d1.getTime() + 14400000).toISOString(),
+          id: 'sim-charge-today-am',
+          observed_at: new Date(d0_am.getTime() + 2280000).toISOString(),
           data: {
-            started_at: d1.toISOString(),
-            ended_at: new Date(d1.getTime() + 14400000).toISOString(),
-            energy_kwh: 28.3,
-            duration_s: 14400,
+            started_at: d0_am.toISOString(),
+            ended_at: new Date(d0_am.getTime() + 2280000).toISOString(),
+            energy_kwh: 28.08,
+            duration_s: 2280,
+            start_soc_percent: 42,
+            end_soc_percent: 78,
+            soc_charged_percent: 36,
+            merged: true,
+            merge_count: 2,
+            merge_gap_s: 240,
+            merge_parts: [{ energy_kwh: 12.6 }, { energy_kwh: 15.48 }],
             partial: false
           }
         },
@@ -1785,6 +1797,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ended_at: new Date(d2.getTime() + 3600000).toISOString(),
             energy_kwh: 42.5,
             duration_s: 3600,
+            start_soc_percent: 20,
+            end_soc_percent: 75,
+            soc_charged_percent: 55,
             partial: false
           }
         },
@@ -1796,6 +1811,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ended_at: new Date(d4.getTime() + 14400000).toISOString(),
             energy_kwh: 39.0,
             duration_s: 14400,
+            start_soc_percent: 30,
+            end_soc_percent: 80,
+            soc_charged_percent: 50,
             partial: false
           }
         },
@@ -1807,17 +1825,22 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ended_at: new Date(d5.getTime() + 10800000).toISOString(),
             energy_kwh: 28.3,
             duration_s: 10800,
+            start_soc_percent: 45,
+            end_soc_percent: 81,
+            soc_charged_percent: 36,
             partial: false
           }
         },
         {
           id: 'sim-charge-d6',
-          observed_at: new Date(d6.getTime() + 10800000).toISOString(),
+          observed_at: new Date(d6.getTime() + 4500000).toISOString(),
           data: {
             started_at: d6.toISOString(),
-            ended_at: new Date(d6.getTime() + 10800000).toISOString(),
-            energy_kwh: 24.8,
-            duration_s: 10800,
+            ended_at: new Date(d6.getTime() + 4500000).toISOString(),
+            energy_kwh: 16.38,
+            duration_s: 4500,
+            soc_charged_percent: 21,
+            soc_retroactive_estimated: true,
             partial: false
           }
         }
@@ -2069,6 +2092,108 @@ export default class CarrotDebugDashboard extends HTMLElement {
             </div>
           ` : `
             <div class="empty">${isEnglish ? 'Select a date to view trip history.' : '날짜를 선택하면 해당 날짜의 주행 기록이 표시됩니다.'}</div>
+          `}
+        </section>
+      `;
+    };
+
+    const formatChargeDuration = (s, isEnglish) => {
+      if (typeof s !== 'number' || !Number.isFinite(s) || s < 0) return '—';
+      const totalSec = Math.round(s);
+      if (totalSec < 60) return isEnglish ? '< 1m' : '1분 미만';
+      const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60);
+      if (isEnglish) {
+        if (h > 0 && m > 0) return `${h}h ${m}m`;
+        if (h > 0) return `${h}h`;
+        return `${m}m`;
+      }
+      if (h > 0 && m > 0) return `${h}시간 ${m}분`;
+      if (h > 0) return `${h}시간`;
+      return `${m}분`;
+    };
+
+    card.chargeHistory = function() {
+      const currentTz = this._hass?.config?.time_zone;
+      const isEnglish = isEn || card.lang === 'en' || card.state?.lang === 'en' || this.state?.lang === 'en';
+      const days = tripDays(this.charges, currentTz);
+      if (!this.chargeDay || !days.some(d => d.key === this.chargeDay)) {
+        const today = days.find(d => d.today) || days[days.length - 1];
+        this.chargeDay = today ? today.key : null;
+      }
+      const selected = days.find(d => d.key === this.chargeDay);
+      const labels = d => d.date.getUTCDate() + (isEnglish ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.date.getUTCDay()]})` : `일(${['일','월','화','수','목','금','토'][d.date.getUTCDay()]})`);
+
+      const daysHtml = days.map(d => `
+        <button class="trip-day charge-day" 
+                data-charge-day="${d.key}" 
+                aria-pressed="${d.key === this.chargeDay}" 
+                aria-label="${d.key}, ${d.indices.length} ${isEnglish ? 'charges' : '회 충전'}">
+          <span class="trip-today charge-today">${d.today ? (isEnglish ? 'Today' : '오늘') : '&nbsp;'}</span>
+          <b>${labels(d)}</b>
+          <span class="trip-count charge-count">${icon('power-plug')} ${d.indices.length}</span>
+        </button>
+      `).join('');
+
+      const batterySvg = `<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;
+
+      return `
+        <section class="panel charge-history">
+          <div class="paneltitle">
+            <h2>${isEnglish ? 'Charging Records' : '충전 내역'}</h2>
+            <span class="sub">${isEnglish ? 'Last 7 days' : '최근 7일'}</span>
+          </div>
+          <div class="trip-days charge-days">
+            ${daysHtml}
+          </div>
+          ${selected ? `
+            <div class="trip-day-heading">${selected.key} · ${selected.indices.length}${isEnglish ? ' charges' : '회 충전'}</div>
+            <div class="scroll">
+              ${selected.indices.length ? selected.indices.map(i => {
+                const e = this.charges[i];
+                const ed = e?.data || e || {};
+                const fast = Boolean(ed.energy_kwh && ed.duration_s && (ed.energy_kwh / (ed.duration_s / 3600) > 11));
+                const boltSvg = fast ?
+                  `<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>` :
+                  `<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;
+
+                const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
+                const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
+                const chargedSoc = ed.soc_charged_percent != null ? Math.round(ed.soc_charged_percent) : ((startSoc != null && endSoc != null) ? Math.max(0, endSoc - startSoc) : null);
+                const isRetro = Boolean(ed.soc_retroactive_estimated);
+
+                let socBadgeHtml = '';
+                if (startSoc != null && endSoc != null) {
+                  const gain = chargedSoc != null ? chargedSoc : Math.max(0, endSoc - startSoc);
+                  socBadgeHtml = `<span class="charge-soc">${batterySvg} ${startSoc}% → ${endSoc}% (+${gain}% ${isEnglish ? 'charged' : '충전'})</span>`;
+                } else if (chargedSoc != null) {
+                  socBadgeHtml = `<span class="charge-soc ${isRetro ? 'retro-mode' : ''}">${batterySvg} +${chargedSoc}% ${isEnglish ? 'charged' : '충전'}${isRetro ? ` <small class="retro-tag">(${isEnglish ? 'est.' : '소급 추산'})</small>` : ''}</span>`;
+                }
+
+                return `
+                  <div class="row charge-row">
+                    <div class="charge-meta">
+                      <span class="charge-icon-wrap ${fast ? 'fast' : ''}">${boltSvg}</span>
+                      <div>
+                        <b class="charge-date">${timeOnly(ed.started_at || e.observed_at)}</b>
+                        <div class="charge-info-sub">
+                          <span class="speed-badge ${fast ? 'fast' : 'slow'}">${fast ? (isEnglish ? 'Fast' : '급속') : (isEnglish ? 'Slow' : '완속')}</span>
+                          <span class="charge-dur">${formatChargeDuration(ed.duration_s, isEnglish)}</span>
+                          ${socBadgeHtml}
+                          ${ed.merged ? `<span class="merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '회 병합'}</span>` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="charge-val">
+                      <strong>${n(ed.energy_kwh, 2)} <small>kWh</small></strong>
+                      <span class="charge-sub" title="${ed.merged ? (ed.merge_parts || []).map(p => `${n(p.energy_kwh, 1)} kWh`).join(' + ') : ''}">
+                        ${ed.merged ? (isEnglish ? `Reconnected in ${Math.max(1, Math.round((ed.merge_gap_s || 0) / 60))}m` : `${Math.max(1, Math.round((ed.merge_gap_s || 0) / 60))}분 간격 재연결`) : (ed.partial ? (isEnglish ? 'Partial data' : '일부 구간만 수집') : (isEnglish ? 'Recorded energy' : '기록된 충전량'))}
+                      </span>
+                    </div>
+                  </div>`;
+              }).join('') : `<div class="empty">${isEnglish ? 'No charges recorded.' : '기록된 충전이 없습니다.'}</div>`}
+            </div>
+          ` : `
+            <div class="empty">${isEnglish ? 'Choose a date to see its charges.' : '날짜를 선택하면 해당 날짜의 충전 기록이 표시됩니다.'}</div>
           `}
         </section>
       `;
@@ -2967,6 +3092,44 @@ export default class CarrotDebugDashboard extends HTMLElement {
         font-size: 11px !important;
         font-weight: 700 !important;
         color: var(--muted) !important;
+      }
+
+      /* Charge History Integrated SoC Pill Badge */
+      .charge-soc {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        background: rgba(16, 185, 129, 0.12) !important;
+        border: 1px solid rgba(16, 185, 129, 0.35) !important;
+        color: #34d399 !important;
+        font-size: 11.5px !important;
+        font-weight: 750 !important;
+        padding: 2px 8px !important;
+        border-radius: 6px !important;
+        white-space: nowrap !important;
+        line-height: 15px !important;
+        flex-shrink: 0 !important;
+      }
+      :host([data-theme="light"]) .charge-soc {
+        background: #d1fae5 !important;
+        border-color: #86efac !important;
+        color: #047857 !important;
+      }
+      .charge-soc.retro-mode {
+        background: rgba(245, 158, 11, 0.12) !important;
+        border-color: rgba(245, 158, 11, 0.35) !important;
+        color: #fbbf24 !important;
+      }
+      :host([data-theme="light"]) .charge-soc.retro-mode {
+        background: #fef3c7 !important;
+        border-color: #fde68a !important;
+        color: #b45309 !important;
+      }
+      .charge-soc-icon {
+        width: 12px !important;
+        height: 12px !important;
+        fill: currentColor !important;
+        display: inline-block !important;
       }
 
       @media(min-width: 901px) {
