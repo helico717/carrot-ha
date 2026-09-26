@@ -102,5 +102,30 @@ class TestChargeSocEnrichment(unittest.TestCase):
         self.assertEqual(enriched[0]['data'].get('soc_charged_percent'), 12.8)
         self.assertTrue(enriched[0]['data'].get('soc_retroactive_estimated'))
 
+    def test_energy_soc_uses_configured_capacity_and_its_timestamp(self):
+        for event_id, offset, soc, wh in [('s1', 0, 50, 39000), ('s2', 3600, 60, 46800)]:
+            state = self._make_state(event_id, offset, soc, wh)
+            state['data']['field_measured_at'] = {
+                'battery_wh': state['observed_at'],
+                'soc_percent': (self.now - timedelta(days=1)).isoformat(),
+            }
+            self.archive.put(state)
+        charge = self._make_charge('c1', 0, 3600, 7.8, 3600)
+        data = self.archive.enrich_charges_soc(self.device, [charge], 100)[0]['data']
+        self.assertEqual(data['start_soc_percent'], 39)
+        self.assertEqual(data['end_soc_percent'], 46.8)
+        self.assertEqual(data['soc_charged_percent'], 7.8)
+        self.assertFalse(data['soc_retroactive_estimated'])
+
+    def test_soc_only_states_remain_a_fallback(self):
+        for event_id, offset, soc in [('s1', 0, 20), ('s2', 3600, 30)]:
+            state = self._make_state(event_id, offset, soc)
+            del state['data']['battery_wh']
+            self.archive.put(state)
+        charge = self._make_charge('c1', 0, 3600, 10, 3600)
+        data = self.archive.enrich_charges_soc(self.device, [charge], 100)[0]['data']
+        self.assertEqual(data['start_soc_percent'], 20)
+        self.assertEqual(data['end_soc_percent'], 30)
+
 if __name__ == '__main__':
     unittest.main()

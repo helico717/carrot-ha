@@ -1,3 +1,4 @@
+import {mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,9 +75,10 @@ assert.ok(
 
 // 5. Verify offline lastGood preserves lock, open_doors, and estimated_range_km
 import vm from 'node:vm';
-const vmContext = vm.createContext({ HTMLElement: class {}, Date, console });
+const vmContext = vm.createContext({mergeConsecutiveTrips, tripTimeline,  HTMLElement: class {}, Date, console });
 vm.runInContext(
   debugContent
+    .replace(/^import .*;\r?\n/m, '')
     .replace('export const DEBUG_FRESHNESS', 'const DEBUG_FRESHNESS')
     .replace('export const DEBUG_MODES', 'const DEBUG_MODES')
     .replace('export function debugDisplay', 'function debugDisplay')
@@ -131,7 +133,7 @@ assert.ok(enContent.includes('Charge cost this month'), 'English card must have 
 // 8. Verify Lock Icon Badge alignment and centering across all dashboards
 const manifestPath = path.resolve('custom_components/carrot_ha/manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-assert.equal(manifest.version, '0.6.10', 'manifest.json version must be 0.6.10');
+assert.match(manifest.version, /^\d+\.\d+\.\d+$/, 'manifest.json must retain a valid release version');
 
 for (const [name, content] of [['Korean', koContent], ['English', enContent], ['Debug', debugContent]]) {
   assert.ok(

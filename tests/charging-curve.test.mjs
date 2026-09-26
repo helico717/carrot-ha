@@ -1,9 +1,10 @@
+import {mergeConsecutiveTrips, tripTimeline} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js', 'utf8');
-const context = vm.createContext({
+const context = vm.createContext({mergeConsecutiveTrips, tripTimeline,
   HTMLElement: class {},
   Date,
   console
@@ -11,6 +12,7 @@ const context = vm.createContext({
 
 vm.runInContext(
   source
+    .replace(/^import .*;\r?\n/m, '')
     .replace('export const DEBUG_FRESHNESS', 'const DEBUG_FRESHNESS')
     .replace('export const DEBUG_MODES', 'const DEBUG_MODES')
     .replace('export function debugDisplay', 'function debugDisplay')

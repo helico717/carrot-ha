@@ -1,4 +1,4 @@
-import {tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips} from './carrot-trip-days.js';
+import {tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';
@@ -839,11 +839,7 @@ class CarrotDashboard extends HTMLElement {
     const timelineSegmentsHtml = dayIndices.map(i => {
       const e = this.trips[i];
       const ed = e?.data || {};
-      const startD = new Date(ed.started_at || e.observed_at);
-      const startMins = startD.getHours() * 60 + startD.getMinutes();
-      const leftPct = Math.max(0, Math.min(97.5, (startMins / 1440) * 100));
-      const durS = ed.duration_s || 600;
-      const widthPct = Math.max(2.2, Math.min(100 - leftPct, (durS / 86400) * 100));
+      const {leftPct, widthPct} = tripTimeline(e, currentTz);
       const isSel = isTrip && i === this.selected;
       const startSoc = ed.start_soc_percent != null
         ? Math.round(ed.start_soc_percent)
@@ -853,7 +849,7 @@ class CarrotDashboard extends HTMLElement {
         : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
       const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
       const usedStr = drain > 0 ? `${drain}% 사용` : (drain < 0 ? `+${Math.abs(drain)}% 회생` : '0% 사용');
-      const segTitle = `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(ed.ended_at || e.observed_at)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}건 병합)` : ''}`;
+      const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}건 병합)` : ''}`;
 
       return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}" 
                    style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;" 
@@ -866,13 +862,14 @@ class CarrotDashboard extends HTMLElement {
     const totalItems = dayIndices.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
-    if (this.selected !== null) {
+    if (this.selected !== null && this.selected !== this._pageSelection) {
       const selPos = dayIndices.indexOf(this.selected);
       if (selPos !== -1) {
         this._tripPage = Math.floor(selPos / ITEMS_PER_PAGE) + 1;
       }
     }
 
+    this._pageSelection = this.selected;
     if (!this._tripPage || this._tripPage < 1) this._tripPage = 1;
     if (this._tripPage > totalPages) this._tripPage = totalPages;
     this._maxTripPages = totalPages;
@@ -913,7 +910,7 @@ class CarrotDashboard extends HTMLElement {
           <div class="sleek-trip-card ${isSel ? 'selected' : ''}" data-trip="${i}">
             <div class="card-top-row">
               <div>
-                <span class="card-time">${timeOnly(ed.started_at || e.observed_at)}</span>
+                <span class="card-time">${timeOnly(ed.started_at || e.observed_at, currentTz)}</span>
                 ${durText ? `<span class="card-dur">${durText}</span>` : ''}
               </div>
               <div class="card-dist">${distStr} <small>km</small></div>

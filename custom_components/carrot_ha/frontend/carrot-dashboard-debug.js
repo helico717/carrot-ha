@@ -1,3 +1,4 @@
+import {mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
@@ -1511,7 +1512,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const getTripDateKey = (val, timeZone) => {
       const d = new Date(val);
       if (!val || Number.isNaN(d.getTime())) return '';
-      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timeZone || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
       return ['year', 'month', 'day'].map(t => parts.find(p => p.type === t)?.value).join('-');
     };
 
@@ -1558,88 +1559,6 @@ export default class CarrotDebugDashboard extends HTMLElement {
       if (h > 0 && m > 0) return `${h}시간 ${m}분`;
       if (h > 0) return `${h}시간`;
       return `${m}분`;
-    };
-
-    const mergeConsecutiveTrips = (rawTrips, timeZone, maxGapSeconds = 1800) => {
-      if (!Array.isArray(rawTrips) || rawTrips.length <= 1) return rawTrips || [];
-      const getStart = e => new Date(e.data?.started_at || e.observed_at || 0).getTime();
-      const getEnd = e => {
-        if (e.data?.ended_at) return new Date(e.data.ended_at).getTime();
-        const dur = Number(e.data?.duration_s) || 0;
-        return getStart(e) + dur * 1000;
-      };
-
-      const sorted = [...rawTrips].sort((a, b) => getStart(a) - getStart(b));
-      const merged = [];
-
-      for (const trip of sorted) {
-        if (!trip || !trip.data) continue;
-        const td = trip.data;
-        const startMs = getStart(trip);
-        const endMs = getEnd(trip);
-        const durS = Number(td.duration_s) || Math.round((endMs - startMs) / 1000);
-        const startSoc = td.start_soc_percent != null ? Number(td.start_soc_percent) : null;
-        const endSoc = td.end_soc_percent != null ? Number(td.end_soc_percent) : null;
-
-        if (merged.length === 0) {
-          merged.push({
-            ...trip,
-            data: {
-              ...td,
-              merged: false,
-              merge_count: 1,
-              started_at: td.started_at || new Date(startMs).toISOString(),
-              ended_at: td.ended_at || new Date(endMs).toISOString(),
-              duration_s: durS,
-              merge_parts: [td]
-            }
-          });
-          continue;
-        }
-
-        const prev = merged[merged.length - 1];
-        const pd = prev.data;
-        const prevEndMs = getEnd(prev);
-        const gapS = (startMs - prevEndMs) / 1000;
-        const prevEndSoc = pd.end_soc_percent != null ? Number(pd.end_soc_percent) : null;
-        const isNoCharging = (startSoc == null || prevEndSoc == null) || (startSoc <= prevEndSoc + 1.0);
-        const isSameDay = getTripDateKey(startMs, timeZone) === getTripDateKey(prevEndMs, timeZone);
-
-        if (gapS >= 0 && gapS <= maxGapSeconds && isNoCharging && isSameDay) {
-          pd.merged = true;
-          pd.merge_count = (pd.merge_count || 1) + 1;
-          pd.ended_at = td.ended_at || new Date(endMs).toISOString();
-          pd.duration_s = (pd.duration_s || 0) + durS;
-          pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
-          pd.energy_wh = (pd.energy_wh || 0) + (Number(td.energy_wh) || 0);
-          if (endSoc != null) pd.end_soc_percent = endSoc;
-          if (td.end_battery_wh != null) pd.end_battery_wh = td.end_battery_wh;
-
-          if (pd.distance_m > 0 && pd.energy_wh > 0) {
-            pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
-          } else if (td.efficiency_km_kwh != null) {
-            pd.efficiency_km_kwh = Math.round(((pd.efficiency_km_kwh || td.efficiency_km_kwh) + td.efficiency_km_kwh) / 2 * 10) / 10;
-          }
-
-          pd.route = [...(pd.route || []), ...(td.route || [])];
-          pd.merge_parts = [...(pd.merge_parts || []), td];
-        } else {
-          merged.push({
-            ...trip,
-            data: {
-              ...td,
-              merged: false,
-              merge_count: 1,
-              started_at: td.started_at || new Date(startMs).toISOString(),
-              ended_at: td.ended_at || new Date(endMs).toISOString(),
-              duration_s: durS,
-              merge_parts: [td]
-            }
-          });
-        }
-      }
-
-      return merged.sort((a, b) => getStart(b) - getStart(a));
     };
 
     const generateMockTrips = (baseMs) => {
@@ -1855,7 +1774,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const esc = val => String(val ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const n = (val, digits = 1) => typeof val === 'number' && Number.isFinite(val) ? val.toLocaleString(isEn ? 'en-GB' : 'ko-KR', { maximumFractionDigits: digits }) : '—';
     const time = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }) : (isEn ? 'No records' : '기록 없음');
-    const timeOnly = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }) : (isEn ? 'No records' : '기록 없음');
+    const timeOnly = (val, timeZone = tz) => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: timeZone || undefined }) : (isEn ? 'No records' : '기록 없음');
     const formatEtaCompletion = val => {
       if (!val) return isEn ? 'Calculating' : '계산 중';
       const targetDate = new Date(val);
@@ -1951,17 +1870,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const timelineSegmentsHtml = dayIndices.map(i => {
         const e = this.trips[i];
         const ed = e?.data || {};
-        const startD = new Date(ed.started_at || e.observed_at);
-        const startMins = startD.getHours() * 60 + startD.getMinutes();
-        const leftPct = Math.max(0, Math.min(97.5, (startMins / 1440) * 100));
-        const durS = ed.duration_s || 600;
-        const widthPct = Math.max(2.2, Math.min(100 - leftPct, (durS / 86400) * 100));
+        const {leftPct, widthPct} = tripTimeline(e, currentTz);
         const isSel = isTrip && i === this.selected;
         const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
         const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
         const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
         const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
-        const segTitle = `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(ed.ended_at || e.observed_at)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}${isEnglish ? ' merged' : '건 병합'})` : ''}`;
+        const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}${isEnglish ? ' merged' : '건 병합'})` : ''}`;
 
         return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}" 
                      style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;" 
@@ -1974,13 +1889,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const totalItems = dayIndices.length;
       const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
-      if (this.selected !== null) {
+      if (this.selected !== null && this.selected !== this._pageSelection) {
         const selPos = dayIndices.indexOf(this.selected);
         if (selPos !== -1) {
           this._tripPage = Math.floor(selPos / ITEMS_PER_PAGE) + 1;
         }
       }
 
+      this._pageSelection = this.selected;
       if (!this._tripPage || this._tripPage < 1) this._tripPage = 1;
       if (this._tripPage > totalPages) this._tripPage = totalPages;
       this._maxTripPages = totalPages;
@@ -2018,7 +1934,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <div class="sleek-trip-card ${isSel ? 'selected' : ''}" data-trip="${i}">
               <div class="card-top-row">
                 <div>
-                  <span class="card-time">${timeOnly(ed.started_at || e.observed_at)}</span>
+                  <span class="card-time">${timeOnly(ed.started_at || e.observed_at, currentTz)}</span>
                   ${durText ? `<span class="card-dur">${durText}</span>` : ''}
                 </div>
                 <div class="card-dist">${distStr} <small>km</small></div>

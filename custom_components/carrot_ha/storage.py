@@ -532,8 +532,10 @@ class Archive:
                 rows = db.execute(
                     """SELECT
                         COALESCE(
-                            json_extract(body, '$.data.field_measured_at.soc_percent'),
-                            json_extract(body, '$.data.field_measured_at.battery_wh'),
+                            CASE WHEN json_extract(body, '$.data.battery_wh') IS NOT NULL
+                                 THEN json_extract(body, '$.data.field_measured_at.battery_wh')
+                                 ELSE json_extract(body, '$.data.field_measured_at.soc_percent') END,
+                            json_extract(body, '$.data.measured_at'),
                             observed
                         ) AS ts,
                         json_extract(body, '$.data.soc_percent') AS soc,
@@ -552,11 +554,11 @@ class Archive:
                     continue
                 try:
                     t = _parse_ts(ts_str).timestamp()
-                    if soc is not None:
-                        soc_val = float(soc)
-                    else:
+                    if wh is not None:
                         wh_val = float(wh)
                         soc_val = min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
+                    else:
+                        soc_val = float(soc)
                     samples.append((t, soc_val))
                 except (ValueError, TypeError):
                     continue

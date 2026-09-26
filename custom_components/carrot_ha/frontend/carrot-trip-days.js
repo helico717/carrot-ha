@@ -80,8 +80,19 @@ export function mergeConsecutiveCharges(events, maxGapSeconds = 900) {
       const currKwh = Number(event.data.energy_kwh) || 0;
       const endMs = Math.max(prevEnd, getEnd(event));
 
+      const startSoc = prev.data.start_soc_percent;
+      const endSoc = event.data.end_soc_percent;
+      const measured = Number.isFinite(startSoc) && Number.isFinite(endSoc)
+        && !prev.data.soc_retroactive_estimated && !event.data.soc_retroactive_estimated;
+      const gain = measured ? Math.max(0, endSoc - startSoc)
+        : (Number.isFinite(prev.data.soc_charged_percent) && Number.isFinite(event.data.soc_charged_percent)
+          ? prev.data.soc_charged_percent + event.data.soc_charged_percent : null);
       prev.data = {
         ...prev.data,
+        start_soc_percent: measured ? startSoc : null,
+        end_soc_percent: measured ? endSoc : null,
+        soc_charged_percent: gain == null ? null : Math.round(gain * 10) / 10,
+        soc_retroactive_estimated: !measured,
         ended_at: new Date(endMs).toISOString(),
         duration_s: prevDur + currDur,
         energy_kwh: Math.round((prevKwh + currKwh) * 1000) / 1000,
@@ -172,14 +183,21 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
       pd.ended_at = td.ended_at || new Date(endMs).toISOString();
       pd.duration_s = (pd.duration_s || 0) + durS;
       pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
-      pd.energy_wh = (pd.energy_wh || 0) + (Number(td.energy_wh) || 0);
-      if (endSoc != null) pd.end_soc_percent = endSoc;
-      if (td.end_battery_wh != null) pd.end_battery_wh = td.end_battery_wh;
+      const completeEnergy = Number.isFinite(pd.energy_wh) && Number.isFinite(td.energy_wh)
+        && !pd.energy_rejected && !td.energy_rejected;
+      pd.energy_wh = completeEnergy ? pd.energy_wh + td.energy_wh : null;
+      pd.energy_rejected = Boolean(pd.energy_rejected || td.energy_rejected);
+      pd.energy_verified = completeEnergy && Boolean(pd.energy_verified && td.energy_verified);
+      pd.distance_estimated = Boolean(pd.distance_estimated || td.distance_estimated);
+      pd.soc_used_percent = Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)
+        ? Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10 : null;
+      pd.end_soc_percent = endSoc;
+      pd.end_battery_wh = td.end_battery_wh ?? null;
 
       if (pd.distance_m > 0 && pd.energy_wh > 0) {
         pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
-      } else if (td.efficiency_km_kwh != null) {
-        pd.efficiency_km_kwh = Math.round(((pd.efficiency_km_kwh || td.efficiency_km_kwh) + td.efficiency_km_kwh) / 2 * 10) / 10;
+      } else {
+        pd.efficiency_km_kwh = null;
       }
 
       pd.route = [...(pd.route || []), ...(td.route || [])];
@@ -203,3 +221,20 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
   return merged.sort((a, b) => getStart(b) - getStart(a));
 }
 
+
+// Position a trip on a local 24-hour clock; driving duration excludes stops.
+export function tripTimeline(event, timeZone) {
+  const data = event.data || {};
+  const start = new Date(data.started_at || event.observed_at);
+  const end = new Date(data.ended_at || (+start + (data.duration_s || 0) * 1000));
+  const minutes = date => {
+    const parts = new Intl.DateTimeFormat('en-GB', {timeZone, hourCycle:'h23', hour:'2-digit', minute:'2-digit', second:'2-digit'}).formatToParts(date);
+    const value = type => Number(parts.find(p => p.type === type).value);
+    return value('hour') * 60 + value('minute') + value('second') / 60;
+  };
+  if (!Number.isFinite(+start) || !Number.isFinite(+end)) return {leftPct:0, widthPct:0};
+  const startMins = minutes(start);
+  const endMins = tripDateKey(end, timeZone) > tripDateKey(start, timeZone) ? 1440 : minutes(end);
+  const leftPct = startMins / 1440 * 100;
+  return {leftPct, widthPct:Math.min(100 - leftPct, Math.max(0, endMins - startMins) / 1440 * 100)};
+}
