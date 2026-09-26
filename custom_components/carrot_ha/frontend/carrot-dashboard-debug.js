@@ -1508,193 +1508,244 @@ export default class CarrotDebugDashboard extends HTMLElement {
       return {key,label};
     };
 
-    if (!card.trips || card.trips.length === 0) {
-      const nowMs = Date.now();
-      const d1 = new Date(nowMs - 86400000); d1.setHours(8, 30, 0, 0);
-      const d1b = new Date(nowMs - 86400000); d1b.setHours(18, 15, 0, 0);
-      const d2 = new Date(nowMs - 86400000 * 2); d2.setHours(14, 0, 0, 0);
-      const d4 = new Date(nowMs - 86400000 * 4); d4.setHours(11, 20, 0, 0);
+    const getTripDateKey = (val, timeZone) => {
+      const d = new Date(val);
+      if (!val || Number.isNaN(d.getTime())) return '';
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timeZone || undefined, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+      return ['year', 'month', 'day'].map(t => parts.find(p => p.type === t)?.value).join('-');
+    };
 
-      card.trips = [
-        {
-          observed_at: new Date(nowMs - 300000).toISOString(),
-          data: {
-            id: 'sim-trip-1',
-            started_at: new Date(nowMs - 1494000 - 300000).toISOString(),
-            ended_at: new Date(nowMs - 300000).toISOString(),
-            duration_s: 1494, // 24m 54s -> "24분"
-            distance_m: 15600,
-            energy_wh: 2100,
-            efficiency_km_kwh: 7.4,
-            soc_used_percent: 2.7,
-            start_battery_wh: 59400,
-            end_battery_wh: 57300,
-            start_soc_percent: 76.2,
-            end_soc_percent: 73.5,
-            route: [
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
-              { latitude: 37.5680, longitude: 126.9800, speedMps: 11.2 },
-              { latitude: 37.5700, longitude: 126.9830, speedMps: 14.5 },
-              { latitude: 37.5720, longitude: 126.9850, speedMps: 0 }
-            ]
-          }
-        },
-        {
-          observed_at: new Date(nowMs - 3600000).toISOString(),
-          data: {
-            id: 'sim-trip-2',
-            started_at: new Date(nowMs - 3600000 - 1038000).toISOString(),
-            ended_at: new Date(nowMs - 3600000).toISOString(),
-            duration_s: 1038, // 17m 18s -> "17분"
-            distance_m: 6860,
-            energy_wh: 1200,
-            efficiency_km_kwh: 5.7,
-            soc_used_percent: 1.5,
-            start_battery_wh: 61600,
-            end_battery_wh: 60400,
-            start_soc_percent: 79.0,
-            end_soc_percent: 77.4,
-            route: [
-              { latitude: 37.5720, longitude: 126.9850, speedMps: 0 },
-              { latitude: 37.5750, longitude: 126.9900, speedMps: 8.5 },
-              { latitude: 37.5780, longitude: 126.9950, speedMps: 0 }
-            ]
-          }
-        },
-        {
-          observed_at: new Date(nowMs - 14400000).toISOString(),
-          data: {
-            id: 'sim-trip-3',
-            started_at: new Date(nowMs - 14400000 - 4500000).toISOString(),
-            ended_at: new Date(nowMs - 14400000).toISOString(),
-            duration_s: 4500, // 1h 15m -> "1시간 15분"
-            distance_m: 54600,
-            energy_wh: 8500,
-            efficiency_km_kwh: 6.4,
-            soc_used_percent: 10.9,
-            start_battery_wh: 70100,
-            end_battery_wh: 61600,
-            start_soc_percent: 89.9,
-            end_soc_percent: 79.0,
-            route: [
-              { latitude: 37.5000, longitude: 127.0000, speedMps: 0 },
-              { latitude: 37.5780, longitude: 126.9950, speedMps: 0 }
-            ]
-          }
-        },
-        {
-          observed_at: new Date(nowMs - 28800000).toISOString(),
-          data: {
-            id: 'sim-trip-4',
-            started_at: new Date(nowMs - 28800000 - 45000).toISOString(),
-            ended_at: new Date(nowMs - 28800000).toISOString(),
-            duration_s: 45, // < 1m -> "1분 미만"
-            distance_m: 350,
-            energy_wh: 50,
-            efficiency_km_kwh: 7.0,
-            soc_used_percent: 0.1,
-            start_battery_wh: 70150,
-            end_battery_wh: 70100,
-            start_soc_percent: 90.0,
-            end_soc_percent: 89.9,
-            route: [
-              { latitude: 37.5000, longitude: 127.0000, speedMps: 0 },
-              { latitude: 37.5010, longitude: 127.0010, speedMps: 0 }
-            ]
-          }
-        },
-        // Trips for yesterday (d1)
-        {
-          observed_at: new Date(d1.getTime() + 1800000).toISOString(),
-          data: {
-            id: 'sim-trip-d1-morning',
-            started_at: d1.toISOString(),
-            ended_at: new Date(d1.getTime() + 1620000).toISOString(),
-            duration_s: 1620, // 27m
-            distance_m: 18200,
-            energy_wh: 2500,
-            efficiency_km_kwh: 7.3,
-            soc_used_percent: 3.2,
-            start_battery_wh: 65000,
-            end_battery_wh: 62500,
-            start_soc_percent: 83.0,
-            end_soc_percent: 79.8,
-            route: [
-              { latitude: 37.5100, longitude: 127.0200, speedMps: 0 },
-              { latitude: 37.5400, longitude: 127.0100, speedMps: 13.0 },
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
-            ]
-          }
-        },
-        {
-          observed_at: new Date(d1b.getTime() + 2000000).toISOString(),
-          data: {
-            id: 'sim-trip-d1-evening',
-            started_at: d1b.toISOString(),
-            ended_at: new Date(d1b.getTime() + 1800000).toISOString(),
-            duration_s: 1800, // 30m
-            distance_m: 19500,
-            energy_wh: 2850,
-            efficiency_km_kwh: 6.8,
-            soc_used_percent: 3.6,
-            start_battery_wh: 62000,
-            end_battery_wh: 59150,
-            start_soc_percent: 79.2,
-            end_soc_percent: 75.6,
-            route: [
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
-              { latitude: 37.5300, longitude: 127.0050, speedMps: 12.0 },
-              { latitude: 37.5100, longitude: 127.0200, speedMps: 0 }
-            ]
-          }
-        },
-        // Trip for 2 days ago (d2)
-        {
-          observed_at: new Date(d2.getTime() + 3500000).toISOString(),
-          data: {
-            id: 'sim-trip-d2',
-            started_at: d2.toISOString(),
-            ended_at: new Date(d2.getTime() + 3200000).toISOString(),
-            duration_s: 3200, // 53m
-            distance_m: 42000,
-            energy_wh: 6450,
-            efficiency_km_kwh: 6.5,
-            soc_used_percent: 8.2,
-            start_battery_wh: 71000,
-            end_battery_wh: 64550,
-            start_soc_percent: 91.0,
-            end_soc_percent: 82.8,
-            route: [
-              { latitude: 37.4500, longitude: 126.9500, speedMps: 0 },
-              { latitude: 37.5100, longitude: 127.0200, speedMps: 16.5 },
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
-            ]
-          }
-        },
-        // Trip for 4 days ago (d4)
-        {
-          observed_at: new Date(d4.getTime() + 2400000).toISOString(),
-          data: {
-            id: 'sim-trip-d4',
-            started_at: d4.toISOString(),
-            ended_at: new Date(d4.getTime() + 2100000).toISOString(),
-            duration_s: 2100, // 35m
-            distance_m: 28500,
-            energy_wh: 4070,
-            efficiency_km_kwh: 7.0,
-            soc_used_percent: 5.2,
-            start_battery_wh: 60000,
-            end_battery_wh: 55930,
-            start_soc_percent: 77.0,
-            end_soc_percent: 71.8,
-            route: [
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 },
-              { latitude: 37.6000, longitude: 127.0400, speedMps: 14.0 },
-              { latitude: 37.5665, longitude: 126.9780, speedMps: 0 }
-            ]
-          }
+    const generateMockRoute = (startLat, startLng, distM, maxKph, seed) => {
+      const maxMps = (maxKph || 60) / 3.6;
+      const count = Math.max(6, Math.min(18, Math.round(distM / 1000 * 1.5)));
+      const pts = [];
+      const angle = (((seed * 9301 + 49297) % 233280) / 233280) * 2 * Math.PI;
+
+      for (let i = 0; i < count; i++) {
+        const progress = i / (count - 1);
+        const r = (progress * 0.04);
+        const lat = startLat + Math.sin(angle) * r + Math.sin(i * 1.3) * 0.002;
+        const lng = startLng + Math.cos(angle) * r + Math.cos(i * 1.3) * 0.002;
+        const spdFactor = Math.sin(progress * Math.PI);
+        const speedMps = (i === 0 || i === count - 1) ? 0 : Math.max(1.5, maxMps * spdFactor * (0.8 + 0.4 * Math.sin(i * 2)));
+        pts.push({
+          latitude: Math.round(lat * 100000) / 100000,
+          longitude: Math.round(lng * 100000) / 100000,
+          speedMps: Math.round(speedMps * 10) / 10
+        });
+      }
+      return pts;
+    };
+
+    const batteryIconName = soc => {
+      if (typeof soc !== 'number' || !Number.isFinite(soc)) return 'battery';
+      const level = Math.max(0, Math.min(100, Math.round(soc)));
+      if (level >= 95) return 'battery';
+      if (level <= 5) return 'battery-outline';
+      return `battery-${Math.round(level / 10) * 10}`;
+    };
+
+    const tripDurationKo = (s, isEnglish) => {
+      if (typeof s !== 'number' || !Number.isFinite(s) || s < 0) return '';
+      const totalSec = Math.round(s);
+      if (totalSec < 60) return isEnglish ? '< 1m' : '1분 미만';
+      const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60);
+      if (isEnglish) {
+        if (h > 0 && m > 0) return `${h}h ${m}m`;
+        if (h > 0) return `${h}h`;
+        return `${m}m`;
+      }
+      if (h > 0 && m > 0) return `${h}시간 ${m}분`;
+      if (h > 0) return `${h}시간`;
+      return `${m}분`;
+    };
+
+    const mergeConsecutiveTrips = (rawTrips, timeZone, maxGapSeconds = 1800) => {
+      if (!Array.isArray(rawTrips) || rawTrips.length <= 1) return rawTrips || [];
+      const getStart = e => new Date(e.data?.started_at || e.observed_at || 0).getTime();
+      const getEnd = e => {
+        if (e.data?.ended_at) return new Date(e.data.ended_at).getTime();
+        const dur = Number(e.data?.duration_s) || 0;
+        return getStart(e) + dur * 1000;
+      };
+
+      const sorted = [...rawTrips].sort((a, b) => getStart(a) - getStart(b));
+      const merged = [];
+
+      for (const trip of sorted) {
+        if (!trip || !trip.data) continue;
+        const td = trip.data;
+        const startMs = getStart(trip);
+        const endMs = getEnd(trip);
+        const durS = Number(td.duration_s) || Math.round((endMs - startMs) / 1000);
+        const startSoc = td.start_soc_percent != null ? Number(td.start_soc_percent) : null;
+        const endSoc = td.end_soc_percent != null ? Number(td.end_soc_percent) : null;
+
+        if (merged.length === 0) {
+          merged.push({
+            ...trip,
+            data: {
+              ...td,
+              merged: false,
+              merge_count: 1,
+              started_at: td.started_at || new Date(startMs).toISOString(),
+              ended_at: td.ended_at || new Date(endMs).toISOString(),
+              duration_s: durS,
+              merge_parts: [td]
+            }
+          });
+          continue;
         }
+
+        const prev = merged[merged.length - 1];
+        const pd = prev.data;
+        const prevEndMs = getEnd(prev);
+        const gapS = (startMs - prevEndMs) / 1000;
+        const prevEndSoc = pd.end_soc_percent != null ? Number(pd.end_soc_percent) : null;
+        const isNoCharging = (startSoc == null || prevEndSoc == null) || (startSoc <= prevEndSoc + 1.0);
+        const isSameDay = getTripDateKey(startMs, timeZone) === getTripDateKey(prevEndMs, timeZone);
+
+        if (gapS >= 0 && gapS <= maxGapSeconds && isNoCharging && isSameDay) {
+          pd.merged = true;
+          pd.merge_count = (pd.merge_count || 1) + 1;
+          pd.ended_at = td.ended_at || new Date(endMs).toISOString();
+          pd.duration_s = (pd.duration_s || 0) + durS;
+          pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
+          pd.energy_wh = (pd.energy_wh || 0) + (Number(td.energy_wh) || 0);
+          if (endSoc != null) pd.end_soc_percent = endSoc;
+          if (td.end_battery_wh != null) pd.end_battery_wh = td.end_battery_wh;
+
+          if (pd.distance_m > 0 && pd.energy_wh > 0) {
+            pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
+          } else if (td.efficiency_km_kwh != null) {
+            pd.efficiency_km_kwh = Math.round(((pd.efficiency_km_kwh || td.efficiency_km_kwh) + td.efficiency_km_kwh) / 2 * 10) / 10;
+          }
+
+          pd.route = [...(pd.route || []), ...(td.route || [])];
+          pd.merge_parts = [...(pd.merge_parts || []), td];
+        } else {
+          merged.push({
+            ...trip,
+            data: {
+              ...td,
+              merged: false,
+              merge_count: 1,
+              started_at: td.started_at || new Date(startMs).toISOString(),
+              ended_at: td.ended_at || new Date(endMs).toISOString(),
+              duration_s: durS,
+              merge_parts: [td]
+            }
+          });
+        }
+      }
+
+      return merged.sort((a, b) => getStart(b) - getStart(a));
+    };
+
+    const generateMockTrips = (baseMs) => {
+      const getDayDate = (daysAgo, h, m) => {
+        const d = new Date(baseMs - daysAgo * 86400000);
+        d.setHours(h, m, 0, 0);
+        return d;
+      };
+
+      const makeTrip = (id, startD, durMin, distKm, startSoc, endSoc, eff, spd, baseLat, baseLng, seed) => {
+        const started_at = startD.toISOString();
+        const ended_at = new Date(startD.getTime() + durMin * 60000).toISOString();
+        const duration_s = durMin * 60;
+        const distance_m = Math.round(distKm * 1000);
+        const energy_wh = Math.round((distKm / Math.max(0.1, eff)) * 1000);
+        const route = generateMockRoute(baseLat, baseLng, distance_m, spd, seed);
+        return {
+          observed_at: ended_at,
+          data: {
+            id,
+            started_at,
+            ended_at,
+            duration_s,
+            distance_m,
+            energy_wh,
+            efficiency_km_kwh: eff,
+            start_soc_percent: startSoc,
+            end_soc_percent: endSoc,
+            route
+          }
+        };
+      };
+
+      const trips = [
+        // Day 0 (Today): Morning commute (2 trips <= 30m apart) + Lunch multi-segment (4 trips <= 30m apart matching screenshot)
+        makeTrip('t0-m1', getDayDate(0, 8, 15), 20, 12.4, 90.0, 87.0, 6.5, 82, 37.5100, 127.0200, 101),
+        makeTrip('t0-m2', getDayDate(0, 8, 50), 8, 3.2, 87.0, 86.0, 6.4, 68, 37.5250, 127.0300, 102), // gap: 15m -> merges with t0-m1
+        makeTrip('t0-l1', getDayDate(0, 12, 52), 7, 1.28, 83.0, 82.0, 5.5, 65, 37.4050, 126.9300, 103),
+        makeTrip('t0-l2', getDayDate(0, 13, 6), 18, 8.83, 82.0, 80.0, 6.3, 90, 37.3950, 126.9380, 104), // gap: 7m -> merges
+        makeTrip('t0-l3', getDayDate(0, 13, 34), 10, 5.91, 80.0, 79.0, 7.4, 88, 37.3680, 126.9400, 105), // gap: 10m -> merges
+        makeTrip('t0-l4', getDayDate(0, 13, 58), 10, 3.06, 79.0, 78.0, 4.1, 82, 37.3300, 126.9680, 106), // gap: 14m -> merges (4건 병합, 19.08km, 83%->78% 5% 사용)
+
+        // Day 1 (Yesterday): Road trip day with 11 trips (tests merging groups into 4 consolidated sessions)
+        makeTrip('t1-1', getDayDate(1, 8, 30), 42, 38.4, 84.0, 72.0, 6.2, 104, 37.4500, 126.9500, 111),
+        makeTrip('t1-2', getDayDate(1, 9, 25), 23, 16.8, 72.0, 67.0, 5.8, 88, 37.4900, 126.9900, 112), // gap: 13m
+        makeTrip('t1-3', getDayDate(1, 10, 10), 25, 22.1, 67.0, 60.0, 6.1, 92, 37.5200, 127.0200, 113), // gap: 22m
+        makeTrip('t1-4', getDayDate(1, 10, 45), 17, 12.3, 60.0, 56.0, 5.5, 78, 37.5500, 127.0500, 114), // gap: 10m
+        makeTrip('t1-5', getDayDate(1, 11, 30), 15, 8.5, 56.0, 53.0, 5.2, 65, 37.5700, 127.0700, 115), // gap: 28m -> 1~5 merge into morning tour!
+        makeTrip('t1-6', getDayDate(1, 13, 25), 43, 41.2, 53.0, 40.0, 6.4, 108, 37.5700, 127.0700, 116), // gap: 100m (lunch stop)
+        makeTrip('t1-7', getDayDate(1, 14, 30), 22, 18.0, 40.0, 34.0, 5.7, 85, 37.5400, 127.0200, 117), // gap: 22m -> merges with t1-6
+        makeTrip('t1-8', getDayDate(1, 16, 32), 23, 19.5, 34.0, 28.0, 6.0, 90, 37.5100, 126.9800, 118), // gap: 100m
+        makeTrip('t1-9', getDayDate(1, 17, 10), 18, 14.2, 28.0, 23.0, 5.6, 82, 37.4800, 126.9500, 119), // gap: 15m -> merges with t1-8
+        makeTrip('t1-10', getDayDate(1, 18, 5), 17, 12.8, 23.0, 19.0, 5.9, 80, 37.4500, 126.9300, 120), // gap: 37m
+        makeTrip('t1-11', getDayDate(1, 18, 40), 11, 10.8, 19.0, 19.0, 6.8, 74, 37.4200, 126.9100, 121), // gap: 18m -> merges with t1-10
+
+        // Day 2 (2 days ago): 9 individual trips with gaps > 30m (tests 2x4 grid 8-card limit and pagination: Page 1 has 8, Page 2 has 1)
+        makeTrip('t2-1', getDayDate(2, 7, 30), 15, 9.2, 38.0, 35.0, 6.2, 75, 37.4100, 126.9200, 131),
+        makeTrip('t2-2', getDayDate(2, 9, 15), 10, 5.2, 35.0, 33.0, 6.3, 60, 37.4300, 126.9400, 132),
+        makeTrip('t2-3', getDayDate(2, 11, 0), 12, 6.1, 33.0, 30.0, 5.9, 65, 37.4600, 126.9700, 133),
+        makeTrip('t2-4', getDayDate(2, 12, 45), 18, 10.2, 30.0, 26.0, 6.0, 80, 37.5000, 127.0100, 134),
+        makeTrip('t2-5', getDayDate(2, 14, 15), 15, 8.9, 26.0, 23.0, 5.8, 72, 37.5300, 127.0300, 135),
+        makeTrip('t2-6', getDayDate(2, 15, 50), 20, 12.5, 23.0, 18.0, 6.2, 85, 37.5500, 127.0500, 136),
+        makeTrip('t2-7', getDayDate(2, 17, 30), 16, 10.0, 45.0, 41.0, 6.0, 78, 37.5200, 127.0100, 137),
+        makeTrip('t2-8', getDayDate(2, 19, 10), 14, 8.2, 41.0, 38.0, 5.7, 70, 37.4800, 126.9700, 138),
+        makeTrip('t2-9', getDayDate(2, 21, 0), 18, 11.5, 38.0, 34.0, 6.1, 84, 37.4400, 126.9300, 139),
+
+        // Day 3 (3 days ago): 8 trips with 2 merged pairs
+        makeTrip('t3-1', getDayDate(3, 8, 0), 22, 10.2, 53.0, 49.0, 5.8, 72, 37.4500, 126.9500, 141),
+        makeTrip('t3-2', getDayDate(3, 8, 28), 18, 11.0, 49.0, 45.0, 5.5, 78, 37.4800, 126.9800, 142),
+        makeTrip('t3-3', getDayDate(3, 11, 15), 14, 8.9, 45.0, 42.0, 5.7, 70, 37.5100, 127.0100, 143),
+        makeTrip('t3-4', getDayDate(3, 13, 50), 19, 13.8, 42.0, 37.0, 6.0, 82, 37.5400, 127.0400, 144),
+        makeTrip('t3-5', getDayDate(3, 15, 30), 12, 7.1, 37.0, 34.0, 5.4, 65, 37.5200, 127.0100, 145),
+        makeTrip('t3-6', getDayDate(3, 17, 45), 22, 15.6, 34.0, 28.0, 5.8, 85, 37.4900, 126.9800, 146),
+        makeTrip('t3-7', getDayDate(3, 19, 20), 16, 9.4, 28.0, 24.0, 5.6, 75, 37.4600, 126.9500, 147),
+        makeTrip('t3-8', getDayDate(3, 19, 42), 25, 18.2, 24.0, 17.0, 5.9, 90, 37.4200, 126.9100, 148),
+
+        // Day 4 (4 days ago): 6 trips
+        makeTrip('t4-1', getDayDate(4, 8, 15), 14, 7.8, 64.0, 61.0, 6.1, 70, 37.4300, 126.9300, 151),
+        makeTrip('t4-2', getDayDate(4, 9, 15), 12, 6.2, 61.0, 59.0, 6.2, 65, 37.4600, 126.9600, 152),
+        makeTrip('t4-3', getDayDate(4, 11, 30), 11, 5.4, 59.0, 57.0, 5.9, 60, 37.4900, 126.9900, 153),
+        makeTrip('t4-4', getDayDate(4, 14, 40), 17, 10.5, 57.0, 53.0, 6.0, 78, 37.5200, 127.0200, 154),
+        makeTrip('t4-5', getDayDate(4, 17, 20), 14, 7.8, 53.0, 50.0, 5.8, 68, 37.5000, 127.0000, 155),
+        makeTrip('t4-6', getDayDate(4, 19, 45), 20, 12.1, 50.0, 45.0, 6.1, 84, 37.4500, 126.9500, 156),
+
+        // Day 5 (5 days ago): 4 trips
+        makeTrip('t5-1', getDayDate(5, 8, 10), 15, 9.2, 78.0, 75.0, 6.2, 75, 37.4400, 126.9400, 161),
+        makeTrip('t5-2', getDayDate(5, 9, 30), 10, 5.2, 75.0, 73.0, 6.3, 60, 37.4700, 126.9700, 162),
+        makeTrip('t5-3', getDayDate(5, 14, 10), 18, 10.2, 73.0, 69.0, 6.0, 80, 37.5100, 127.0100, 163),
+        makeTrip('t5-4', getDayDate(5, 17, 40), 15, 8.9, 69.0, 66.0, 5.8, 72, 37.4600, 126.9600, 164),
+
+        // Day 6 (6 days ago): 2 trips
+        makeTrip('t6-1', getDayDate(6, 8, 15), 37, 21.3, 90.0, 83.0, 6.4, 95, 37.4500, 126.9500, 171),
+        makeTrip('t6-2', getDayDate(6, 18, 40), 38, 21.3, 83.0, 77.0, 6.2, 92, 37.5100, 127.0100, 172)
       ];
+
+      return trips.sort((a, b) => new Date(b.data.started_at).getTime() - new Date(a.data.started_at).getTime());
+    };
+
+    const nowMs = Date.now();
+    const tz = this._hass?.config?.time_zone;
+    if (!card._mockTripsInitialized) {
+      card._mockTripsInitialized = true;
+      card._rawTrips = generateMockTrips(nowMs);
+      card._mergedTrips = mergeConsecutiveTrips(card._rawTrips, tz, 1800);
+      if (card._mergeTripsEnabled === undefined) card._mergeTripsEnabled = true;
+      card.trips = card._mergeTripsEnabled ? card._mergedTrips : card._rawTrips;
     }
     if (!card.charges || card.charges.length === 0) {
       const nowMs = Date.now();
@@ -1777,7 +1828,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       card.v.battery_history = generateMockBatteryHistory(this.state.soc, this.state.mode === 'charging', this.state.mode === 'driving');
     }
 
-    const tz = this._hass?.config?.time_zone;
+    // tz already declared above
     const esc = val => String(val ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const n = (val, digits = 1) => typeof val === 'number' && Number.isFinite(val) ? val.toLocaleString(isEn ? 'en-GB' : 'ko-KR', { maximumFractionDigits: digits }) : '—';
     const time = val => val && !Number.isNaN(new Date(val).getTime()) ? new Date(val).toLocaleString(isEn ? 'en-GB' : 'ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz || undefined }) : (isEn ? 'No records' : '기록 없음');
@@ -1828,6 +1879,200 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const icon = name => `<ha-icon icon="mdi:${name}"></ha-icon>`;
     const metric = (label, val, unit, ico, sub = '', cls = '') =>
       `<div class="metric ${cls}">${icon(ico)}<span class="label">${label}</span><strong>${esc(val)}<small>${esc(unit)}</small></strong>${sub ? `<span class="hint">${esc(sub)}</span>` : ''}</div>`;
+
+    const tripDays = (events, timeZone, now = new Date()) => {
+      const today = getTripDateKey(now, timeZone);
+      const anchor = new Date(today + 'T12:00:00Z');
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(+anchor - (6 - i) * 86400000);
+        const key = date.toISOString().slice(0, 10);
+        return {
+          key,
+          date,
+          today: i === 6,
+          indices: (events || []).flatMap((e, index) => {
+            const timeVal = e?.data?.started_at || e?.started_at || e?.observed_at || e?.data?.observed_at;
+            return getTripDateKey(timeVal, timeZone) === key ? [index] : [];
+          })
+        };
+      });
+    };
+
+    card.tripHistory = function(isTrip) {
+      const currentTz = this._hass?.config?.time_zone;
+      const isEnglish = isEn || card.lang === 'en';
+      const days = tripDays(this.trips, currentTz);
+      if (this.tripDay && !days.some(d => d.key === this.tripDay)) {
+        this.tripDay = null;
+      }
+      if (!this.tripDay) {
+        const todayObj = days.find(d => d.today) || days[days.length - 1];
+        this.tripDay = todayObj ? todayObj.key : null;
+      }
+      const selected = days.find(d => d.key === this.tripDay);
+      const dayIndices = selected ? selected.indices : [];
+      const labels = d => d.date.getUTCDate() + (isEnglish ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.date.getUTCDay()]})` : `일(${['일','월','화','수','목','금','토'][d.date.getUTCDay()]})`);
+
+      const daysHtml = days.map(d => `
+        <button class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 
+                data-trip-day="${d.key}" 
+                aria-pressed="${d.key === this.tripDay}" 
+                aria-label="${d.key}, ${d.indices.length} ${isEnglish ? 'trips' : '회 주행'}">
+          <span class="trip-today">${d.today ? (isEnglish ? 'Today' : '오늘') : '&nbsp;'}</span>
+          <b>${labels(d)}</b>
+          <span class="trip-count"><ha-icon icon="mdi:road"></ha-icon> ${d.indices.length}</span>
+        </button>
+      `).join('');
+
+      // Timeline Segments (placed inside 24H rail)
+      const timelineSegmentsHtml = dayIndices.map(i => {
+        const e = this.trips[i];
+        const ed = e?.data || {};
+        const startD = new Date(ed.started_at || e.observed_at);
+        const startMins = startD.getHours() * 60 + startD.getMinutes();
+        const leftPct = Math.max(0, Math.min(97.5, (startMins / 1440) * 100));
+        const durS = ed.duration_s || 600;
+        const widthPct = Math.max(2.2, Math.min(100 - leftPct, (durS / 86400) * 100));
+        const isSel = isTrip && i === this.selected;
+        const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
+        const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
+        const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
+        const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
+        const segTitle = `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(ed.ended_at || e.observed_at)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}${isEnglish ? ' merged' : '건 병합'})` : ''}`;
+
+        return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}" 
+                     style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;" 
+                     data-trip="${i}" 
+                     title="${esc(segTitle)}"></div>`;
+      }).join('');
+
+      // 2x4 Grid & Pagination (2 columns x max 4 rows = max 8 per page)
+      const ITEMS_PER_PAGE = 8;
+      const totalItems = dayIndices.length;
+      const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+
+      if (this.selected !== null) {
+        const selPos = dayIndices.indexOf(this.selected);
+        if (selPos !== -1) {
+          this._tripPage = Math.floor(selPos / ITEMS_PER_PAGE) + 1;
+        }
+      }
+
+      if (!this._tripPage || this._tripPage < 1) this._tripPage = 1;
+      if (this._tripPage > totalPages) this._tripPage = totalPages;
+      this._maxTripPages = totalPages;
+
+      const startIdx = (this._tripPage - 1) * ITEMS_PER_PAGE;
+      const visibleIndices = dayIndices.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+      let cardsHtml = '';
+      if (visibleIndices.length === 0) {
+        cardsHtml = `<div class="empty" style="grid-column: 1 / -1; padding: 40px 10px;">${isEnglish ? 'No trips recorded for this date.' : '기록된 주행이 없습니다.'}</div>`;
+      } else {
+        cardsHtml = visibleIndices.map(i => {
+          const e = this.trips[i];
+          const ed = e?.data || {};
+          const durText = tripDurationKo(ed.duration_s, isEnglish);
+          const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
+          const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
+          const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
+          const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
+          const isSel = isTrip && i === this.selected;
+
+          // Authentic Carrot HA Badges
+          const socHtml = (startSoc != null && endSoc != null)
+            ? `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`
+            : '';
+          const effHtml = ed.efficiency_km_kwh != null
+            ? `<span class="trip-eff">${n(ed.efficiency_km_kwh, 1)} km/kWh</span>`
+            : '';
+          const mergeHtml = (ed.merged && ed.merge_count > 1)
+            ? `<span class="trip-merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '건 병합'}</span>`
+            : '';
+          const distStr = n((ed.distance_m || 0) / 1000, 2);
+
+          return `
+            <div class="sleek-trip-card ${isSel ? 'selected' : ''}" data-trip="${i}">
+              <div class="card-top-row">
+                <div>
+                  <span class="card-time">${timeOnly(ed.started_at || e.observed_at)}</span>
+                  ${durText ? `<span class="card-dur">${durText}</span>` : ''}
+                </div>
+                <div class="card-dist">${distStr} <small>km</small></div>
+              </div>
+              <div class="card-badges-row">
+                ${socHtml}
+                ${effHtml}
+                ${mergeHtml}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const paginationHtml = `
+        <div class="panel-pagination">
+          <button class="page-nav-btn" data-nav-page="prev" ${this._tripPage <= 1 ? 'disabled' : ''}>
+            ◀ ${isEnglish ? 'Prev Page' : '이전 페이지'}
+          </button>
+          <span class="page-indicator-text">
+            ${this._tripPage} / ${totalPages} ${isEnglish ? 'Page' : '페이지'} (${isEnglish ? 'Total ' : '총 '}${totalItems}${isEnglish ? '' : '개'})
+          </span>
+          <button class="page-nav-btn" data-nav-page="next" ${this._tripPage >= totalPages ? 'disabled' : ''}>
+            ${isEnglish ? 'Next Page' : '다음 페이지'} ▶
+          </button>
+        </div>
+      `;
+
+      const isMergeActive = this._mergeTripsEnabled !== false;
+      const hasMergedTrips = dayIndices.some(i => this.trips[i]?.data?.merged);
+      const mergeSubText = isMergeActive
+        ? (hasMergedTrips ? (isEnglish ? '(≤30m gaps merged)' : '(30분 이하 인접 주행 병합됨)') : '')
+        : (isEnglish ? '(individual trips)' : '(개별 분할 표시)');
+
+      return `
+        <section class="panel trip-history">
+          <div class="paneltitle">
+            <h2>${isEnglish ? 'Recent Trips' : '최근 주행'}</h2>
+            <span class="sub">${isEnglish ? 'Recent 7 days' : '최근 7일'}</span>
+          </div>
+          <div class="trip-days">
+            ${daysHtml}
+          </div>
+          ${selected ? `
+            <div class="day-timeline-wrap">
+              <div class="day-timeline-topline">
+                <span class="day-timeline-title">
+                  <strong>${selected.key} · ${dayIndices.length}${isEnglish ? ' trips' : '회 주행'}</strong>
+                  <small class="day-timeline-merge-sub">${mergeSubText}</small>
+                </span>
+                <button class="merge-toggle-badge ${isMergeActive ? '' : 'off'}" id="btnToggleTripMerge" title="${isEnglish ? 'Click to toggle 30-min adjacent trip merge' : '클릭하여 30분 이하 인접 주행 병합 토글'}">
+                  ${isMergeActive ? (isEnglish ? 'Merged (≤30m)' : '30분 이하 병합됨') : (isEnglish ? 'Individual Trips' : '개별 분할 표시')}
+                </button>
+              </div>
+              <div class="day-timeline-scale">
+                <span>00:00</span>
+                <span>06:00</span>
+                <span>12:00</span>
+                <span>18:00</span>
+                <span>24:00</span>
+              </div>
+              <div class="day-timeline-rail">
+                ${timelineSegmentsHtml}
+              </div>
+            </div>
+            <div class="trip-grid-container">
+              <div class="trip-grid-2x4">
+                ${cardsHtml}
+              </div>
+              ${paginationHtml}
+            </div>
+          ` : `
+            <div class="empty">${isEnglish ? 'Select a date to view trip history.' : '날짜를 선택하면 해당 날짜의 주행 기록이 표시됩니다.'}</div>
+          `}
+        </section>
+      `;
+    };
 
     card.overview = (v) => {
       const displayState = card.vehicleStatus(v);
@@ -2288,9 +2533,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     const origRender = card.render.bind(card);
     card.render = () => {
-      const chargeState=card.v.charging?'on':'off';
-      card._hass={...(this._hass||{}),states:{...(this._hass?.states||{}),'binary_sensor.carrot_debug_simulated':{state:chargeState}}};
+      const chargeState = card.v.charging ? 'on' : 'off';
+      card._hass = { ...(this._hass || {}), states: { ...(this._hass?.states || {}), 'binary_sensor.carrot_debug_simulated': { state: chargeState } } };
       origRender();
+
       const refreshBtn = card.shadowRoot?.querySelector('.refresh');
       if (refreshBtn) {
         refreshBtn.onclick = (e) => {
@@ -2299,6 +2545,45 @@ export default class CarrotDebugDashboard extends HTMLElement {
           this.applyDebugTelemetry();
         };
       }
+
+      // Pagination controls handling
+      card.shadowRoot?.querySelectorAll('[data-nav-page]').forEach(b => {
+        b.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const dir = b.dataset.navPage;
+          if (dir === 'prev') {
+            card._tripPage = Math.max(1, (card._tripPage || 1) - 1);
+          } else if (dir === 'next') {
+            card._tripPage = Math.min(card._maxTripPages || 1, (card._tripPage || 1) + 1);
+          }
+          card.render();
+        };
+      });
+
+      // 30-min adjacent trip merge toggle handling
+      const mergeBtn = card.shadowRoot?.querySelector('#btnToggleTripMerge');
+      if (mergeBtn) {
+        mergeBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          card._mergeTripsEnabled = !(card._mergeTripsEnabled !== false);
+          card.trips = card._mergeTripsEnabled ? card._mergedTrips : card._rawTrips;
+          card.selected = null;
+          card._tripPage = 1;
+          card.render();
+        };
+      }
+
+      // Reset trip pagination page when switching day
+      card.shadowRoot?.querySelectorAll('[data-trip-day]').forEach(b => {
+        const orig = b.onclick;
+        b.onclick = (e) => {
+          card._tripPage = 1;
+          if (orig) orig.call(b, e);
+        };
+      });
+
       this.injectCustomStyles(card);
 
       if (typeof window !== 'undefined' && window.ResizeObserver) {
@@ -2309,9 +2594,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 try { m.invalidateSize(); } catch (e) {}
               });
             }
+            if (card.map) {
+              try { card.map.invalidateSize(); } catch (e) {}
+            }
           });
         }
-        card.shadowRoot?.querySelectorAll('.mini-map').forEach(el => {
+        card.shadowRoot?.querySelectorAll('.mini-map, .map').forEach(el => {
           card._mapResizeObserver.observe(el);
         });
       }
@@ -2320,6 +2608,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
           card.miniMaps.forEach(m => {
             try { m.invalidateSize(); } catch (e) {}
           });
+        }
+        if (card.map) {
+          try { card.map.invalidateSize(); } catch (e) {}
         }
       }, 120);
     };
@@ -2342,22 +2633,238 @@ export default class CarrotDebugDashboard extends HTMLElement {
         display: grid !important;
         grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
         gap: 4px !important;
-        padding: 0 10px 15px !important;
+        padding: 0 10px 12px !important;
       }
       .charge-days {
         max-width: 480px !important;
         margin: 0 auto 12px !important;
       }
+      .trip-day {
+        max-width: 54px !important;
+        margin: 0 auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        border-radius: 12px !important;
+        padding: 6px 2px !important;
+        background: rgba(255,255,255,0.025) !important;
+        border: 1px solid transparent !important;
+        color: var(--ink) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 2px !important;
+        cursor: pointer !important;
+        transition: all .18s ease !important;
+      }
+      .trip-day:hover {
+        background: rgba(255,255,255,0.06) !important;
+      }
+      .trip-day[aria-pressed="true"], .trip-day.active {
+        background: linear-gradient(180deg, #1d4ed8 0%, #1e40af 100%) !important;
+        border-color: #60a5fa !important;
+        box-shadow: 0 3px 10px rgba(29,78,216,0.45) !important;
+        color: #fff !important;
+      }
+      :host([data-theme="light"]) .trip-day[aria-pressed="true"], :host([data-theme="light"]) .trip-day.active {
+        background: #dbeafe !important;
+        border-color: #3b82f6 !important;
+        color: #1e3a8a !important;
+      }
+
+      /* 24H Master Driving Timeline Bar */
+      .day-timeline-wrap {
+        padding: 10px 14px 12px !important;
+        background: rgba(0,0,0,0.18) !important;
+        border-top: 1px solid var(--line) !important;
+        border-bottom: 1px solid var(--line) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+      }
+      :host([data-theme="light"]) .day-timeline-wrap {
+        background: rgba(0,0,0,0.025) !important;
+      }
+      .day-timeline-topline {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        font-size: 12px !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+      }
+      .day-timeline-title strong {
+        color: var(--ink) !important;
+        font-weight: 750 !important;
+        font-size: 12px !important;
+      }
+      .day-timeline-merge-sub {
+        color: var(--muted) !important;
+        font-size: 11px !important;
+        margin-left: 4px !important;
+      }
+      .merge-toggle-badge {
+        background: rgba(168, 85, 247, 0.15) !important;
+        color: #c084fc !important;
+        border: 1px solid rgba(168, 85, 247, 0.35) !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        padding: 3px 9px !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all .15s ease !important;
+      }
+      :host([data-theme="light"]) .merge-toggle-badge {
+        background: #f3e8ff !important;
+        color: #7e22ce !important;
+        border-color: #d8b4fe !important;
+      }
+      .merge-toggle-badge:hover {
+        background: rgba(168, 85, 247, 0.3) !important;
+        transform: translateY(-1px) !important;
+      }
+      .merge-toggle-badge.off {
+        background: rgba(148, 163, 184, 0.15) !important;
+        color: #94a3b8 !important;
+        border-color: rgba(148, 163, 184, 0.3) !important;
+      }
+      .day-timeline-scale {
+        display: flex !important;
+        justify-content: space-between !important;
+        font-size: 9.5px !important;
+        color: var(--muted) !important;
+        font-weight: 700 !important;
+        padding: 0 1px !important;
+        user-select: none !important;
+      }
+      .day-timeline-rail {
+        position: relative !important;
+        width: 100% !important;
+        height: 20px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border-radius: 6px !important;
+        overflow: hidden !important;
+        border: 1px solid var(--line) !important;
+      }
+      :host([data-theme="light"]) .day-timeline-rail {
+        background: rgba(0,0,0,0.04) !important;
+      }
+      .timeline-trip-segment {
+        position: absolute !important;
+        top: 2px !important;
+        bottom: 2px !important;
+        border-radius: 4px !important;
+        background: linear-gradient(135deg, #2563eb, #38bdf8) !important;
+        cursor: pointer !important;
+        transition: all .15s ease !important;
+        box-shadow: 0 1px 4px rgba(37,99,235,0.3) !important;
+      }
+      .timeline-trip-segment:hover, .timeline-trip-segment.selected {
+        background: #ff8a18 !important;
+        box-shadow: 0 0 10px rgba(255,138,24,0.9) !important;
+        z-index: 5 !important;
+      }
+
+      /* 2x4 Trip Grid Container & Pagination */
+      .trip-grid-container {
+        padding: 12px 14px 14px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        min-height: 340px !important;
+      }
+      .trip-grid-2x4 {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+      }
+      @container (max-width: 500px) {
+        .trip-grid-2x4 {
+          grid-template-columns: 1fr !important;
+          gap: 6px !important;
+        }
+      }
+
+      /* Sleek Trip Card */
+      .sleek-trip-card {
+        background: var(--surface, rgba(255,255,255,0.03)) !important;
+        border: 1px solid var(--line) !important;
+        border-radius: 12px !important;
+        padding: 9px 12px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+        cursor: pointer !important;
+        transition: all .16s ease !important;
+        text-align: left !important;
+        position: relative !important;
+      }
+      :host([data-theme="light"]) .sleek-trip-card {
+        background: #ffffff !important;
+      }
+      .sleek-trip-card:hover {
+        border-color: rgba(56, 189, 248, 0.5) !important;
+        background: rgba(255,255,255,0.06) !important;
+        transform: translateY(-1px) !important;
+      }
+      :host([data-theme="light"]) .sleek-trip-card:hover {
+        background: #f8fafc !important;
+      }
+      .sleek-trip-card.selected {
+        border-color: #ff8a18 !important;
+        background: rgba(255, 138, 24, 0.1) !important;
+        box-shadow: 0 0 0 1px #ff8a18 !important;
+      }
+
+      /* Top Row: Time, Dur & Distance */
+      .card-top-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: baseline !important;
+      }
+      .card-time {
+        font-size: 12px !important;
+        font-weight: 750 !important;
+        color: var(--ink) !important;
+      }
+      .card-dur {
+        font-size: 11px !important;
+        color: var(--muted) !important;
+        font-weight: 500 !important;
+        margin-left: 4px !important;
+      }
+      .card-dist {
+        font-size: 15px !important;
+        font-weight: 850 !important;
+        color: var(--ink) !important;
+        letter-spacing: -0.3px !important;
+        white-space: nowrap !important;
+      }
+      .card-dist small {
+        font-size: 10.5px !important;
+        font-weight: 500 !important;
+        color: var(--muted) !important;
+      }
+
+      /* Badges Row */
+      .card-badges-row {
+        display: flex !important;
+        align-items: center !important;
+        gap: 5px !important;
+        flex-wrap: wrap !important;
+      }
+
+      /* Authentic Carrot HA Badges */
       .trip-soc {
         display: inline-flex !important;
         align-items: center !important;
-        gap: 5px !important;
-        font-size: 11.5px !important;
+        gap: 4px !important;
+        font-size: 11px !important;
         font-weight: 600 !important;
         color: #34d399 !important;
         background: rgba(16, 185, 129, 0.12) !important;
         border: 1px solid rgba(16, 185, 129, 0.28) !important;
-        padding: 2px 7px !important;
+        padding: 2.5px 7px !important;
         border-radius: 6px !important;
         letter-spacing: -0.2px !important;
         white-space: nowrap !important;
@@ -2369,32 +2876,103 @@ export default class CarrotDebugDashboard extends HTMLElement {
         border-color: #86efac !important;
       }
       .trip-soc ha-icon {
-        --mdc-icon-size: 14px !important;
-        width: 14px !important;
-        height: 14px !important;
-        display: inline-block !important;
-        color: currentColor !important;
-        vertical-align: middle !important;
+        --mdc-icon-size: 13px !important;
+        width: 13px !important;
+        height: 13px !important;
       }
+      .trip-soc .soc-used-tag {
+        font-size: 10px !important;
+        color: #6ee7b7 !important;
+        font-weight: 600 !important;
+        opacity: 0.95 !important;
+        margin-left: 2px !important;
+      }
+      :host([data-theme="light"]) .trip-soc .soc-used-tag {
+        color: #166534 !important;
+      }
+
       .trip-eff {
         display: inline-flex !important;
         align-items: center !important;
-        margin-left: 6px !important;
         font-weight: 600 !important;
-        font-size: 11.5px !important;
+        font-size: 11px !important;
         color: #38bdf8 !important;
         background: rgba(56, 189, 248, 0.12) !important;
-        padding: 2px 7px !important;
+        padding: 2.5px 7px !important;
         border-radius: 6px !important;
         border: 1px solid rgba(56, 189, 248, 0.25) !important;
         letter-spacing: -0.2px !important;
         white-space: nowrap !important;
         line-height: 1.2 !important;
+        margin-left: 0 !important;
       }
       :host([data-theme="light"]) .trip-eff {
         background: #e0f2fe !important;
         color: #0284c7 !important;
         border-color: #bae6fd !important;
+      }
+
+      .trip-merge-badge {
+        display: inline-flex !important;
+        align-items: center !important;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        padding: 2px 6px !important;
+        border-radius: 6px !important;
+        background: rgba(168, 85, 247, 0.15) !important;
+        color: #c084fc !important;
+        border: 1px solid rgba(168, 85, 247, 0.3) !important;
+        white-space: nowrap !important;
+        line-height: 1.2 !important;
+      }
+      :host([data-theme="light"]) .trip-merge-badge {
+        background: #f3e8ff !important;
+        color: #7e22ce !important;
+        border-color: #d8b4fe !important;
+      }
+
+      /* Pagination Bar */
+      .panel-pagination {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 10px 4px 0 !important;
+        margin-top: 10px !important;
+        border-top: 1px solid var(--line) !important;
+      }
+      .page-nav-btn {
+        border: 1px solid var(--line) !important;
+        background: rgba(255,255,255,0.04) !important;
+        color: var(--ink) !important;
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        padding: 5px 12px !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        transition: all .15s ease !important;
+      }
+      :host([data-theme="light"]) .page-nav-btn {
+        background: #f1f5f9 !important;
+      }
+      .page-nav-btn:hover:not(:disabled) {
+        background: #2563eb !important;
+        color: #fff !important;
+        border-color: #3b82f6 !important;
+      }
+      .page-nav-btn:disabled {
+        opacity: 0.3 !important;
+        cursor: not-allowed !important;
+      }
+      .page-indicator-text {
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: var(--muted) !important;
+      }
+
+      @media(min-width: 901px) {
+        .layout:has(.trip-history) {
+          grid-template-columns: minmax(0, 1.15fr) minmax(460px, 1fr) !important;
+        }
       }
       /* Typography & Alignment Unification across States */
       .energy-head .soc-value,
