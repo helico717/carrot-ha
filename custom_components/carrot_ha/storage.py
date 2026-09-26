@@ -47,6 +47,28 @@ class Archive:
         if device not in self._derived_ready:
             with self.connect() as db:
                 trip_repair.refresh(db, device)
+                # Update retained caches across month boundaries, not just the
+                # currently displayed month. Missing evidence preserves kWh.
+                cached_rows = db.execute("""SELECT te.id,te.fingerprint,te.energy_kwh,e.body,d.body
+                    FROM trip_energy te JOIN events e ON e.device=te.device AND e.id=te.id
+                    JOIN trip_derivations d ON d.device=te.device AND d.id=te.id
+                    WHERE te.device=?""", (device,)).fetchall()
+                for key, cached_fp, kwh, event_body, derived_body in cached_rows:
+                    data = json.loads(event_body)['data']
+                    derived = json.loads(derived_body)
+                    old_fp = json.loads(cached_fp)
+                    new_fp = [data.get(k) for k in ('started_at','ended_at','distance_m','partial')]
+                    energy = derived.get('energy')
+                    if (old_fp[:2] != new_fp[:2] or old_fp[3:] != new_fp[3:]
+                            or derived.get('energy_rejected')
+                            or (energy and not energy.get('summary_eligible'))):
+                        db.execute('DELETE FROM trip_energy WHERE device=? AND id=?',(device,key))
+                        continue
+                    km = (derived['distance_m'] if derived.get('distance_m') is not None else data.get('distance_m',0))/1000
+                    if energy:
+                        kwh = energy['energy_wh']/1000
+                    db.execute('UPDATE trip_energy SET fingerprint=?,distance_km=?,energy_kwh=? WHERE device=? AND id=?',
+                               (json.dumps(new_fp),km,kwh,device,key))
             self._derived_ready.add(device)
 
     def repair_trips(self, device):
@@ -167,6 +189,7 @@ class Archive:
                 raise ValueError('Timezone required')
             return dt.timestamp()
 
+        self._ensure_derivations(device)
         distance = energy = 0.0
         count = 0
         with self.connect() as db:
@@ -179,6 +202,9 @@ class Archive:
                 derived_row = db.execute('SELECT body FROM trip_derivations WHERE device=? AND id=?',(device,event_id)).fetchone()
                 derived = json.loads(derived_row[0]) if derived_row else None
                 trip_repair.apply({'data':trip}, derived)
+                if trip.get('energy_rejected') or (trip.get('energy_verified') and not trip.get('energy_verified_for_summary')):
+                    db.execute('DELETE FROM trip_energy WHERE device=? AND id=?',(device,event_id))
+                    continue
                 cached = db.execute('SELECT fingerprint,distance_km,energy_kwh FROM trip_energy WHERE device=? AND id=?', (device, event_id)).fetchone()
                 if cached and cached[0] != fingerprint:
                     # A distance-only revision must not destroy retained measured kWh.
@@ -427,7 +453,7 @@ class Archive:
         # Enrich each trip
         for trip in trips:
             data = trip.get('data', {})
-            if data.get('energy_verified'):
+            if data.get('energy_verified') or data.get('energy_rejected'):
                 continue
             started = data.get('started_at')
             ended = data.get('ended_at')

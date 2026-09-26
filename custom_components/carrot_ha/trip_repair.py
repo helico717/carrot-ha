@@ -5,7 +5,7 @@ import json
 import math
 from datetime import datetime
 
-VERSION = 1
+VERSION = 2
 
 
 def timestamp(value):
@@ -78,16 +78,27 @@ def route_summary(route, start, end):
 class Samples:
     def __init__(self, rows):
         self.fields = {'odometer_km': {}, 'battery_wh': {}}
+        self.invalid = {key: set() for key in self.fields}
         for observed, odo, odo_at, wh, wh_at, measured, stale, charging, driving in rows:
             for key, value, at in [('odometer_km', odo, odo_at), ('battery_wh', wh, wh_at)]:
                 t = timestamp(at or measured or observed)
-                if t is None or not finite(value) or value < 0 or stale:
+                if t is None:
+                    continue
+                if not finite(value) or value < 0 or stale:
+                    if value is not None:
+                        self.invalid[key].add(t)
                     continue
                 if key == 'battery_wh' and value > 150000:
                     continue
                 # A repeated field measurement is one sample, not new evidence.
                 self.fields[key].setdefault(t, (value, bool(charging), driving))
         self.times = {k: sorted(v) for k, v in self.fields.items()}
+        self.invalid = {k: sorted(v-self.fields[k].keys()) for k,v in self.invalid.items()}
+
+    def has_invalid(self, key, start, end):
+        times = self.invalid[key]
+        i = bisect.bisect_left(times, start)
+        return i < len(times) and times[i] <= end
 
     def nearest(self, key, target, maximum=90):
         times = self.times[key]
@@ -107,57 +118,115 @@ class Samples:
         return [(t, self.fields[key][t]) for t in times[bisect.bisect_left(times,start):bisect.bisect_right(times,end)]]
 
 
+def source_fingerprint(data):
+    return json.dumps([data.get('distance_source'), data.get('distance_quality')], sort_keys=True)
+
+
 def derive(data, samples, old=None):
     fp = fingerprint(data)
     route = route_points(data)
     digest = route_digest(route)
+    source_fp = source_fingerprint(data)
     start, end = timestamp(data.get('started_at')), timestamp(data.get('ended_at'))
     result = {'version': VERSION, 'fingerprint': fp, 'route_digest': digest,
-              'status': 'unchanged', 'reason': 'insufficient_evidence', 'distance_m': None}
+              'source_fingerprint': source_fp, 'status': 'unchanged',
+              'reason': 'insufficient_evidence', 'distance_m': None}
     if start is None or end is None or not 0 < end-start <= 86400:
         return result
-    old_valid = (old and old.get('version') == VERSION and old.get('fingerprint') == fp
-                 and (not digest or old.get('route_digest') == digest))
-    # Retain validated evidence when the raw retention policy has removed it.
-    if old_valid:
+    # Algorithm upgrades do not erase the last validated result. Source changes
+    # and changed available routes do invalidate it. Version-1 records had no
+    # source fingerprint, so migrate them only for the legacy GPS source.
+    compatible = (old and old.get('fingerprint') == fp
+                  and old.get('source_fingerprint', json.dumps([None, None])) == source_fp
+                  and (not digest or old.get('route_digest') == digest))
+    if compatible:
         result.update(old)
+        result.update(version=VERSION, source_fingerprint=source_fp)
+        if old.get('distance_m') is not None:
+            result['distance_version'] = old.get('distance_version', old.get('version', 1))
+        if old.get('energy'):
+            result['energy_version'] = old.get('energy_version', old.get('version', 1))
+
+    # Distance-only revisions do not change the battery measurement window.
+    # Preserve its endpoints separately from the distance fingerprint.
+    if old and old.get('energy'):
+        try:
+            same_window = json.loads(old['fingerprint'])[:2] == json.loads(fp)[:2]
+        except (KeyError, ValueError, TypeError):
+            same_window = False
+        if same_window:
+            result['energy'] = old['energy']
+            result['energy_version'] = old.get('energy_version', old.get('version', 1))
+
+    quality = data.get('distance_quality') or {}
+    source = data.get('distance_source')
+    incomplete_can = source == 'can_speed' and quality.get('complete') is False
+    trusted_distance = ((source == 'can_speed' and quality.get('complete') is True)
+                        or (source == 'odometer_gap_recovery' and quality.get('estimated') is True))
     summary = route_summary(route, start, end)
-    trusted_distance = data.get('distance_source') in ('can_speed', 'odometer_gap_recovery')
+    # The retained geometric summary can be checked against late odometer data
+    # after route thinning. An available but invalid route cannot use this path.
+    if not route and compatible:
+        summary = old.get('gps')
     if summary:
         result['gps'] = summary
     a, b = samples.nearest('odometer_km', start), samples.nearest('odometer_km', end)
-    if a and b and a['at'] < b['at']:
+    has_odometer = a is not None and b is not None
+    if has_odometer:
         odo_m = (b['value']-a['value'])*1000
         window = samples.window('odometer_km', a['at'], b['at'])
         monotonic = all(y[1][0] >= x[1][0] for x,y in zip(window,window[1:]))
         result['odometer'] = {'start': a, 'end': b, 'distance_m': odo_m}
+        result['route_verified'] = bool(summary and a['at'] < b['at'] and monotonic
+            and 0 <= odo_m <= (end-start)*60
+            and abs(summary['distance_m']-odo_m) <= max(2000, odo_m*0.03)
+            and timestamp(summary['first_at'])-start <= 90
+            and end-timestamp(summary['last_at']) <= 90)
+    invalid_route = bool(route) and summary is None
+    contradicted = (invalid_route or (has_odometer and not result.get('route_verified'))
+                    or samples.has_invalid('odometer_km', start, end))
+    if contradicted:
+        result.update(distance_m=None, status='unchanged', reason='evidence_conflict', route_verified=False)
+        result.pop('estimated', None)
+        result.pop('distance_version', None)
+    elif summary and has_odometer and result.get('route_verified'):
         raw = data.get('distance_m')
-        if summary and finite(raw) and raw >= 0 and monotonic and 0 <= odo_m <= (end-start)*60:
-            gps_m = summary['distance_m']
-            # Quantized odometer is corroboration, not the short-trip distance.
-            corroborated = abs(gps_m-odo_m) <= max(2000, odo_m*0.03)
-            complete_route = (timestamp(summary['first_at'])-start <= 90
-                              and end-timestamp(summary['last_at']) <= 90)
-            result['route_verified'] = corroborated and complete_route
-            if (not trusted_distance and summary['gap_count'] and gps_m-raw > max(200, raw*0.01)
-                    and corroborated and complete_route and gps_m >= 1000):
-                result.update(distance_m=gps_m, status='corrected',
-                              reason='gps_gap_reconstruction_odometer_checked', estimated=True)
-            elif not old_valid:
-                result['reason'] = 'no_supported_distance_loss' if corroborated else 'gps_odometer_disagree'
-    # Energy is independently verified, even when GPS gaps marked the trip partial.
-    # Only certify partial records with the same route + odometer corroboration.
-    energy_eligible = not data.get('partial') or result.get('route_verified', False)
+        gps_m = summary['distance_m']
+        repairable_source = source in (None, 'legacy_gps') or incomplete_can
+        if (not trusted_distance and repairable_source and (summary['gap_count'] or incomplete_can)
+                and finite(raw) and raw >= 0 and gps_m-raw > max(200, raw*0.01) and gps_m >= 1000):
+            result.update(distance_m=gps_m, status='corrected', estimated=True, distance_version=VERSION,
+                          reason='gps_gap_reconstruction_odometer_checked')
+        elif has_odometer and route:
+            result.update(distance_m=None, status='unchanged', reason='no_supported_distance_loss')
+            result.pop('estimated', None)
+            result.pop('distance_version', None)
+
+    result['distance_incomplete'] = incomplete_can and result.get('distance_m') is None
+    energy_eligible = (not result['distance_incomplete']
+                       and (not data.get('partial') or trusted_distance or result.get('route_verified', False)))
     a, b = samples.nearest('battery_wh', start), samples.nearest('battery_wh', end)
-    if energy_eligible and a and b and a['at'] < b['at']:
+    window = samples.window('battery_wh', min(start,a['at']) if a else start,
+                            max(end,b['at']) if b else end)
+    contaminated = any(v[1] for _,v in window) or samples.has_invalid('battery_wh', start, end)
+    # Missing raw samples preserve prior evidence. Present conflicting evidence
+    # clears it explicitly, including summary caches and legacy UI enrichment.
+    result['energy_rejected'] = not energy_eligible or contaminated
+    if a and b:
+        result.pop('energy', None)
         boundary_gap = a['gap_s']+b['gap_s']
-        window = samples.window('battery_wh', min(start,a['at']), max(end,b['at']))
-        contaminated = a['charging'] or b['charging'] or any(v[1] for _,v in window)
-        if not contaminated and boundary_gap <= min(90, (end-start)*0.1):
-            energy = a['value']-b['value']
-            if abs(energy)*3600/(end-start) <= 250000:
-                result['energy'] = {'start': a, 'end': b, 'energy_wh': round(energy,1),
-                                    'summary_eligible': a['at'] >= start and b['at'] <= end}
+        energy = a['value']-b['value']
+        valid = (energy_eligible and not contaminated and a['at'] < b['at']
+                 and boundary_gap <= min(90, (end-start)*0.1)
+                 and abs(energy)*3600/(end-start) <= 250000)
+        result['energy_rejected'] = not valid
+        if valid:
+            result['energy'] = {'start': a, 'end': b, 'energy_wh': round(energy,1),
+                               'summary_eligible': a['at'] >= start and b['at'] <= end}
+            result['energy_version'] = VERSION
+    if result['energy_rejected']:
+        result.pop('energy', None)
+        result.pop('energy_version', None)
     return result
 
 
@@ -181,15 +250,21 @@ def refresh(db, device):
 
 
 def apply(event, derived):
-    if not derived or derived.get('fingerprint') != fingerprint(event['data']):
-        return event
     data = event['data']
+    quality = data.get('distance_quality') or {}
+    if quality.get('estimated') is True:
+        data['distance_estimated'] = True
+    if (not derived or derived.get('fingerprint') != fingerprint(data)
+            or derived.get('source_fingerprint', source_fingerprint(data)) != source_fingerprint(data)):
+        return event
+    data['energy_rejected'] = derived.get('energy_rejected', False)
+    data['distance_incomplete'] = derived.get('distance_incomplete', False)
     if derived.get('distance_m') is not None:
         data['distance_raw_m'] = data['distance_m']
         data['distance_m'] = derived['distance_m']
         data['distance_source'] = derived['reason']
         data['distance_estimated'] = True
-        data['distance_correction_version'] = derived['version']
+        data['distance_correction_version'] = derived.get('distance_version', derived['version'])
     if derived.get('energy'):
         energy = derived['energy']
         data['start_battery_wh'] = energy['start']['value']
