@@ -120,3 +120,86 @@ export function mergeConsecutiveCharges(events, maxGapSeconds = 900) {
   // Preserve original descending order (newest first)
   return merged.sort((a, b) => getStart(b) - getStart(a));
 }
+
+export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) {
+  if (!Array.isArray(rawTrips) || rawTrips.length <= 1) return rawTrips || [];
+  const getStart = e => new Date(e.data?.started_at || e.observed_at || 0).getTime();
+  const getEnd = e => {
+    if (e.data?.ended_at) return new Date(e.data.ended_at).getTime();
+    const dur = Number(e.data?.duration_s) || 0;
+    return getStart(e) + dur * 1000;
+  };
+
+  const sorted = [...rawTrips].sort((a, b) => getStart(a) - getStart(b));
+  const merged = [];
+
+  for (const trip of sorted) {
+    if (!trip || !trip.data) continue;
+    const td = trip.data;
+    const startMs = getStart(trip);
+    const endMs = getEnd(trip);
+    const durS = Number(td.duration_s) || Math.round((endMs - startMs) / 1000);
+    const startSoc = td.start_soc_percent != null ? Number(td.start_soc_percent) : null;
+    const endSoc = td.end_soc_percent != null ? Number(td.end_soc_percent) : null;
+
+    if (merged.length === 0) {
+      merged.push({
+        ...trip,
+        data: {
+          ...td,
+          merged: false,
+          merge_count: 1,
+          started_at: td.started_at || new Date(startMs).toISOString(),
+          ended_at: td.ended_at || new Date(endMs).toISOString(),
+          duration_s: durS,
+          merge_parts: [td]
+        }
+      });
+      continue;
+    }
+
+    const prev = merged[merged.length - 1];
+    const pd = prev.data;
+    const prevEndMs = getEnd(prev);
+    const gapS = (startMs - prevEndMs) / 1000;
+    const prevEndSoc = pd.end_soc_percent != null ? Number(pd.end_soc_percent) : null;
+    const isNoCharging = (startSoc == null || prevEndSoc == null) || (startSoc <= prevEndSoc + 1.0);
+    const isSameDay = tripDateKey(startMs, timeZone) === tripDateKey(prevEndMs, timeZone);
+
+    if (gapS >= 0 && gapS <= maxGapSeconds && isNoCharging && isSameDay) {
+      pd.merged = true;
+      pd.merge_count = (pd.merge_count || 1) + 1;
+      pd.ended_at = td.ended_at || new Date(endMs).toISOString();
+      pd.duration_s = (pd.duration_s || 0) + durS;
+      pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
+      pd.energy_wh = (pd.energy_wh || 0) + (Number(td.energy_wh) || 0);
+      if (endSoc != null) pd.end_soc_percent = endSoc;
+      if (td.end_battery_wh != null) pd.end_battery_wh = td.end_battery_wh;
+
+      if (pd.distance_m > 0 && pd.energy_wh > 0) {
+        pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
+      } else if (td.efficiency_km_kwh != null) {
+        pd.efficiency_km_kwh = Math.round(((pd.efficiency_km_kwh || td.efficiency_km_kwh) + td.efficiency_km_kwh) / 2 * 10) / 10;
+      }
+
+      pd.route = [...(pd.route || []), ...(td.route || [])];
+      pd.merge_parts = [...(pd.merge_parts || []), td];
+    } else {
+      merged.push({
+        ...trip,
+        data: {
+          ...td,
+          merged: false,
+          merge_count: 1,
+          started_at: td.started_at || new Date(startMs).toISOString(),
+          ended_at: td.ended_at || new Date(endMs).toISOString(),
+          duration_s: durS,
+          merge_parts: [td]
+        }
+      });
+    }
+  }
+
+  return merged.sort((a, b) => getStart(b) - getStart(a));
+}
+

@@ -1,4 +1,4 @@
-import {tripDays, loadRecentTrips, mergeConsecutiveCharges} from './carrot-trip-days.js';
+import {tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips} from './carrot-trip-days.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('en-GB',{maximumFractionDigits:digits}) : '—';
@@ -68,7 +68,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;this._mergeTripsEnabled=true;this._tripPage=1;this._maxTripPages=1;this._rawTrips=[];this._mergedTrips=[];}
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -77,7 +77,11 @@ class CarrotDashboard extends HTMLElement {
       const cached=JSON.parse(raw);
       if(cached&&cached.v&&typeof cached.v==='object'&&Object.keys(cached.v).length){
         this.v=cached.v;
-        if(Array.isArray(cached.trips)&&cached.trips.length)this.trips=cached.trips;
+        if(Array.isArray(cached.trips)&&cached.trips.length){
+          this._rawTrips=cached.trips;
+          this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
+          this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
+        }
         if(Array.isArray(cached.charges)&&cached.charges.length)this.charges=cached.charges;
         this.isFromCache=true;
         return true;
@@ -88,7 +92,7 @@ class CarrotDashboard extends HTMLElement {
   saveCache(){
     try{
       if(!this.v||!Object.keys(this.v).length)return;
-      const cachedTrips=(this.trips||[]).slice(0,5);
+      const cachedTrips=(this._rawTrips?.length?this._rawTrips:(this.trips||[])).slice(0,5);
       const cachedCharges=(this.charges||[]).slice(0,10);
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
@@ -119,7 +123,10 @@ class CarrotDashboard extends HTMLElement {
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
       const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
-      this.trips=trips.events;this.charges=mergeConsecutiveCharges(charges.events);
+      this._rawTrips=trips.events||[];
+      this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
+      this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
+      this.charges=mergeConsecutiveCharges(charges.events);
       if(selectedStart!=null){
         const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
         this.selected=idx!==-1?idx:null;
@@ -175,7 +182,45 @@ class CarrotDashboard extends HTMLElement {
       :host{width:100%;min-width:0}ha-card{max-width:1440px;margin:auto}.top{padding:20px 24px 12px}.top h1{font-size:25px}.brand{font-size:10px}.nav{margin:0 24px 16px}.main{padding:0 24px 18px}.foot{margin-top:14px}.foot div{line-height:1.6}.cockpit{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px}.hero{position:relative;min-height:350px;overflow:hidden;border-radius:20px;background:radial-gradient(ellipse at 65% 80%,#c2cdd0,#e5e9e6 75%);color:#17272d}.hero-copy{position:relative;z-index:1;padding:24px}.hero-copy small{font-size:11px;letter-spacing:2px}.hero-copy h2{font-size:36px;line-height:1.15;margin:10px 0 0;letter-spacing:-1.5px}.hero .car-image{position:absolute;width:100%;height:100%;object-fit:cover;inset:0 0 auto;pointer-events:none}.quick{display:flex;flex-direction:column;gap:12px;min-width:0}.energy{background:#18221f;border:1px solid #34463e;border-radius:18px;padding:18px}.energy-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.energy-head strong{font-size:42px;line-height:1}.energy-head strong small{font-size:16px;color:#a9bdb0}.energy-head span{font-size:12px;color:#a9bdb0}.energy p{margin:8px 0 0;font-size:12px;color:#b8c9bf}.quick-metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}.quick-metrics .metric{padding:13px}.quick-metrics .metric strong{font-size:22px}.quick-metrics .metric ha-icon{display:none}.quick-metrics .label{margin-bottom:6px}.shortcut{display:flex;align-items:center;text-align:left;justify-content:space-between;width:100%;padding:15px;border-radius:15px;border:1px solid var(--line);background:#181c1e;gap:12px}.shortcut b{display:block;font-size:13px}.shortcut small{display:block;color:var(--muted);font-size:11px;margin-top:5px}.shortcut em{font-style:normal;color:var(--green)}.overview-links{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.mini-condition{display:flex;justify-content:space-around;gap:8px;border-top:1px solid var(--line);padding-top:13px;margin-top:14px;color:#b9c0c3;font-size:12px}.mini-condition span{white-space:nowrap}.mini-condition b{color:var(--ink)}
       @container(max-width:700px){.top{padding:15px 16px 10px}.top h1{font-size:22px}.brand{font-size:9px;letter-spacing:2px}.nav{margin:0 16px 12px}.nav button{padding:10px 4px;font-size:12px}.main{padding:0 16px 14px}.cockpit{grid-template-columns:1fr;gap:12px}.hero{min-height:160px}.hero-copy{padding:17px}.hero-copy h2{font-size:28px;max-width:160px}.hero .car-image{width:83%;height:250px;left:20%;top:-48px;object-fit:cover}.energy{padding:13px 15px}.energy-head strong{font-size:34px}.batterybar{margin:10px 0 4px}.quick{gap:10px}.quick-metrics .metric{padding:11px 13px}.quick-metrics .metric strong{font-size:21px}.quick-metrics .label{font-size:11px}.quick-metrics .metric:nth-child(n+3){display:none}.overview-links{margin-top:10px}.shortcut{padding:12px}.shortcut small{line-height:1.5}.mini-condition{margin-top:10px;padding-top:10px;font-size:11px}.foot{font-size:10px;gap:8px}.foot .refresh{padding:9px}.map{height:310px}.metric ha-icon{margin-bottom:7px}.metric{padding:12px}.metric strong{font-size:23px}}@container(max-width:360px){.hero .car-image{left:15%;width:90%}.hero-copy h2{font-size:24px}.mini-condition{flex-wrap:wrap}.overview-links{grid-template-columns:1fr}.badge{font-size:9px}}
 
-   .trip-days,.charge-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:0 10px 15px}.charge-days{max-width:480px;margin:0 auto 12px;gap:4px}.trip-day,.charge-day{max-width:54px;margin:0 auto;width:100%;min-width:0;border:1px solid transparent;border-radius:13px;padding:6px 2px;background:rgba(255,255,255,.025);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .18s ease}.trip-day:hover,.charge-day:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.08)}.trip-day[aria-pressed="true"],.charge-day[aria-pressed="true"]{background:linear-gradient(180deg,#1d4ed8 0%,#1e40af 100%);border-color:#60a5fa;box-shadow:0 3px 10px rgba(29,78,216,.45);color:#fff}.trip-day[aria-pressed="true"] b,.charge-day[aria-pressed="true"] b{color:#fff;font-weight:700}.trip-day[aria-pressed="true"] .trip-today,.charge-day[aria-pressed="true"] .charge-today{color:#e0f2fe;font-weight:750}.trip-day[aria-pressed="true"] .trip-count,.charge-day[aria-pressed="true"] .charge-count{color:#dbeafe;font-weight:600}.trip-day[aria-pressed="true"] .trip-count ha-icon,.charge-day[aria-pressed="true"] .charge-count ha-icon{color:#dbeafe}:host([data-theme="light"]) .trip-day[aria-pressed="true"],:host([data-theme="light"]) .charge-day[aria-pressed="true"]{background:#dbeafe;border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.25);color:#1e3a8a}:host([data-theme="light"]) .trip-day[aria-pressed="true"] b,:host([data-theme="light"]) .charge-day[aria-pressed="true"] b{color:#1e3a8a}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-today,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-today{color:#1d4ed8}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-count,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-count{color:#1e40af}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-count ha-icon,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-count ha-icon{color:#1e40af}.trip-day b,.charge-day b{font-size:11px;white-space:nowrap;color:#d1d5db}.trip-today,.charge-today{height:12px;line-height:12px;font-size:10px;color:#60a5fa;font-weight:600}:host([data-theme="light"]) .trip-today,:host([data-theme="light"]) .charge-today{color:#2563eb}.trip-count,.charge-count{display:flex;align-items:center;justify-content:center;gap:3px;font-size:11px;line-height:12px;color:var(--muted)}.trip-count ha-icon{--mdc-icon-size:10px;width:10px;height:12px}.charge-count ha-icon{--mdc-icon-size:11px;width:11px;height:12px}.trip-day-heading{padding:13px 22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}.charge-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--line);font-size:13px;gap:12px}.charge-meta{display:flex;align-items:center;gap:14px;text-align:left;min-width:0;flex:1 1 auto}.charge-meta>div{min-width:0;text-align:left}.charge-icon-wrap,:host([data-theme="light"]) .charge-icon-wrap{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#edf4fe;color:#2563eb;flex-shrink:0}:host([data-theme="dark"]) .charge-icon-wrap{background:#162235;color:#60a5fa}.charge-icon-wrap.fast,:host([data-theme="light"]) .charge-icon-wrap.fast{background:#dbeafe;color:#1d4ed8}:host([data-theme="dark"]) .charge-icon-wrap.fast{background:#1e355b;color:#93c5fd}.charge-bolt{width:20px;height:20px;display:block;fill:currentColor}.charge-date{font-size:14px;font-weight:650;display:block;margin-bottom:4px;text-align:left!important;white-space:nowrap}.charge-info-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-align:left!important;flex-wrap:wrap}.charge-dur{color:var(--muted);font-size:12px;white-space:nowrap;flex-shrink:0}.speed-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;white-space:nowrap;flex-shrink:0}.speed-badge.slow,:host([data-theme="light"]) .speed-badge.slow{background:#edf4fe;color:#2563eb}:host([data-theme="dark"]) .speed-badge.slow{background:#162235;color:#60a5fa}.speed-badge.fast,:host([data-theme="light"]) .speed-badge.fast{background:#dbeafe;color:#1e40af}:host([data-theme="dark"]) .speed-badge.fast{background:#1e355b;color:#93c5fd}.merge-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;background:#f3e8ff;color:#6b21a8;white-space:nowrap;flex-shrink:0}:host([data-theme="dark"]) .merge-badge{background:#3b1d54;color:#e9d5ff}.charge-soc{display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:11.5px;font-weight:750;padding:2px 8px;border-radius:6px;white-space:nowrap;line-height:15px;flex-shrink:0}:host([data-theme="light"]) .charge-soc{background:#d1fae5;border-color:#86efac;color:#047857}.charge-soc.retro-mode{background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);color:#fbbf24}:host([data-theme="light"]) .charge-soc.retro-mode{background:#fef3c7;border-color:#fde68a;color:#b45309}.charge-soc-icon{width:12px;height:12px;fill:currentColor;display:inline-block}.charge-val{text-align:right;flex-shrink:0;max-width:55%}.charge-sub{display:block;font-size:11px;font-weight:normal;color:var(--muted);margin-top:2px;word-break:keep-all;line-height:1.3}@media(min-width:901px){.layout:has(.trip-history){grid-template-columns:minmax(0,1.35fr) minmax(390px,1fr)}}@media(max-width:420px){.trip-days,.charge-days{padding-left:3px;padding-right:3px;gap:2px}.trip-day,.charge-day{border-radius:10px;padding:5px 1px}.trip-day b,.charge-day b{font-size:10px}.trip-today,.charge-today{font-size:9px;height:10px;line-height:10px}.trip-count,.charge-count{font-size:10px;line-height:10px}}
+   .trip-days,.charge-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:0 10px 15px}.charge-days{max-width:480px;margin:0 auto 12px;gap:4px}.trip-day,.charge-day{max-width:54px;margin:0 auto;width:100%;min-width:0;border:1px solid transparent;border-radius:13px;padding:6px 2px;background:rgba(255,255,255,.025);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .18s ease}.trip-day:hover,.charge-day:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.08)}.trip-day[aria-pressed="true"],.charge-day[aria-pressed="true"]{background:linear-gradient(180deg,#1d4ed8 0%,#1e40af 100%);border-color:#60a5fa;box-shadow:0 3px 10px rgba(29,78,216,.45);color:#fff}.trip-day[aria-pressed="true"] b,.charge-day[aria-pressed="true"] b{color:#fff;font-weight:700}.trip-day[aria-pressed="true"] .trip-today,.charge-day[aria-pressed="true"] .charge-today{color:#e0f2fe;font-weight:750}.trip-day[aria-pressed="true"] .trip-count,.charge-day[aria-pressed="true"] .charge-count{color:#dbeafe;font-weight:600}.trip-day[aria-pressed="true"] .trip-count ha-icon,.charge-day[aria-pressed="true"] .charge-count ha-icon{color:#dbeafe}:host([data-theme="light"]) .trip-day[aria-pressed="true"],:host([data-theme="light"]) .charge-day[aria-pressed="true"]{background:#dbeafe;border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.25);color:#1e3a8a}:host([data-theme="light"]) .trip-day[aria-pressed="true"] b,:host([data-theme="light"]) .charge-day[aria-pressed="true"] b{color:#1e3a8a}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-today,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-today{color:#1d4ed8}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-count,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-count{color:#1e40af}:host([data-theme="light"]) .trip-day[aria-pressed="true"] .trip-count ha-icon,:host([data-theme="light"]) .charge-day[aria-pressed="true"] .charge-count ha-icon{color:#1e40af}.trip-day b,.charge-day b{font-size:11px;white-space:nowrap;color:#d1d5db}.trip-today,.charge-today{height:12px;line-height:12px;font-size:10px;color:#60a5fa;font-weight:600}:host([data-theme="light"]) .trip-today,:host([data-theme="light"]) .charge-today{color:#2563eb}.trip-count,.charge-count{display:flex;align-items:center;justify-content:center;gap:3px;font-size:11px;line-height:12px;color:var(--muted)}.trip-count ha-icon{--mdc-icon-size:10px;width:10px;height:12px}.charge-count ha-icon{--mdc-icon-size:11px;width:11px;height:12px}.trip-day-heading{padding:13px 22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}.charge-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--line);font-size:13px;gap:12px}.charge-meta{display:flex;align-items:center;gap:14px;text-align:left;min-width:0;flex:1 1 auto}.charge-meta>div{min-width:0;text-align:left}.charge-icon-wrap,:host([data-theme="light"]) .charge-icon-wrap{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#edf4fe;color:#2563eb;flex-shrink:0}:host([data-theme="dark"]) .charge-icon-wrap{background:#162235;color:#60a5fa}.charge-icon-wrap.fast,:host([data-theme="light"]) .charge-icon-wrap.fast{background:#dbeafe;color:#1d4ed8}:host([data-theme="dark"]) .charge-icon-wrap.fast{background:#1e355b;color:#93c5fd}.charge-bolt{width:20px;height:20px;display:block;fill:currentColor}.charge-date{font-size:14px;font-weight:650;display:block;margin-bottom:4px;text-align:left!important;white-space:nowrap}.charge-info-sub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-align:left!important;flex-wrap:wrap}.charge-dur{color:var(--muted);font-size:12px;white-space:nowrap;flex-shrink:0}.speed-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;white-space:nowrap;flex-shrink:0}.speed-badge.slow,:host([data-theme="light"]) .speed-badge.slow{background:#edf4fe;color:#2563eb}:host([data-theme="dark"]) .speed-badge.slow{background:#162235;color:#60a5fa}.speed-badge.fast,:host([data-theme="light"]) .speed-badge.fast{background:#dbeafe;color:#1e40af}:host([data-theme="dark"]) .speed-badge.fast{background:#1e355b;color:#93c5fd}.merge-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:-0.2px;line-height:15px;background:#f3e8ff;color:#6b21a8;white-space:nowrap;flex-shrink:0}:host([data-theme="dark"]) .merge-badge{background:#3b1d54;color:#e9d5ff}.charge-soc{display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#34d399;font-size:11.5px;font-weight:750;padding:2px 8px;border-radius:6px;white-space:nowrap;line-height:15px;flex-shrink:0}:host([data-theme="light"]) .charge-soc{background:#d1fae5;border-color:#86efac;color:#047857}.charge-soc.retro-mode{background:rgba(245,158,11,0.12);border-color:rgba(245,158,11,0.35);color:#fbbf24}:host([data-theme="light"]) .charge-soc.retro-mode{background:#fef3c7;border-color:#fde68a;color:#b45309}.charge-soc-icon{width:12px;height:12px;fill:currentColor;display:inline-block}.charge-val{text-align:right;flex-shrink:0;max-width:55%}.charge-sub{display:block;font-size:11px;font-weight:normal;color:var(--muted);margin-top:2px;word-break:keep-all;line-height:1.3}@media(min-width:901px){.layout:has(.trip-history){grid-template-columns:minmax(0,1.15fr) minmax(460px,1fr)!important}}@media(max-width:420px){.trip-days,.charge-days{padding-left:3px;padding-right:3px;gap:2px}.trip-day,.charge-day{border-radius:10px;padding:5px 1px}.trip-day b,.charge-day b{font-size:10px}.trip-today,.charge-today{font-size:9px;height:10px;line-height:10px}.trip-count,.charge-count{font-size:10px;line-height:10px}}
+.day-timeline-wrap{padding:10px 14px 12px;background:rgba(0,0,0,0.18);border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+:host([data-theme="light"]) .day-timeline-wrap{background:rgba(0,0,0,0.025)}
+.day-timeline-topline{display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:6px}
+.day-timeline-title strong{color:var(--ink);font-weight:750;font-size:12px}
+.day-timeline-merge-sub{color:var(--muted);font-size:11px;margin-left:4px}
+.merge-toggle-badge{background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:3px 9px;border-radius:8px;cursor:pointer;transition:all .15s ease}
+:host([data-theme="light"]) .merge-toggle-badge{background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe}
+.merge-toggle-badge:hover{background:rgba(168,85,247,0.3);transform:translateY(-1px)}
+.merge-toggle-badge.off{background:rgba(148,163,184,0.15);color:#94a3b8;border-color:rgba(148,163,184,0.3)}
+.day-timeline-scale{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);font-weight:700;padding:0 1px;user-select:none}
+.day-timeline-rail{position:relative;width:100%;height:20px;background:rgba(255,255,255,0.05);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+:host([data-theme="light"]) .day-timeline-rail{background:rgba(0,0,0,0.04)}
+.timeline-trip-segment{position:absolute;top:2px;bottom:2px;border-radius:4px;background:linear-gradient(135deg,#2563eb,#38bdf8);cursor:pointer;transition:all .15s ease;box-shadow:0 1px 4px rgba(37,99,235,0.3)}
+.timeline-trip-segment:hover,.timeline-trip-segment.selected{background:#ff8a18;box-shadow:0 0 10px rgba(255,138,24,0.9);z-index:5}
+.trip-grid-container{padding:12px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:340px}
+.trip-grid-2x4{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@container(max-width:500px){.trip-grid-2x4{grid-template-columns:1fr;gap:6px}}
+.sleek-trip-card{background:var(--surface,rgba(255,255,255,0.03));border:1px solid var(--line);border-radius:12px;padding:9px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:all .16s ease;text-align:left;position:relative}
+:host([data-theme="light"]) .sleek-trip-card{background:#ffffff}
+.sleek-trip-card:hover{border-color:rgba(56,189,248,0.5);background:rgba(255,255,255,0.06);transform:translateY(-1px)}
+:host([data-theme="light"]) .sleek-trip-card:hover{background:#f8fafc}
+.sleek-trip-card.selected{border-color:#ff8a18;background:rgba(255,138,24,0.1);box-shadow:0 0 0 1px #ff8a18}
+.card-top-row{display:flex;justify-content:space-between;align-items:baseline}
+.card-time{font-size:12px;font-weight:750;color:var(--ink)}
+.card-dur{font-size:11px;color:var(--muted);font-weight:500;margin-left:4px}
+.card-dist{font-size:15px;font-weight:850;color:var(--ink);letter-spacing:-0.3px;white-space:nowrap}
+.card-dist small{font-size:10.5px;font-weight:500;color:var(--muted)}
+.card-badges-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.soc-used-tag{font-size:10px;color:#6ee7b7;font-weight:600;opacity:0.95;margin-left:2px}
+:host([data-theme="light"]) .soc-used-tag{color:#166534}
+.trip-merge-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);white-space:nowrap;line-height:1.2}
+:host([data-theme="light"]) .trip-merge-badge{background:#f3e8ff;color:#7e22ce;border-color:#d8b4fe}
+.panel-pagination{display:flex;justify-content:space-between;align-items:center;padding:10px 4px 0;margin-top:10px;border-top:1px solid var(--line)}
+.page-nav-btn{border:1px solid var(--line);background:rgba(255,255,255,0.04);color:var(--ink);font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer;transition:all .15s ease}
+:host([data-theme="light"]) .page-nav-btn{background:#f1f5f9}
+.page-nav-btn:hover:not(:disabled){background:#2563eb;color:#fff;border-color:#3b82f6}
+.page-nav-btn:disabled{opacity:0.3;cursor:not-allowed}
+.page-indicator-text{font-size:11px;font-weight:700;color:var(--muted)}
 .charge-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(360px,1fr);gap:18px;align-items:start;width:100%}
 .charge-layout .battery-history{margin-bottom:0;width:100%}
 .charge-sidebar{display:flex;flex-direction:column;gap:16px;min-width:0;width:100%}
@@ -509,7 +554,28 @@ class CarrotDashboard extends HTMLElement {
     select.onchange=()=>{this.themeMode=select.value;try{localStorage.setItem('carrot-theme-'+(this.config?.device_id||'default'),this.themeMode);}catch{}this.applyTheme();};
     this.shadowRoot.querySelector('main').append(themeControl);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
-    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;this.selected=null;this.render();});
+    this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=()=>{this.tripDay=b.dataset.tripDay;this.selected=null;this._tripPage=1;this.render();});
+    const mergeBtn=this.shadowRoot.querySelector('#btnToggleTripMerge');
+    if(mergeBtn){
+      mergeBtn.onclick=(e)=>{
+        e.preventDefault();e.stopPropagation();
+        this._mergeTripsEnabled=!(this._mergeTripsEnabled!==false);
+        this.trips=this._mergeTripsEnabled?this._mergedTrips:this._rawTrips;
+        this.selected=null;
+        this._tripPage=1;
+        this.render();
+      };
+    }
+    this.shadowRoot.querySelectorAll('[data-nav-page]').forEach(b=>b.onclick=(e)=>{
+      e.stopPropagation();
+      const dir=b.dataset.navPage;
+      if(dir==='prev'){
+        this._tripPage=Math.max(1,(this._tripPage||1)-1);
+      }else if(dir==='next'){
+        this._tripPage=Math.min(this._maxTripPages||1,(this._tripPage||1)+1);
+      }
+      this.render();
+    });
     this.shadowRoot.querySelectorAll('[data-charge-day]').forEach(b=>b.onclick=()=>{
       this.chargeDay=b.dataset.chargeDay;
       const bDays=this.v?.battery_history;
@@ -744,12 +810,186 @@ class CarrotDashboard extends HTMLElement {
     return `<section class="panel charge-history"><div class="paneltitle"><h2>Charging records</h2><span class="sub">Last 7 days</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} charges"><span class="trip-today charge-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} charges</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):null;const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):null;const chargedSoc=ed.soc_charged_percent!=null?Math.round(ed.soc_charged_percent):((startSoc!=null&&endSoc!=null)?Math.max(0,endSoc-startSoc):null);const isRetro=Boolean(ed.soc_retroactive_estimated);const batterySvg=`<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;const socBadgeHtml=startSoc!=null&&endSoc!=null?`<span class="charge-soc">${batterySvg} ${startSoc}% → ${endSoc}% (+${chargedSoc!=null?chargedSoc:endSoc-startSoc}% charged)</span>`:(chargedSoc!=null?`<span class="charge-soc ${isRetro?'retro-mode':''}">${batterySvg} +${chargedSoc}% charged${isRetro?' <small class="retro-tag">(est.)</small>':''}</span>`:'');return `<div class="row charge-row"><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeOnly(ed.started_at)}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'Fast':'Slow'}</span><span class="charge-dur">${formatDuration(ed.duration_s)}</span>${socBadgeHtml}${ed.merged?`<span class="merge-badge">${ed.merge_count} merged</span>`:''}</div></div></div><div class="charge-val"><strong>${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub" title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${ed.merged?`Reconnected in ${Math.max(1,Math.round((ed.merge_gap_s||0)/60))}m`:(ed.partial?'Partial data':'Recorded energy')}</span></div></div>`;}).join(''):'<div class="empty">No charges recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its charges.</div>'}</section>`;
   }
   tripHistory(isTrip){
-    const days=tripDays(this.trips,this._hass?.config?.time_zone);
-    if(this.tripDay&&!days.some(d=>d.key===this.tripDay))this.tripDay=null;
-    const selected=days.find(d=>d.key===this.tripDay);
-    const labels=d=>d.date.toLocaleDateString('en-US',{day:'numeric',weekday:'short',timeZone:'UTC'});
-    const capacity=(this.v&&this.v.soc_capacity_kwh)||78.0;
-    return `<section class="panel trip-history"><div class="paneltitle"><h2>Recent trips</h2><span class="sub">Last 7 days</span></div><div class="trip-days">${days.map(d=>`<button class="trip-day" data-trip-day="${d.key}" aria-pressed="${d.key===this.tripDay}" aria-label="${d.key}, ${d.indices.length} trips"><span class="trip-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count">${icon('road')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} trips</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.trips[i];const ed=e?.data||{};const durText=tripDurationEn(ed.duration_s);const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):(ed.start_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.start_battery_wh/(capacity*1000)*100))):null);const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):(ed.end_battery_wh!=null?Math.round(Math.min(100,Math.max(0,ed.end_battery_wh/(capacity*1000)*100))):null);const hasSoc=startSoc!=null&&endSoc!=null;const effHtml=ed.efficiency_km_kwh!=null?`<span class="trip-eff">${n(ed.efficiency_km_kwh,1)} km/kWh</span>`:'';const socHtml=hasSoc?`<span class="trip-soc">${icon(batteryIconName(startSoc))} ${startSoc}% → ${endSoc}%</span>`:(!effHtml&&!durText?`<small>${duration(ed.duration_s)}</small>`:'');return `<button class="tripbtn ${isTrip&&i===this.selected?'selected':''}" data-trip="${i}"><span><b>${timeOnly(ed.started_at||e.observed_at)}${durText?`<span class="trip-dur">${durText}</span>`:''}</b>${socHtml}${effHtml}${ed.distance_estimated?'<span class="trip-eff">Distance corrected · estimated</span>':''}</span><strong>${n((ed.distance_m||0)/1000,2)} <small>km</small></strong></button>`;}).join(''):'<div class="empty">No trips recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its trips.</div>'}</section>`;
+    const currentTz = this._hass?.config?.time_zone;
+    const days = tripDays(this.trips, currentTz);
+    if (this.tripDay && !days.some(d => d.key === this.tripDay)) {
+      this.tripDay = null;
+    }
+    if (!this.tripDay) {
+      const todayObj = days.find(d => d.today) || days[days.length - 1];
+      this.tripDay = todayObj ? todayObj.key : null;
+    }
+    const selected = days.find(d => d.key === this.tripDay);
+    const dayIndices = selected ? selected.indices : [];
+    const labels = d => d.date.toLocaleDateString('en-US', {day:'numeric', weekday:'short', timeZone:'UTC'});
+    const capacity = (this.v && this.v.soc_capacity_kwh) || 78.0;
+
+    const daysHtml = days.map(d => `
+      <button class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 
+              data-trip-day="${d.key}" 
+              aria-pressed="${d.key === this.tripDay}" 
+              aria-label="${d.key}, ${d.indices.length} trips">
+        <span class="trip-today">${d.today ? 'Today' : '&nbsp;'}</span>
+        <b>${labels(d)}</b>
+        <span class="trip-count"><ha-icon icon="mdi:road"></ha-icon> ${d.indices.length}</span>
+      </button>
+    `).join('');
+
+    // Timeline Segments (placed inside 24H rail)
+    const timelineSegmentsHtml = dayIndices.map(i => {
+      const e = this.trips[i];
+      const ed = e?.data || {};
+      const startD = new Date(ed.started_at || e.observed_at);
+      const startMins = startD.getHours() * 60 + startD.getMinutes();
+      const leftPct = Math.max(0, Math.min(97.5, (startMins / 1440) * 100));
+      const durS = ed.duration_s || 600;
+      const widthPct = Math.max(2.2, Math.min(100 - leftPct, (durS / 86400) * 100));
+      const isSel = isTrip && i === this.selected;
+      const startSoc = ed.start_soc_percent != null
+        ? Math.round(ed.start_soc_percent)
+        : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+      const endSoc = ed.end_soc_percent != null
+        ? Math.round(ed.end_soc_percent)
+        : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
+      const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
+      const usedStr = drain > 0 ? `${drain}% used` : (drain < 0 ? `+${Math.abs(drain)}% regen` : '0% used');
+      const segTitle = `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(ed.ended_at || e.observed_at)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count} merged)` : ''}`;
+
+      return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}" 
+                   style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;" 
+                   data-trip="${i}" 
+                   title="${esc(segTitle)}"></div>`;
+    }).join('');
+
+    // 2x4 Grid & Pagination (2 columns x max 4 rows = max 8 per page)
+    const ITEMS_PER_PAGE = 8;
+    const totalItems = dayIndices.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+
+    if (this.selected !== null) {
+      const selPos = dayIndices.indexOf(this.selected);
+      if (selPos !== -1) {
+        this._tripPage = Math.floor(selPos / ITEMS_PER_PAGE) + 1;
+      }
+    }
+
+    if (!this._tripPage || this._tripPage < 1) this._tripPage = 1;
+    if (this._tripPage > totalPages) this._tripPage = totalPages;
+    this._maxTripPages = totalPages;
+
+    const startIdx = (this._tripPage - 1) * ITEMS_PER_PAGE;
+    const visibleIndices = dayIndices.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+
+    let cardsHtml = '';
+    if (visibleIndices.length === 0) {
+      cardsHtml = `<div class="empty" style="grid-column: 1 / -1; padding: 40px 10px;">No trips recorded for this date.</div>`;
+    } else {
+      cardsHtml = visibleIndices.map(i => {
+        const e = this.trips[i];
+        const ed = e?.data || {};
+        const durText = tripDurationEn(ed.duration_s);
+        const startSoc = ed.start_soc_percent != null
+          ? Math.round(ed.start_soc_percent)
+          : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+        const endSoc = ed.end_soc_percent != null
+          ? Math.round(ed.end_soc_percent)
+          : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
+        const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
+        const usedStr = drain > 0 ? `${drain}% used` : (drain < 0 ? `+${Math.abs(drain)}% regen` : '0% used');
+        const isSel = isTrip && i === this.selected;
+
+        const socHtml = (startSoc != null && endSoc != null)
+          ? `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`
+          : '';
+        const effHtml = ed.efficiency_km_kwh != null
+          ? `<span class="trip-eff">${n(ed.efficiency_km_kwh, 1)} km/kWh</span>`
+          : '';
+        const mergeHtml = (ed.merged && ed.merge_count > 1)
+          ? `<span class="trip-merge-badge">${ed.merge_count} merged</span>`
+          : '';
+        const distStr = n((ed.distance_m || 0) / 1000, 2);
+
+        return `
+          <div class="sleek-trip-card ${isSel ? 'selected' : ''}" data-trip="${i}">
+            <div class="card-top-row">
+              <div>
+                <span class="card-time">${timeOnly(ed.started_at || e.observed_at)}</span>
+                ${durText ? `<span class="card-dur">${durText}</span>` : ''}
+              </div>
+              <div class="card-dist">${distStr} <small>km</small></div>
+            </div>
+            <div class="card-badges-row">
+              ${socHtml}
+              ${effHtml}
+              ${mergeHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    const paginationHtml = `
+      <div class="panel-pagination">
+        <button class="page-nav-btn" data-nav-page="prev" ${this._tripPage <= 1 ? 'disabled' : ''}>
+          ◀ Prev Page
+        </button>
+        <span class="page-indicator-text">
+          ${this._tripPage} / ${totalPages} Page (Total ${totalItems})
+        </span>
+        <button class="page-nav-btn" data-nav-page="next" ${this._tripPage >= totalPages ? 'disabled' : ''}>
+          Next Page ▶
+        </button>
+      </div>
+    `;
+
+    const isMergeActive = this._mergeTripsEnabled !== false;
+    const hasMergedTrips = dayIndices.some(i => this.trips[i]?.data?.merged);
+    const mergeSubText = isMergeActive
+      ? (hasMergedTrips ? '(≤30m gaps merged)' : '')
+      : '(individual trips)';
+
+    return `
+      <section class="panel trip-history">
+        <div class="paneltitle">
+          <h2>Recent trips</h2>
+          <span class="sub">Last 7 days</span>
+        </div>
+        <div class="trip-days">
+          ${daysHtml}
+        </div>
+        ${selected ? `
+          <div class="day-timeline-wrap">
+            <div class="day-timeline-topline">
+              <span class="day-timeline-title">
+                <strong>${selected.key} · ${dayIndices.length} trips</strong>
+                <small class="day-timeline-merge-sub">${mergeSubText}</small>
+              </span>
+              <button class="merge-toggle-badge ${isMergeActive ? '' : 'off'}" id="btnToggleTripMerge" title="Click to toggle 30-min adjacent trip merge">
+                ${isMergeActive ? 'Merged (≤30m)' : 'Individual Trips'}
+              </button>
+            </div>
+            <div class="day-timeline-scale">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>24:00</span>
+            </div>
+            <div class="day-timeline-rail">
+              ${timelineSegmentsHtml}
+            </div>
+          </div>
+          <div class="trip-grid-container">
+            <div class="trip-grid-2x4">
+              ${cardsHtml}
+            </div>
+            ${paginationHtml}
+          </div>
+        ` : `
+          <div class="empty">Select a date to view trip history.</div>
+        `}
+      </section>
+    `;
   }
   overview(v){
     const tz = this._hass?.config?.time_zone;

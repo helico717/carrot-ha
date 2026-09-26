@@ -23,16 +23,19 @@ import { tripDays } from '../custom_components/carrot_ha/frontend/carrot-trip-da
 const { default: KoreanDashboard } = await import('../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js');
 const { default: EnglishDashboard } = await import('../custom_components/carrot_ha/frontend/carrot-dashboard-en.js');
 
+const testDays = tripDays([], undefined);
+const testDay = testDays[0]?.key || new Date().toISOString().slice(0, 10);
+
 for (const [name, DashClass, durExpected] of [
   ['Korean', KoreanDashboard, '24분'],
   ['English', EnglishDashboard, '24m']
 ]) {
   const inst = new DashClass();
   inst.trips = [{
-    observed_at: '2026-09-19T10:50:00Z',
+    observed_at: `${testDay}T10:50:00Z`,
     data: {
-      started_at: '2026-09-19T10:25:06Z',
-      ended_at: '2026-09-19T10:50:00Z',
+      started_at: `${testDay}T10:25:06Z`,
+      ended_at: `${testDay}T10:50:00Z`,
       duration_s: 1494,
       distance_m: 15600,
       efficiency_km_kwh: 7.4,
@@ -40,7 +43,7 @@ for (const [name, DashClass, durExpected] of [
       end_soc_percent: 73.5
     }
   }];
-  inst.tripDay = '2026-09-19';
+  inst.tripDay = testDay;
   const html = inst.tripHistory(true);
 
   assert(html.includes('trip-days'), `${name}: Missing trip-days`);
@@ -66,10 +69,10 @@ for (const [name, DashClass, durExpected] of [
   const instWh = new DashClass();
   instWh.v = { soc_capacity_kwh: 78.0 };
   instWh.trips = [{
-    observed_at: '2026-09-19T10:50:00Z',
+    observed_at: `${testDay}T10:50:00Z`,
     data: {
-      started_at: '2026-09-19T10:25:06Z',
-      ended_at: '2026-09-19T10:50:00Z',
+      started_at: `${testDay}T10:25:06Z`,
+      ended_at: `${testDay}T10:50:00Z`,
       duration_s: 1494,
       distance_m: 11530,
       efficiency_km_kwh: 7.4,
@@ -77,7 +80,7 @@ for (const [name, DashClass, durExpected] of [
       end_battery_wh: 57720   // 57720 / 78000 = 74%
     }
   }];
-  instWh.tripDay = '2026-09-19';
+  instWh.tripDay = testDay;
   const htmlWh = instWh.tripHistory(true);
   assert(htmlWh.includes('class="trip-soc"'), `${name} Wh fallback: Missing trip-soc badge`);
   assert(htmlWh.includes('76% → 74%'), `${name} Wh fallback: Expected calculated 76% → 74% from Wh`);
@@ -88,16 +91,16 @@ for (const [name, DashClass, durExpected] of [
   // Test Case 3: When no SOC is available at all, but duration & efficiency exist, do NOT duplicate duration
   const instNoSoc = new DashClass();
   instNoSoc.trips = [{
-    observed_at: '2026-09-19T10:50:00Z',
+    observed_at: `${testDay}T10:50:00Z`,
     data: {
-      started_at: '2026-09-19T10:25:06Z',
-      ended_at: '2026-09-19T10:50:00Z',
+      started_at: `${testDay}T10:25:06Z`,
+      ended_at: `${testDay}T10:50:00Z`,
       duration_s: 1494,
       distance_m: 11530,
       efficiency_km_kwh: 7.4
     }
   }];
-  instNoSoc.tripDay = '2026-09-19';
+  instNoSoc.tripDay = testDay;
   const htmlNoSoc = instNoSoc.tripHistory(true);
   assert(!htmlNoSoc.includes('class="trip-soc"'), `${name} NoSoc: Should not show trip-soc`);
   assert(htmlNoSoc.includes('class="trip-eff"'), `${name} NoSoc: Should show trip-eff`);
@@ -106,13 +109,13 @@ for (const [name, DashClass, durExpected] of [
   // Test Case 4: Daily summary mode vs Specific trip mode in trips tab
   const instTrips = new DashClass();
   instTrips.tab = 'trips';
-  instTrips.tripDay = '2026-09-19';
+  instTrips.tripDay = testDay;
   instTrips.trips = [
     {
-      observed_at: '2026-09-19T10:50:00Z',
+      observed_at: `${testDay}T10:50:00Z`,
       data: {
-        started_at: '2026-09-19T10:25:00Z',
-        ended_at: '2026-09-19T10:45:00Z',
+        started_at: `${testDay}T10:25:00Z`,
+        ended_at: `${testDay}T10:45:00Z`,
         duration_s: 1200,
         distance_m: 15600,
         energy_wh: 2000,
@@ -121,10 +124,10 @@ for (const [name, DashClass, durExpected] of [
       }
     },
     {
-      observed_at: '2026-09-19T14:20:00Z',
+      observed_at: `${testDay}T14:20:00Z`,
       data: {
-        started_at: '2026-09-19T14:10:00Z',
-        ended_at: '2026-09-19T14:20:00Z',
+        started_at: `${testDay}T14:10:00Z`,
+        ended_at: `${testDay}T14:20:00Z`,
         duration_s: 600,
         distance_m: 10000,
         energy_wh: 1500,
@@ -146,7 +149,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('7.3'), 'Korean Summary: Expected average efficiency 7.3 km/kWh');
     assert(summaryHtml.includes('>평균속도</span>'), 'Korean Summary: Missing 평균속도 metric');
     assert(summaryHtml.includes('51'), 'Korean Summary: Expected average speed 51 km/h');
-    assert(summaryHtml.includes('2026-09-19 주행 요약'), 'Korean Summary: Expected 2026-09-19 주행 요약 title');
+    assert(summaryHtml.includes(`${testDay} 주행 요약`), 'Korean Summary: Expected trip summary title');
     assert(summaryHtml.includes('총 2회 주행'), 'Korean Summary: Expected 총 2회 주행 subtitle');
     assert(summaryHtml.includes('이날 출발(하늘색) / 이날 도착(파랑)'), 'Korean Summary: Expected 이날 출발/이날 도착 legend');
   } else {
@@ -157,7 +160,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('7.3'), 'English Summary: Expected average efficiency 7.3 km/kWh');
     assert(summaryHtml.includes('>Avg speed</span>'), 'English Summary: Missing Avg speed metric');
     assert(summaryHtml.includes('51'), 'English Summary: Expected average speed 51 km/h');
-    assert(summaryHtml.includes('2026-09-19 trip summary'), 'English Summary: Expected 2026-09-19 trip summary title');
+    assert(summaryHtml.includes(`${testDay} trip summary`), 'English Summary: Expected trip summary title');
     assert(summaryHtml.includes('2 trips total'), 'English Summary: Expected 2 trips total subtitle');
     assert(summaryHtml.includes('Day start (sky blue) / Day arrival (blue)'), 'English Summary: Expected Day start/Day arrival legend');
   }
