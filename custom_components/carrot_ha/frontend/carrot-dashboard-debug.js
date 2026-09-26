@@ -2050,7 +2050,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         </button>
       `).join('');
 
-      const batterySvg = `<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;
+      const batterySocIcon = soc => `<ha-icon class="charge-soc-icon" icon="mdi:${batteryIconName(soc)}" aria-hidden="true"></ha-icon>`;const batterySvg = `<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;
 
       return `
         <section class="panel charge-history">
@@ -2080,9 +2080,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 let socBadgeHtml = '';
                 if (startSoc != null && endSoc != null) {
                   const gain = chargedSoc != null ? chargedSoc : Math.max(0, endSoc - startSoc);
-                  socBadgeHtml = `<span class="charge-soc">${batterySvg} ${startSoc}% → ${endSoc}% (+${gain}% ${isEnglish ? 'charged' : '충전'})</span>`;
+                  socBadgeHtml = `<span class="charge-soc">${batterySocIcon(startSoc)} ${startSoc}% → ${batterySocIcon(endSoc)} ${endSoc}% (+${gain}%)</span>`;
                 } else if (chargedSoc != null) {
-                  socBadgeHtml = `<span class="charge-soc ${isRetro ? 'retro-mode' : ''}">${batterySvg} +${chargedSoc}% ${isEnglish ? 'charged' : '충전'}${isRetro ? ` <small class="retro-tag">(${isEnglish ? 'est.' : '소급 추산'})</small>` : ''}</span>`;
+                  socBadgeHtml = `<span class="charge-soc ${isRetro ? 'retro-mode' : ''}">${batterySvg} +${chargedSoc}%${isRetro ? ` <small class="retro-tag">(${isEnglish ? 'est.' : '소급 추산'})</small>` : ''}</span>`;
                 }
 
                 return `
@@ -3011,7 +3011,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
 
       /* Charge History Integrated SoC Pill Badge */
-      .charge-soc {
+      .charge-row .charge-soc {
         display: inline-flex !important;
         align-items: center !important;
         gap: 4px !important;
@@ -3026,22 +3026,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
         line-height: 15px !important;
         flex-shrink: 0 !important;
       }
-      :host([data-theme="light"]) .charge-soc {
+      :host([data-theme="light"]) .charge-row .charge-soc {
         background: #d1fae5 !important;
         border-color: #86efac !important;
         color: #047857 !important;
       }
-      .charge-soc.retro-mode {
+      .charge-row .charge-soc.retro-mode {
         background: rgba(245, 158, 11, 0.12) !important;
         border-color: rgba(245, 158, 11, 0.35) !important;
         color: #fbbf24 !important;
       }
-      :host([data-theme="light"]) .charge-soc.retro-mode {
+      :host([data-theme="light"]) .charge-row .charge-soc.retro-mode {
         background: #fef3c7 !important;
         border-color: #fde68a !important;
         color: #b45309 !important;
       }
-      .charge-soc-icon {
+      .charge-row .charge-soc-icon {
+        --mdc-icon-size: 14px;
+        color: inherit;
+        flex-shrink: 0;
         width: 12px !important;
         height: 12px !important;
         fill: currentColor !important;

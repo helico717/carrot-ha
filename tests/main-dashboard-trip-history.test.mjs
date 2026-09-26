@@ -183,8 +183,9 @@ test('Main Dashboards (KO & EN): 24H Timeline, 30-min Merge, 2x4 Grid & Paginati
     const chgHtml = card.chargeHistory();
 
     assert(chgHtml.includes('class="charge-soc"'), `${lang}: Missing .charge-soc badge`);
-    assert(chgHtml.includes('42% → 80%'), `${lang}: Missing charge start/end SoC`);
-    assert(chgHtml.includes(isEn ? '+38% charged' : '+38% 충전'), `${lang}: Missing charged percentage`);
+    assert(chgHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').includes('42% → 80%'), `${lang}: Missing charge start/end SoC`);
+    assert(chgHtml.includes('(+38%)'), `${lang}: Missing charged percentage`);
+    assert.match(chgHtml, /mdi:battery-40[^>]*><\/ha-icon> 42% → <ha-icon[^>]*mdi:battery-80[^>]*><\/ha-icon> 80%/);
     assert(chgHtml.includes('retro-mode'), `${lang}: Missing retro-mode badge for retroactive estimate`);
     assert(chgHtml.includes(isEn ? '(est.)' : '(소급 추산)'), `${lang}: Missing retroactive estimate tag`);
   }

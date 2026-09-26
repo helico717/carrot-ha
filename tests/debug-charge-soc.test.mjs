@@ -57,8 +57,10 @@ test('Carrot HA Debug Dashboard: Integrated Charge SoC Pill Badges & Retroactive
   const koHtml = card.chargeHistory();
   assert(koHtml.includes('class="panel charge-history"'), 'Should render charge history panel');
   assert(koHtml.includes('class="charge-soc"'), 'Should render charge-soc pill badge');
-  assert(koHtml.includes('24% → 80% (+56% 충전)'), 'Should render integrated 24% → 80% (+56% 충전)');
-  assert(koHtml.includes('42% → 78% (+36% 충전)'), 'Should render integrated 42% → 78% (+36% 충전)');
+  assert(koHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').includes('24% → 80% (+56%)'), 'Should render integrated 24% → 80% (+56%)');
+  assert(koHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').includes('42% → 78% (+36%)'), 'Should render integrated 42% → 78% (+36%)');
+
+  assert.match(koHtml, /mdi:battery-20[^>]*><\/ha-icon> 24% → <ha-icon[^>]*mdi:battery-80[^>]*><\/ha-icon> 80%/);
 
   // 3. Render chargeHistory for retroactive charge session (sim-charge-d6)
   // Set day to d6
@@ -67,14 +69,14 @@ test('Carrot HA Debug Dashboard: Integrated Charge SoC Pill Badges & Retroactive
   const d6Key = ['year', 'month', 'day'].map(t => parts.find(p => p.type === t)?.value).join('-');
   card.chargeDay = d6Key;
   const d6Html = card.chargeHistory();
-  assert(d6Html.includes('+21% 충전'), 'Should render retroactive +21% 충전');
+  assert(d6Html.includes('+21%'), 'Should render retroactive +21% 충전');
   assert(d6Html.includes('소급 추산'), 'Should include (소급 추산) tag');
 
   // 4. English mode test
   debugCard.state.lang = 'en';
   card.chargeDay = null; // Reset to today
   const enHtml = card.chargeHistory();
-  assert(enHtml.includes('24% → 80% (+56% charged)'), 'Should render in English in en mode');
+  assert(enHtml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').includes('24% → 80% (+56%)'), 'Should render in English in en mode');
 
   console.log('✔ Carrot HA Debug Dashboard charge SoC badges validated successfully!');
 });
