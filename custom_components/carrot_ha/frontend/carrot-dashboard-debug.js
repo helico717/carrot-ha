@@ -3042,13 +3042,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
         color: #b45309 !important;
       }
       .charge-row .charge-soc-icon {
-        --mdc-icon-size: 14px;
-        color: inherit;
-        flex-shrink: 0;
+        --mdc-icon-size: 12px !important;
         width: 12px !important;
         height: 12px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        line-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: inherit !important;
         fill: currentColor !important;
-        display: inline-block !important;
+        flex-shrink: 0 !important;
+      }
+      .charge-row .charge-soc-icon svg,
+      .charge-row svg.charge-soc-icon {
+        display: block !important;
+        width: 12px !important;
+        height: 12px !important;
+        margin: auto !important;
       }
 
       @media(min-width: 901px) {

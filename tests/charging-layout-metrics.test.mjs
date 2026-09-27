@@ -30,9 +30,25 @@ for (const [name, content] of [['Korean', koContent], ['English', enContent]]) {
     content.includes('let fastKwh = v.month_fast_kwh;'),
     `${name} dashboard must include slow/fast fallback resolution logic`
   );
+  // 2. Battery icon centering in .charge-soc pill badge
+  assert.match(
+    content,
+    /\.charge-row \.charge-soc-icon\{--mdc-icon-size:12px !important;width:12px !important;height:12px !important;display:inline-flex !important;align-items:center !important;justify-content:center !important;/,
+    `${name} dashboard must set --mdc-icon-size: 12px and display: inline-flex on .charge-row .charge-soc-icon for vertical centering`
+  );
+  assert.match(
+    content,
+    /\.charge-row \.charge-soc-icon svg,\.charge-row svg\.charge-soc-icon\{display:block !important;width:12px !important;height:12px !important;margin:auto !important\}/,
+    `${name} dashboard must ensure SVG within .charge-soc-icon is sized to 12px and centered`
+  );
 }
 
 // 2. Debug simulator telemetry & preview-pane CSS verification
+assert.match(
+  debugContent,
+  /\.charge-row \.charge-soc-icon\s*\{[^}]*--mdc-icon-size:\s*12px\s*!important;[^}]*display:\s*inline-flex\s*!important;/s,
+  'Debug dashboard must set --mdc-icon-size: 12px and display: inline-flex on .charge-row .charge-soc-icon'
+);
 assert.match(
   debugContent,
   /month_slow_kwh:\s*45\.5/,
@@ -54,4 +70,4 @@ assert.match(
   'Debug dashboard #dashSlot must specify width: 100%'
 );
 
-console.log('PASS: Charging tab layout full-width stretch and slow/fast metrics tests completed successfully!');
+console.log('PASS: Charging tab layout full-width stretch, slow/fast metrics, and battery icon centering tests completed successfully!');

@@ -773,10 +773,25 @@
     color: #b45309;
   }
   .charge-soc-icon {
-    width: 12px;
-    height: 12px;
-    fill: currentColor;
-    display: inline-block;
+    --mdc-icon-size: 12px !important;
+    width: 12px !important;
+    height: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: inherit !important;
+    fill: currentColor !important;
+    flex-shrink: 0 !important;
+  }
+  .charge-soc-icon svg,
+  svg.charge-soc-icon {
+    display: block !important;
+    width: 12px !important;
+    height: 12px !important;
+    margin: auto !important;
   }
 
   .merge-badge {
