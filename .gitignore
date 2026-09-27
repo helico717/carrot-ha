@@ -3,3 +3,12 @@ __pycache__/
 *.py[cod]
 
 .DS_Store
+
+# Camera device credentials and runtime state are never source artifacts.
+camera_agent/camera.json
+camera_agent/camera.tmp
+camera_agent/enabled
+camera_agent/*.pid
+camera_agent/*.lock
+camera_agent/*.log
+camera_agent/continue.sh.before-camera

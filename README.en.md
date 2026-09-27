@@ -4,7 +4,7 @@
 
 Collect vehicle data on a comma device running Carrotpilot, store it in your own Cloudflare account, and view it in Home Assistant (HA). Features include trip routes, battery state of charge (SOC), estimated charging records, seven-day battery history charts, and a dedicated parameter tuning card that allows you to remotely inspect and adjust CarrotPilot parameters with official GitHub Wiki documentation. Remote physical vehicle control (steering, doors, etc.) is not supported.
 
-The implementation was used on an ID.4 and adapted for configurable MEB vehicles. **ID. Buzz and other MEB models, and all Carrotpilot branches, have not been validated.** Home Assistant 2026.3 or later is required. The dashboard API currently requires an HA administrator account.
+The implementation was used on an ID.4 and adapted for configurable MEB vehicles. **ID. Buzz and other MEB models, and all Carrotpilot branches, have not been validated.** Home Assistant 2026.9 or later is required. The dashboard API currently requires an HA administrator account.
 
 ## Documentation & Guides
 

@@ -20,19 +20,22 @@
   "options": {
     "step": {
       "init": {
-        "title": "SOC display calibration",
+        "title": "Carrot HA settings",
         "description": "Set the SOC calculation capacity for your vehicle. This is not a battery degradation measurement.",
         "data": {
           "soc_capacity_kwh": "SOC calculation capacity (kWh)",
           "cloud_url": "Cloudflare Worker URL (https://…workers.dev)",
           "cloud_view_token": "WAYON_VIEW_TOKEN (read-only key)",
-          "vehicle_model": "Vehicle model (e.g. ID. Buzz)"
+          "vehicle_model": "Vehicle model (e.g. ID. Buzz)",
+          "camera_enabled": "Enable parked cameras (experimental)",
+          "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)"
         }
       }
     },
     "error": {
       "invalid_capacity": "Enter a finite capacity between 20 and 150 kWh.",
-      "invalid_cloud": "Enter an HTTPS base URL without a path and a view token."
+      "invalid_cloud": "Enter an HTTPS base URL without a path and a view token.",
+      "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace."
     }
   }
 }
