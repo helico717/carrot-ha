@@ -113,7 +113,9 @@ class DeviceAgent:
             if self.process is not None or not self.status():
                 await ws.send_json({'type': 'ended', 'session_id': session_id})
                 return
-            if data.get('cameras') != ['wide', 'driver']:
+            requested_cameras = data.get('cameras')
+            if (not isinstance(requested_cameras, list) or not requested_cameras
+                    or any(c not in ('wide', 'road', 'driver') for c in requested_cameras)):
                 raise ValueError('Unsupported camera request')
             # Remote input cannot choose a program, path, duration or command.
             self.process = await asyncio.create_subprocess_exec(

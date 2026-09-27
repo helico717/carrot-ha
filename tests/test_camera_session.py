@@ -107,11 +107,13 @@ class SessionTests(unittest.TestCase):
         session_id = str(uuid.uuid4())
         self.assertEqual(module.decode_media(module.encode_media(session_id, "driver", TS)),
                          (session_id, "driver", TS))
+        self.assertEqual(module.decode_media(module.encode_media(session_id, "road", TS)),
+                         (session_id, "road", TS))
         for payload in (b"", bytes(188), TS[:-1], TS * 513):
             with self.subTest(size=len(payload)), self.assertRaises(ValueError):
                 module.encode_media(session_id, "wide", payload)
         packet = module.encode_media(session_id, "wide", TS)
-        for corrupt in (b"", packet[:10], b"bad!" + packet[4:], packet[:20] + b"\x03" + packet[21:]):
+        for corrupt in (b"", packet[:10], b"bad!" + packet[4:], packet[:20] + b"\x99" + packet[21:]):
             with self.assertRaises(ValueError):
                 module.decode_media(corrupt)
 

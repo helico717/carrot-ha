@@ -10,7 +10,7 @@ import struct
 import time
 import uuid
 
-CAMERAS = {"wide": 1, "driver": 2}
+CAMERAS = {"wide": 1, "driver": 2, "road": 3}
 HEADER = struct.Struct("!4s16sB")
 MAGIC = b"CHV1"
 MAX_PAYLOAD = 188 * 512

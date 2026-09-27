@@ -17,13 +17,19 @@ async def async_setup_entry(hass, entry, async_add_entities):
         return
     placeholder = await hass.async_add_executor_job(
         (Path(__file__).parent / 'frontend' / 'camera_idle.png').read_bytes)
-    async_add_entities([CarrotCamera(entry, relay, name, placeholder) for name in ('wide', 'driver')])
+    async_add_entities([CarrotCamera(entry, relay, name, placeholder) for name in ('wide', 'road', 'driver')])
 
 
 class CarrotCamera(Camera):
     _attr_should_poll = False
     _attr_has_entity_name = True
     _attr_supported_features = CameraEntityFeature.STREAM | CameraEntityFeature.ON_OFF
+
+    CAMERA_NAMES = {
+        'wide': '광각 카메라',
+        'road': '망원 카메라',
+        'driver': '실내 카메라',
+    }
 
     def __init__(self, entry, relay, camera, placeholder):
         super().__init__()
@@ -33,7 +39,7 @@ class CarrotCamera(Camera):
         self._source = None
         self._lock = asyncio.Lock()
         self._attr_unique_id = f'{entry.data["device_id"]}_camera_{camera}'
-        self._attr_name = '광각 카메라' if camera == 'wide' else '실내 카메라'
+        self._attr_name = self.CAMERA_NAMES.get(camera, camera)
         self._attr_device_info = comma_device_info(entry)
         self.content_type = 'image/png'
 

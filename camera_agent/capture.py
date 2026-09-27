@@ -56,7 +56,11 @@ def run(session_id):
     last_progress = time.monotonic()
     try:
         poller = messaging.Poller()
-        names = {'livestreamWideRoadEncodeData': 'wide', 'livestreamDriverEncodeData': 'driver'}
+        names = {
+            'livestreamWideRoadEncodeData': 'wide',
+            'livestreamRoadEncodeData': 'road',
+            'livestreamDriverEncodeData': 'driver',
+        }
         sockets = [messaging.sub_sock(name, poller=poller, conflate=True) for name in names]
         muxes = {name: TransportMux() for name in names.values()}
         require_offroad(params)

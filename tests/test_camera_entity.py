@@ -88,6 +88,15 @@ class EntityTests(unittest.IsolatedAsyncioTestCase):
         self.stream.stop.assert_awaited_once()
         self.assertIsNone(await self.entity.stream_source())
 
+    async def test_setup_entry_creates_all_three_cameras(self):
+        hass = Mock(data={'carrot_ha': {'entry': {'camera_relay': self.relay}}})
+        hass.async_add_executor_job = AsyncMock(return_value=b'placeholder')
+        added = []
+        await camera.async_setup_entry(hass, self.entry, added.extend)
+        self.assertEqual(len(added), 3)
+        self.assertEqual([e.camera for e in added], ['wide', 'road', 'driver'])
+        self.assertEqual([e._attr_name for e in added], ['광각 카메라', '망원 카메라', '실내 카메라'])
+
 
 if __name__ == '__main__':
     unittest.main()
