@@ -14,6 +14,9 @@ package.__path__ = [str(ROOT)]
 class FakeCamera:
     def __init__(self):
         self.stream = None
+    @property
+    def enabled(self):
+        return True
     def async_write_ha_state(self):
         pass
 

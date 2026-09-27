@@ -29,7 +29,7 @@ class CarrotCamera(Camera):
         super().__init__()
         self.entry, self.relay, self.camera = entry, relay, camera
         self.placeholder = placeholder
-        self.enabled = True
+        self._is_on = True
         self._source = None
         self._lock = asyncio.Lock()
         self._attr_unique_id = f'{entry.data["device_id"]}_camera_{camera}'
@@ -43,7 +43,7 @@ class CarrotCamera(Camera):
 
     @property
     def is_on(self):
-        return self.enabled
+        return self._is_on
 
     @property
     def is_streaming(self):
@@ -70,7 +70,7 @@ class CarrotCamera(Camera):
             self.async_write_ha_state()
 
     async def stream_source(self):
-        if not self.enabled or not self.relay.ready:
+        if not self._is_on or not self.relay.ready:
             return None
         return self.relay.source(self.camera)
 
@@ -79,7 +79,7 @@ class CarrotCamera(Camera):
             prefs = await get_dynamic_camera_stream_settings(self.hass, self.entity_id)
             if prefs.preload_stream:
                 raise HomeAssistantError('Disable Preload stream for Carrot cameras; continuous preloading is unsupported')
-            if not self.enabled or not self.relay.ready:
+            if not self._is_on or not self.relay.ready:
                 raise HomeAssistantError('Camera device must be connected and offroad')
             if self.stream and self.relay.source_valid(self._source):
                 return self.stream
@@ -96,7 +96,7 @@ class CarrotCamera(Camera):
             return self.stream
 
     async def async_turn_off(self):
-        self.enabled = False
+        self._is_on = False
         await self.relay.stop_camera(self.camera)
         if self.stream:
             await self.stream.stop()
@@ -104,7 +104,7 @@ class CarrotCamera(Camera):
         self.async_write_ha_state()
 
     async def async_turn_on(self):
-        self.enabled = True
+        self._is_on = True
         self.async_write_ha_state()
 
     async def async_added_to_hass(self):
