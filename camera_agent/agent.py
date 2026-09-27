@@ -192,7 +192,7 @@ async def main():
                         delay = 2
                         await agent.connection(ws)
             except (aiohttp.ClientError, OSError, ValueError, RuntimeError, TimeoutError) as exc:
-                print('Camera connection unavailable: ' + type(exc).__name__, flush=True)
+                print(f'Camera connection unavailable: {type(exc).__name__}: {exc}', flush=True)
             await asyncio.sleep(delay)
             delay = min(delay * 2, 60)
     finally:
