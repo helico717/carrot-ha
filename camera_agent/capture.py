@@ -124,12 +124,19 @@ def run(session_id):
             except Exception:
                 errors.append('process_cleanup_failed')
         for sock in sockets:
-            sock.close()
-        if flag_owned and param_bool(params.get('IsTakingSnapshot')) is True:
-            if original is None:
-                params.remove('IsTakingSnapshot')
-            else:
-                params.put_bool('IsTakingSnapshot', param_bool(original))
+            with __import__('contextlib').suppress(Exception):
+                if hasattr(sock, 'close'):
+                    sock.close()
+        sockets.clear()
+        if flag_owned:
+            try:
+                if param_bool(params.get('IsTakingSnapshot')) is True:
+                    if original is None:
+                        params.remove('IsTakingSnapshot')
+                    else:
+                        params.put_bool('IsTakingSnapshot', param_bool(original))
+            except Exception:
+                errors.append('flag_cleanup_failed')
         for mux in muxes.values():
             with __import__('contextlib').suppress(Exception):
                 mux.close()

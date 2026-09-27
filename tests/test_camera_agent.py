@@ -59,6 +59,22 @@ class AgentTests(unittest.IsolatedAsyncioTestCase):
         process.wait.assert_awaited_once()
         self.assertIsNone(device.process)
 
+    def test_offroad_clears_stale_snapshot_flag(self):
+        fake_params = {'IsOffroad': True, 'IsOnroad': False, 'IsDriverViewEnabled': False, 'IsTakingSnapshot': True}
+        mock_params = Mock(
+            get=lambda key: fake_params.get(key),
+            get_bool=lambda key: fake_params.get(key) is True,
+            remove=lambda key: fake_params.pop(key, None),
+        )
+        with patch.dict('sys.modules', {
+            'openpilot.common.params': Mock(Params=lambda: mock_params),
+            'camera_smoke_test': Mock(param_bool=lambda v: v if isinstance(v, bool) else None,
+                                      active_camera_processes=lambda: []),
+        }):
+            device = agent.DeviceAgent()
+            self.assertTrue(device.offroad())
+            self.assertNotIn('IsTakingSnapshot', fake_params)
+
 
 if __name__ == '__main__':
     unittest.main()

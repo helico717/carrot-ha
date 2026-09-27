@@ -48,11 +48,15 @@ class DeviceAgent:
         from openpilot.common.params import Params
         from camera_smoke_test import param_bool, active_camera_processes
         params = Params()
+        active = active_camera_processes()
+        if self.process is None and not active and params.get_bool('IsTakingSnapshot'):
+            with suppress(Exception):
+                params.remove('IsTakingSnapshot')
         return (param_bool(params.get('IsOffroad')) is True
                 and param_bool(params.get('IsOnroad')) is False
                 and not params.get_bool('IsDriverViewEnabled')
                 and (self.process is not None or (
-                    not params.get_bool('IsTakingSnapshot') and not active_camera_processes())))
+                    not params.get_bool('IsTakingSnapshot') and not active)))
 
     async def stop_capture(self):
         async with self.stop_lock:
