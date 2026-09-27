@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+from urllib.parse import urlencode
 from datetime import datetime, timezone
 from aiohttp import ClientTimeout
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -58,7 +59,13 @@ async def sync(hass, runtime):
 
     history_ingested = False
     try:
-        feed = await get('/api/json')
+        try:
+            feed = await get('/api/latest-state?' + urlencode({'device_id': entry.data['device_id']}))
+        except CloudHTTPError as error:
+            if error.status != 404:
+                raise
+            # Keep older Workers usable during a rolling upgrade.
+            feed = await get('/api/json')
         await save({'state': feed.get('state')})
         cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
         while True:
@@ -76,19 +83,33 @@ async def sync(hass, runtime):
                 cursor = item['sequence']
                 await hass.async_add_executor_job(runtime['archive'].cursor,'telemetry',cursor)
             if not history['has_more']:break
-        offset = count = 0
-        while True:
+        offset = int(await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset') or 0)
+        seen = runtime.setdefault('trip_sync_seen', set())
+        if offset == 0:
+            seen.clear()
+        # Bound each run; resume the remaining pages on the next scheduled sync.
+        for _ in range(10):
             feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
             trips = feed.get('trips')
             if not isinstance(trips, list):
                 raise ValueError('Invalid trips response')
+            ids = [trip.get('id') for trip in trips]
+            if any(not isinstance(key, str) or not key for key in ids):
+                raise ValueError('Invalid trip ID')
+            if trips and not set(ids).difference(seen):
+                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                seen.clear()
+                raise ValueError('Trip pagination did not advance')
             await save({'trips': trips})
-            count += len(trips)
-            if len(trips) < 10:
-                break
+            seen.update(ids)
             offset += len(trips)
+            if len(trips) < 10:
+                runtime['cloud_trip_count'] = offset
+                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                seen.clear()
+                break
+            await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', offset)
             await asyncio.sleep(0)
-        runtime['cloud_trip_count'] = count
         runtime['summary'] = await hass.async_add_executor_job(runtime['archive'].overview, entry.data['device_id'])
         runtime['cloud_status'] = 'ok'
         runtime['cloud_last_sync'] = datetime.now(timezone.utc).isoformat()

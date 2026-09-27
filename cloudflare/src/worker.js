@@ -1754,10 +1754,10 @@ async function fetchServerApi(env, path) {
   });
 }
 
-async function fetchServerTripList(env, limit) {
+async function fetchServerTripList(env, limit, offset = 0, includeRoute = false) {
   const response = await fetchServerApi(
     env,
-    `/v1/wayon/trips?limit=${encodeURIComponent(limit)}&offset=0&include_route=false`,
+    `/v1/wayon/trips?limit=${encodeURIComponent(limit)}&offset=${offset}&include_route=${includeRoute}`,
   );
   if (!response || !response.ok) {
     throw new Error(`server_trip_list_${response?.status || "unavailable"}`);
@@ -1767,7 +1767,18 @@ async function fetchServerTripList(env, limit) {
   if (payload?.schemaVersion !== "wayon-trip-read-v1" || !Array.isArray(payload.trips)) {
     throw new Error("server_trip_list_schema");
   }
-  return payload.trips.map(parseServerTripSummary);
+  return payload.trips.map(trip => includeRoute
+    ? { ...parseServerTripSummary(trip), route: trip.route || [] }
+    : parseServerTripSummary(trip));
+}
+
+async function handleLatestState(request, env) {
+  if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
+  const deviceId = new URL(request.url).searchParams.get("device_id");
+  if (!deviceId) return json({ error: "device_id_required" }, 400);
+  const state = await env.DB.prepare("SELECT * FROM latest_state WHERE device_id = ?")
+    .bind(deviceId).first();
+  return json({ state });
 }
 
 async function fetchServerTrip(env, tripId) {
@@ -1951,8 +1962,9 @@ async function handleTrips(request, env, pathname) {
 
   const url = new URL(request.url);
   const requestedLimit = boundedLimit(url.searchParams.get("limit"), 100, 5000);
+  const offset = Math.max(0, Number.parseInt(url.searchParams.get("offset") || "0", 10) || 0);
   try {
-    return tripHistoryJson({ trips: await fetchServerTripList(env, requestedLimit) }, "server");
+    return tripHistoryJson({ trips: await fetchServerTripList(env, requestedLimit, offset, url.searchParams.get("include_route") === "true") }, "server");
   } catch (error) {
     console.warn("Wayon server trip list unavailable; using D1", error?.message || error);
   }
@@ -2610,6 +2622,7 @@ export default {
     if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
     if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
     if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
+    if (request.method === "GET" && pathname === "/api/latest-state") return handleLatestState(request, env);
     if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
     return json({error: "not_found"}, 404);
   },
