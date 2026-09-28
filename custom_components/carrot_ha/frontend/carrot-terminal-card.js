@@ -1,23 +1,27 @@
 const CARROT_TERMINAL_ASSET = '/carrot_ha_static/carrot_web/js/vendor/xterm.js';
+const CARROT_TERMINAL_FIT_ASSET = '/carrot_ha_static/carrot_web/js/vendor/xterm-addon-fit.js';
 const CARROT_TERMINAL_CSS = '/carrot_ha_static/carrot_web/css/vendor/xterm.css';
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve();
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`${src}를 불러오지 못했습니다.`));
+    document.head.appendChild(script);
+  });
+}
 
 let carrotTerminalAssets;
 function loadCarrotTerminalAssets() {
   if (carrotTerminalAssets) return carrotTerminalAssets;
-  carrotTerminalAssets = new Promise((resolve, reject) => {
-    if (window.Terminal) return resolve();
-    if (!document.querySelector(`link[href="${CARROT_TERMINAL_CSS}"]`)) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = CARROT_TERMINAL_CSS;
-      document.head.appendChild(link);
+  carrotTerminalAssets = (async () => {
+    if (!window.Terminal) await loadScript(CARROT_TERMINAL_ASSET);
+    if (!window.FitAddon) {
+      try { await loadScript(CARROT_TERMINAL_FIT_ASSET); } catch (_) {}
     }
-    const script = document.createElement('script');
-    script.src = CARROT_TERMINAL_ASSET;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('xterm.js를 불러오지 못했습니다.'));
-    document.head.appendChild(script);
-  });
+  })();
   return carrotTerminalAssets;
 }
 
@@ -30,11 +34,13 @@ class CarrotTerminalCard extends HTMLElement {
     this._unsubscribe = null;
     this._terminal = null;
     this._terminalData = null;
+    this._fitAddon = null;
     this._status = {};
     this._active = false;
     this._queue = '';
     this._flushTimer = null;
     this._sending = false;
+    this._ctrlActive = false;
     this._decoder = new TextDecoder('utf-8');
   }
 
@@ -67,6 +73,8 @@ class CarrotTerminalCard extends HTMLElement {
     this._unsubscribe = null;
     this._terminalData?.dispose?.();
     this._terminalData = null;
+    this._fitAddon?.dispose?.();
+    this._fitAddon = null;
     this._terminal?.dispose?.();
     this._terminal = null;
     if (this._flushTimer) clearTimeout(this._flushTimer);
@@ -97,14 +105,28 @@ class CarrotTerminalCard extends HTMLElement {
       cols: 100,
       rows: 30,
       cursorBlink: true,
+      cursorStyle: 'block',
       convertEol: false,
       scrollback: 5000,
       fontSize: 13,
       lineHeight: 1.25,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-      theme: {background: '#0b0f14', foreground: '#e6e9ef', cursor: '#7ee0a0'},
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace',
+      theme: {
+        background: '#000000',
+        foreground: '#e6e9ef',
+        cursor: '#7ee0a0',
+        cursorAccent: '#000000',
+        selectionBackground: 'rgba(126, 224, 160, 0.3)',
+      },
     });
+    if (window.FitAddon?.FitAddon) {
+      this._fitAddon = new window.FitAddon.FitAddon();
+      this._terminal.loadAddon(this._fitAddon);
+    }
     this._terminal.open(host);
+    if (this._fitAddon) {
+      try { this._fitAddon.fit(); } catch (_) {}
+    }
     this._terminalData = this._terminal.onData(data => this._enqueue(data));
     return this._terminal;
   }
@@ -122,6 +144,9 @@ class CarrotTerminalCard extends HTMLElement {
       this._active = true;
       this._setMessage('연결됨');
       this._renderState();
+      if (this._fitAddon) {
+        setTimeout(() => { try { this._fitAddon.fit(); } catch (_) {} }, 50);
+      }
     } catch (error) {
       this._active = false;
       this._setMessage(error.message || '터미널 연결 실패', true);
@@ -143,6 +168,15 @@ class CarrotTerminalCard extends HTMLElement {
 
   _enqueue(data) {
     if (!this._active || !data) return;
+    if (this._ctrlActive && typeof data === 'string' && data.length === 1) {
+      const code = data.toUpperCase().charCodeAt(0);
+      if (code >= 64 && code <= 95) {
+        data = String.fromCharCode(code - 64);
+      }
+      this._ctrlActive = false;
+      const ctrlBtn = this.shadowRoot?.getElementById('ctrl-toggle');
+      if (ctrlBtn) ctrlBtn.classList.remove('active');
+    }
     this._queue += data;
     if (this._queue.length >= 1024) {
       this._flush();
@@ -245,31 +279,119 @@ class CarrotTerminalCard extends HTMLElement {
   _render() {
     if (!this.shadowRoot || this.shadowRoot.childElementCount) return;
     this.shadowRoot.innerHTML = `
+      <link rel="stylesheet" href="${CARROT_TERMINAL_CSS}">
       <style>
-        :host{display:block}ha-card{overflow:hidden}header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--divider-color)}
-        h2{margin:0;flex:1;font-size:16px}#badge{font-size:11px;padding:4px 8px;border-radius:999px;background:var(--secondary-background-color);color:var(--secondary-text-color)}
-        #badge.ready{background:color-mix(in srgb,var(--success-color,#43a047) 18%,transparent);color:var(--success-color,#43a047)}
-        .actions,.keys{display:flex;gap:7px;overflow:auto}.actions button,.keys button{border:1px solid var(--divider-color);border-radius:8px;background:var(--card-background-color);color:var(--primary-text-color);padding:7px 11px;white-space:nowrap}
-        button:disabled{opacity:.45}.shell{background:#0b0f14;padding:8px;overflow:auto}#terminal{width:max(100%,820px);height:430px}.keys{padding:9px 12px;background:var(--secondary-background-color)}
-        #message{padding:8px 14px;font-size:12px;color:var(--secondary-text-color);border-top:1px solid var(--divider-color)}#message.error{color:var(--error-color,#db4437)}
-        @media(max-width:600px){header{align-items:flex-start;flex-wrap:wrap}.actions{width:100%}#terminal{height:55vh}}
+        :host { display: block; }
+        ha-card { overflow: hidden; background: var(--card-background-color, #1c1c1e); border-radius: 12px; }
+        header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12)); }
+        h2 { margin: 0; flex: 1; font-size: 15px; font-weight: 600; color: var(--primary-text-color); }
+        #badge { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; background: var(--secondary-background-color, rgba(255,255,255,0.08)); color: var(--secondary-text-color); }
+        #badge.ready { background: color-mix(in srgb, var(--success-color, #43a047) 18%, transparent); color: var(--success-color, #43a047); }
+        .actions { display: inline-flex; gap: 6px; }
+        .actions button, .keys button { border: 1px solid var(--divider-color, rgba(255,255,255,0.14)); border-radius: 7px; background: var(--secondary-background-color, #2c2c2e); color: var(--primary-text-color, #fff); padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background 0.15s ease; }
+        .actions button:hover, .keys button:hover { background: color-mix(in srgb, var(--primary-text-color, #fff) 15%, transparent); }
+        button:disabled { opacity: 0.35; cursor: not-allowed; }
+        .keys button.active { background: var(--primary-color, #03a9f4) !important; color: #fff !important; border-color: var(--primary-color, #03a9f4) !important; }
+        
+        /* Terminal Shell */
+        .shell { background: #000; padding: 10px; overflow: auto; box-sizing: border-box; }
+        #terminal { width: 100%; min-width: 600px; height: 420px; box-sizing: border-box; }
+        
+        /* Mobile Keys Bar */
+        .keys { display: flex; gap: 6px; padding: 8px 12px; background: var(--secondary-background-color, #18181a); overflow-x: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--divider-color, rgba(255,255,255,0.08)); }
+        .keys::-webkit-scrollbar { height: 4px; }
+        .keys::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        
+        #message { padding: 8px 16px; font-size: 11px; color: var(--secondary-text-color); border-top: 1px solid var(--divider-color, rgba(255,255,255,0.08)); background: var(--card-background-color); }
+        #message.error { color: var(--error-color, #f44336); }
+
+        /* Synchronous Shadow DOM xterm fallback styles */
+        .xterm { cursor: text; position: relative; user-select: none; -webkit-user-select: none; }
+        .xterm.focus, .xterm:focus { outline: none; }
+        .xterm .xterm-helpers { position: absolute; top: 0; z-index: 5; }
+        .xterm .xterm-helper-textarea {
+          padding: 0; border: 0; margin: 0;
+          position: absolute; opacity: 0; left: -9999em; top: 0;
+          width: 0; height: 0; z-index: -5;
+          white-space: nowrap; overflow: hidden; resize: none;
+        }
+        .xterm .xterm-viewport { background-color: #000; overflow-y: scroll; cursor: default; position: absolute; right: 0; left: 0; top: 0; bottom: 0; }
+        .xterm .xterm-screen { position: relative; }
+        .xterm .xterm-screen canvas { position: absolute; left: 0; top: 0; }
+        .xterm-char-measure-element { display: inline-block; visibility: hidden; position: absolute; top: 0; left: -9999em; line-height: normal; }
+
+        @media (max-width: 600px) {
+          header { flex-wrap: wrap; }
+          #terminal { height: 50vh; }
+        }
       </style>
       <ha-card>
-        <header><h2>${this._config?.title || 'Comma 원격 터미널'}</h2><span id="badge">상태 확인 중</span>
-          <div class="actions"><button id="connect">연결</button><button id="disconnect" disabled>연결 해제</button></div>
+        <header>
+          <h2>${this._config?.title || 'Comma 원격 터미널'}</h2>
+          <span id="badge">상태 확인 중</span>
+          <div class="actions">
+            <button id="connect">연결</button>
+            <button id="disconnect" disabled>연결 해제</button>
+          </div>
         </header>
         <div class="shell"><div id="terminal"></div></div>
-        <div class="keys"><button data-action="ctrl_c">Ctrl+C</button><button data-action="clear">Clear</button><button data-key="tab">Tab</button><button data-key="up">↑</button><button data-key="down">↓</button><button data-key="left">←</button><button data-key="right">→</button></div>
+        <div class="keys">
+          <button data-key="esc">Esc</button>
+          <button id="ctrl-toggle" class="key-toggle">Ctrl</button>
+          <button data-action="ctrl_c">Ctrl+C</button>
+          <button data-key="ctrl_d">Ctrl+D</button>
+          <button data-action="clear">Clear</button>
+          <button data-key="detach">Detach</button>
+          <button data-key="tab">Tab</button>
+          <button data-key="home">Home</button>
+          <button data-key="end">End</button>
+          <button data-key="pgup">PgUp</button>
+          <button data-key="pgdn">PgDn</button>
+          <button data-key="up">↑</button>
+          <button data-key="down">↓</button>
+          <button data-key="left">←</button>
+          <button data-key="right">→</button>
+        </div>
         <div id="message">관리자만 연결할 수 있습니다.</div>
       </ha-card>`;
+
     this.shadowRoot.getElementById('connect').onclick = () => this._connect();
     this.shadowRoot.getElementById('disconnect').onclick = () => this._release();
-    this.shadowRoot.querySelectorAll('[data-action]').forEach(button => button.onclick = () => this._control(button.dataset.action));
-    const keys = {tab: '\t', up: '\u001b[A', down: '\u001b[B', left: '\u001b[D', right: '\u001b[C'};
-    this.shadowRoot.querySelectorAll('[data-key]').forEach(button => button.onclick = () => {
-      this._enqueue(keys[button.dataset.key]);
-      this._terminal?.focus();
+    this.shadowRoot.querySelectorAll('[data-action]').forEach(btn => {
+      btn.onclick = () => this._control(btn.dataset.action);
     });
+
+    const ctrlBtn = this.shadowRoot.getElementById('ctrl-toggle');
+    if (ctrlBtn) {
+      ctrlBtn.onclick = () => {
+        this._ctrlActive = !this._ctrlActive;
+        ctrlBtn.classList.toggle('active', this._ctrlActive);
+        this._terminal?.focus();
+      };
+    }
+
+    const keys = {
+      esc: '\u001b',
+      ctrl_d: '\u0004',
+      detach: '\u0060d',
+      tab: '\t',
+      home: '\u001b[H',
+      end: '\u001b[F',
+      pgup: '\u001b[5~',
+      pgdn: '\u001b[6~',
+      up: '\u001b[A',
+      down: '\u001b[B',
+      left: '\u001b[D',
+      right: '\u001b[C',
+    };
+    this.shadowRoot.querySelectorAll('[data-key]').forEach(btn => {
+      btn.onclick = () => {
+        const char = keys[btn.dataset.key];
+        if (char) this._enqueue(char);
+        this._terminal?.focus();
+      };
+    });
+
     this._renderState();
   }
 
