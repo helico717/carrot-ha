@@ -28,7 +28,9 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                              vol.Optional('cloud_url', default=self.config_entry.options.get('cloud_url', '')): str,
                              vol.Optional('cloud_view_token', default=self.config_entry.options.get('cloud_view_token', '')): str,
                              vol.Optional('camera_enabled', default=self.config_entry.options.get('camera_enabled', False)): bool,
-                             vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str})
+                             vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str,
+                             vol.Optional('terminal_enabled', default=self.config_entry.options.get('terminal_enabled', False)): bool,
+                             vol.Optional('terminal_token', default=self.config_entry.options.get('terminal_token', '')): str})
         errors = {}
         if user_input is not None:
             try:
@@ -40,12 +42,21 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                 data['cloud_url'] = data.get('cloud_url', '').strip().rstrip('/')
                 data['cloud_view_token'] = data.get('cloud_view_token', '').strip()
                 data['camera_token'] = data.get('camera_token', '').strip()
+                data['terminal_token'] = data.get('terminal_token', '').strip()
                 token = data['camera_token']
                 if data.get('camera_enabled') and (
                     not 32 <= len(token) <= 256 or not token.isascii() or any(c.isspace() for c in token)
                     or token in (self.config_entry.data['token'], data['cloud_view_token'])
                 ):
                     errors['base'] = 'invalid_camera_token'
+                    return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
+                terminal_token = data['terminal_token']
+                if data.get('terminal_enabled') and (
+                    not 32 <= len(terminal_token) <= 256 or not terminal_token.isascii()
+                    or any(c.isspace() for c in terminal_token)
+                    or terminal_token in (self.config_entry.data['token'], data['cloud_view_token'], token)
+                ):
+                    errors['base'] = 'invalid_terminal_token'
                     return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 url = urlsplit(data['cloud_url'])
                 if data['cloud_url'] and (url.scheme != 'https' or not url.hostname or url.path or url.query or url.fragment or url.username or url.password or not data['cloud_view_token']):

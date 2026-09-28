@@ -1,11 +1,12 @@
 {
   "domain": "carrot_ha",
   "name": "Carrot HA",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "config_flow": true,
   "dependencies": [
     "http",
-    "stream"
+    "stream",
+    "websocket_api"
   ],
   "codeowners": [
     "@helico717"

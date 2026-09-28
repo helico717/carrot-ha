@@ -28,14 +28,17 @@
           "cloud_view_token": "WAYON_VIEW_TOKEN (조회용 토큰)",
           "vehicle_model": "차량 모델 (예: ID. Buzz)",
           "camera_enabled": "주차 카메라 사용 (실험 기능)",
-          "camera_token": "영상 전용 토큰 (기존 토큰과 다른 32자 이상)"
+          "camera_token": "영상 전용 토큰 (기존 토큰과 다른 32자 이상)",
+          "terminal_enabled": "주차 중 원격 터미널 사용 (실험 기능)",
+          "terminal_token": "터미널 전용 토큰 (기존 토큰과 다른 32자 이상)"
         }
       }
     },
     "error": {
       "invalid_capacity": "20~150 kWh 범위의 유효한 값을 입력하세요.",
       "invalid_cloud": "경로가 없는 HTTPS Worker 주소와 조회용 토큰을 입력하세요.",
-      "invalid_camera_token": "기존 토큰과 다른 32~256자의 공백 없는 영문/숫자 토큰을 입력하세요."
+      "invalid_camera_token": "기존 토큰과 다른 32~256자의 공백 없는 영문/숫자 토큰을 입력하세요.",
+      "invalid_terminal_token": "다른 모든 토큰과 다른 32~256자의 터미널 전용 ASCII 토큰을 입력하세요."
     }
   }
 }

@@ -28,14 +28,17 @@
           "cloud_view_token": "WAYON_VIEW_TOKEN (read-only key)",
           "vehicle_model": "Vehicle model (e.g. ID. Buzz)",
           "camera_enabled": "Enable parked cameras (experimental)",
-          "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)"
+          "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)",
+          "terminal_enabled": "Enable parked remote terminal (experimental)",
+          "terminal_token": "Dedicated terminal token (32+ characters, separate from other tokens)"
         }
       }
     },
     "error": {
       "invalid_capacity": "Enter a finite capacity between 20 and 150 kWh.",
       "invalid_cloud": "Enter an HTTPS base URL without a path and a view token.",
-      "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace."
+      "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace.",
+      "invalid_terminal_token": "Use a terminal-only 32–256 character ASCII token different from every other token."
     }
   }
 }

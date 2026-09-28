@@ -27,6 +27,10 @@ async def async_setup(hass, config):
     hass.http.register_view(ParamStatusView(hass))
     from .camera_http import CameraDeviceView
     hass.http.register_view(CameraDeviceView(hass))
+    from .terminal_http import TerminalDeviceView
+    hass.http.register_view(TerminalDeviceView(hass))
+    from .terminal_ws import async_register as async_register_terminal_ws
+    async_register_terminal_ws(hass)
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -58,10 +62,23 @@ async def async_setup_entry(hass, entry):
         async def stop_camera_relay(event):
             await relay.close()
         entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_camera_relay))
+    runtime['terminal_options'] = (entry.options.get('terminal_enabled', False), entry.options.get('terminal_token', ''))
+    if runtime['terminal_options'][0] and len(runtime['terminal_options'][1]) >= 32:
+        from .terminal_relay import TerminalRelay
+        from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+        terminal_relay = TerminalRelay(runtime['terminal_options'][1],
+                                       lambda: async_dispatcher_send(hass, 'carrot_terminal_' + entry.entry_id))
+        await terminal_relay.start()
+        runtime['terminal_relay'] = terminal_relay
+        async def stop_terminal_relay(event):
+            await terminal_relay.close()
+        entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_terminal_relay))
     try:
         await hass.config_entries.async_forward_entry_setups(entry, ['sensor','binary_sensor','device_tracker','camera'])
     except Exception:
         if relay := runtime.get('camera_relay'):
+            await relay.close()
+        if relay := runtime.get('terminal_relay'):
             await relay.close()
         raise
     entry.async_on_unload(entry.add_update_listener(_options_updated))
@@ -96,6 +113,9 @@ async def _options_updated(hass, entry):
     if runtime.get('camera_options') != (entry.options.get('camera_enabled', False), entry.options.get('camera_token', '')):
         await hass.config_entries.async_reload(entry.entry_id)
         return
+    if runtime.get('terminal_options') != (entry.options.get('terminal_enabled', False), entry.options.get('terminal_token', '')):
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
     task = runtime.get('cloud_task')
     if task and not task.done():
         task.cancel()
@@ -106,6 +126,8 @@ async def _options_updated(hass, entry):
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','camera']):
         if relay := hass.data[DOMAIN][entry.entry_id].get('camera_relay'):
+            await relay.close()
+        if relay := hass.data[DOMAIN][entry.entry_id].get('terminal_relay'):
             await relay.close()
         task = hass.data[DOMAIN][entry.entry_id].get('cloud_task')
         if task and not task.done():
