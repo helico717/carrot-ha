@@ -84,56 +84,49 @@ Save the deployed Worker HTTPS URL and all three tokens privately. Enter UPLOAD 
 Follow the HACS steps in the [overview](../README.en.md). Choose a device ID such as `my-buzz`; it is neither the VIN nor an HA entity ID. Use HA_LOCAL for initial registration and VIEW for the read token in options. Set your vehicle model and SOC calculation capacity.
 Adding `/carrot_ha_static/carrot-dashboard.js` as a dashboard resource automatically registers both `custom:carrot-dashboard-card` and `custom:carrot-params-card`.
 
-## 3. Install the collector on comma
+## 3. Comma Device Setup (Git-Managed Native Daemon)
 
-Park the vehicle first. SSH authentication and recovery are covered in the [Windows/Mac recovery guide (Korean)](REINSTALL.md). Copy the collector files using the commands below from the extracted repository root. Replace the path and IP with yours. Stop if any command fails. If a collector already exists, use the [upgrade guide](COMMA-DEPLOY-ENGINE.md) instead of overwriting running files.
+> [!TIP]
+> **No manual SCP or file copy is required!**  
+> The Carrot HA collector, param sync, and reverse terminal are natively integrated into the [`helico717/openpilot`](https://github.com/helico717/openpilot) repository on branch `carrot-wip-model_selector-ha` under `selfdrive/carrot/ha`.
 
-**Windows PowerShell:**
+Setup steps:
 
-```powershell
-Set-Location "$env:USERPROFILE\Downloads\carrot-ha-main"
-ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\param_sync.py .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
-ssh comma@192.168.43.1
-```
+1. **Verify Branch**:
+   Ensure your Comma device is running the `carrot-wip-model_selector-ha` branch.
+   (Check on device screen or run `git branch --show-current`).
 
-**Mac Terminal:**
+2. **Register Connection Configuration (`connection.json`)**:
+   Create `/data/carrot_ha/connection.json` (or use existing `/data/id4-collector/connection.json`) with the following format:
+   ```json
+   {
+     "url": "https://your-worker.workers.dev",
+     "device": "my-buzz",
+     "token": "YOUR_WAYON_UPLOAD_TOKEN"
+   }
+   ```
+   *(If you previously configured this, existing configurations are detected automatically without re-entering).*
 
-```bash
-cd "$HOME/Downloads/carrot-ha-main"
-ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/param_sync.py collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
-ssh comma@192.168.43.1
-```
+3. **Automatic Startup**:
+   - Openpilot's process manager (`manager.py`) automatically starts the `carrot_ha` daemon upon startup.
+   - Reboot Comma (`sudo reboot`) to begin running.
 
-For a custom port, add `-p PORT` to every ssh command and `-P PORT` to every scp command. Add `-i KEY_PATH` to both if needed. Windows users can alternatively use WinSCP.
-
-In comma SSH, for a new installation:
-
-```bash
-cd /data/id4-collector
-python3 configure.py
-```
-
-Enter your Worker URL, the same device ID used in HA, and the UPLOAD token. Then run:
-
-```bash
-PYTHONPATH="/data/openpilot/pydeps:/data/openpilot${PYTHONPATH:+:$PYTHONPATH}" /usr/local/venv/bin/python3 install.py
-python3 /data/id4-collector/status.py >&2
-```
-
-The installer checks the startup script and DBC structure before registering automatic startup. If it reports an unsupported startup file or missing module, report the error and branch information instead of bypassing the check. The collector is a separate process and consumes additional memory.
+4. **Future Updates**:
+   - Simply open the **Comma Remote Terminal** card in Home Assistant and click **`[📥 당근 Git Pull]`**, or use the Carrot Web UI update button.
+   - **Never manually edit or copy files on Comma via SSH!** For full architecture and developer guidelines, see [Development & Deployment Workflow](DEVELOPMENT_WORKFLOW.md) and [AGENTS.md](../AGENTS.md).
 
 ## 4. Validate your MEB vehicle
 
 1. While parked, compare battery, odometer, and temperature readings with the vehicle. Missing values do not indicate successful support.
-2. Check `tail -n 30 /data/id4-collector/collector.log >&2` after installation.
+2. Check logs:
+   - On the HA dashboard, verify the `custom:carrot-dashboard-card` status badge.
+   - In the remote terminal, inspect `tail -n 30 /data/carrot_ha/collector.log` (or `/data/id4-collector/collector.log`).
 3. After normal use, check trip routes and charging records. Collection is receive-only; it does not send CAN control commands.
 4. After an internet outage, confirm `pending` decreases and delivery becomes `ok`. Missing data while comma was off or the vehicle was asleep cannot be recovered.
-5. To stop collection, run `python3 /data/id4-collector/disable.py`. Stored data and the Git checkout are preserved.
 
 ID. Buzz has not yet been validated on a real vehicle. Record the model year, battery specification, Carrotpilot branch, and commit when reporting compatibility, excluding personal information and tokens.
 
 ## Limitations
 
 Charging classification, power, and SOC are estimates. The graph may carry forward the last known value through missing periods, but excludes those carried values from consumption calculations. Records may be removed under the configured server/HA retention policies; consult the [full guide (Korean)](GUIDE.md).
+

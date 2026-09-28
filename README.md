@@ -8,43 +8,49 @@ ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른
 
 ## 사용 가이드
 
+- [개발 및 배포 워크플로우 가이드](docs/DEVELOPMENT_WORKFLOW.md) / [AI 에이전트 개발 지침 (AGENTS.md)](AGENTS.md): **필독**. 2개 저장소 분리 아키텍처 및 Comma Git 기반 배포 원칙 (SSH 수동 파일 조작 금지).
+- [원격 터미널 설정 가이드](docs/TERMINAL_SETUP.md): 셀룰러 연결에서도 주차 중 Home Assistant에서 Comma 터미널을 열고 원클릭 Git Pull 및 재부팅을 수행하는 방법.
 - [대시보드·엔터티 상세 가이드](docs/GUIDE.md): 상태 배지의 문구·색상, 각 탭의 값, 모든 센서·위치 엔터티, 충전 추정과 미확인 값의 의미.
-- [주차 카메라 설치·테스트](docs/CAMERA_SETUP.md): 실험적 광각·실내 camera 엔터티, 별도 콤마 서비스와 HTTPS 영상 연결. 기본값은 꺼짐이며 현재 검증한 comma four 커밋으로 제한됩니다.
-- [파라미터 원격 제어 설정 가이드](docs/COMMA_PARAM_SETUP.md): 콤마에 `param_sync.py` 모듈을 추가하여 HA에서 당근파일럿 설정을 원격 튜닝하는 방법.
+- [파라미터 원격 제어 설정 가이드](docs/COMMA_PARAM_SETUP.md): HA에서 당근파일럿 설정을 원격 튜닝하는 방법과 안전 정책.
 - [파라미터 동기화 아키텍처 및 안전 정책](docs/PARAMETERS_0_6_1.md): 큐 ID 기반 적용 확인, 로컬 서버 유효성 검증, 우회 쓰기 배제 정책.
-- [Windows/Mac 수집기 복구 가이드](docs/REINSTALL.md): 콤마를 플래싱하거나 재설치했을 때 연결 정보 분실 대처와 복구 절차.
+- [Windows/Mac 수집기 복구 가이드](docs/REINSTALL.md): 콤마를 플래싱하거나 재설치했을 때 연결 정보 복구 절차.
+- [주차 카메라 설치·테스트](docs/CAMERA_SETUP.md): 실험적 광각·실내 camera 엔터티, 별도 콤마 서비스와 HTTPS 영상 연결.
 
-## 처음 설치
+## 아키텍처 및 처음 설치
 
-1. [설치 안내](docs/INSTALL.md)에 따라 개인 Cloudflare 서버와 콤마 수집기(`collector` 및 `param_sync.py`)를 준비합니다.
+1. **Comma 3/3X (Git 기반 내장 데몬)**:
+   - Comma 기기 소프트웨어로 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치를 사용합니다.
+   - 수집기, 파라미터 동기화, 역방향 터미널 데몬이 `selfdrive/carrot/ha`에 이미 내장되어 있어 별도의 파일 복사가 필요 없습니다.
+   - [설치 안내](docs/INSTALL.md)에 따라 개인 Cloudflare 서버와 연결 정보(`connection.json`)를 등록합니다.
 2. HACS → 오른쪽 위 메뉴 → Custom repositories에서 `https://github.com/helico717/carrot-ha`를 추가합니다. 유형은 **Integration**입니다.
 3. Carrot HA를 다운로드하고 HA를 재시작합니다.
 4. 설정 → 기기 및 서비스 → 통합 추가 → Carrot HA. 정해둔 장치 ID와 전용 토큰을 입력합니다.
 5. 통합의 구성에서 Worker 주소, 읽기 토큰, 차량 모델, SOC 계산 용량을 입력합니다. 배터리 용량은 차량별로 확인하세요.
-6. 대시보드 리소스에 `/carrot_ha_static/carrot-dashboard.js`을 **JavaScript 모듈**로 추가합니다 (대시보드 카드와 파라미터 카드가 모두 포함되어 등록됩니다).
-7. **차량 대시보드 카드**: 수동 카드에 다음을 입력합니다. 장치 ID는 통합과 콤마에 입력한 값과 같아야 합니다.
-
+6. 대시보드 리소스 등록:
+   - `/carrot_ha_static/carrot-dashboard.js` (JavaScript 모듈: 대시보드 및 파라미터 카드)
+   - `/carrot_ha_static/carrot-terminal-card.js` (JavaScript 모듈: 원격 웹 터미널 카드)
+7. **차량 대시보드 카드**:
 ```yaml
 type: custom:carrot-dashboard-card
 device_id: my-meb
 vehicle_name: ID. Buzz
-# 본인 차량 이미지를 HA /config/www/에 넣은 경우:
-# vehicle_image: /local/my-car.png
 ```
 
-기본 이미지는 Carrot HA 아이콘입니다. 이미지 파일은 본인이 사용할 수 있는 것으로 준비하세요. 차량 상태 엔터티는 통합에서 자동으로 찾으므로 `test_id4` 같은 이름에 의존하지 않습니다. 필요하면 `charging_entity`, `online_entity`를 카드에 명시할 수 있습니다.
-
-8. **당근파일럿 파라미터 튜닝 카드**: 수동 카드에 다음을 입력합니다.
-
+8. **당근파일럿 파라미터 튜닝 카드**:
 ```yaml
 type: custom:carrot-params-card
 device_id: my-meb
 ```
 
-- 실제 콤마 당근 웹(포트 7000)의 고유 디자인과 카테고리 계층, 토글, 숫자 스텝퍼, 다이얼로그를 그대로 제공합니다.
-- 파라미터 클릭 시 공식 GitHub Wiki(`Settings-Catalog.json`)의 상세 마크다운 문서를 직접 로드하여 표시합니다.
-- 상단 상태 스트립을 통해 실시간 동기화 상태(`연결됨`, `대기 중`, `Comma 적용 확인`, `오류` 등)와 마지막 수신 시각을 표시합니다.
-- 설정 변경 시 Cloudflare D1 큐를 거쳐 콤마 로컬 서버(`:7000/api/param_set`)에서 유효성 검증 후 안전하게 적용되며, 실제 저장된 값을 역조회하여 확인합니다.
+9. **Comma 원격 터미널 카드**:
+```yaml
+type: custom:carrot-terminal-card
+device_id: my-meb
+title: Comma 원격 터미널
+```
+- 주차 중 셀룰러 환경에서도 원격으로 Comma 셸에 접속합니다.
+- **`[🔍 업데이트 확인]`**, **`[📥 당근 Git Pull]`**, **`[🔄 기기 재부팅]`** 원클릭 워크플로우 단축키를 제공합니다.
+
 
 ## 다른 MEB 차량
 

@@ -132,104 +132,66 @@ GitHub → Settings → SSH and GPG keys → New SSH key에 인증용 공개키�
 IP·동일 네트워크·콤마 전원·SSH 활성화를 확인하세요. 콤마와 PC가 연결됐더라도 콤마의 인터넷 접속은 별도 확인이 필요합니다.
 포트가 8022인 환경에서는 **모든** SSH에 `-p 8022`, scp에 대문자 **`-P 8022`**를 추가합니다. 해당 주소의 호스트 키 삭제는 `ssh-keygen -R '[192.168.43.1]:8022'`입니다.
 
-## 3. PC에서 수집기 전체 복사
+## 3. 콤마에 내장 브랜치 설치 및 연결 복원
 
-호환되는 배포 버전의 저장소 ZIP을 다운로드하고 압축을 풉니다. 실험용 과거 브랜치나 engine.py 하나만 복사하지 마세요. 폴더 안에 `collector`, `custom_components`, `README.md`가 보여야 합니다.
+> [!TIP]
+> **수동 SCP 파일 복사가 필요 없습니다!**  
+> 수집기, 파라미터 동기화, 역방향 터미널 클라이언트는 이미 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치에 정식 내장 데몬(`selfdrive/carrot/ha`)으로 통합되어 있습니다.
 
-먼저 SSH로 접속해 기존 파일 유무를 확인할 수 있습니다.
+### A. openpilot 브랜치 확인 및 전환
 
-```text
-ssh comma@192.168.43.1 'ls -ld /data/id4-collector'
-```
-
-`No such file or directory`이면 클린 설치에서 정상입니다. 이미 수집기나 `connection.json`이 남아 있다면 덮어쓰기 전에 상태·백업을 확인하고 [기존 수집기 교체 가이드](COMMA-DEPLOY-ENGINE.md)를 사용하세요.
-
-### Windows PowerShell
-
-첫 줄의 경로를 실제 압축 해제 폴더로 바꾸세요. 아래 예시는 사용자 Downloads입니다.
-
-```powershell
-Set-Location "$env:USERPROFILE\Downloads\carrot-ha-main"
-ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp .\collector\collector.py .\collector\engine.py .\collector\configure.py .\collector\install.py .\collector\disable.py .\collector\status.py .\collector\wayon_vehicle_telemetry.py .\collector\supervisor.sh .\collector\param_sync.py .\collector\LICENSE.reference comma@192.168.43.1:/data/id4-collector/
-ssh comma@192.168.43.1 'ls /data/id4-collector'
-```
-
-명령은 한 줄씩 실행하고 실패 시 다음으로 넘어가지 마세요. WinSCP를 쓴다면 같은 계정·키·포트로 접속해 위 10개 파일을 `/data/id4-collector` **바로 안에** 복사해도 됩니다.
-
-### Mac 터미널
-
-첫 줄의 경로를 실제 압축 해제 폴더로 바꾸세요.
+콤마 기기 SSH 또는 터미널에서 `helico717/openpilot`의 커스텀 브랜치를 사용하도록 설정합니다:
 
 ```bash
-cd "$HOME/Downloads/carrot-ha-main"
-ssh comma@192.168.43.1 'mkdir -p /data/id4-collector'
-scp collector/collector.py collector/engine.py collector/configure.py collector/install.py collector/disable.py collector/status.py collector/wayon_vehicle_telemetry.py collector/supervisor.sh collector/param_sync.py collector/LICENSE.reference comma@192.168.43.1:/data/id4-collector/
-ssh comma@192.168.43.1 'ls /data/id4-collector'
+cd /data/openpilot
+git remote set-url origin https://github.com/helico717/openpilot.git
+git fetch origin carrot-wip-model_selector-ha
+git checkout -B carrot-wip-model_selector-ha origin/carrot-wip-model_selector-ha
+git reset --hard origin/carrot-wip-model_selector-ha
 ```
 
-각 파일에 `100%`가 표시되고 마지막 목록에 10개 파일이 있으면 전송 완료입니다. `/data/id4-collector/collector/`처럼 한 단계 더 들어간 위치에 넣지 마세요. 파일 복사만으로 수집기가 시작되지는 않습니다.
+*(공장 초기화 기기 설치 마법사에서 설치 URL을 `https://github.com/helico717/openpilot` 및 브랜치 `carrot-wip-model_selector-ha`로 지정해도 됩니다.)*
 
-## 4. 콤마에서 연결 정보 입력
+### B. 연결 정보 복원 (`connection.json`)
 
-**PC 터미널에서 접속:**
-
-```text
-ssh comma@192.168.43.1
-```
-
-**이후는 Windows/Mac 모두 콤마 SSH 안에서 실행:**
+기존 Worker URL, Device ID, UPLOAD 토큰을 `/data/carrot_ha/connection.json`에 저장합니다:
 
 ```bash
-cd /data/id4-collector
-python3 configure.py
+mkdir -p /data/carrot_ha
+cat << 'EOF' > /data/carrot_ha/connection.json
+{
+  "url": "https://your-worker.workers.dev",
+  "device": "my-buzz",
+  "token": "YOUR_WAYON_UPLOAD_TOKEN"
+}
+EOF
 ```
 
-| 질문 | 입력 |
-|---|---|
-| `Worker HTTPS URL:` | 1절에서 확인한 기존 Worker 기본 HTTPS 주소 |
-| `Device ID (same as HA):` | 기존 HA의 Device ID 그대로 |
-| `UPLOAD token (hidden):` | 기존 또는 재발급한 UPLOAD 토큰. 붙여넣어도 화면에 표시되지 않는 것이 정상 |
+*(1절에서 확인한 실제 Worker 주소, Device ID, UPLOAD 토큰으로 교체하세요.)*
 
-`Saved. Next run install.py while parked.`가 나오면 저장 성공입니다.
+## 4. 기기 재부팅 및 자동 구동
 
-`connection.json already exists`는 기존 설정을 보호하기 위한 중단입니다. 무작정 삭제하지 마세요. 오입력 직후이고 아직 설치·실행하지 않은 경우에만 아래처럼 백업 이름으로 옮긴 뒤 다시 설정할 수 있습니다. 실행 중인 수집기라면 먼저 교체 가이드의 중단 절차를 따르세요.
+openpilot의 상주 프로세스 관리자(`manager.py`)가 시동 시 `carrot_ha` 데몬을 자동으로 감지하고 실행합니다. 수동으로 `continue.sh`를 수정하거나 `install.py`를 실행할 필요가 없습니다.
 
 ```bash
-mv /data/id4-collector/connection.json "/data/id4-collector/connection.json.backup-$(date +%Y%m%d-%H%M%S)"
-python3 /data/id4-collector/configure.py
+sudo reboot
 ```
 
-백업에도 토큰이 들어 있으므로 저장소나 문의에 첨부하지 마세요.
+## 5. 콤마 → 서버 전송 검증
 
-## 5. 콤마에서 설치·자동 시작 등록
+재부팅 후 약 1~2분 뒤 상태를 확인합니다:
 
-차량 전원을 끄고 콤마가 대기 화면인 상태에서 실행합니다. 절대 경로를 사용하므로 현재 폴더가 `/data/openpilot`이어도 됩니다.
+- **원격 터미널에서 로그 확인**:
+  ```bash
+  tail -n 30 /data/carrot_ha/collector.log
+  ```
+  *(기존 `/data/id4-collector/` 디렉터리가 남아있다면 해당 경로에 기록될 수도 있습니다.)*
 
-```bash
-PYTHONPATH="/data/openpilot/pydeps:/data/openpilot${PYTHONPATH:+:$PYTHONPATH}" /usr/local/venv/bin/python3 /data/id4-collector/install.py
-```
+- **실행 프로세스 확인**:
+  ```bash
+  pgrep -af 'selfdrive.carrot.ha.daemon'
+  ```
 
-`Installed. Git checkout unchanged.`가 나오면 시작 및 부팅 시 자동 실행 등록 성공입니다.
-
-| 오류 | 행동 |
-|---|---|
-| `Install while parked/offroad. Nothing changed.` | P만 놓지 말고 차량 전원을 끈 뒤 콤마 대기 화면을 기다립니다. IsOnroad 검사를 강제로 우회하지 않습니다. |
-| `can't open file … install.py` | 위 절대 경로 명령과 3절 파일 목록을 확인합니다. |
-| `/usr/local/venv/bin/python3` 없음 | Carrotpilot 설치 완료와 사용 브랜치의 실행 환경을 확인합니다. 임의 시스템 Python으로 강제 설치하지 않습니다. |
-| `Unsupported startup file` / `Unrecognized continue.sh` / 모듈·DBC 오류 | 중단하고 오류와 Carrotpilot 브랜치·커밋을 기록해 호환성을 확인합니다. |
-| `^M`, `bad interpreter` | 파일이 Windows 편집기에서 CRLF로 변환됐는지 확인하고 원본 LF 파일을 다시 전송합니다. |
-
-## 6. 콤마 → 서버 전송 검증
-
-설치 후 **90초 기다렸다가** 콤마 SSH에서 실행합니다.
-
-```bash
-python3 /data/id4-collector/status.py
-tail -n 30 /data/id4-collector/collector.log
-```
-
-다시 60~90초 기다린 뒤 같은 명령으로 **시각이 갱신되는지** 확인하세요.
 
 | 결과 | 뜻 / 확인 기준 |
 |---|---|
