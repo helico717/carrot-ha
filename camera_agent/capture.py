@@ -16,7 +16,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / 'pydeps')]
 
 from camera_session import MAX_PAYLOAD, encode_media
 from media import TransportMux
-from camera_smoke_test import active_camera_processes, require_offroad, stop_owned, param_bool, EXPECTED_COMMIT, unexpected_system_changes
+from camera_smoke_test import active_camera_processes, require_offroad, stop_owned, param_bool, SUPPORTED_COMMITS, unexpected_system_changes
 
 
 def run(session_id):
@@ -158,7 +158,7 @@ def main():
     import uuid
     uuid.UUID(args.session)
     commit = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
-    if commit != EXPECTED_COMMIT:
+    if commit not in SUPPORTED_COMMITS:
         raise RuntimeError('Unsupported openpilot commit; compatibility review required')
     changes = subprocess.check_output(['git', '-C', str(ROOT), 'status', '--porcelain',
                                       '--untracked-files=all', '--', 'openpilot/system'], text=True)

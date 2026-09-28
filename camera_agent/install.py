@@ -16,13 +16,13 @@ def main():
     if Path(__file__).resolve().parent != BASE:
         raise SystemExit('Extract this bundle to /data/carrot-camera first.')
     from agent import validate_config
-    from camera_smoke_test import EXPECTED_COMMIT, require_offroad, unexpected_system_changes
+    from camera_smoke_test import SUPPORTED_COMMITS, require_offroad, unexpected_system_changes
     from openpilot.common.params import Params
     import aiohttp
     import av
     require_offroad(Params())
     commit = subprocess.check_output(['git', '-C', '/data/openpilot', 'rev-parse', 'HEAD'], text=True).strip()
-    if commit != EXPECTED_COMMIT:
+    if commit not in SUPPORTED_COMMITS:
         raise SystemExit('Unsupported openpilot commit; nothing installed.')
     changes = subprocess.check_output(['git', '-C', '/data/openpilot', 'status', '--porcelain',
                                       '--untracked-files=all', '--', 'openpilot/system'], text=True)

@@ -16,17 +16,25 @@ import tempfile
 import time
 
 
-EXPECTED_COMMIT = "5cb0f3e590a28d0138ad9f48506f65743cdaa326"
+SUPPORTED_COMMITS = frozenset({
+    "5cb0f3e590a28d0138ad9f48506f65743cdaa326",  # ajouatom base
+    "07be35fe08dbc1304e56cf186d8c33a36498fa95",  # helico717 HA collector fork
+})
 SOURCES = ("wideRoadCameraState", "driverCameraState",
            "livestreamWideRoadEncodeData", "livestreamDriverEncodeData")
 
 
 def unexpected_system_changes(status):
     # Native executables may be untracked build outputs on installed devices.
-    # Only these exact untracked paths are exempt, never tracked modifications.
+    # The HA collector fork also permits staged/unstaged edits to the exact
+    # process registration file. Deletions, renames, conflicts and other system
+    # source edits still require review.
     allowed = {
         "?? openpilot/system/camerad/camerad",
         "?? openpilot/system/loggerd/encoderd",
+        " M openpilot/system/manager/process_config.py",
+        "M  openpilot/system/manager/process_config.py",
+        "MM openpilot/system/manager/process_config.py",
     }
     return [line for line in status.splitlines() if line and line not in allowed]
 
@@ -221,7 +229,7 @@ def main():
         parser.error("Run only disconnected from the vehicle, with --vehicle-disconnected")
     root = Path("/data/openpilot")
     commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-    if commit != EXPECTED_COMMIT:
+    if commit not in SUPPORTED_COMMITS:
         raise SystemExit("Different openpilot commit; re-review required before testing")
     changes = subprocess.check_output(
         ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=all",

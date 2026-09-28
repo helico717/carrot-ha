@@ -36,6 +36,39 @@ class FakeParams:
 
 
 class SmokeTests(unittest.TestCase):
+    def test_both_supported_commits_reach_dependency_check(self):
+        for commit in ('5cb0f3e590a28d0138ad9f48506f65743cdaa326',
+                       '07be35fe08dbc1304e56cf186d8c33a36498fa95'):
+            with self.subTest(commit=commit), \
+                    patch.object(sys, 'argv', ['probe', '--vehicle-disconnected']), \
+                    patch.object(probe.subprocess, 'check_output', side_effect=[
+                        commit, ' M openpilot/system/manager/process_config.py\n']), \
+                    patch.object(probe.shutil, 'which', return_value=None), \
+                    patch.object(probe, 'run') as run:
+                with self.assertRaisesRegex(SystemExit, 'GNU timeout'):
+                    probe.main()
+                run.assert_not_called()
+
+    def test_unknown_commit_still_stops_before_other_checks(self):
+        with patch.object(sys, 'argv', ['probe', '--vehicle-disconnected']), \
+                patch.object(probe.subprocess, 'check_output', return_value='a' * 40) as git, \
+                patch.object(probe, 'run') as run:
+            with self.assertRaisesRegex(SystemExit, 'Different openpilot commit'):
+                probe.main()
+            git.assert_called_once()
+            run.assert_not_called()
+
+    def test_process_registration_edits_are_allowed(self):
+        for status in (' M', 'M ', 'MM'):
+            with self.subTest(status=status):
+                self.assertEqual(probe.unexpected_system_changes(
+                    status + ' openpilot/system/manager/process_config.py\n'), [])
+
+    def test_allowed_registration_does_not_hide_other_changes(self):
+        rejected = ' M openpilot/system/camerad/snapshot.py'
+        self.assertEqual(probe.unexpected_system_changes(
+            ' M openpilot/system/manager/process_config.py\n' + rejected + '\n'), [rejected])
+
     def test_untracked_native_binaries_are_allowed(self):
         self.assertEqual(probe.unexpected_system_changes(
             "?? openpilot/system/camerad/camerad\n"
@@ -43,7 +76,14 @@ class SmokeTests(unittest.TestCase):
 
     def test_source_and_tracked_binary_changes_still_block(self):
         for line in (
-            " M openpilot/system/manager/process_config.py",
+            " M openpilot/system/camerad/snapshot.py",
+            " D openpilot/system/manager/process_config.py",
+            "D  openpilot/system/manager/process_config.py",
+            "UU openpilot/system/manager/process_config.py",
+            " T openpilot/system/manager/process_config.py",
+            "?? openpilot/system/manager/process_config.py",
+            " M openpilot/system/manager/process_config.py.backup",
+            "R  openpilot/system/manager/process_config.py -> openpilot/system/manager/renamed.py",
             "M  openpilot/system/camerad/camerad",
             " D openpilot/system/loggerd/encoderd",
             "?? openpilot/system/camerad/extra.py",
