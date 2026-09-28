@@ -30,7 +30,8 @@
           "camera_enabled": "Enable parked cameras (experimental)",
           "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)",
           "terminal_enabled": "Enable parked remote terminal (experimental)",
-          "terminal_token": "Dedicated terminal token (32+ characters, separate from other tokens)"
+          "terminal_ha_url": "External HA HTTPS URL (automatic terminal connection)",
+          "terminal_upload_token": "Existing WAYON_UPLOAD_TOKEN (no Comma file edits)"
         }
       }
     },
@@ -38,7 +39,8 @@
       "invalid_capacity": "Enter a finite capacity between 20 and 150 kWh.",
       "invalid_cloud": "Enter an HTTPS base URL without a path and a view token.",
       "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace.",
-      "invalid_terminal_token": "Use a terminal-only 32–256 character ASCII token different from every other token."
+      "invalid_terminal_token": "Use a terminal-only 32–256 character ASCII token different from every other token.",
+      "invalid_terminal_setup": "Enter the external HA HTTPS URL, Worker URL and an upload token separate from the view token."
     }
   }
 }

@@ -30,7 +30,8 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                              vol.Optional('camera_enabled', default=self.config_entry.options.get('camera_enabled', False)): bool,
                              vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str,
                              vol.Optional('terminal_enabled', default=self.config_entry.options.get('terminal_enabled', False)): bool,
-                             vol.Optional('terminal_token', default=self.config_entry.options.get('terminal_token', '')): str})
+                             vol.Optional('terminal_ha_url', default=self.config_entry.options.get('terminal_ha_url', '')): str,
+                             vol.Optional('terminal_upload_token', default=self.config_entry.options.get('terminal_upload_token', '')): str})
         errors = {}
         if user_input is not None:
             try:
@@ -42,7 +43,18 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                 data['cloud_url'] = data.get('cloud_url', '').strip().rstrip('/')
                 data['cloud_view_token'] = data.get('cloud_view_token', '').strip()
                 data['camera_token'] = data.get('camera_token', '').strip()
-                data['terminal_token'] = data.get('terminal_token', '').strip()
+                import secrets
+                data['terminal_token'] = self.config_entry.options.get('terminal_token') or secrets.token_hex(32)
+                data['terminal_ha_url'] = data.get('terminal_ha_url', '').strip().rstrip('/')
+                data['terminal_upload_token'] = data.get('terminal_upload_token', '').strip()
+                if data.get('terminal_enabled'):
+                    address = urlsplit(data['terminal_ha_url'])
+                    if (address.scheme != 'https' or not address.hostname or address.path or address.query
+                            or address.fragment or address.username or address.password
+                            or not data['cloud_url'] or not data['terminal_upload_token']
+                            or data['terminal_upload_token'] == data['cloud_view_token']):
+                        errors['base'] = 'invalid_terminal_setup'
+                        return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 token = data['camera_token']
                 if data.get('camera_enabled') and (
                     not 32 <= len(token) <= 256 or not token.isascii() or any(c.isspace() for c in token)

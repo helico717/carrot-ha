@@ -70,6 +70,9 @@ async def async_setup_entry(hass, entry):
                                        lambda: async_dispatcher_send(hass, 'carrot_terminal_' + entry.entry_id))
         await terminal_relay.start()
         runtime['terminal_relay'] = terminal_relay
+        from .terminal_bootstrap import publish_loop
+        bootstrap_task = hass.async_create_background_task(publish_loop(hass, entry), 'carrot terminal discovery')
+        entry.async_on_unload(bootstrap_task.cancel)
         async def stop_terminal_relay(event):
             await terminal_relay.close()
         entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_terminal_relay))
@@ -113,7 +116,8 @@ async def _options_updated(hass, entry):
     if runtime.get('camera_options') != (entry.options.get('camera_enabled', False), entry.options.get('camera_token', '')):
         await hass.config_entries.async_reload(entry.entry_id)
         return
-    if runtime.get('terminal_options') != (entry.options.get('terminal_enabled', False), entry.options.get('terminal_token', '')):
+    if (runtime.get('terminal_options') != (entry.options.get('terminal_enabled', False), entry.options.get('terminal_token', ''))
+            or entry.options.get('terminal_enabled')):
         await hass.config_entries.async_reload(entry.entry_id)
         return
     task = runtime.get('cloud_task')

@@ -2611,6 +2611,10 @@ export default {
   async fetch(request, env) {
     if (!requireBindings(env)) return json({error: "missing_cloudflare_bindings"}, 503);
     const {pathname} = new URL(request.url);
+    if (pathname === '/api/terminal/bootstrap') {
+      const {terminalBootstrap} = await import('./terminal_bootstrap.js');
+      return terminalBootstrap(request, env, authorize(request, env, true));
+    }
     if (request.method === "POST" && pathname === "/api/settings/sync") return handleSettingsSync(request, env);
     if (request.method === "GET" && pathname === "/api/settings") return handleGetSettings(request, env);
     if (request.method === "POST" && pathname === "/api/params/queue") return handleParamsQueue(request, env);
