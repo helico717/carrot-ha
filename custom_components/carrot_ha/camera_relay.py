@@ -2,19 +2,26 @@
 import asyncio
 from contextlib import suppress
 import hmac
+import logging
 import secrets
 import time
+import uuid
 
 from aiohttp import WSMsgType, web
 
 from .camera_session import CAMERAS, HEADER, MAX_PAYLOAD, CameraSession
 
+RETRYABLE_STOPS = {'device_ended', 'device_disconnected', 'source_timeout'}
+MAX_CAPTURE_ATTEMPTS = 3  # Initial capture plus two retries within the same deadline.
+_LOGGER = logging.getLogger(__name__)
+
 
 class CameraRelay:
-    def __init__(self, token, changed=lambda: None):
+    def __init__(self, token, changed=lambda: None, *, clock=time.monotonic):
         self.token = token
         self.changed = changed
-        self.session = CameraSession()
+        self.clock = clock
+        self.session = CameraSession(clock)
         self.ws = None
         self.runner = None
         self.task = None
@@ -47,26 +54,31 @@ class CameraRelay:
             if self.tickets[key]['camera'] == camera:
                 del self.tickets[key]
         key = secrets.token_urlsafe(32)
-        self.tickets[key] = {'camera': camera, 'session': None, 'valid': True, 'created': time.monotonic()}
+        self.tickets[key] = {'camera': camera, 'session': None, 'valid': True,
+                             'created': self.clock(), 'deadline': None, 'attempts': 0}
         return f'{self.base_url}/{key}/{camera}.ts'
 
     def valid(self, key):
         ticket = self.tickets.get(key)
         return bool(ticket and ticket['valid'] and (
-            ticket['session'] is not None or time.monotonic() - ticket['created'] < 60))
+            self.clock() < ticket['deadline'] if ticket['deadline'] is not None
+            else self.clock() - ticket['created'] < 60))
 
     def source_valid(self, url):
         return bool(url and self.valid(url.rsplit('/', 2)[-2]))
 
-    def invalidate_session(self, session_id):
+    def invalidate_session(self, session_id, reason=None):
         for ticket in self.tickets.values():
             if ticket['session'] == session_id:
-                ticket['valid'] = False
+                if reason not in RETRYABLE_STOPS or ticket['attempts'] >= MAX_CAPTURE_ATTEMPTS:
+                    ticket['valid'] = False
 
     async def commands(self, commands):
         for command in commands:
             if command['type'] == 'stop':
-                self.invalidate_session(command['session_id'])
+                self.invalidate_session(command['session_id'], command.get('reason'))
+                if command.get('reason') in RETRYABLE_STOPS:
+                    _LOGGER.warning('Camera capture interrupted: %s', command['reason'])
             if self.ws is not None and not self.ws.closed:
                 try:
                     async with self.send_lock, asyncio.timeout(3):
@@ -105,20 +117,38 @@ class CameraRelay:
                     if not isinstance(data, dict):
                         raise ValueError('Invalid control message')
                     if data.get('type') == 'status' and data.get('protocol') == 1:
+                        if data.get('offroad') is not True:
+                            # Also revoke pending retries not attached to a
+                            # currently active capture session.
+                            for ticket in self.tickets.values():
+                                ticket['valid'] = False
                         await self.commands(self.session.device_status(generation, offroad=data.get('offroad')))
-                    elif data.get('type') == 'ended' and data.get('session_id') == self.session.session_id:
-                        await self.commands(self.session.stop('device_ended'))
+                    elif data.get('type') == 'ended':
+                        # Capture teardown can finish after stop or after a new
+                        # viewer has started. An old completion is not a protocol
+                        # violation and must not disconnect the current session.
+                        ended_session = data.get('session_id')
+                        if not isinstance(ended_session, str):
+                            raise ValueError('Missing ended session')
+                        uuid.UUID(ended_session)
+                        if ended_session == self.session.session_id:
+                            await self.commands(self.session.stop('device_ended'))
                     else:
                         raise ValueError('Invalid control message')
                 elif message.type == WSMsgType.ERROR:
                     break
-        except (ValueError, TypeError, ConnectionError, RuntimeError):
+        except (ValueError, TypeError):
+            for ticket in self.tickets.values():
+                ticket['valid'] = False
             if ws.prepared:
                 await ws.close(code=1008, message=b'Invalid or interrupted camera connection')
+        except (ConnectionError, RuntimeError):
+            if ws.prepared:
+                await ws.close()
         finally:
             commands = self.session.disconnect(generation)
             for command in commands:
-                self.invalidate_session(command['session_id'])
+                self.invalidate_session(command['session_id'], command.get('reason'))
             self.ws = None
             self.changed()
         return ws
@@ -129,11 +159,16 @@ class CameraRelay:
             raise web.HTTPForbidden()
         if not self.ready:
             raise web.HTTPServiceUnavailable()
+        ticket = self.tickets[key]
         try:
-            reader, commands = self.session.subscribe(camera)
+            reader, commands = self.session.subscribe(camera, deadline=ticket['deadline'])
         except (RuntimeError, ValueError):
             raise web.HTTPServiceUnavailable() from None
-        self.tickets[key]['session'] = self.session.session_id
+        if ticket['session'] != self.session.session_id:
+            ticket['attempts'] += 1
+        ticket['session'] = self.session.session_id
+        ticket['deadline'] = min(ticket['deadline'] or self.session.deadline, self.session.deadline)
+        stop_reason = 'no_viewers'
         response = web.StreamResponse(headers={'Content-Type': 'video/mp2t', 'Cache-Control': 'no-store'})
         try:
             await self.commands(commands)
@@ -150,11 +185,15 @@ class CameraRelay:
                     break
                 async with asyncio.timeout(5):
                     await response.write(packet)
-        except (ConnectionError, TimeoutError):
+        except TimeoutError:
+            stop_reason = 'source_timeout'
+            if not response.prepared:
+                raise web.HTTPGatewayTimeout() from None
+        except ConnectionError:
             if not response.prepared:
                 raise web.HTTPGatewayTimeout() from None
         finally:
-            await self.commands(self.session.unsubscribe(reader))
+            await self.commands(self.session.unsubscribe(reader, reason=stop_reason))
         return response
 
     async def stop_camera(self, camera):

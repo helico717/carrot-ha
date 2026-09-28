@@ -61,7 +61,10 @@ def run(session_id):
             'livestreamRoadEncodeData': 'road',
             'livestreamDriverEncodeData': 'driver',
         }
-        sockets = [messaging.sub_sock(name, poller=poller, conflate=True) for name in names]
+        # H.264 delta frames depend on earlier frames. Conflation can discard
+        # both the bootstrap keyframe and reference frames during scheduling
+        # delays; only decoded display frames may safely be conflated.
+        sockets = [messaging.sub_sock(name, poller=poller, conflate=False) for name in names]
         muxes = {name: TransportMux() for name in names.values()}
         require_offroad(params)
         if active_camera_processes() or params.get_bool('IsTakingSnapshot'):

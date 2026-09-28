@@ -76,6 +76,7 @@ class CameraSession:
         self.ready = False
         self.session_id = None
         self.started = None
+        self.deadline = None
         self.last_device_seen = None
         self.readers = set()
         self.last_reason = None
@@ -104,7 +105,7 @@ class CameraSession:
         self.generation, self.ready, self.last_device_seen = None, False, None
         return commands
 
-    def subscribe(self, camera):
+    def subscribe(self, camera, *, deadline=None):
         if camera not in CAMERAS:
             raise ValueError("Unknown camera")
         if (not self.ready or self.generation is None or self.last_device_seen is None
@@ -113,26 +114,32 @@ class CameraSession:
         if len(self.readers) >= MAX_VIEWERS:
             raise RuntimeError("Viewer limit reached")
         commands = []
+        if deadline is not None and self.clock() >= deadline:
+            raise RuntimeError("Viewing request expired")
         if self.session_id is None:
             self.session_id = str(uuid.uuid4())
             self.started = self.clock()
+            self.deadline = min(self.started + MAX_SESSION_SECONDS,
+                                deadline if deadline is not None else float('inf'))
             commands.append({"type": "start", "session_id": self.session_id,
                              "cameras": list(CAMERAS), "lease_seconds": LEASE_SECONDS,
                              "max_seconds": MAX_SESSION_SECONDS})
-        elif self.clock() - self.started >= MAX_SESSION_SECONDS:
+        elif self.clock() >= self.deadline:
             # The adapter's periodic tick is responsible for teardown; never
             # extend the existing deadline when another viewer arrives.
             raise RuntimeError("Session expired")
+        elif deadline is not None:
+            self.deadline = min(self.deadline, deadline)
         reader = Reader(camera)
         self.readers.add(reader)
         return reader, commands
 
-    def unsubscribe(self, reader):
+    def unsubscribe(self, reader, *, reason="no_viewers"):
         if reader not in self.readers:
             return []
         self.readers.remove(reader)
         reader.close("viewer_closed")
-        return self.stop("no_viewers") if not self.readers else []
+        return self.stop(reason) if not self.readers else []
 
     def accept_media(self, generation, data):
         if generation != self.generation or generation is None:
@@ -142,7 +149,7 @@ class CameraSession:
         session_id, camera, payload = decode_media(data)
         if session_id != self.session_id or self.session_id is None:
             return []
-        if self.clock() - self.started >= MAX_SESSION_SECONDS:
+        if self.clock() >= self.deadline:
             return self.stop("session_expired")
         # Media traffic is not an offroad status heartbeat. Never extend a
         # device lease using an endless video stream alone.
@@ -161,14 +168,14 @@ class CameraSession:
             return self.disconnect(self.generation)
         if self.session_id is None:
             return []
-        if self.clock() - self.started >= MAX_SESSION_SECONDS:
+        if self.clock() >= self.deadline:
             return self.stop("session_expired")
         return [{"type": "renew", "session_id": self.session_id,
                  "lease_seconds": LEASE_SECONDS}]
 
     def stop(self, reason):
         session_id = self.session_id
-        self.session_id, self.started, self.last_reason = None, None, reason
+        self.session_id, self.started, self.deadline, self.last_reason = None, None, None, reason
         for reader in self.readers:
             reader.close(reason)
         self.readers.clear()

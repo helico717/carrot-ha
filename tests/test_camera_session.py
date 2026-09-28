@@ -64,6 +64,16 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.session.tick()[0]["reason"], "session_expired")
         self.assertTrue(reader.closed)
 
+    def test_retry_deadline_shortens_capture_and_cannot_be_extended(self):
+        reader, _ = self.session.subscribe('wide', deadline=10)
+        self.session.subscribe('driver', deadline=100)
+        self.now = 10
+        self.session.device_status(self.generation, offroad=True)
+        self.assertEqual(self.session.tick()[0]['reason'], 'session_expired')
+        self.assertTrue(reader.closed)
+        with self.assertRaises(RuntimeError):
+            self.session.subscribe('wide', deadline=10)
+
     def test_onroad_or_unknown_status_stops(self):
         for status in (False, None, 1, "true"):
             with self.subTest(status=status):
