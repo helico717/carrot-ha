@@ -12,3 +12,5 @@ camera_agent/*.pid
 camera_agent/*.lock
 camera_agent/*.log
 camera_agent/continue.sh.before-camera
+cloudflare/wrangler.json
+
