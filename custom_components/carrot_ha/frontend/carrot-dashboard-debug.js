@@ -1,4 +1,4 @@
-import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js';
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
@@ -382,11 +382,19 @@ export default class CarrotDebugDashboard extends HTMLElement {
         rear_driver: false,    // 운전석 뒤 도어
         rear_passenger: false, // 조수석 뒤 도어
         trunk: false           // 트렁크
-      }
+      },
+      cameraMode: 'mock',      // 'mock' | 'real'
+      simStreamStatus: 'ok',   // 'ok' | 'front_only' | 'rear_only' | 'both_wait' | 'sync_drift' | 'dropped'
+      selectedCameraDevice: '',
+      simConnectDelayMs: 600,
+      simPtsOffsetMs: 0,
+      simMissingStream: 'none',
+      simFailOnRetry: false
     };
     this.smoothState = null;
     this._noiseTimer = null;
     this._userThemeSelected = false;
+    this.cameraModal = null;
   }
 
   getEffectiveTheme(theme = this.state.theme) {
@@ -410,6 +418,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (this._noiseTimer) {
       clearInterval(this._noiseTimer);
       this._noiseTimer = null;
+    }
+    if (this.cameraModal) {
+      this.cameraModal.destroy();
+      this.cameraModal = null;
     }
   }
 
@@ -650,6 +662,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
     };
     this.dashCard.busy = false;
     this.dashCard.render();
+    if ((displayed.display_state === 'driving' || displayed.onroad) && this.cameraModal && this.cameraModal.isOpen) {
+      this.cameraModal.setState('stopped', this.state.lang === 'en' ? 'Driving detected: camera monitoring automatically stopped for safety.' : '차량 주행 감지됨 — 안전을 위해 카메라 모니터링이 자동 종료되었습니다.');
+      this.cameraModal.cleanupSession();
+    }
     this.updateInspectorReadout(displayed, displayed.time_to_80_s, displayed.time_to_100_s, displayed.eta_100);
   }
 
@@ -1384,6 +1400,51 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
+            <!-- Group Camera: 360° 카메라 모니터링 시뮬레이터 & 실기기 시험 제어 -->
+            <div class="control-group">
+              <div class="group-label">
+                <span>📹 360° 카메라 모니터링 시뮬레이터 & 시험</span>
+                <span class="value" id="cameraModeVal">${this.state.cameraMode === 'real' ? '🚗 실기기 연결 모드' : '🧪 모의 시뮬레이션 (기본)'}</span>
+              </div>
+              <div class="btn-group" style="margin-bottom: 8px;">
+                <button id="btnCamModeMock" class="${this.state.cameraMode !== 'real' ? 'active' : ''}">🧪 모의 시뮬레이션 (기본값)</button>
+                <button id="btnCamModeReal" class="${this.state.cameraMode === 'real' ? 'active charge' : ''}">🚗 실기기 시험 모드 (HA 연결)</button>
+              </div>
+
+              <!-- 모의 모드 시뮬레이션 시나리오 프리셋 -->
+              <div id="camMockScenarios" style="${this.state.cameraMode === 'real' ? 'display:none;' : ''}">
+                <div class="charger-section-title">🧪 모의 스트림 상태 & 장애 시뮬레이션</div>
+                <div class="btn-group" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:6px;margin-bottom:6px;">
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'ok' || !this.state.simStreamStatus ? 'active' : ''}" data-cam-preset="ok">✓ 정상 (Both OK)</button>
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'front_only' ? 'active' : ''}" data-cam-preset="front_only">⚠️ 전방만 (실내 대기)</button>
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'rear_only' ? 'active' : ''}" data-cam-preset="rear_only">⚠️ 실내만 (전방 대기)</button>
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'both_wait' ? 'active' : ''}" data-cam-preset="both_wait">⏳ 프레임 지연</button>
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'sync_drift' ? 'active' : ''}" data-cam-preset="sync_drift">⏱️ 동기화 편차 (+1.2s)</button>
+                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'dropped' ? 'active' : ''}" data-cam-preset="dropped">❌ 스트림 단절</button>
+                </div>
+                <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:4px;">
+                  • <b>모의 모드</b>: 실제 차량 네트워크 요청 및 Comma 하드웨어 구동 없이 WebGL 투영, 방향 회전, 동기화 편차, 상태 전환을 100% 안전하게 검증합니다.
+                </div>
+              </div>
+
+              <!-- 실기기 시험 모드 기기 선택 및 상태 -->
+              <div id="camRealDevicePanel" style="${this.state.cameraMode === 'real' ? '' : 'display:none;'}">
+                <div class="charger-section-title">🚗 Home Assistant 연결 기기 및 카메라 상태</div>
+                <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">
+                  * 브라우저 인증 세션을 통해 Home Assistant 카메라 엔터티(wide/driver)의 HLS 스트림을 수신합니다.
+                </div>
+                <div class="preset-dropdown-row">
+                  <span class="preset-label">장치 선택</span>
+                  <select id="camDeviceSelect" class="preset-select" aria-label="카메라 장치 선택">
+                    ${this.renderDeviceSelectOptions()}
+                  </select>
+                </div>
+                <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
+                  🔒 <b>보안 및 주행 안전 규칙</b>: 실기기 시험 시 Comma 장치와 서버가 최신 실제 Offroad 및 주차/충전 상태를 재검증합니다. 주행 중에는 카메라 연결이 즉시 차단됩니다.
+                </div>
+              </div>
+            </div>
+
             <!-- Live Inspector Box -->
             <div class="inspector-box">
               <div class="inspect-item">
@@ -1452,6 +1513,93 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.dashCard.applyTheme();
       this.dashCard.render();
     }
+    if (this.cameraModal) {
+      this.cameraModal.setTheme(currentTheme);
+    }
+  }
+
+  openCamera360(triggerBtn) {
+    if (!this.cameraModal) {
+      this.cameraModal = new CarrotCamera360Modal({
+        container: this.shadowRoot,
+        lang: this.state.lang,
+        theme: this.getEffectiveTheme()
+      });
+    } else {
+      this.cameraModal.setTheme(this.getEffectiveTheme());
+      this.cameraModal.setLanguage(this.state.lang);
+    }
+
+    if (this.state.cameraMode === 'mock') {
+      this.cameraModal.simConfig = {
+        connectDelayMs: this.state.simConnectDelayMs || 600,
+        missingStream: this.state.simMissingStream || 'none',
+        ptsOffsetMs: this.state.simPtsOffsetMs || 0,
+        failOnRetry: this.state.simFailOnRetry || false
+      };
+    }
+
+    let cameraEntities = {};
+    if (this.state.cameraMode === 'real') {
+      cameraEntities = this.findCarrotCameraEntities(this.state.selectedCameraDevice);
+    }
+
+    this.cameraModal.open({
+      mode: this.state.cameraMode || 'mock',
+      hass: this._hass,
+      deviceId: this.state.selectedCameraDevice || '',
+      cameraEntities,
+      returnFocusElem: triggerBtn
+    });
+  }
+
+  findCarrotCameraEntities(deviceId = '') {
+    const states = this._hass?.states || {};
+    let wide = null, driver = null, road = null;
+
+    for (const [entityId, stateObj] of Object.entries(states)) {
+      if (!entityId.startsWith('camera.')) continue;
+      const uid = stateObj.attributes?.unique_id || '';
+      const name = stateObj.attributes?.friendly_name || '';
+
+      if (deviceId && !entityId.includes(deviceId) && !uid.includes(deviceId)) {
+        continue;
+      }
+
+      if (entityId.endsWith('_camera_wide') || entityId.endsWith('_wide') || uid.endsWith('_camera_wide') || name.includes('광각')) {
+        wide = entityId;
+      } else if (entityId.endsWith('_camera_driver') || entityId.endsWith('_driver') || uid.endsWith('_camera_driver') || name.includes('실내') || name.includes('운전자')) {
+        driver = entityId;
+      } else if (entityId.endsWith('_camera_road') || entityId.endsWith('_road') || uid.endsWith('_camera_road') || name.includes('망원')) {
+        road = entityId;
+      }
+    }
+
+    return { wide, driver, road };
+  }
+
+  renderDeviceSelectOptions() {
+    const isEn = this.state.lang === 'en';
+    const states = this._hass?.states || {};
+    const devices = new Set();
+
+    for (const [entityId, stateObj] of Object.entries(states)) {
+      if (entityId.startsWith('camera.')) {
+        const parts = entityId.slice(7).split('_');
+        if (parts.length > 1) {
+          devices.add(parts.slice(0, -1).join('_'));
+        }
+      }
+    }
+
+    if (devices.size === 0) {
+      return `<option value="">${isEn ? 'Comma 3X / Carrot Device (Auto-detect)' : 'Comma 3X / 당근 기기 (자동 감지)'}</option>`;
+    }
+
+    return Array.from(devices).map(dev => {
+      const selected = this.state.selectedCameraDevice === dev ? 'selected' : '';
+      return `<option value="${dev}" ${selected}>${dev}</option>`;
+    }).join('');
   }
 
   mountDashboard() {
@@ -2539,6 +2687,48 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
       const socState = !charging && soc !== null ? (soc < 15 ? 'is-critical soc-critical' : soc < 30 ? 'is-low soc-low' : '') : '';
 
+      let cameraConditionSlotHtml = '';
+      if (isDriving || v.onroad === true || displayState.key === 'driving') {
+        cameraConditionSlotHtml = `<span class="mini-condition-camera is-hidden" aria-hidden="true" style="visibility:hidden;min-width:44px;min-height:36px;"></span>`;
+      } else if (displayState.key === 'parked' || displayState.key === 'charging') {
+        const isReal = this.state.cameraMode === 'real';
+        const camEntities = isReal ? this.findCarrotCameraEntities(this.state.selectedCameraDevice) : { wide: true, driver: true };
+        if (isReal && (!camEntities.wide || !camEntities.driver)) {
+          cameraConditionSlotHtml = `
+            <span class="mini-condition-camera is-unconfigured" title="${isEn ? 'Camera not configured in Home Assistant' : '카메라 미설정: HA 설정이 필요합니다'}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.6"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+              <span>${isEn ? 'Camera Unconfigured' : '카메라 미설정'}</span>
+            </span>`;
+        } else {
+          cameraConditionSlotHtml = `
+            <button type="button" class="mini-condition-camera-btn" id="camera360Trigger" aria-label="${isEn ? 'View 360° Camera' : '360° 카메라 보기'}">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+              <span>${isEn ? 'View Camera' : '카메라 보기'}</span>
+            </button>`;
+        }
+      } else if (displayState.key === 'stale') {
+        cameraConditionSlotHtml = `
+          <span class="mini-condition-camera-disabled" title="${isEn ? 'Data delayed. Camera disabled.' : '데이터 지연으로 카메라가 비활성화되었습니다.'}">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>${isEn ? 'Data Delayed' : '데이터 지연'}</span>
+          </span>`;
+      } else if (displayState.key === 'offline') {
+        cameraConditionSlotHtml = `
+          <span class="mini-condition-camera-disabled" title="${isEn ? 'Device offline. Camera unavailable.' : '기기 오프라인으로 카메라를 사용할 수 없습니다.'}">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+            <span>${isEn ? 'Camera Offline' : '카메라 연결 안 됨'}</span>
+          </span>`;
+      } else {
+        cameraConditionSlotHtml = `
+          <span class="mini-condition-camera-disabled" title="${isEn ? 'Checking vehicle status...' : '차량 상태 확인 중입니다.'}">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>${isEn ? 'Checking Status' : '상태 확인 중'}</span>
+          </span>`;
+      }
+
       return `<div class="cockpit desktop-balanced-cockpit">
         <div class="overview-col-visual">
           <section class="hero">
@@ -2548,7 +2738,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
           <div class="mini-condition">
             <span>${isEn ? 'Outside' : '외기'} <b>${n(v.outside_temp_c)}°C</b></span>
             <span>12V <b>${n(v.aux_voltage, 1)}V</b></span>
-            <span>${isEn ? 'Climate' : '공조'} <b>${v.ac_on == null ? '—' : v.ac_on ? 'ON' : 'OFF'}</b></span>
+            ${cameraConditionSlotHtml}
           </div>
         </div>
         <div class="overview-col-telemetry">
@@ -2577,6 +2767,15 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const chargeState = card.v.charging ? 'on' : 'off';
       card._hass = { ...(this._hass || {}), states: { ...(this._hass?.states || {}), 'binary_sensor.carrot_debug_simulated': { state: chargeState } } };
       origRender();
+
+      const camBtn = card.shadowRoot?.querySelector('#camera360Trigger');
+      if (camBtn) {
+        camBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openCamera360(camBtn);
+        };
+      }
 
       const refreshBtn = card.shadowRoot?.querySelector('.refresh');
       if (refreshBtn) {
@@ -3286,6 +3485,61 @@ export default class CarrotDebugDashboard extends HTMLElement {
           color: var(--ink) !important;
           font-size: 13.5px !important;
           margin-left: 2px !important;
+        }
+
+        .mini-condition-camera-btn {
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          background: rgba(59, 130, 246, 0.15) !important;
+          color: #60a5fa !important;
+          border: 1px solid rgba(59, 130, 246, 0.35) !important;
+          padding: 6px 12px !important;
+          border-radius: 20px !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          cursor: pointer !important;
+          min-height: 44px !important;
+          min-width: 44px !important;
+          box-sizing: border-box !important;
+          transition: all 0.15s ease !important;
+        }
+        .mini-condition-camera-btn:hover {
+          background: rgba(59, 130, 246, 0.25) !important;
+          border-color: #3b82f6 !important;
+          color: #93c5fd !important;
+          transform: translateY(-1px) !important;
+        }
+        .mini-condition-camera-btn:focus-visible {
+          outline: 2px solid #3b82f6 !important;
+          outline-offset: 2px !important;
+        }
+        :host([data-theme="light"]) .mini-condition-camera-btn {
+          background: rgba(37, 99, 235, 0.1) !important;
+          color: #1d4ed8 !important;
+          border-color: rgba(37, 99, 235, 0.3) !important;
+        }
+        :host([data-theme="light"]) .mini-condition-camera-btn:hover {
+          background: rgba(37, 99, 235, 0.18) !important;
+          border-color: #2563eb !important;
+          color: #1e40af !important;
+        }
+        .mini-condition-camera-disabled, .mini-condition-camera.is-unconfigured {
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 5px !important;
+          color: #64748b !important;
+          font-size: 11.5px !important;
+          cursor: not-allowed !important;
+          padding: 6px 8px !important;
+          min-height: 44px !important;
+          box-sizing: border-box !important;
+        }
+        .mini-condition-camera.is-hidden {
+          display: inline-block !important;
+          visibility: hidden !important;
+          min-width: 44px !important;
+          min-height: 44px !important;
         }
 
         /* Right column: Telemetry & Quick Links */
@@ -4723,6 +4977,84 @@ export default class CarrotDebugDashboard extends HTMLElement {
         this.state.lang = this.state.lang === 'ko' ? 'en' : 'ko';
         btnLang.textContent = this.state.lang === 'ko' ? '🌐 언어: 한국어 (KO)' : '🌐 Language: English (EN)';
         this.mountDashboard();
+        this.applyDebugTelemetry();
+      });
+    }
+
+    // Camera Simulator Controls
+    const btnCamModeMock = root.querySelector('#btnCamModeMock');
+    const btnCamModeReal = root.querySelector('#btnCamModeReal');
+    const camMockScenarios = root.querySelector('#camMockScenarios');
+    const camRealDevicePanel = root.querySelector('#camRealDevicePanel');
+    const cameraModeVal = root.querySelector('#cameraModeVal');
+    const camDeviceSelect = root.querySelector('#camDeviceSelect');
+
+    const updateCameraModeUI = (mode) => {
+      this.state.cameraMode = mode;
+      const isEn = this.state.lang === 'en';
+      if (btnCamModeMock) btnCamModeMock.className = mode !== 'real' ? 'active' : '';
+      if (btnCamModeReal) btnCamModeReal.className = mode === 'real' ? 'active charge' : '';
+      if (camMockScenarios) camMockScenarios.style.display = mode === 'real' ? 'none' : '';
+      if (camRealDevicePanel) camRealDevicePanel.style.display = mode === 'real' ? '' : 'none';
+      if (cameraModeVal) cameraModeVal.textContent = mode === 'real' ? (isEn ? '🚗 Live Vehicle Mode' : '🚗 실기기 연결 모드') : (isEn ? '🧪 Simulation (Default)' : '🧪 모의 시뮬레이션 (기본)');
+
+      if (this.cameraModal && this.cameraModal.isOpen) {
+        this.cameraModal.close();
+      }
+      this.applyDebugTelemetry();
+    };
+
+    if (btnCamModeMock) {
+      btnCamModeMock.addEventListener('click', () => updateCameraModeUI('mock'));
+    }
+    if (btnCamModeReal) {
+      btnCamModeReal.addEventListener('click', () => updateCameraModeUI('real'));
+    }
+
+    // Cam Mock presets
+    root.querySelectorAll('[data-cam-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.camPreset;
+        root.querySelectorAll('[data-cam-preset]').forEach(b => b.classList.toggle('active', b === btn));
+        this.state.simStreamStatus = preset;
+
+        if (preset === 'ok') {
+          this.state.simMissingStream = 'none';
+          this.state.simPtsOffsetMs = 0;
+          this.state.simConnectDelayMs = 400;
+          this.state.simFailOnRetry = false;
+        } else if (preset === 'front_only') {
+          this.state.simMissingStream = 'rear';
+          this.state.simPtsOffsetMs = 0;
+        } else if (preset === 'rear_only') {
+          this.state.simMissingStream = 'front';
+          this.state.simPtsOffsetMs = 0;
+        } else if (preset === 'both_wait') {
+          this.state.simMissingStream = 'both';
+          this.state.simPtsOffsetMs = 0;
+        } else if (preset === 'sync_drift') {
+          this.state.simMissingStream = 'none';
+          this.state.simPtsOffsetMs = 1200; // 1.2s drift
+        } else if (preset === 'dropped') {
+          this.state.simMissingStream = 'none';
+          this.state.simFailOnRetry = true;
+        }
+
+        if (this.cameraModal && this.cameraModal.isOpen && this.state.cameraMode === 'mock') {
+          this.cameraModal.simConfig = {
+            connectDelayMs: this.state.simConnectDelayMs || 400,
+            missingStream: this.state.simMissingStream || 'none',
+            ptsOffsetMs: this.state.simPtsOffsetMs || 0,
+            failOnRetry: this.state.simFailOnRetry || false
+          };
+          this.cameraModal.startSession();
+        }
+      });
+    });
+
+    if (camDeviceSelect) {
+      camDeviceSelect.addEventListener('change', (e) => {
+        this.state.selectedCameraDevice = e.target.value;
         this.applyDebugTelemetry();
       });
     }
