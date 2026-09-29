@@ -28,8 +28,8 @@ export class Camera360Renderer {
 
     // Lens calibration parameters (configurable, not hardcoded APK constants)
     this.calibration = {
-      frontFov: 150.0 * DEG2RAD,
-      rearFov: 150.0 * DEG2RAD,
+      frontFov: 186.0 * DEG2RAD,
+      rearFov: 186.0 * DEG2RAD,
       frontCenter: [0.5, 0.5],
       rearCenter: [0.5, 0.5],
       frontDist: [0.0, 0.0],
@@ -110,12 +110,13 @@ export class Camera360Renderer {
 
         if (mirrorX) nx = -nx;
 
-        vec2 texCoord = center + vec2(nx, ny);
+        // Fix inverted video: negate ny so top of camera frame (row 0) maps to top of view (sky/ceiling)
+        vec2 texCoord = center + vec2(nx, -ny);
         if (texCoord.x < 0.0 || texCoord.x > 1.0 || texCoord.y < 0.0 || texCoord.y > 1.0) {
           return vec4(0.0);
         }
 
-        float edgeFalloff = smoothstep(1.0, 0.92, normAngle);
+        float edgeFalloff = smoothstep(1.0, 0.94, normAngle);
         vec4 col = texture2D(tex, texCoord);
         return vec4(col.rgb, col.a * edgeFalloff);
       }
@@ -137,14 +138,14 @@ export class Camera360Renderer {
         }
 
         if (u_viewMode == 2) { // Cabin only
-          vec4 r = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, true);
+          vec4 r = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, false);
           gl_FragColor = vec4(mix(bg, r.rgb, r.a), 1.0);
           return;
         }
 
         // 360 Stitched Mode
         vec4 frontCol = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, false);
-        vec4 rearCol = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, true);
+        vec4 rearCol = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, false);
 
         float wFront = frontCol.a;
         float wRear = rearCol.a;
