@@ -1031,6 +1031,7 @@ export class CarrotCamera360Modal {
     this.deviceId = deviceId;
     this.cameraEntities = cameraEntities;
     this.returnFocusElem = returnFocusElem;
+    this.retryCount = 0;
     this.sessionSeq++;
     const currentSeq = this.sessionSeq;
 
@@ -1248,17 +1249,9 @@ export class CarrotCamera360Modal {
       this.realStreams.frontVideo = frontVideo;
       this.realStreams.rearVideo = rearVideo;
 
-      // Handle HLS loading (native Safari or Hls.js fallback)
-      await Promise.all([
-        this._loadHls(frontVideo, wideUrl),
-        this._loadHls(rearVideo, driverUrl)
-      ]);
-
-      if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-
       this.setState('waiting_for_frames', isEn ? 'Waiting for first decoded keyframes...' : '첫 디코딩 프레임 대기 중...');
 
-      // Bounded first frame timeout
+      // Bounded first frame timeout (30 seconds)
       this.firstFrameTimer = setTimeout(() => {
         if (this.sessionSeq !== targetSeq || !this.isOpen) return;
         if (this.state !== 'playing') {
@@ -1275,10 +1268,14 @@ export class CarrotCamera360Modal {
         if (rearVideo.readyState >= 2) rearReady = true;
 
         if (frontReady && rearReady) {
-          clearTimeout(this.firstFrameTimer);
-          this.firstFrameTimer = null;
-          this.setState('playing');
-          this.startRealRenderLoop(targetSeq);
+          if (this.firstFrameTimer) {
+            clearTimeout(this.firstFrameTimer);
+            this.firstFrameTimer = null;
+          }
+          if (this.state !== 'playing') {
+            this.setState('playing');
+            this.startRealRenderLoop(targetSeq);
+          }
         } else if (frontReady && !rearReady) {
           this.setState('waiting_for_frames', isEn ? 'Front ready. Waiting for Cabin camera...' : '전방 수신 완료. 실내 카메라 프레임 대기 중...');
         } else if (!frontReady && rearReady) {
@@ -1290,10 +1287,28 @@ export class CarrotCamera360Modal {
       rearVideo.addEventListener('loadeddata', checkReady);
       frontVideo.addEventListener('playing', checkReady);
       rearVideo.addEventListener('playing', checkReady);
+      frontVideo.addEventListener('timeupdate', checkReady);
+      rearVideo.addEventListener('timeupdate', checkReady);
 
       // Listen for errors
-      frontVideo.addEventListener('error', () => this.handlePlaybackFailure(isEn ? 'Front camera stream interrupted.' : '전방 카메라 스트림이 중단되었습니다.'));
-      rearVideo.addEventListener('error', () => this.handlePlaybackFailure(isEn ? 'Cabin camera stream interrupted.' : '실내 카메라 스트림이 중단되었습니다.'));
+      frontVideo.addEventListener('error', () => {
+        if (this.sessionSeq === targetSeq && this.isOpen) {
+          this.handlePlaybackFailure(isEn ? 'Front camera stream interrupted.' : '전방 카메라 스트림이 중단되었습니다.');
+        }
+      });
+      rearVideo.addEventListener('error', () => {
+        if (this.sessionSeq === targetSeq && this.isOpen) {
+          this.handlePlaybackFailure(isEn ? 'Cabin camera stream interrupted.' : '실내 카메라 스트림이 중단되었습니다.');
+        }
+      });
+
+      // Handle HLS loading (Hls.js prioritized, native Safari fallback)
+      await Promise.all([
+        this._loadHls(frontVideo, wideUrl),
+        this._loadHls(rearVideo, driverUrl)
+      ]);
+
+      if (this.sessionSeq !== targetSeq || !this.isOpen) return;
 
     } catch (err) {
       if (this.sessionSeq !== targetSeq || !this.isOpen) return;
@@ -1301,34 +1316,110 @@ export class CarrotCamera360Modal {
     }
   }
 
-  async _loadHls(video, url) {
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      await video.play().catch(() => {});
-    } else {
-      if (!window.Hls && typeof document !== 'undefined') {
+  async _ensureHls() {
+    if (typeof window === 'undefined') return false;
+    if (window.Hls) return true;
+    if (this._hlsLoadingPromise) return this._hlsLoadingPromise;
+
+    this._hlsLoadingPromise = (async () => {
+      let localUrl = null;
+      try {
+        localUrl = new URL('./carrot-assets/hls.min.js', import.meta.url).href;
+      } catch (_) {
+        localUrl = '/carrot_ha_static/carrot-assets/hls.min.js';
+      }
+
+      const sources = [
+        localUrl,
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
+      ];
+
+      for (const src of sources) {
+        if (!src) continue;
         try {
-          await new Promise((resolve) => {
+          await new Promise((resolve, reject) => {
             const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
+            s.src = src;
+            s.async = true;
             s.onload = () => resolve();
-            s.onerror = () => resolve();
+            s.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(s);
           });
+          if (window.Hls) return true;
         } catch (_) {}
       }
-      if (window.Hls && window.Hls.isSupported()) {
-        const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
+      return Boolean(window.Hls);
+    })();
+
+    return this._hlsLoadingPromise;
+  }
+
+  async _loadHls(video, url) {
+    const isEn = this.lang === 'en';
+    await this._ensureHls();
+
+    // 1. Prefer Hls.js across Chrome, Firefox, Edge, Android
+    if (window.Hls && window.Hls.isSupported()) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const hls = new window.Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 30,
+          maxBufferLength: 10,
+        });
+
         hls.loadSource(url);
         hls.attachMedia(video);
         video._hls = hls;
-        await video.play().catch(() => {});
-      } else {
-        // Fallback direct assignment
-        video.src = url;
-        await video.play().catch(() => {});
-      }
+
+        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+          video.play().catch(() => {});
+        });
+
+        hls.on(window.Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case window.Hls.ErrorTypes.NETWORK_ERROR:
+                hls.startLoad();
+                break;
+              case window.Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError();
+                break;
+              default:
+                if (!settled) {
+                  settled = true;
+                  reject(new Error(data.details || 'HLS fatal error'));
+                } else {
+                  this.handlePlaybackFailure(data.details || (isEn ? 'HLS stream decoding failed.' : 'HLS 스트림 디코딩 실패.'));
+                }
+                break;
+            }
+          }
+        });
+
+        setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            video.play().catch(() => {});
+            resolve();
+          }
+        }, 3000);
+      });
     }
+
+    // 2. Safari fallback
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.play().catch(() => {});
+      return;
+    }
+
+    throw new Error(isEn ? 'Browser does not support HLS video playback.' : '브라우저가 HLS 비디오 재생을 지원하지 않습니다.');
   }
 
   startRealRenderLoop(targetSeq) {
