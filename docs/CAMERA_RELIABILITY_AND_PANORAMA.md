@@ -60,20 +60,14 @@ UI는 연결 중 → 카메라 시작 중 → 첫 영상 대기 → 재생 중�
 현재 완료: APK 구조 확인, 코드 원인 분석, 종료 알림 경쟁 조건 재현·수정, conflation 제거, 기본 상세창용 제한적 백엔드 재시도 복구. 미완료: 사용자 환경의 실패 로그 대조, 뷰어 수명 기반 재시도 UI, 360도 카드 구현 및 실제 브라우저 재생 검증. 이번 수정만으로 간헐적 재생 실패가 모두 해결됐다고 주장하지 않는다.
 
 
-## 224482d 설치 환경에서 0.7.1 시험 업데이트
+## Git 기반 카메라 업데이트로 전환
 
-이번 카메라 실행 코드 변경은 HA의 camera_relay.py/camera_session.py와 콤마의 capture.py다. 빌드 ZIP에는 동일한 camera_session.py가 콤마 쪽에도 포함된다. 기존 camera.json과 영상 토큰을 다시 만들 필요가 없다. openpilot 브랜치 업데이트도 필요 없다.
+2026-09-29 기기 로그에서 `e96fd20a` 업데이트 후 `Unsupported openpilot commit`이
+반복되는 것을 확인했다. HA 재시도 수정이 되돌아간 것이 아니라, 별도 설치된 카메라
+프로그램의 커밋 허용 목록이 신규 openpilot 커밋을 거부한 것이다.
 
-1. HA 카메라를 모두 turn_off하고 콤마에서 아래 disable.py를 실행한다.
-2. HA 통합 폴더를 백업하고 carrot_ha-0.7.1.zip을 /config에 덮어쓴 뒤 HA를 재시작한다.
-3. carrot-camera-agent-0.7.1.zip을 콤마 /data에 복사하고 아래 순서로 프로그램 파일을 갱신한다. ZIP은 camera.json을 포함하지 않는다.
-
-```bash
-cd /data/carrot-camera
-/usr/local/venv/bin/python3 disable.py
-python3 -m zipfile -e /data/carrot-camera-agent-0.7.1.zip /data
-/usr/local/venv/bin/python3 install.py
-tail -n 50 /data/carrot-camera/agent.log
-```
-
-4. HA 카메라를 turn_on한 뒤 기본 상세창에서 시험한다. HA 로그의 `Camera capture interrupted: ...`와 같은 시각의 agent.log를 대응하면 캡처/네트워크 오류를 구별하는 데 도움이 된다. 로컬 0.7.1 ZIP 생성은 커밋·push·HA 배포가 완료됐다는 의미가 아니다.
+콤마 실행 코드는 openpilot 커스텀 브랜치의 `openpilot/selfdrive/carrot/ha/camera/`로
+이관한다. 커밋 번호 대신 실행에 필요한 기능을 검사하고 manager가 서비스를 관리한다.
+기존 설정과 활성화 상태는 보존하며 이전 supervisor가 종료된 뒤 전환한다.
+설치·업데이트와 검증 절차는 [CAMERA_SETUP.md](CAMERA_SETUP.md)를 따른다.
+과거의 ZIP/SCP/continue.sh 직접 편집 방식은 더 이상 사용하지 않는다.

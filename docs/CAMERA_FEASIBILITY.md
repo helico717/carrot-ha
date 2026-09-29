@@ -1,3 +1,5 @@
+> 초기 조사 기록이다. 현재 설치와 업데이트는 [CAMERA_SETUP.md](CAMERA_SETUP.md)를 따른다.
+
 # 카메라 연동 조사 및 검증 순서
 
 조사일: 2026-09-27. 소스 조사와 실기기 검증 이력이다. 설치 가능한 초기 구현은 [CAMERA_SETUP.md](CAMERA_SETUP.md)를 따른다. HAOS/iOS 최종 재생과 실차 장시간 검증은 아직 남아 있다.
@@ -50,10 +52,11 @@
 
 사용자가 제공한 preflight 결과에서 aarch64, 지정 커밋, offroad=true/onroad=false, 카메라 프로세스 없음, camerad/encoderd 실행 파일 존재, 조사 대상 소스의 tracked_changes 없음이 확인됐다. IsTakingSnapshot은 null이었다. 이 정적 결과는 프레임 생성 성공을 의미하지 않는다.
 
-`scripts/camera_smoke_test.py`는 해당 커밋의 차량에서 분리된 기기 전용 실험이다. `/data/camera_smoke_test.py`에 복사하고 다음을 실행한다.
+차량에서 분리된 기기의 수동 진단은 openpilot 저장소에 포함된 probe 모듈을 사용한다. 파일을 기기에 복사하지 않는다.
 
 ```bash
-/usr/local/venv/bin/python3 /data/camera_smoke_test.py --vehicle-disconnected
+cd /data/openpilot
+python -m openpilot.selfdrive.carrot.ha.camera.probe --vehicle-disconnected
 ```
 
 이 명령은 읽기 전용이 아니다. IsTakingSnapshot을 임시 설정하고 기존 camerad 및 `encoderd --stream`을 실행한다. 기존 --stream은 **세 카메라**를 인코딩한다. wide/driver 메시지와 코덱 헤더·데이터 도착만 세며 최대 관찰 20초, 부모 alarm 30초, 각 자식 GNU timeout 35초(+강제 종료 유예 3초)로 제한한다. 정상/예외/일반 종료 신호에서 소유한 프로세스 그룹만 종료하고 임시 파라미터를 복원한다. SIGKILL·전원 단절에서는 Python 정리 코드 실행을 보장할 수 없다. 다른 카메라 기능과 동시에 사용하거나 차량에 다시 연결하지 않는다.

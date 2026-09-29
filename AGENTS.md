@@ -30,6 +30,7 @@ The Carrot HA system is strictly divided into two independent repositories:
 │    - engine.py (Calculations, charging state)         │
 │    - param_sync.py (CarrotPilot params sync)          │
 │    - terminal.py (Parked reverse WSS terminal)        │
+│    - camera/ (Git-managed parked camera service)     │
 │    - wayon_vehicle_telemetry.py (CAN decoder)         │
 │  • system/manager/process_config.py (manager daemon)   │
 │  • .github/workflows/ (Upstream auto-sync action)     │
@@ -71,6 +72,7 @@ The Carrot HA system is strictly divided into two independent repositories:
 | **Change CAN decoding, battery calculation, or Comma telemetry signals** | `helico717/openpilot` (branch: `carrot-wip-model_selector-ha`) | `openpilot/selfdrive/carrot/ha/` | Commit & push to GitHub → Comma runs `git pull` |
 | **Modify CarrotPilot parameter sync daemon on Comma** | `helico717/openpilot` (branch: `carrot-wip-model_selector-ha`) | `openpilot/selfdrive/carrot/ha/param_sync.py` | Commit & push to GitHub → Comma runs `git pull` |
 | **Modify the reverse terminal daemon on Comma** | `helico717/openpilot` (branch: `carrot-wip-model_selector-ha`) | `openpilot/selfdrive/carrot/ha/terminal.py` | Commit & push to GitHub → Comma runs `git pull` |
+| **Modify the parked camera agent, capture, or compatibility checks on Comma** | `helico717/openpilot` (branch: `carrot-wip-model_selector-ha`) | `openpilot/selfdrive/carrot/ha/camera/` | Commit & push → clean Git pull & reboot; no camera ZIP/SCP |
 | **Modify Home Assistant sensors, coordinator, or entities** | `helico717/carrot-ha` (branch: `main`) | `custom_components/carrot_ha/` | Commit & push to GitHub → Update in HA & restart |
 | **Update the Lovelace cards (Dashboard, Params, Terminal Card)** | `helico717/carrot-ha` (branch: `main`) | `custom_components/carrot_ha/frontend/` | Commit & push to GitHub → Refresh browser (`Ctrl+F5`) |
 | **Update Cloudflare Worker API, D1 schema, or WSS relay** | `helico717/carrot-ha` (branch: `main`) | `cloudflare/src/worker.js` | `cd cloudflare && npx wrangler deploy` |
@@ -160,7 +162,8 @@ The Carrot HA system is strictly divided into two independent repositories:
   - Runtime logs, sqlite databases, and cached tokens **must never** be written inside `/data/openpilot`.
 - **Persistent State Directory**:
   - `selfdrive/carrot/ha` stores its runtime sqlite database and config under `/data/id4-collector/` or `/data/carrot_ha/` (outside the git tree).
-  - Openpilot Params (`/data/params/d/`) are used for vehicle state flags.
+  - The parked camera stores config and enabled state under `/data/carrot_ha/camera/`. Legacy `/data/carrot-camera` settings migrate automatically; camera program files are maintained only in openpilot Git.
+- Openpilot Params (`/data/params/d/`) are used for vehicle state flags.
 - **Auto-Sync Workflow**:
   - The GitHub Action `.github/workflows/sync_upstream_model_selector.yml` automatically pulls upstream changes from `ajouatom/openpilot:carrot-wip-model_selector` while preserving our `carrot_ha` daemon commits.
   - Keeping `/data/openpilot` clean ensures that auto-sync merges never encounter conflicts on the physical device.
