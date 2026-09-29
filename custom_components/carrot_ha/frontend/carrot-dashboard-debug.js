@@ -383,7 +383,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         rear_passenger: false, // 조수석 뒤 도어
         trunk: false           // 트렁크
       },
-      cameraMode: 'mock',      // 'mock' | 'real'
+      cameraMode: 'auto',      // 'auto' (real if entities exist, fallback mock) | 'real' | 'mock'
       simStreamStatus: 'ok',   // 'ok' | 'front_only' | 'rear_only' | 'both_wait' | 'sync_drift' | 'dropped'
       selectedCameraDevice: '',
       simConnectDelayMs: 600,
@@ -1400,19 +1400,19 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
-            <!-- Group Camera: 360° 카메라 모니터링 시뮬레이터 & 실기기 시험 제어 -->
+            <!-- Group Camera: 360° 카메라 모니터링 실기기 & 시뮬레이터 제어 -->
             <div class="control-group">
               <div class="group-label">
-                <span>📹 360° 카메라 모니터링 시뮬레이터 & 시험</span>
-                <span class="value" id="cameraModeVal">${this.state.cameraMode === 'real' ? '🚗 실기기 연결 모드' : '🧪 모의 시뮬레이션 (기본)'}</span>
+                <span>📹 360° 카메라 모니터링 (실기기 & 시뮬레이터)</span>
+                <span class="value" id="cameraModeVal">${this.getEffectiveCameraMode() === 'real' ? '🚗 실기기 연결 모드' : '🧪 모의 시뮬레이션 모드'}</span>
               </div>
               <div class="btn-group" style="margin-bottom: 8px;">
-                <button id="btnCamModeMock" class="${this.state.cameraMode !== 'real' ? 'active' : ''}">🧪 모의 시뮬레이션 (기본값)</button>
-                <button id="btnCamModeReal" class="${this.state.cameraMode === 'real' ? 'active charge' : ''}">🚗 실기기 시험 모드 (HA 연결)</button>
+                <button id="btnCamModeReal" class="${this.getEffectiveCameraMode() === 'real' ? 'active charge' : ''}">🚗 실기기 카메라 (기본 / HA 연결)</button>
+                <button id="btnCamModeMock" class="${this.getEffectiveCameraMode() !== 'real' ? 'active' : ''}">🧪 모의 시뮬레이션 (테스트)</button>
               </div>
 
               <!-- 모의 모드 시뮬레이션 시나리오 프리셋 -->
-              <div id="camMockScenarios" style="${this.state.cameraMode === 'real' ? 'display:none;' : ''}">
+              <div id="camMockScenarios" style="${this.getEffectiveCameraMode() === 'real' ? 'display:none;' : ''}">
                 <div class="charger-section-title">🧪 모의 스트림 상태 & 장애 시뮬레이션</div>
                 <div class="btn-group" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:6px;margin-bottom:6px;">
                   <button class="cam-preset-btn ${this.state.simStreamStatus === 'ok' || !this.state.simStreamStatus ? 'active' : ''}" data-cam-preset="ok">✓ 정상 (Both OK)</button>
@@ -1428,7 +1428,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
 
               <!-- 실기기 시험 모드 기기 선택 및 상태 -->
-              <div id="camRealDevicePanel" style="${this.state.cameraMode === 'real' ? '' : 'display:none;'}">
+              <div id="camRealDevicePanel" style="${this.getEffectiveCameraMode() === 'real' ? '' : 'display:none;'}">
                 <div class="charger-section-title">🚗 Home Assistant 연결 기기 및 카메라 상태</div>
                 <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">
                   * 브라우저 인증 세션을 통해 Home Assistant 카메라 엔터티(wide/driver)의 HLS 스트림을 수신합니다.
@@ -1518,6 +1518,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
   }
 
+  getEffectiveCameraMode() {
+    if (this.state.cameraMode === 'mock') return 'mock';
+    if (this.state.cameraMode === 'real') return 'real';
+    // 'auto' mode: check if real camera entities exist in HA
+    const camEntities = this.findCarrotCameraEntities(this.state.selectedCameraDevice);
+    if (camEntities.wide && camEntities.driver) {
+      return 'real';
+    }
+    return 'mock';
+  }
+
   openCamera360(triggerBtn) {
     if (!this.cameraModal) {
       this.cameraModal = new CarrotCamera360Modal({
@@ -1530,7 +1541,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       this.cameraModal.setLanguage(this.state.lang);
     }
 
-    if (this.state.cameraMode === 'mock') {
+    const effectiveMode = this.getEffectiveCameraMode();
+
+    if (effectiveMode === 'mock') {
       this.cameraModal.simConfig = {
         connectDelayMs: this.state.simConnectDelayMs || 600,
         missingStream: this.state.simMissingStream || 'none',
@@ -1540,12 +1553,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
     }
 
     let cameraEntities = {};
-    if (this.state.cameraMode === 'real') {
+    if (effectiveMode === 'real') {
       cameraEntities = this.findCarrotCameraEntities(this.state.selectedCameraDevice);
     }
 
     this.cameraModal.open({
-      mode: this.state.cameraMode || 'mock',
+      mode: effectiveMode,
       hass: this._hass,
       deviceId: this.state.selectedCameraDevice || '',
       cameraEntities,
@@ -2691,7 +2704,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
       if (isDriving || v.onroad === true || displayState.key === 'driving') {
         cameraConditionSlotHtml = `<span class="mini-condition-camera is-hidden" aria-hidden="true" style="visibility:hidden;min-width:44px;min-height:36px;"></span>`;
       } else if (displayState.key === 'parked' || displayState.key === 'charging') {
-        const isReal = this.state.cameraMode === 'real';
+        const effectiveCamMode = this.getEffectiveCameraMode();
+        const isReal = effectiveCamMode === 'real';
         const camEntities = isReal ? this.findCarrotCameraEntities(this.state.selectedCameraDevice) : { wide: true, driver: true };
         if (isReal && (!camEntities.wide || !camEntities.driver)) {
           cameraConditionSlotHtml = `
@@ -4992,11 +5006,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const updateCameraModeUI = (mode) => {
       this.state.cameraMode = mode;
       const isEn = this.state.lang === 'en';
-      if (btnCamModeMock) btnCamModeMock.className = mode !== 'real' ? 'active' : '';
-      if (btnCamModeReal) btnCamModeReal.className = mode === 'real' ? 'active charge' : '';
-      if (camMockScenarios) camMockScenarios.style.display = mode === 'real' ? 'none' : '';
-      if (camRealDevicePanel) camRealDevicePanel.style.display = mode === 'real' ? '' : 'none';
-      if (cameraModeVal) cameraModeVal.textContent = mode === 'real' ? (isEn ? '🚗 Live Vehicle Mode' : '🚗 실기기 연결 모드') : (isEn ? '🧪 Simulation (Default)' : '🧪 모의 시뮬레이션 (기본)');
+      const effectiveMode = this.getEffectiveCameraMode();
+      if (btnCamModeMock) btnCamModeMock.className = effectiveMode !== 'real' ? 'active' : '';
+      if (btnCamModeReal) btnCamModeReal.className = effectiveMode === 'real' ? 'active charge' : '';
+      if (camMockScenarios) camMockScenarios.style.display = effectiveMode === 'real' ? 'none' : '';
+      if (camRealDevicePanel) camRealDevicePanel.style.display = effectiveMode === 'real' ? '' : 'none';
+      if (cameraModeVal) cameraModeVal.textContent = effectiveMode === 'real' ? (isEn ? '🚗 Live Vehicle Mode' : '🚗 실기기 연결 모드') : (isEn ? '🧪 Simulation Mode' : '🧪 모의 시뮬레이션 모드');
 
       if (this.cameraModal && this.cameraModal.isOpen) {
         this.cameraModal.close();

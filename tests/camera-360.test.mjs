@@ -217,7 +217,23 @@ const found = debug.findCarrotCameraEntities();
 assert.equal(found.wide, 'camera.my_comma_camera_wide');
 assert.equal(found.driver, 'camera.my_comma_camera_driver');
 assert.equal(found.road, 'camera.my_comma_camera_road');
-console.log('Entity discovery helper passed.');
+
+// Test getEffectiveCameraMode
+debug.getEffectiveCameraMode = CarrotDebugDashboard.prototype.getEffectiveCameraMode.bind(debug);
+debug.state.selectedCameraDevice = '';
+debug.state.cameraMode = 'auto';
+assert.equal(debug.getEffectiveCameraMode(), 'real', 'Auto mode must resolve to real when camera entities exist');
+
+debug._hass = { states: {} };
+assert.equal(debug.getEffectiveCameraMode(), 'mock', 'Auto mode must fallback to mock when no camera entities exist');
+
+debug.state.cameraMode = 'real';
+assert.equal(debug.getEffectiveCameraMode(), 'real', 'Explicit real mode must return real');
+
+debug.state.cameraMode = 'mock';
+assert.equal(debug.getEffectiveCameraMode(), 'mock', 'Explicit mock mode must return mock');
+
+console.log('Entity discovery helper and effective camera mode resolution passed.');
 
 // 5. Test Driving Safety Stop Rule
 debug.cameraModal = {

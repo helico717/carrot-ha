@@ -1305,16 +1305,29 @@ export class CarrotCamera360Modal {
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url;
       await video.play().catch(() => {});
-    } else if (window.Hls && window.Hls.isSupported()) {
-      const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      video._hls = hls;
-      await video.play().catch(() => {});
     } else {
-      // Fallback direct assignment
-      video.src = url;
-      await video.play().catch(() => {});
+      if (!window.Hls && typeof document !== 'undefined') {
+        try {
+          await new Promise((resolve) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js';
+            s.onload = () => resolve();
+            s.onerror = () => resolve();
+            document.head.appendChild(s);
+          });
+        } catch (_) {}
+      }
+      if (window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        video._hls = hls;
+        await video.play().catch(() => {});
+      } else {
+        // Fallback direct assignment
+        video.src = url;
+        await video.play().catch(() => {});
+      }
     }
   }
 
