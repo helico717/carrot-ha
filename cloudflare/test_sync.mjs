@@ -47,5 +47,16 @@ for (const offset of [0,10,20]) {
 assert.equal(serverIds.size, 27);
 assert.deepEqual(serverCalls.map(p=>p.get('offset')), ['0','10','20']);
 assert.ok(serverCalls.every(p=>p.get('include_route')==='true'));
+
+// D1-backed trips must tolerate corrupted route_json and missing quality entries without 500
+delete env.WAYON_SERVER_API;
+sqlite.exec("INSERT OR REPLACE INTO trips (id, device_id, started_at, ended_at, duration_s, distance_m, route_json, created_at) VALUES ('trip-corrupted', 'test-id4', '2026-09-09T02:00:00Z', '2026-09-09T03:00:00Z', 3600, 5000, '{invalid-json', '2026-09-09T03:00:00Z')");
+const resilientRes = await request('/api/trips?limit=10&offset=0&include_route=true');
+assert.equal(resilientRes.status, 200);
+const resilientTrips = (await resilientRes.json()).trips;
+const corrupted = resilientTrips.find(t => t.id === 'trip-corrupted');
+assert.ok(corrupted);
+assert.deepEqual(corrupted.route, []);
+
 sqlite.close();
 console.log('PASS: lightweight state auth/isolation/query count and server pagination with routes');

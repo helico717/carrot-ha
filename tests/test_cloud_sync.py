@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 
 
 class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
-    async def run_sync(self, fail=False, previous=0, trip_pages=None, repeat=False, legacy=False):
+    async def run_sync(self, fail=False, previous=0, trip_pages=None, repeat=False, legacy=False, state_500=False, trip_500=False):
         def event(hour):
             return {'kind': 'state', 'observed_at': f'2026-09-24T{hour:02}:00:00Z'}
 
@@ -48,10 +48,13 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
         def get(url, **kwargs):
             calls.append(url)
             response = Response()
-            if legacy and '/api/latest-state?' in url:
-                response.status = 404
+            if (legacy or state_500) and '/api/latest-state?' in url:
+                response.status = 500 if state_500 else 404
                 return response
-            response.body = responses.pop(0)
+            if trip_500 and '/api/trips?' in url:
+                response.status = 500
+                return response
+            response.body = responses.pop(0) if responses else {}
             if fail and 'after=1' in url:
                 response.status = 500
             return response
@@ -126,3 +129,15 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('offset=100&', runtime['test_calls'][-1])
         self.assertEqual(runtime['cloud_trip_count'], 100)
         self.assertEqual(runtime['test_cursors']['trip_offset'], 0)
+
+    async def test_latest_state_500_falls_back_to_json(self):
+        runtime, _, _ = await self.run_sync(state_500=True)
+        self.assertTrue(runtime['test_calls'][0].endswith('/api/latest-state?device_id=test'))
+        self.assertTrue(runtime['test_calls'][1].endswith('/api/json'))
+        self.assertEqual(runtime['cloud_status'], 'ok')
+
+    async def test_trip_sync_500_preserves_state_and_completes_ok(self):
+        runtime, _, _ = await self.run_sync(trip_500=True)
+        self.assertEqual(runtime['cloud_status'], 'ok')
+        self.assertIsNotNone(runtime['latest'])
+        self.assertIsNotNone(runtime['cloud_last_sync'])

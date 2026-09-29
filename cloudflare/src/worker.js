@@ -1695,9 +1695,15 @@ async function latestVehicleLock(env) {
 
 function parseTripRoute(trip) {
   const { route_json: routeJson, ...rest } = trip;
+  let route = [];
+  try {
+    route = typeof routeJson === "string" ? JSON.parse(routeJson || "[]") : (routeJson || []);
+  } catch {
+    route = [];
+  }
   return {
     ...rest,
-    route: JSON.parse(routeJson || "[]"),
+    route: Array.isArray(route) ? route : [],
   };
 }
 
@@ -1773,12 +1779,17 @@ async function fetchServerTripList(env, limit, offset = 0, includeRoute = false)
 }
 
 async function handleLatestState(request, env) {
-  if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
-  const deviceId = new URL(request.url).searchParams.get("device_id");
-  if (!deviceId) return json({ error: "device_id_required" }, 400);
-  const state = await env.DB.prepare("SELECT * FROM latest_state WHERE device_id = ?")
-    .bind(deviceId).first();
-  return json({ state });
+  try {
+    if (!authorize(request, env, false)) return json({ error: "unauthorized" }, 401);
+    const deviceId = new URL(request.url).searchParams.get("device_id");
+    if (!deviceId) return json({ error: "device_id_required" }, 400);
+    const state = await env.DB.prepare("SELECT * FROM latest_state WHERE device_id = ?")
+      .bind(deviceId).first();
+    return json({ state: state || null });
+  } catch (err) {
+    console.error("handleLatestState error:", err);
+    return json({ error: "latest_state_failed", message: String(err) }, 500);
+  }
 }
 
 async function fetchServerTrip(env, tripId) {
@@ -2323,13 +2334,22 @@ async function handleTripsWithQuality(request,env,pathname) {
   if(response.status!==200)return response;
   const body=await response.json();
   for(const trip of (body.trips||[body])) {
-    const quality=await env.DB.prepare("SELECT partial FROM trip_quality WHERE id=?").bind(trip.id).first();
-    if(quality)trip.partial=Boolean(quality.partial);
-    const distance=await env.DB.prepare("SELECT source,quality_json FROM trip_distance_quality WHERE id=?").bind(trip.id).first();
-    if(distance) {
-      trip.distance_source=distance.source;
-      trip.distance_quality=JSON.parse(distance.quality_json);
-    }
+    if (!trip || !trip.id) continue;
+    try {
+      const quality=await env.DB.prepare("SELECT partial FROM trip_quality WHERE id=?").bind(trip.id).first();
+      if(quality)trip.partial=Boolean(quality.partial);
+    } catch (_) {}
+    try {
+      const distance=await env.DB.prepare("SELECT source,quality_json FROM trip_distance_quality WHERE id=?").bind(trip.id).first();
+      if(distance) {
+        trip.distance_source=distance.source;
+        try {
+          trip.distance_quality=JSON.parse(distance.quality_json);
+        } catch (_) {
+          trip.distance_quality=null;
+        }
+      }
+    } catch (_) {}
   }
   return json(body);
 }
@@ -2609,26 +2629,31 @@ async function handleCleanup(request, env) {
 
 export default {
   async fetch(request, env) {
-    if (!requireBindings(env)) return json({error: "missing_cloudflare_bindings"}, 503);
-    const {pathname} = new URL(request.url);
-    if (pathname === '/api/terminal/bootstrap') {
-      const {terminalBootstrap} = await import('./terminal_bootstrap.js');
-      return terminalBootstrap(request, env, authorize(request, env, true));
+    try {
+      if (!requireBindings(env)) return json({error: "missing_cloudflare_bindings"}, 503);
+      const {pathname} = new URL(request.url);
+      if (pathname === '/api/terminal/bootstrap') {
+        const {terminalBootstrap} = await import('./terminal_bootstrap.js');
+        return terminalBootstrap(request, env, authorize(request, env, true));
+      }
+      if (request.method === "POST" && pathname === "/api/settings/sync") return handleSettingsSync(request, env);
+      if (request.method === "GET" && pathname === "/api/settings") return handleGetSettings(request, env);
+      if (request.method === "POST" && pathname === "/api/params/queue") return handleParamsQueue(request, env);
+      if (request.method === "GET" && pathname === "/api/params/pending") return handleParamsPending(request, env);
+      if (request.method === "POST" && pathname === "/api/params/ack") return handleParamsAck(request, env);
+      if (request.method === "GET" && pathname === "/api/params/status") return handleParamsStatus(request, env);
+      if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
+      if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
+      if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
+      if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
+      if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
+      if (request.method === "GET" && pathname === "/api/latest-state") return handleLatestState(request, env);
+      if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
+      return json({error: "not_found"}, 404);
+    } catch (err) {
+      console.error("Top-level worker error:", err);
+      return json({error: "internal_error", message: String(err)}, 500);
     }
-    if (request.method === "POST" && pathname === "/api/settings/sync") return handleSettingsSync(request, env);
-    if (request.method === "GET" && pathname === "/api/settings") return handleGetSettings(request, env);
-    if (request.method === "POST" && pathname === "/api/params/queue") return handleParamsQueue(request, env);
-    if (request.method === "GET" && pathname === "/api/params/pending") return handleParamsPending(request, env);
-    if (request.method === "POST" && pathname === "/api/params/ack") return handleParamsAck(request, env);
-    if (request.method === "GET" && pathname === "/api/params/status") return handleParamsStatus(request, env);
-    if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
-    if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
-    if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
-    if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
-    if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
-    if (request.method === "GET" && pathname === "/api/latest-state") return handleLatestState(request, env);
-    if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
-    return json({error: "not_found"}, 404);
   },
   async scheduled(event, env, ctx) {
     if (env.DB) {

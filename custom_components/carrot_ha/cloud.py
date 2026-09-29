@@ -59,14 +59,17 @@ async def sync(hass, runtime):
 
     history_ingested = False
     try:
+        fallback_trips = None
         try:
             feed = await get('/api/latest-state?' + urlencode({'device_id': entry.data['device_id']}))
         except CloudHTTPError as error:
-            if error.status != 404:
-                raise
-            # Keep older Workers usable during a rolling upgrade.
+            # Keep older or temporarily failing Workers usable by falling back to /api/json
+            _LOGGER.warning('Carrot latest-state endpoint unavailable (HTTP %s); falling back to /api/json', error.status)
             feed = await get('/api/json')
+            fallback_trips = feed.get('trips')
         await save({'state': feed.get('state')})
+        if fallback_trips and isinstance(fallback_trips, list):
+            await save({'trips': fallback_trips})
         cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
         while True:
             try:
@@ -83,33 +86,44 @@ async def sync(hass, runtime):
                 cursor = item['sequence']
                 await hass.async_add_executor_job(runtime['archive'].cursor,'telemetry',cursor)
             if not history['has_more']:break
-        offset = int(await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset') or 0)
-        seen = runtime.setdefault('trip_sync_seen', set())
-        if offset == 0:
-            seen.clear()
-        # Bound each run; resume the remaining pages on the next scheduled sync.
-        for _ in range(10):
-            feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
-            trips = feed.get('trips')
-            if not isinstance(trips, list):
-                raise ValueError('Invalid trips response')
-            ids = [trip.get('id') for trip in trips]
-            if any(not isinstance(key, str) or not key for key in ids):
-                raise ValueError('Invalid trip ID')
-            if trips and not set(ids).difference(seen):
-                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+        offset = 0
+        try:
+            offset = int(await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset') or 0)
+            seen = runtime.setdefault('trip_sync_seen', set())
+            if offset == 0:
                 seen.clear()
-                raise ValueError('Trip pagination did not advance')
-            await save({'trips': trips})
-            seen.update(ids)
-            offset += len(trips)
-            if len(trips) < 10:
-                runtime['cloud_trip_count'] = offset
-                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
-                seen.clear()
-                break
-            await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', offset)
-            await asyncio.sleep(0)
+            # Bound each run; resume the remaining pages on the next scheduled sync.
+            for _ in range(10):
+                feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
+                trips = feed.get('trips')
+                if not isinstance(trips, list):
+                    raise ValueError('Invalid trips response')
+                ids = [trip.get('id') for trip in trips]
+                if any(not isinstance(key, str) or not key for key in ids):
+                    raise ValueError('Invalid trip ID')
+                if trips and not set(ids).difference(seen):
+                    await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                    seen.clear()
+                    raise ValueError('Trip pagination did not advance')
+                await save({'trips': trips})
+                seen.update(ids)
+                offset += len(trips)
+                if len(trips) < 10:
+                    runtime['cloud_trip_count'] = offset
+                    await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                    seen.clear()
+                    break
+                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', offset)
+                await asyncio.sleep(0)
+        except CloudHTTPError as trip_error:
+            _LOGGER.warning('Carrot trip sync unavailable: HTTP %s at %s; preserving state and existing history', trip_error.status, trip_error.path)
+            if not fallback_trips and offset == 0:
+                try:
+                    legacy_feed = await get('/api/json')
+                    if isinstance(legacy_feed.get('trips'), list):
+                        await save({'trips': legacy_feed['trips']})
+                except Exception as legacy_error:
+                    _LOGGER.debug('Carrot fallback /api/json trip sync failed: %s', type(legacy_error).__name__)
         runtime['summary'] = await hass.async_add_executor_job(runtime['archive'].overview, entry.data['device_id'])
         runtime['cloud_status'] = 'ok'
         runtime['cloud_last_sync'] = datetime.now(timezone.utc).isoformat()

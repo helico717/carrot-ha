@@ -67,6 +67,13 @@ const ackPayload = {
 const ackRes = await (await request('/api/params/ack', 'upload-test', ackPayload)).json();
 assert.equal(ackRes.ok, true);
 
+// Comma syncs snapshot with applied values
+assert.equal((await request('/api/settings/sync', 'upload-test', {
+  device_id: 'test-id4',
+  catalog: syncPayload.catalog,
+  values: { AlwaysLateral: 1 }
+})).status, 200);
+
 // Verify settings values updated
 const updatedSettings = await (await request('/api/settings', 'view-test')).json();
 assert.equal(updatedSettings.values.AlwaysLateral, 1);
