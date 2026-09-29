@@ -437,6 +437,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (this.dashCard) {
       this.dashCard._hass = hass;
     }
+    this.updateCameraDevicesUI();
     if (!this._userThemeSelected) {
       const haTheme = this.getEffectiveTheme('auto');
       if (this.getAttribute('data-theme') !== haTheme) {
@@ -1439,6 +1440,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
                     ${this.renderDeviceSelectOptions()}
                   </select>
                 </div>
+                <!-- 실시간 감지된 카메라 엔터티 상태 리스트 -->
+                <div id="camEntitiesStatusBox" style="margin-top:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                  ${this.renderCameraEntitiesStatusHtml()}
+                </div>
                 <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
                   🔒 <b>보안 및 주행 안전 규칙</b>: 실기기 시험 시 Comma 장치와 서버가 최신 실제 Offroad 및 주차/충전 상태를 재검증합니다. 주행 중에는 카메라 연결이 즉시 차단됩니다.
                 </div>
@@ -1566,53 +1571,262 @@ export default class CarrotDebugDashboard extends HTMLElement {
     });
   }
 
-  findCarrotCameraEntities(deviceId = '') {
-    const states = this._hass?.states || {};
-    let wide = null, driver = null, road = null;
+  isCarrotCameraEntity(entityId, stateObj) {
+    if (!entityId || !entityId.startsWith('camera.')) return false;
+    const attr = stateObj?.attributes || {};
+    const name = attr.friendly_name || '';
+    const brand = (attr.brand || '').toLowerCase();
 
-    for (const [entityId, stateObj] of Object.entries(states)) {
-      if (!entityId.startsWith('camera.')) continue;
-      const uid = stateObj.attributes?.unique_id || '';
-      const name = stateObj.attributes?.friendly_name || '';
+    // 1. Explicitly exclude known non-Carrot integrations (e.g. 3D printers, generic IP cameras)
+    if (brand.includes('bambu') || entityId.includes('p2s') || entityId.includes('a1_combo')) return false;
+    if (entityId.includes('192_168_') || entityId.includes('gm_house') || entityId.includes('live_view')) return false;
+    if (attr.model && attr.model.toLowerCase().includes('bambu')) return false;
 
-      if (deviceId && !entityId.includes(deviceId) && !uid.includes(deviceId)) {
-        continue;
-      }
+    // 2. Offroad viewing mode and HLS transport are exclusive signatures of CarrotCamera (custom_components/carrot_ha/camera.py)
+    if (attr.viewing_mode === 'offroad_only' || attr.transport === 'https_hls') return true;
 
-      if (entityId.endsWith('_camera_wide') || entityId.endsWith('_wide') || uid.endsWith('_camera_wide') || name.includes('광각')) {
-        wide = entityId;
-      } else if (entityId.endsWith('_camera_driver') || entityId.endsWith('_driver') || uid.endsWith('_camera_driver') || name.includes('실내') || name.includes('운전자')) {
-        driver = entityId;
-      } else if (entityId.endsWith('_camera_road') || entityId.endsWith('_road') || uid.endsWith('_camera_road') || name.includes('망원')) {
-        road = entityId;
+    // 3. Korean entity naming pattern from Carrot HA setup:
+    // camera.comma_gwanggag_kamera, camera.comma_silnae_kamera, camera.comma_mangweon_kamera
+    if (entityId.includes('_gwanggag_kamera') || entityId.includes('_silnae_kamera') || entityId.includes('_mangweon_kamera')) return true;
+
+    // 4. Standard Carrot HA unique_id / suffix patterns
+    const uid = attr.unique_id || '';
+    if (uid.includes('_camera_wide') || uid.includes('_camera_driver') || uid.includes('_camera_road')) return true;
+    if (entityId.endsWith('_camera_wide') || entityId.endsWith('_camera_driver') || entityId.endsWith('_camera_road')) return true;
+
+    // 5. Friendly name matching Comma
+    if (name.includes('Comma') && (name.includes('광각') || name.includes('실내') || name.includes('망원') || name.toLowerCase().includes('wide') || name.toLowerCase().includes('driver') || name.toLowerCase().includes('road'))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  identifyCarrotCameraRole(entityId, stateObj) {
+    const attr = stateObj?.attributes || {};
+    const name = attr.friendly_name || '';
+    const uid = attr.unique_id || '';
+
+    if (
+      entityId.endsWith('_gwanggag_kamera') ||
+      entityId.endsWith('_camera_wide') ||
+      entityId.endsWith('_wide') ||
+      uid.endsWith('_camera_wide') ||
+      name.includes('광각') ||
+      name.toLowerCase().includes('wide')
+    ) {
+      return 'wide';
+    }
+
+    if (
+      entityId.endsWith('_silnae_kamera') ||
+      entityId.endsWith('_camera_driver') ||
+      entityId.endsWith('_driver') ||
+      uid.endsWith('_camera_driver') ||
+      name.includes('실내') ||
+      name.includes('운전자') ||
+      name.toLowerCase().includes('driver')
+    ) {
+      return 'driver';
+    }
+
+    if (
+      entityId.endsWith('_mangweon_kamera') ||
+      entityId.endsWith('_camera_road') ||
+      entityId.endsWith('_road') ||
+      uid.endsWith('_camera_road') ||
+      name.includes('망원') ||
+      name.toLowerCase().includes('road')
+    ) {
+      return 'road';
+    }
+
+    return null;
+  }
+
+  extractCarrotDeviceId(entityId, stateObj) {
+    const attr = stateObj?.attributes || {};
+    const uid = attr.unique_id || '';
+
+    if (uid && uid.includes('_camera_')) {
+      const match = uid.match(/^(.*?)_camera_(?:wide|driver|road)$/);
+      if (match && match[1]) return match[1];
+    }
+
+    const idWithoutDomain = entityId.replace(/^camera\./, '');
+    const suffixes = [
+      '_gwanggag_kamera',
+      '_silnae_kamera',
+      '_mangweon_kamera',
+      '_camera_wide',
+      '_camera_driver',
+      '_camera_road',
+      '_wide_kamera',
+      '_driver_kamera',
+      '_road_kamera',
+      '_wide',
+      '_driver',
+      '_road'
+    ];
+
+    for (const suffix of suffixes) {
+      if (idWithoutDomain.endsWith(suffix)) {
+        const prefix = idWithoutDomain.slice(0, -suffix.length);
+        return prefix || 'comma';
       }
     }
 
-    return { wide, driver, road };
+    return idWithoutDomain.split('_')[0] || 'comma';
+  }
+
+  getCarrotCameraDevices() {
+    const states = this._hass?.states || {};
+    const devicesMap = new Map();
+
+    for (const [entityId, stateObj] of Object.entries(states)) {
+      if (!this.isCarrotCameraEntity(entityId, stateObj)) continue;
+
+      const role = this.identifyCarrotCameraRole(entityId, stateObj);
+      if (!role) continue;
+
+      const deviceId = this.extractCarrotDeviceId(entityId, stateObj);
+      if (!devicesMap.has(deviceId)) {
+        const friendlyName = stateObj.attributes?.friendly_name || '';
+        const devName = friendlyName.startsWith('Comma')
+          ? 'Comma'
+          : (deviceId.charAt(0).toUpperCase() + deviceId.slice(1));
+
+        devicesMap.set(deviceId, {
+          id: deviceId,
+          name: devName,
+          wide: null,
+          driver: null,
+          road: null,
+          wideState: null,
+          driverState: null,
+          roadState: null
+        });
+      }
+
+      const dev = devicesMap.get(deviceId);
+      dev[role] = entityId;
+      dev[`${role}State`] = stateObj.state;
+    }
+
+    return Array.from(devicesMap.values());
+  }
+
+  findCarrotCameraEntities(deviceId = '') {
+    const devices = this.getCarrotCameraDevices();
+    if (devices.length === 0) {
+      return { wide: null, driver: null, road: null };
+    }
+
+    let dev = null;
+    if (deviceId) {
+      dev = devices.find(d => d.id === deviceId);
+    }
+    if (!dev) {
+      dev = devices.find(d => d.wide && d.driver) || devices[0];
+    }
+
+    return {
+      wide: dev ? dev.wide : null,
+      driver: dev ? dev.driver : null,
+      road: dev ? dev.road : null,
+      device: dev
+    };
   }
 
   renderDeviceSelectOptions() {
     const isEn = this.state.lang === 'en';
-    const states = this._hass?.states || {};
-    const devices = new Set();
+    const devices = this.getCarrotCameraDevices();
 
-    for (const [entityId, stateObj] of Object.entries(states)) {
-      if (entityId.startsWith('camera.')) {
-        const parts = entityId.slice(7).split('_');
-        if (parts.length > 1) {
-          devices.add(parts.slice(0, -1).join('_'));
-        }
+    if (devices.length === 0) {
+      return `<option value="">${isEn ? 'Comma 3X / Carrot Device (Not detected)' : 'Comma 3X / 당근 기기 (감지되지 않음)'}</option>`;
+    }
+
+    return devices.map(dev => {
+      const selected = (this.state.selectedCameraDevice === dev.id || (!this.state.selectedCameraDevice && devices.length === 1)) ? 'selected' : '';
+      const hasBoth = dev.wide && dev.driver;
+      const statusText = hasBoth
+        ? (isEn ? 'Wide & Cabin Connected' : '광각·실내 연결됨')
+        : (isEn ? 'Partial Cameras' : '일부 카메라만 연결됨');
+      return `<option value="${dev.id}" ${selected}>🚗 ${dev.name} (${dev.id}) · ${statusText}</option>`;
+    }).join('');
+  }
+
+  renderCameraEntitiesStatusHtml() {
+    const isEn = this.state.lang === 'en';
+    const camEntities = this.findCarrotCameraEntities(this.state.selectedCameraDevice);
+
+    const formatEntityChip = (label, entityId, state) => {
+      if (!entityId) {
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+            <span style="color:#94a3b8;">${label}</span>
+            <span style="color:#f87171;font-weight:600;">⚠️ ${isEn ? 'Not found' : '미설정'}</span>
+          </div>`;
+      }
+      const isOnline = state && state !== 'unavailable';
+      const stateBadge = isOnline
+        ? `<span style="color:#34d399;font-weight:600;">● ${state}</span>`
+        : `<span style="color:#f87171;font-weight:600;">● ${state || 'offline'}</span>`;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span style="color:#cbd5e1;font-weight:500;">${label}: <code style="font-size:10.5px;color:#93c5fd;">${entityId}</code></span>
+          ${stateBadge}
+        </div>`;
+    };
+
+    const wideState = this._hass?.states?.[camEntities.wide]?.state;
+    const driverState = this._hass?.states?.[camEntities.driver]?.state;
+    const roadState = this._hass?.states?.[camEntities.road]?.state;
+
+    return `
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+        <span>${isEn ? 'Detected Comma Camera Streams' : '감지된 Comma 카메라 스트림'}</span>
+        <span style="font-size:10.5px;font-weight:600;color:${camEntities.wide && camEntities.driver ? '#34d399' : '#f87171'};">
+          ${camEntities.wide && camEntities.driver ? (isEn ? '✓ Ready for 360°' : '✓ 360° 합성 준비 완료') : (isEn ? '⚠️ Need Wide & Cabin' : '⚠️ 광각·실내 필요')}
+        </span>
+      </div>
+      ${formatEntityChip(isEn ? 'Front Wide' : '전방 광각', camEntities.wide, wideState)}
+      ${formatEntityChip(isEn ? 'Cabin Wide' : '실내 광각', camEntities.driver, driverState)}
+      ${formatEntityChip(isEn ? 'Front Road' : '전방 망원', camEntities.road, roadState)}
+    `;
+  }
+
+  updateCameraDevicesUI() {
+    const root = this.shadowRoot;
+    if (!root) return;
+
+    const camDeviceSelect = root.querySelector('#camDeviceSelect');
+    if (camDeviceSelect) {
+      camDeviceSelect.innerHTML = this.renderDeviceSelectOptions();
+      const devices = this.getCarrotCameraDevices();
+      if (!this.state.selectedCameraDevice && devices.length > 0) {
+        this.state.selectedCameraDevice = devices[0].id;
+        camDeviceSelect.value = devices[0].id;
       }
     }
 
-    if (devices.size === 0) {
-      return `<option value="">${isEn ? 'Comma 3X / Carrot Device (Auto-detect)' : 'Comma 3X / 당근 기기 (자동 감지)'}</option>`;
+    const camEntitiesStatusBox = root.querySelector('#camEntitiesStatusBox');
+    if (camEntitiesStatusBox) {
+      camEntitiesStatusBox.innerHTML = this.renderCameraEntitiesStatusHtml();
     }
 
-    return Array.from(devices).map(dev => {
-      const selected = this.state.selectedCameraDevice === dev ? 'selected' : '';
-      return `<option value="${dev}" ${selected}>${dev}</option>`;
-    }).join('');
+    const cameraModeVal = root.querySelector('#cameraModeVal');
+    const isEn = this.state.lang === 'en';
+    const effectiveMode = this.getEffectiveCameraMode();
+    if (cameraModeVal) {
+      cameraModeVal.textContent = effectiveMode === 'real'
+        ? (isEn ? '🚗 Live Vehicle Mode' : '🚗 실기기 연결 모드')
+        : (isEn ? '🧪 Simulation Mode' : '🧪 모의 시뮬레이션 모드');
+    }
+
+    if (this.dashCard && typeof this.dashCard.render === 'function') {
+      this.dashCard.render();
+    }
   }
 
   mountDashboard() {
@@ -5016,6 +5230,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       if (this.cameraModal && this.cameraModal.isOpen) {
         this.cameraModal.close();
       }
+      this.updateCameraDevicesUI();
       this.applyDebugTelemetry();
     };
 
@@ -5070,6 +5285,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (camDeviceSelect) {
       camDeviceSelect.addEventListener('change', (e) => {
         this.state.selectedCameraDevice = e.target.value;
+        this.updateCameraDevicesUI();
         this.applyDebugTelemetry();
       });
     }

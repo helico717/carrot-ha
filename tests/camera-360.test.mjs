@@ -252,4 +252,111 @@ assert.ok(debug.cameraModal.msg.includes('주행') || debug.cameraModal.msg.incl
 assert.equal(debug.cameraModal.cleaned, true);
 console.log('Driving safety automatic stop rule passed.');
 
+// 6. Test Non-Carrot Camera Filtering & Comma Device Grouping
+console.log('Testing Non-Carrot camera rejection and Comma device grouping...');
+const liveHaMockStates = {
+  // Non-Carrot Cameras: Bambu Lab 3D printers, Generic IP, Frigate, TP-Link
+  'camera.p2s_combo': {
+    state: 'idle',
+    attributes: { access_token: 'tok1', friendly_name: 'P2S Combo', supported_features: 2 }
+  },
+  'camera.p2s_combo_camera': {
+    state: 'streaming',
+    attributes: { brand: 'Bambu Lab', icon: 'mdi:camera', friendly_name: 'P2S_Combo 카메라', supported_features: 2 }
+  },
+  'camera.a1_combo_camera': {
+    state: 'streaming',
+    attributes: { brand: 'Bambu Lab', icon: 'mdi:camera', friendly_name: 'A1_Combo 카메라', supported_features: 0 }
+  },
+  'camera.192_168_0_140': {
+    state: 'idle',
+    attributes: { friendly_name: '할머니집 카메라 HD', supported_features: 2 }
+  },
+  'camera.gm_house': {
+    state: 'unavailable',
+    attributes: { friendly_name: 'Gm House' }
+  },
+  // Genuine Carrot HA Cameras (Comma 3 / 3X)
+  'camera.comma_gwanggag_kamera': {
+    state: 'idle',
+    attributes: {
+      friendly_name: 'Comma 광각 카메라',
+      unique_id: 'test-id4_camera_wide',
+      viewing_mode: 'offroad_only',
+      transport: 'https_hls',
+      session_limit_seconds: 300,
+      supported_features: 3
+    }
+  },
+  'camera.comma_silnae_kamera': {
+    state: 'idle',
+    attributes: {
+      friendly_name: 'Comma 실내 카메라',
+      unique_id: 'test-id4_camera_driver',
+      viewing_mode: 'offroad_only',
+      transport: 'https_hls',
+      session_limit_seconds: 300,
+      supported_features: 3
+    }
+  },
+  'camera.comma_mangweon_kamera': {
+    state: 'idle',
+    attributes: {
+      friendly_name: 'Comma 망원 카메라',
+      unique_id: 'test-id4_camera_road',
+      viewing_mode: 'offroad_only',
+      transport: 'https_hls',
+      session_limit_seconds: 300,
+      supported_features: 3
+    }
+  }
+};
+
+debug._hass = { states: liveHaMockStates };
+debug.state.selectedCameraDevice = '';
+
+// Test non-Carrot filtering
+assert.equal(debug.isCarrotCameraEntity('camera.p2s_combo', liveHaMockStates['camera.p2s_combo']), false);
+assert.equal(debug.isCarrotCameraEntity('camera.p2s_combo_camera', liveHaMockStates['camera.p2s_combo_camera']), false);
+assert.equal(debug.isCarrotCameraEntity('camera.a1_combo_camera', liveHaMockStates['camera.a1_combo_camera']), false);
+assert.equal(debug.isCarrotCameraEntity('camera.192_168_0_140', liveHaMockStates['camera.192_168_0_140']), false);
+assert.equal(debug.isCarrotCameraEntity('camera.gm_house', liveHaMockStates['camera.gm_house']), false);
+
+// Test genuine Carrot camera acceptance
+assert.equal(debug.isCarrotCameraEntity('camera.comma_gwanggag_kamera', liveHaMockStates['camera.comma_gwanggag_kamera']), true);
+assert.equal(debug.isCarrotCameraEntity('camera.comma_silnae_kamera', liveHaMockStates['camera.comma_silnae_kamera']), true);
+assert.equal(debug.isCarrotCameraEntity('camera.comma_mangweon_kamera', liveHaMockStates['camera.comma_mangweon_kamera']), true);
+
+// Test grouping into single device
+const carrotDevices = debug.getCarrotCameraDevices();
+assert.equal(carrotDevices.length, 1, 'Must discover exactly 1 Carrot device, ignoring all 3D printers and IP cams');
+assert.equal(carrotDevices[0].id, 'test-id4', 'Device ID must be test-id4 from unique_id');
+assert.equal(carrotDevices[0].name, 'Comma');
+assert.equal(carrotDevices[0].wide, 'camera.comma_gwanggag_kamera');
+assert.equal(carrotDevices[0].driver, 'camera.comma_silnae_kamera');
+assert.equal(carrotDevices[0].road, 'camera.comma_mangweon_kamera');
+
+// Test findCarrotCameraEntities with empty deviceId auto-picks Comma device
+const resolvedCameras = debug.findCarrotCameraEntities();
+assert.equal(resolvedCameras.wide, 'camera.comma_gwanggag_kamera');
+assert.equal(resolvedCameras.driver, 'camera.comma_silnae_kamera');
+assert.equal(resolvedCameras.road, 'camera.comma_mangweon_kamera');
+
+// Test dropdown HTML: Must contain Comma and NOT contain any non-Carrot devices
+const dropdownHtml = debug.renderDeviceSelectOptions();
+assert.ok(dropdownHtml.includes('test-id4'), 'Dropdown must list test-id4');
+assert.ok(dropdownHtml.includes('광각·실내 연결됨'), 'Dropdown must show connected status');
+assert.equal(dropdownHtml.includes('p2s'), false, 'Dropdown must NOT contain p2s 3D printer');
+assert.equal(dropdownHtml.includes('a1_combo'), false, 'Dropdown must NOT contain a1_combo 3D printer');
+assert.equal(dropdownHtml.includes('192_168_0'), false, 'Dropdown must NOT contain 192_168_0 IP camera');
+
+// Test status chips HTML
+const statusHtml = debug.renderCameraEntitiesStatusHtml();
+assert.ok(statusHtml.includes('camera.comma_gwanggag_kamera'));
+assert.ok(statusHtml.includes('camera.comma_silnae_kamera'));
+assert.ok(statusHtml.includes('camera.comma_mangweon_kamera'));
+assert.ok(statusHtml.includes('360° 합성 준비 완료'));
+
+console.log('Non-Carrot camera rejection and Comma device grouping passed.');
+
 console.log('\n=== ALL 360 CAMERA UNIT TESTS PASSED SUCCESSFULLY ===\n');
