@@ -43,6 +43,8 @@ class CarrotTerminalCard extends HTMLElement {
     this._sending = false;
     this._ctrlActive = false;
     this._decoder = new TextDecoder('utf-8');
+    this._promptTimer = null;
+    this._hasOutputThisSession = false;
   }
 
   static getStubConfig() { return {device_id: 'test-id4'}; }
@@ -81,6 +83,7 @@ class CarrotTerminalCard extends HTMLElement {
     this._terminal?.dispose?.();
     this._terminal = null;
     if (this._flushTimer) clearTimeout(this._flushTimer);
+    if (this._promptTimer) clearTimeout(this._promptTimer);
   }
 
   async _resubscribe() {
@@ -150,12 +153,25 @@ class CarrotTerminalCard extends HTMLElement {
     return this._terminal;
   }
 
+  _schedulePromptFallback() {
+    if (this._promptTimer) clearTimeout(this._promptTimer);
+    // If output is not received within 400ms (e.g. re-attached to an idle, existing shell session
+    // where historical output was suppressed), send a single newline to reveal the prompt.
+    this._promptTimer = setTimeout(() => {
+      this._promptTimer = null;
+      if (this._active && !this._hasOutputThisSession) {
+        this._enqueue('\r');
+      }
+    }, 400);
+  }
+
   async _connect() {
     if (!this._hass || this._active) return;
     try {
       const terminal = await this._ensureTerminal();
       terminal.focus();
       this._setMessage('연결 요청 중…');
+      this._hasOutputThisSession = false;
       await this._hass.connection.sendMessagePromise({
         type: 'carrot_ha/terminal/acquire',
         device_id: this._config.device_id,
@@ -164,12 +180,11 @@ class CarrotTerminalCard extends HTMLElement {
       this._setMessage('연결됨');
       this._renderState();
       this._fit();
-      // Prompt auto-trigger: send newline so user immediately sees shell prompt
-      setTimeout(() => {
-        if (this._active) this._enqueue('\r');
-      }, 150);
+      this._schedulePromptFallback();
     } catch (error) {
       this._active = false;
+      if (this._promptTimer) clearTimeout(this._promptTimer);
+      this._promptTimer = null;
       this._setMessage(error.message || '터미널 연결 실패', true);
       this._renderState();
     }
@@ -177,6 +192,9 @@ class CarrotTerminalCard extends HTMLElement {
 
   async _release() {
     if (!this._hass || !this._config?.device_id || !this._active) return;
+    if (this._promptTimer) clearTimeout(this._promptTimer);
+    this._promptTimer = null;
+    this._hasOutputThisSession = false;
     this._active = false;
     this._renderState();
     try {
@@ -261,6 +279,9 @@ class CarrotTerminalCard extends HTMLElement {
       return;
     }
     if (event.type === 'ended') {
+      if (this._promptTimer) clearTimeout(this._promptTimer);
+      this._promptTimer = null;
+      this._hasOutputThisSession = false;
       this._active = false;
       this._setMessage(`종료됨: ${event.reason || 'session ended'}`, true);
       this._renderState();
@@ -271,15 +292,20 @@ class CarrotTerminalCard extends HTMLElement {
       this._setMessage('연결됨');
       this._renderState();
       this._fit();
-      setTimeout(() => {
-        if (this._active) this._enqueue('\r');
-      }, 150);
+      if (!this._hasOutputThisSession) {
+        this._schedulePromptFallback();
+      }
       return;
     }
     if (event.type !== 'terminal' || !event.message) return;
     const message = event.message;
     const terminal = await this._ensureTerminal();
     if (message.type === 'pty_output' && typeof message.b64 === 'string') {
+      this._hasOutputThisSession = true;
+      if (this._promptTimer) {
+        clearTimeout(this._promptTimer);
+        this._promptTimer = null;
+      }
       const raw = atob(message.b64);
       const bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
       terminal.write(bytes);
@@ -353,9 +379,9 @@ class CarrotTerminalCard extends HTMLElement {
         }
         .actions { display: inline-flex; gap: 8px; }
         .actions button {
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.16));
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.2));
           border-radius: 8px;
-          background: var(--secondary-background-color, #242730);
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 6%, var(--card-background-color, #242730));
           color: var(--primary-text-color, #fff);
           padding: 7px 14px;
           font-size: 13px;
@@ -365,10 +391,10 @@ class CarrotTerminalCard extends HTMLElement {
           transition: all 0.15s ease;
         }
         .actions button:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary-text-color, #fff) 18%, #242730);
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 14%, var(--card-background-color, #242730));
         }
         .actions button:disabled, .workflows button:disabled, .keys button:disabled {
-          opacity: 0.35;
+          opacity: 0.45;
           cursor: not-allowed;
         }
 
@@ -398,7 +424,7 @@ class CarrotTerminalCard extends HTMLElement {
           gap: 8px;
           padding: 10px 14px;
           background: var(--card-background-color, #13151b);
-          border-top: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+          border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.15));
           overflow-x: auto;
           align-items: center;
           -webkit-overflow-scrolling: touch;
@@ -407,9 +433,9 @@ class CarrotTerminalCard extends HTMLElement {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.16));
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.2));
           border-radius: 8px;
-          background: var(--secondary-background-color, #20232c);
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 6%, var(--card-background-color, #20232c));
           color: var(--primary-text-color, #fff);
           padding: 7px 14px;
           font-size: 12px;
@@ -419,23 +445,23 @@ class CarrotTerminalCard extends HTMLElement {
           transition: all 0.15s ease;
         }
         .workflow-btn:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary-text-color, #fff) 18%, #20232c);
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 14%, var(--card-background-color, #20232c));
         }
         .workflow-btn.primary {
           border-color: color-mix(in srgb, var(--primary-color, #03a9f4) 60%, transparent);
-          background: color-mix(in srgb, var(--primary-color, #03a9f4) 18%, transparent);
-          color: var(--primary-color, #4fc3f7);
+          background: color-mix(in srgb, var(--primary-color, #03a9f4) 15%, transparent);
+          color: var(--primary-color, #03a9f4);
         }
         .workflow-btn.primary:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary-color, #03a9f4) 30%, transparent);
+          background: color-mix(in srgb, var(--primary-color, #03a9f4) 25%, transparent);
         }
         .workflow-btn.danger {
           border-color: color-mix(in srgb, var(--error-color, #f44336) 50%, transparent);
-          background: color-mix(in srgb, var(--error-color, #f44336) 16%, transparent);
-          color: var(--error-color, #ff7961);
+          background: color-mix(in srgb, var(--error-color, #f44336) 15%, transparent);
+          color: var(--error-color, #e53935);
         }
         .workflow-btn.danger:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--error-color, #f44336) 30%, transparent);
+          background: color-mix(in srgb, var(--error-color, #f44336) 25%, transparent);
         }
 
         /* Mobile / Navigation Keys Bar */
@@ -444,28 +470,29 @@ class CarrotTerminalCard extends HTMLElement {
           gap: 6px;
           padding: 8px 14px;
           background: var(--secondary-background-color, #0d0f13);
-          border-top: 1px solid var(--divider-color, rgba(255, 255, 255, 0.06));
+          border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.12));
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
         }
         .keys button {
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+          border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.22));
           border-radius: 7px;
-          background: #1c1f26;
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 8%, var(--card-background-color, #1c1f26));
           color: var(--primary-text-color, #e0e0e0);
           padding: 6px 12px;
           font-size: 12px;
           font-weight: 600;
           cursor: pointer;
           white-space: nowrap;
-          transition: background 0.15s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+          transition: background 0.15s ease, border-color 0.15s ease;
         }
         .keys button:hover:not(:disabled) {
-          background: color-mix(in srgb, var(--primary-text-color, #fff) 18%, #1c1f26);
+          background: color-mix(in srgb, var(--primary-text-color, #fff) 16%, var(--card-background-color, #1c1f26));
         }
         .keys button.active {
           background: var(--primary-color, #03a9f4) !important;
-          color: #fff !important;
+          color: #ffffff !important;
           border-color: var(--primary-color, #03a9f4) !important;
         }
 
