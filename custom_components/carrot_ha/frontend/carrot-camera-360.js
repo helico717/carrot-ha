@@ -14,7 +14,8 @@ const RAD2DEG = 180 / Math.PI;
 export class Camera360Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    // GLSL ES 1.00 shaders: request the matching context.
+    this.gl = canvas.getContext('webgl');
     if (!this.gl) {
       throw new Error('WebGL not supported');
     }
@@ -23,7 +24,7 @@ export class Camera360Renderer {
     this.rearTexture = null;
     this.yaw = 0.0;     // radians
     this.pitch = 0.0;   // radians (-75 deg to +75 deg)
-    this.fov = 85.0 * DEG2RAD; // 85 degree display FOV
+    this.fov = 75.0 * DEG2RAD; // FOV along the longer viewport dimension
     this.viewMode = 0;  // 0: 360 stitched, 1: front only, 2: cabin only
 
     // Lens calibration parameters (configurable, not hardcoded APK constants)
@@ -36,6 +37,7 @@ export class Camera360Renderer {
       rearDist: [0.0, 0.0]
     };
 
+    this.sourceAspect = [1344 / 760, 1344 / 760];
     this.initGL();
   }
 
@@ -69,11 +71,12 @@ export class Camera360Renderer {
       uniform vec2 u_rearDist;
       uniform float u_frontMaxAngle;
       uniform float u_rearMaxAngle;
+      uniform vec2 u_sourceAspect;
 
       vec3 getRay(vec2 uv, float aspect) {
         vec2 ndc = uv * 2.0 - 1.0;
         float tanHalfFov = tan(u_fov * 0.5);
-        vec3 ray = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, 1.0));
+        vec3 ray = normalize(vec3(ndc.x * tanHalfFov * min(aspect, 1.0), ndc.y * tanHalfFov / max(aspect, 1.0), 1.0));
 
         // Pitch around X
         float cp = cos(u_pitch);
@@ -88,9 +91,9 @@ export class Camera360Renderer {
         return normalize(r2);
       }
 
-      vec4 sampleFisheye(sampler2D tex, vec3 ray, vec3 forward, vec3 right, vec3 up, float maxAngle, vec2 center, vec2 dist, bool mirrorX) {
+      vec4 sampleFisheye(sampler2D tex, vec3 ray, vec3 forward, vec3 right, vec3 up, float maxAngle, vec2 center, vec2 dist, float sourceAspect, bool mirrorX) {
         float cosA = dot(ray, forward);
-        if (cosA <= 0.0) return vec4(0.0);
+        // Fisheye overlap extends beyond 90 degrees; do not clip it.
 
         float angle = acos(clamp(cosA, -1.0, 1.0));
         if (angle > maxAngle) return vec4(0.0);
@@ -106,7 +109,7 @@ export class Camera360Renderer {
         float rDist = normAngle * (1.0 + dist.x * normAngle * normAngle + dist.y * pow(normAngle, 4.0));
 
         float nx = (rx / rLen) * rDist * 0.5;
-        float ny = (ry / rLen) * rDist * 0.5;
+        float ny = (ry / rLen) * rDist * 0.5 * sourceAspect;
 
         if (mirrorX) nx = -nx;
 
@@ -116,7 +119,7 @@ export class Camera360Renderer {
           return vec4(0.0);
         }
 
-        float edgeFalloff = smoothstep(1.0, 0.94, normAngle);
+        float edgeFalloff = (1.0 - smoothstep(0.94, 1.0, normAngle));
         vec4 col = texture2D(tex, texCoord);
         return vec4(col.rgb, col.a * edgeFalloff);
       }
@@ -132,20 +135,20 @@ export class Camera360Renderer {
         }
 
         if (u_viewMode == 1) { // Front only
-          vec4 f = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, false);
+          vec4 f = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, u_sourceAspect.x, false);
           gl_FragColor = vec4(mix(bg, f.rgb, f.a), 1.0);
           return;
         }
 
         if (u_viewMode == 2) { // Cabin only
-          vec4 r = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, false);
+          vec4 r = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
           gl_FragColor = vec4(mix(bg, r.rgb, r.a), 1.0);
           return;
         }
 
         // 360 Stitched Mode
-        vec4 frontCol = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, false);
-        vec4 rearCol = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, false);
+        vec4 frontCol = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, u_sourceAspect.x, false);
+        vec4 rearCol = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
 
         float wFront = frontCol.a;
         float wRear = rearCol.a;
@@ -185,6 +188,7 @@ export class Camera360Renderer {
 
     this.uniforms = {
       resolution: gl.getUniformLocation(program, 'u_resolution'),
+      sourceAspect: gl.getUniformLocation(program, 'u_sourceAspect'),
       yaw: gl.getUniformLocation(program, 'u_yaw'),
       pitch: gl.getUniformLocation(program, 'u_pitch'),
       fov: gl.getUniformLocation(program, 'u_fov'),
@@ -231,6 +235,9 @@ export class Camera360Renderer {
 
   updateTexture(textureUnit, source) {
     if (!source) return;
+    const w = source.videoWidth || source.width;
+    const h = source.videoHeight || source.height;
+    if (w > 0 && h > 0) this.sourceAspect[textureUnit] = w / h;
     const gl = this.gl;
     const tex = textureUnit === 0 ? this.frontTexture : this.rearTexture;
     gl.activeTexture(textureUnit === 0 ? gl.TEXTURE0 : gl.TEXTURE1);
@@ -246,13 +253,19 @@ export class Camera360Renderer {
     const gl = this.gl;
     if (!gl || !this.program) return;
 
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    // CSS aspect ratios change on phones and on rotation. Never stretch a
+    // fixed 16:9 framebuffer into a differently shaped viewport.
+    const dpr = Math.min(globalThis.devicePixelRatio || 1, 2);
+    const width = Math.max(1, Math.round((this.canvas.clientWidth || this.canvas.width) * dpr));
+    const height = Math.max(1, Math.round((this.canvas.clientHeight || this.canvas.height) * dpr));
+    if (this.canvas.width !== width) this.canvas.width = width;
+    if (this.canvas.height !== height) this.canvas.height = height;
     gl.viewport(0, 0, width, height);
 
     gl.useProgram(this.program);
 
     gl.uniform2f(this.uniforms.resolution, width, height);
+    gl.uniform2fv(this.uniforms.sourceAspect, this.sourceAspect);
     gl.uniform1f(this.uniforms.yaw, this.yaw);
     gl.uniform1f(this.uniforms.pitch, this.pitch);
     gl.uniform1f(this.uniforms.fov, this.fov);
@@ -492,7 +505,9 @@ export class CarrotCamera360Modal {
     this.mode = 'mock';  // 'mock' | 'real'
     this.retryCount = 0;
     this.maxRetries = 3;
-    this.firstFrameTimeoutMs = 15000;
+    this.firstFrameTimeoutMs = 45000;
+    this.retryTimer = null;
+    this.closeTimer = null;
 
     // Front/Rear video elements or mock generators
     this.renderer = null;
@@ -823,16 +838,22 @@ export class CarrotCamera360Modal {
           border-color: #cbd5e1;
         }
         @media (max-width: 640px) {
-          .camera360-modal-root {
-            padding: 8px;
-          }
+          .camera360-modal-root { padding: 0; }
           .camera360-card {
-            border-radius: 16px;
+            height: 100dvh;
+            max-height: 100dvh;
+            border-radius: 0;
+            border: 0;
           }
+          .camera360-topbar { padding-top: max(12px, env(safe-area-inset-top)); flex-shrink: 0; }
+          .camera360-bottombar { padding-bottom: max(12px, env(safe-area-inset-bottom)); flex-shrink: 0; }
           .camera360-viewport {
-            aspect-ratio: 4 / 3;
-            min-height: 240px;
+            flex: 1;
+            aspect-ratio: auto;
+            min-height: 0;
+            max-height: none;
           }
+          .camera360-canvas { position: absolute; inset: 0; }
           .camera360-topbar, .camera360-bottombar {
             padding: 10px 14px;
           }
@@ -945,19 +966,24 @@ export class CarrotCamera360Modal {
         this.viewButtons.forEach(b => b.classList.toggle('is-active', b === btn));
         if (this.renderer) {
           this.renderer.viewMode = mode;
+          this.renderer.setOrientation(mode === 2 ? 180 : 0, 0);
+          this.updateHud();
         }
       });
     });
 
     // Pointer events for dragging
     let isDragging = false;
+    let dragPointer = null;
     let startX = 0;
     let startY = 0;
     let initialYaw = 0;
     let initialPitch = 0;
 
     const onPointerDown = (e) => {
-      if (!this.renderer || this.state !== 'playing') return;
+      if (!this.renderer || this.state !== 'playing' || isDragging || e.button > 0) return;
+      dragPointer = e.pointerId;
+      e.preventDefault();
       isDragging = true;
       this.viewport.classList.add('is-dragging');
       this.viewport.setPointerCapture(e.pointerId);
@@ -968,19 +994,21 @@ export class CarrotCamera360Modal {
     };
 
     const onPointerMove = (e) => {
-      if (!isDragging || !this.renderer) return;
+      if (!isDragging || !this.renderer || e.pointerId !== dragPointer) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      const sensitivity = 0.004;
+      const rect = this.viewport.getBoundingClientRect();
+      const sensitivity = this.renderer.fov / Math.max(rect.width, rect.height, 1);
 
       this.renderer.yaw = (initialYaw - dx * sensitivity) % (2 * Math.PI);
-      this.renderer.pitch = Math.max(-75 * DEG2RAD, Math.min(75 * DEG2RAD, initialPitch + dy * sensitivity));
+      this.renderer.pitch = Math.max(-75 * DEG2RAD, Math.min(75 * DEG2RAD, initialPitch - dy * sensitivity));
       this.updateHud();
     };
 
     const onPointerUp = (e) => {
-      if (!isDragging) return;
+      if (!isDragging || e.pointerId !== dragPointer) return;
       isDragging = false;
+      dragPointer = null;
       this.viewport.classList.remove('is-dragging');
       try {
         this.viewport.releasePointerCapture(e.pointerId);
@@ -991,6 +1019,7 @@ export class CarrotCamera360Modal {
     this.viewport.addEventListener('pointermove', onPointerMove);
     this.viewport.addEventListener('pointerup', onPointerUp);
     this.viewport.addEventListener('pointercancel', onPointerUp);
+    this.viewport.addEventListener('lostpointercapture', onPointerUp);
 
     // Escape key listener
     this._onKeyDown = (e) => {
@@ -1026,6 +1055,7 @@ export class CarrotCamera360Modal {
 
   open({ mode = 'mock', hass = null, deviceId = '', cameraEntities = {}, returnFocusElem = null } = {}) {
     if (this.isOpen) return;
+    clearTimeout(this.closeTimer);
     this.isOpen = true;
     this.mode = mode;
     this.hass = hass;
@@ -1034,6 +1064,13 @@ export class CarrotCamera360Modal {
     this.returnFocusElem = returnFocusElem;
     this.retryCount = 0;
     this.sessionSeq++;
+    this.viewDeadline = Date.now() + 300000;
+    clearTimeout(this.deadlineTimer);
+    this.deadlineTimer = setTimeout(() => {
+      if (!this.isOpen) return;
+      this.cleanupSession();
+      this.setState('error', this.lang === 'en' ? 'Viewing time ended. Close and reopen to start a new session.' : '시청 시간이 종료되었습니다. 닫고 다시 열어 새로 시작하세요.');
+    }, 300000);
     const currentSeq = this.sessionSeq;
 
     // Apply modal appearance
@@ -1126,6 +1163,11 @@ export class CarrotCamera360Modal {
     if (this.sessionSeq !== targetSeq || !this.isOpen) return;
 
     this.cleanupSession();
+    targetSeq = this.sessionSeq;
+    if (this.viewDeadline && Date.now() >= this.viewDeadline) {
+      this.setState('error', this.lang === 'en' ? 'Viewing time ended. Close and reopen.' : '시청 시간이 종료되었습니다. 닫고 다시 열어주세요.');
+      return;
+    }
 
     try {
       this.renderer = new Camera360Renderer(this.canvas);
@@ -1219,6 +1261,15 @@ export class CarrotCamera360Modal {
 
     this.setState('connecting', isEn ? 'Requesting authenticated camera streams from Home Assistant...' : 'Home Assistant에 인증된 카메라 스트림을 요청하고 있습니다...');
 
+      // Bound the entire request-to-first-frame path, including the HA WS request.
+      this.firstFrameTimer = setTimeout(() => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+        if (this.state !== 'playing') {
+          this.handlePlaybackFailure(isEn ? 'First frame timeout: camera capture delayed.' : '첫 프레임 수신 시간 초과: 카메라 구동 지연.');
+        }
+      }, this.firstFrameTimeoutMs);
+
+
     try {
       // Request HLS streams from HA WebSocket API for both cameras
       const [wideRes, driverRes] = await Promise.all([
@@ -1252,19 +1303,12 @@ export class CarrotCamera360Modal {
 
       this.setState('waiting_for_frames', isEn ? 'Waiting for first decoded keyframes...' : '첫 디코딩 프레임 대기 중...');
 
-      // Bounded first frame timeout (30 seconds)
-      this.firstFrameTimer = setTimeout(() => {
-        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-        if (this.state !== 'playing') {
-          this.handlePlaybackFailure(isEn ? 'First frame timeout: camera capture delayed.' : '첫 프레임 수신 시간 초과: 카메라 구동 지연.');
-        }
-      }, this.firstFrameTimeoutMs);
-
       // Wait until both videos have decoded data
       let frontReady = false;
       let rearReady = false;
 
       const checkReady = () => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
         if (frontVideo.readyState >= 2) frontReady = true;
         if (rearVideo.readyState >= 2) rearReady = true;
 
@@ -1305,8 +1349,8 @@ export class CarrotCamera360Modal {
 
       // Handle HLS loading (Hls.js prioritized, native Safari fallback)
       await Promise.all([
-        this._loadHls(frontVideo, wideUrl),
-        this._loadHls(rearVideo, driverUrl)
+        this._loadHls(frontVideo, wideUrl, targetSeq),
+        this._loadHls(rearVideo, driverUrl, targetSeq)
       ]);
 
       if (this.sessionSeq !== targetSeq || !this.isOpen) return;
@@ -1355,14 +1399,18 @@ export class CarrotCamera360Modal {
     return this._hlsLoadingPromise;
   }
 
-  async _loadHls(video, url) {
+  async _loadHls(video, url, targetSeq = this.sessionSeq) {
     const isEn = this.lang === 'en';
     await this._ensureHls();
+    const active = () => this.isOpen && this.sessionSeq === targetSeq;
+    if (!active()) return;
 
     // 1. Prefer Hls.js across Chrome, Firefox, Edge, Android
     if (window.Hls && window.Hls.isSupported()) {
       return new Promise((resolve, reject) => {
         let settled = false;
+        let recoveries = 0;
+        video._cancelLoad = () => { settled = true; resolve(); };
         const hls = new window.Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -1375,6 +1423,7 @@ export class CarrotCamera360Modal {
         video._hls = hls;
 
         hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+          if (!active()) return;
           if (!settled) {
             settled = true;
             resolve();
@@ -1383,7 +1432,13 @@ export class CarrotCamera360Modal {
         });
 
         hls.on(window.Hls.Events.ERROR, (event, data) => {
+          if (!active()) return;
           if (data.fatal) {
+            if (++recoveries > 2) {
+              if (!settled) { settled = true; reject(new Error(data.details || "HLS recovery failed")); }
+              else this.handlePlaybackFailure(data.details || "HLS recovery failed");
+              return;
+            }
             switch (data.type) {
               case window.Hls.ErrorTypes.NETWORK_ERROR:
                 hls.startLoad();
@@ -1403,13 +1458,8 @@ export class CarrotCamera360Modal {
           }
         });
 
-        setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            video.play().catch(() => {});
-            resolve();
-          }
-        }, 3000);
+        // Readiness is reported by manifest/decoded frames, never by a timer.
+        // The shared first-frame timer bounds startup and cancels this waiter.
       });
     }
 
@@ -1453,14 +1503,16 @@ export class CarrotCamera360Modal {
   }
 
   handlePlaybackFailure(reason) {
-    if (!this.isOpen) return;
+    if (!this.isOpen || this.state === 'retrying' || this.state === 'error') return;
     this.cleanupSession();
 
     if (this.retryCount < this.maxRetries) {
       this.retryCount++;
       this.setState('retrying', `${reason} (재시도 중 ${this.retryCount}/${this.maxRetries})`);
-      setTimeout(() => {
-        if (this.isOpen) this.startSession();
+      const retrySeq = this.sessionSeq;
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = null;
+        if (this.isOpen && this.sessionSeq === retrySeq) this.startSession(retrySeq);
       }, 2000);
     } else {
       this.setState('error', `${reason} — 최대 재시도 횟수를 초과했습니다.`);
@@ -1468,6 +1520,10 @@ export class CarrotCamera360Modal {
   }
 
   cleanupSession() {
+    // Invalidate callbacks BEFORE load()/destroy() can emit stale errors.
+    this.sessionSeq++;
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
     if (this.animId) {
       cancelAnimationFrame(this.animId);
       this.animId = null;
@@ -1484,16 +1540,18 @@ export class CarrotCamera360Modal {
 
     // Teardown real stream video elements & HLS players
     if (this.realStreams.frontVideo) {
+      this.realStreams.frontVideo._cancelLoad?.();
       if (this.realStreams.frontVideo._hls) this.realStreams.frontVideo._hls.destroy();
       this.realStreams.frontVideo.pause();
-      this.realStreams.frontVideo.src = '';
+      this.realStreams.frontVideo.removeAttribute('src');
       this.realStreams.frontVideo.load();
       this.realStreams.frontVideo = null;
     }
     if (this.realStreams.rearVideo) {
+      this.realStreams.rearVideo._cancelLoad?.();
       if (this.realStreams.rearVideo._hls) this.realStreams.rearVideo._hls.destroy();
       this.realStreams.rearVideo.pause();
-      this.realStreams.rearVideo.src = '';
+      this.realStreams.rearVideo.removeAttribute('src');
       this.realStreams.rearVideo.load();
       this.realStreams.rearVideo = null;
     }
@@ -1502,13 +1560,16 @@ export class CarrotCamera360Modal {
   close() {
     if (!this.isOpen) return;
     this.isOpen = false;
+    clearTimeout(this.deadlineTimer);
     this.sessionSeq++; // Invalidate pending callbacks
 
     this.cleanupSession();
     this.setState('stopped');
 
     this.wrapper.classList.remove('is-visible');
-    setTimeout(() => {
+    const closeSeq = this.sessionSeq;
+    this.closeTimer = setTimeout(() => {
+      if (this.isOpen || this.sessionSeq !== closeSeq) return;
       this.wrapper.style.display = 'none';
       document.body.style.overflow = '';
       if (this.returnFocusElem && typeof this.returnFocusElem.focus === 'function') {
