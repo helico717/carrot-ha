@@ -106,7 +106,7 @@ class CameraRelay:
         self.ws = ws
         try:
             await ws.prepare(request)
-            await ws.send_json({'type': 'hello', 'protocol': 1})
+            await ws.send_json({'type': 'hello', 'protocol': 2})
             async for message in ws:
                 if message.type == WSMsgType.BINARY:
                     await self.commands(self.session.accept_media(generation, message.data))
@@ -195,6 +195,49 @@ class CameraRelay:
         finally:
             await self.commands(self.session.unsubscribe(reader, reason=stop_reason))
         return response
+
+    async def live_ws(self, request):
+        if not self.ready:
+            raise web.HTTPServiceUnavailable(text='Camera device offline or busy')
+        ws = web.WebSocketResponse(heartbeat=10, compress=False)
+        await ws.prepare(request)
+
+        try:
+            reader, commands = self.session.subscribe('all')
+        except (RuntimeError, ValueError) as err:
+            await ws.close(code=1013, message=str(err).encode())
+            return ws
+
+        await self.commands(commands)
+        pump_task = None
+
+        async def pump_to_browser():
+            try:
+                while not reader.closed:
+                    data = await reader.queue.get()
+                    if data is None:
+                        break
+                    await ws.send_bytes(data)
+            except (ConnectionError, RuntimeError):
+                pass
+
+        pump_task = asyncio.create_task(pump_to_browser())
+        try:
+            async for msg in ws:
+                if msg.type == WSMsgType.TEXT:
+                    if msg.data == 'WLP1':
+                        await ws.send_str('WLP1')
+                elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
+                    break
+        finally:
+            if pump_task:
+                pump_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await pump_task
+            await self.commands(self.session.unsubscribe(reader, reason='viewer_closed'))
+            if not ws.closed:
+                await ws.close()
+        return ws
 
     async def stop_camera(self, camera):
         for ticket in self.tickets.values():

@@ -13,47 +13,51 @@ import time
 import uuid
 
 CAMERAS = {"wide": 1, "driver": 2, "road": 3}
-HEADER = struct.Struct("!4s16sB")
-MAGIC = b"CHV1"
-MAX_PAYLOAD = 188 * 512
+MAGIC_WLV1 = b"WLV1"
+HEADER_SIZE = 24
+HEADER = struct.Struct("!4sBB6sQI")
+
+FRAME_METADATA = 0
+FRAME_WIDE = 1
+FRAME_DRIVER = 2
+FRAME_STATUS = 3
+FRAME_ROAD = 4
+
+CAMERAS_BY_ID = {
+    FRAME_WIDE: "wide",
+    FRAME_DRIVER: "driver",
+    FRAME_ROAD: "road",
+}
+ID_BY_CAMERAS = {v: k for k, v in CAMERAS_BY_ID.items()}
+
+FLAG_KEY = 0x01
+MAX_PAYLOAD = 4 * 1024 * 1024
 MAX_VIEWERS = 8
-QUEUE_CHUNKS = 16
+QUEUE_CHUNKS = 32
 LEASE_SECONDS = 12
 MAX_SESSION_SECONDS = 300
 
 
-def encode_media(session_id, camera, payload):
-    if camera not in CAMERAS:
-        raise ValueError("Unknown camera")
-    _validate_ts(payload)
-    return HEADER.pack(MAGIC, uuid.UUID(session_id).bytes, CAMERAS[camera]) + payload
-
-
-def _validate_ts(payload):
-    if not payload or len(payload) > MAX_PAYLOAD or len(payload) % 188:
-        raise ValueError("Invalid MPEG-TS payload size")
-    if any(payload[offset] != 0x47 for offset in range(0, len(payload), 188)):
-        raise ValueError("Invalid MPEG-TS packet sync")
-
-
-def decode_media(data):
-    if not isinstance(data, bytes) or len(data) < HEADER.size or len(data) > HEADER.size + MAX_PAYLOAD:
-        raise ValueError("Invalid media message size")
-    magic, session, camera_id = HEADER.unpack_from(data)
-    if magic != MAGIC or camera_id not in CAMERAS.values():
-        raise ValueError("Invalid media message header")
-    payload = data[HEADER.size:]
-    _validate_ts(payload)
-    camera = next(name for name, value in CAMERAS.items() if value == camera_id)
-    return str(uuid.UUID(bytes=session)), camera, payload
+def decode_frame_header(data):
+    if not isinstance(data, (bytes, bytearray)) or len(data) < HEADER_SIZE:
+        raise ValueError("Frame too short")
+    magic, frame_type, flags, _, timestamp_us, payload_size = HEADER.unpack_from(data)
+    if magic != MAGIC_WLV1:
+        raise ValueError(f"Invalid frame magic: {magic!r}")
+    if len(data) < HEADER_SIZE + payload_size:
+        raise ValueError("Incomplete frame payload")
+    is_key = bool(flags & FLAG_KEY)
+    camera = CAMERAS_BY_ID.get(frame_type)
+    return frame_type, camera, is_key, timestamp_us, payload_size
 
 
 @dataclass(eq=False)
 class Reader:
-    camera: str
+    camera: str  # "wide", "driver", "all"
     queue: asyncio.Queue = field(default_factory=lambda: asyncio.Queue(maxsize=QUEUE_CHUNKS))
     closed: bool = False
     reason: str | None = None
+    dropping_until_key: bool = False
 
     def close(self, reason):
         if self.closed:
@@ -62,6 +66,7 @@ class Reader:
         while not self.queue.empty():
             self.queue.get_nowait()
         self.queue.put_nowait(None)
+
 
 
 class CameraSession:
@@ -108,7 +113,7 @@ class CameraSession:
         return commands
 
     def subscribe(self, camera, *, deadline=None):
-        if camera not in CAMERAS:
+        if camera not in CAMERAS and camera != "all":
             raise ValueError("Unknown camera")
         if (not self.ready or self.generation is None or self.last_device_seen is None
                 or self.clock() - self.last_device_seen >= LEASE_SECONDS):
@@ -125,7 +130,7 @@ class CameraSession:
                                 deadline if deadline is not None else float('inf'))
             commands.append({"type": "start", "session_id": self.session_id,
                              "cameras": list(CAMERAS), "lease_seconds": LEASE_SECONDS,
-                             "max_seconds": MAX_SESSION_SECONDS})
+                             "max_seconds": MAX_SESSION_SECONDS, "protocol": 2})
         elif self.clock() >= self.deadline:
             # The adapter's periodic tick is responsible for teardown; never
             # extend the existing deadline when another viewer arrives.
@@ -148,21 +153,41 @@ class CameraSession:
             return []
         if self.clock() - self.last_device_seen >= LEASE_SECONDS:
             return self.disconnect(generation)
-        session_id, camera, payload = decode_media(data)
-        if session_id != self.session_id or self.session_id is None:
+        if self.session_id is None:
             return []
         if self.clock() >= self.deadline:
             return self.stop("session_expired")
-        # Media traffic is not an offroad status heartbeat. Never extend a
-        # device lease using an endless video stream alone.
+
+        try:
+            frame_type, camera, is_key, _, _ = decode_frame_header(data)
+        except ValueError:
+            return []
+
+        # Deliver full wire frame to matching readers
         for reader in tuple(self.readers):
-            if reader.camera != camera:
+            if reader.camera != "all" and reader.camera != camera:
                 continue
+
+            if reader.dropping_until_key:
+                if not is_key:
+                    continue
+                reader.dropping_until_key = False
+
             try:
-                reader.queue.put_nowait(payload)
+                reader.queue.put_nowait(data)
             except asyncio.QueueFull:
-                self.readers.remove(reader)
-                reader.close("slow_consumer")
+                if not is_key:
+                    reader.dropping_until_key = True
+                else:
+                    while not reader.queue.empty():
+                        try:
+                            reader.queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+                    try:
+                        reader.queue.put_nowait(data)
+                    except asyncio.QueueFull:
+                        pass
         return self.stop("no_viewers") if not self.readers else []
 
     def tick(self):

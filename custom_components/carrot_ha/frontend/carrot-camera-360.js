@@ -11,6 +11,15 @@
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 
+const HEADER_SIZE = 24;
+const FRAME_METADATA = 0;
+const FRAME_WIDE = 1;
+const FRAME_DRIVER = 2;
+const FRAME_STATUS = 3;
+const FLAG_KEY = 1;
+const FRAME_SYNC_TOLERANCE_US = 100_000; // 100ms
+const MAX_DECODE_QUEUE = 12;
+
 export class Camera360Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -235,8 +244,8 @@ export class Camera360Renderer {
 
   updateTexture(textureUnit, source) {
     if (!source) return;
-    const w = source.videoWidth || source.width;
-    const h = source.videoHeight || source.height;
+    const w = source.displayWidth || source.videoWidth || source.width || 0;
+    const h = source.displayHeight || source.videoHeight || source.height || 0;
     if (w > 0 && h > 0) this.sourceAspect[textureUnit] = w / h;
     const gl = this.gl;
     const tex = textureUnit === 0 ? this.frontTexture : this.rearTexture;
@@ -524,12 +533,27 @@ export class CarrotCamera360Modal {
       failOnRetry: false
     };
 
-    // Real device streaming
+    // Real device WebCodecs streaming
     this.realStreams = {
-      frontVideo: null,
-      rearVideo: null,
-      frontEntity: null,
-      rearEntity: null
+      socket: null,
+      heartbeatTimer: null,
+      receiveBuffer: new Uint8Array(0),
+      wide: {
+        decoder: null,
+        frame: null,
+        ready: false,
+        keySeen: false,
+        droppingUntilKey: false,
+        lastTimestamp: -1,
+      },
+      driver: {
+        decoder: null,
+        frame: null,
+        ready: false,
+        keySeen: false,
+        droppingUntilKey: false,
+        lastTimestamp: -1,
+      },
     };
 
     this.buildDOM();
@@ -1259,101 +1283,63 @@ export class CarrotCamera360Modal {
       return;
     }
 
-    this.setState('connecting', isEn ? 'Requesting authenticated camera streams from Home Assistant...' : 'Home Assistant에 인증된 카메라 스트림을 요청하고 있습니다...');
+    // WebCodecs support validation
+    if (typeof window === 'undefined' || typeof VideoDecoder === 'undefined' || typeof EncodedVideoChunk === 'undefined') {
+      this.handlePlaybackFailure(isEn ? 'WebCodecs hardware video decoding is not supported in this browser.' : '현재 브라우저에서 WebCodecs 하드웨어 디코딩을 지원하지 않습니다.');
+      return;
+    }
 
-      // Bound the entire request-to-first-frame path, including the HA WS request.
-      this.firstFrameTimer = setTimeout(() => {
-        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-        if (this.state !== 'playing') {
-          this.handlePlaybackFailure(isEn ? 'First frame timeout: camera capture delayed.' : '첫 프레임 수신 시간 초과: 카메라 구동 지연.');
-        }
-      }, this.firstFrameTimeoutMs);
+    this.setState('connecting', isEn ? 'Connecting to live camera WebSocket...' : '실시간 카메라 웹소켓에 연결하고 있습니다...');
 
+    this.firstFrameTimer = setTimeout(() => {
+      if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+      if (this.state !== 'playing') {
+        this.handlePlaybackFailure(isEn ? 'First frame timeout: camera capture delayed.' : '첫 프레임 수신 시간 초과: 카메라 구동 지연.');
+      }
+    }, this.firstFrameTimeoutMs);
 
     try {
-      // Request HLS streams from HA WebSocket API for both cameras
-      const [wideRes, driverRes] = await Promise.all([
-        this.hass.callWS({ type: 'camera/stream', entity_id: wideEntity }),
-        this.hass.callWS({ type: 'camera/stream', entity_id: driverEntity })
-      ]);
-
-      if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-
-      const wideUrl = wideRes?.url;
-      const driverUrl = driverRes?.url;
-
-      if (!wideUrl || !driverUrl) {
-        throw new Error(isEn ? 'Home Assistant failed to provide camera HLS stream URLs.' : 'Home Assistant에서 카메라 스트림 URL을 받지 못했습니다.');
+      // Determine WebSocket live URL
+      const livePath = wideState?.attributes?.live_ws_url || driverState?.attributes?.live_ws_url;
+      let wsUrl = '';
+      if (livePath) {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${proto}//${window.location.host}${livePath}`;
+      } else {
+        const entityId = wideEntity || driverEntity || '';
+        const match = entityId.match(/camera\.(.+)_camera_/);
+        const deviceId = match ? match[1] : '';
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${proto}//${window.location.host}/api/carrot_ha/v1/camera/${deviceId}/live`;
       }
 
-      this.setState('starting', isEn ? 'Starting video decoders...' : '비디오 디코더를 연결하고 있습니다...');
+      const socket = new WebSocket(wsUrl);
+      socket.binaryType = 'arraybuffer';
+      this.realStreams.socket = socket;
 
-      // Create video elements
-      const frontVideo = document.createElement('video');
-      const rearVideo = document.createElement('video');
-      [frontVideo, rearVideo].forEach(v => {
-        v.autoplay = true;
-        v.muted = true;
-        v.playsInline = true;
-        v.crossOrigin = 'anonymous';
-      });
-
-      this.realStreams.frontVideo = frontVideo;
-      this.realStreams.rearVideo = rearVideo;
-
-      this.setState('waiting_for_frames', isEn ? 'Waiting for first decoded keyframes...' : '첫 디코딩 프레임 대기 중...');
-
-      // Wait until both videos have decoded data
-      let frontReady = false;
-      let rearReady = false;
-
-      const checkReady = () => {
+      socket.onopen = () => {
         if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-        if (frontVideo.readyState >= 2) frontReady = true;
-        if (rearVideo.readyState >= 2) rearReady = true;
-
-        if (frontReady && rearReady) {
-          if (this.firstFrameTimer) {
-            clearTimeout(this.firstFrameTimer);
-            this.firstFrameTimer = null;
-          }
-          if (this.state !== 'playing') {
-            this.setState('playing');
-            this.startRealRenderLoop(targetSeq);
-          }
-        } else if (frontReady && !rearReady) {
-          this.setState('waiting_for_frames', isEn ? 'Front ready. Waiting for Cabin camera...' : '전방 수신 완료. 실내 카메라 프레임 대기 중...');
-        } else if (!frontReady && rearReady) {
-          this.setState('waiting_for_frames', isEn ? 'Cabin ready. Waiting for Front camera...' : '실내 수신 완료. 전방 카메라 프레임 대기 중...');
-        }
+        this.setState('starting', isEn ? 'Connected. Waiting for camera frames...' : '연결됨. 카메라 프레임 수신 대기 중...');
+        this._startHeartbeat(socket, targetSeq);
       };
 
-      frontVideo.addEventListener('loadeddata', checkReady);
-      rearVideo.addEventListener('loadeddata', checkReady);
-      frontVideo.addEventListener('playing', checkReady);
-      rearVideo.addEventListener('playing', checkReady);
-      frontVideo.addEventListener('timeupdate', checkReady);
-      rearVideo.addEventListener('timeupdate', checkReady);
+      socket.onmessage = (event) => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+        if (typeof event.data === 'string') return;
+        this._appendChunk(event.data, targetSeq);
+      };
 
-      // Listen for errors
-      frontVideo.addEventListener('error', () => {
-        if (this.sessionSeq === targetSeq && this.isOpen) {
-          this.handlePlaybackFailure(isEn ? 'Front camera stream interrupted.' : '전방 카메라 스트림이 중단되었습니다.');
+      socket.onerror = () => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+        this.handlePlaybackFailure(isEn ? 'Camera WebSocket connection failed.' : '카메라 웹소켓 연결에 실패했습니다.');
+      };
+
+      socket.onclose = (ev) => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+        if (ev.code !== 1000) {
+          this.handlePlaybackFailure(isEn ? 'Camera stream disconnected.' : '카메라 스트림 연결이 종료되었습니다.');
         }
-      });
-      rearVideo.addEventListener('error', () => {
-        if (this.sessionSeq === targetSeq && this.isOpen) {
-          this.handlePlaybackFailure(isEn ? 'Cabin camera stream interrupted.' : '실내 카메라 스트림이 중단되었습니다.');
-        }
-      });
-
-      // Handle HLS loading (Hls.js prioritized, native Safari fallback)
-      await Promise.all([
-        this._loadHls(frontVideo, wideUrl, targetSeq),
-        this._loadHls(rearVideo, driverUrl, targetSeq)
-      ]);
-
-      if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+      };
 
     } catch (err) {
       if (this.sessionSeq !== targetSeq || !this.isOpen) return;
@@ -1361,139 +1347,188 @@ export class CarrotCamera360Modal {
     }
   }
 
-  async _ensureHls() {
-    if (typeof window === 'undefined') return false;
-    if (window.Hls) return true;
-    if (this._hlsLoadingPromise) return this._hlsLoadingPromise;
-
-    this._hlsLoadingPromise = (async () => {
-      let localUrl = null;
-      try {
-        localUrl = new URL('./carrot-assets/hls.min.js', import.meta.url).href;
-      } catch (_) {
-        localUrl = '/carrot_ha_static/carrot-assets/hls.min.js';
-      }
-
-      const sources = [
-        localUrl,
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'
-      ];
-
-      for (const src of sources) {
-        if (!src) continue;
+  _startHeartbeat(socket, targetSeq) {
+    if (this.realStreams.heartbeatTimer) clearInterval(this.realStreams.heartbeatTimer);
+    this.realStreams.heartbeatTimer = setInterval(() => {
+      if (this.sessionSeq !== targetSeq || !this.isOpen || !this.realStreams.socket) return;
+      if (socket.readyState === WebSocket.OPEN) {
         try {
-          await new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = src;
-            s.async = true;
-            s.onload = () => resolve();
-            s.onerror = () => reject(new Error(`Failed to load ${src}`));
-            document.head.appendChild(s);
-          });
-          if (window.Hls) return true;
+          socket.send('WLP1');
         } catch (_) {}
       }
-      return Boolean(window.Hls);
-    })();
-
-    return this._hlsLoadingPromise;
+    }, 3000);
   }
 
-  async _loadHls(video, url, targetSeq = this.sessionSeq) {
-    const isEn = this.lang === 'en';
-    await this._ensureHls();
-    const active = () => this.isOpen && this.sessionSeq === targetSeq;
-    if (!active()) return;
-
-    // 1. Prefer Hls.js across Chrome, Firefox, Edge, Android
-    if (window.Hls && window.Hls.isSupported()) {
-      return new Promise((resolve, reject) => {
-        let settled = false;
-        let recoveries = 0;
-        video._cancelLoad = () => { settled = true; resolve(); };
-        const hls = new window.Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 30,
-          maxBufferLength: 10,
-        });
-
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        video._hls = hls;
-
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-          if (!active()) return;
-          if (!settled) {
-            settled = true;
-            resolve();
-          }
-          video.play().catch(() => {});
-        });
-
-        hls.on(window.Hls.Events.ERROR, (event, data) => {
-          if (!active()) return;
-          if (data.fatal) {
-            if (++recoveries > 2) {
-              if (!settled) { settled = true; reject(new Error(data.details || "HLS recovery failed")); }
-              else this.handlePlaybackFailure(data.details || "HLS recovery failed");
-              return;
-            }
-            switch (data.type) {
-              case window.Hls.ErrorTypes.NETWORK_ERROR:
-                hls.startLoad();
-                break;
-              case window.Hls.ErrorTypes.MEDIA_ERROR:
-                hls.recoverMediaError();
-                break;
-              default:
-                if (!settled) {
-                  settled = true;
-                  reject(new Error(data.details || 'HLS fatal error'));
-                } else {
-                  this.handlePlaybackFailure(data.details || (isEn ? 'HLS stream decoding failed.' : 'HLS 스트림 디코딩 실패.'));
-                }
-                break;
-            }
-          }
-        });
-
-        // Readiness is reported by manifest/decoded frames, never by a timer.
-        // The shared first-frame timer bounds startup and cancels this waiter.
-      });
+  _appendChunk(chunk, targetSeq) {
+    const incoming = new Uint8Array(chunk);
+    let buf = this.realStreams.receiveBuffer;
+    if (buf.length === 0) {
+      this.realStreams.receiveBuffer = incoming;
+    } else {
+      const merged = new Uint8Array(buf.length + incoming.length);
+      merged.set(buf);
+      merged.set(incoming, buf.length);
+      this.realStreams.receiveBuffer = merged;
     }
+    this._consumeFrames(targetSeq);
+  }
 
-    // 2. Safari fallback
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      video.play().catch(() => {});
+  _consumeFrames(targetSeq) {
+    let offset = 0;
+    let buf = this.realStreams.receiveBuffer;
+    while (buf.length - offset >= HEADER_SIZE) {
+      const view = new DataView(buf.buffer, buf.byteOffset + offset);
+      // Verify magic 'WLV1' = 87, 76, 86, 49
+      if (view.getUint8(0) !== 87 || view.getUint8(1) !== 76 ||
+          view.getUint8(2) !== 86 || view.getUint8(3) !== 49) {
+        offset += 1;
+        continue;
+      }
+      const frameType = view.getUint8(4);
+      const flags = view.getUint8(5);
+      const timestamp = view.getUint32(12) * 4294967296 + view.getUint32(16);
+      const payloadSize = view.getUint32(20);
+      if (buf.length - offset < HEADER_SIZE + payloadSize) break;
+
+      const payload = buf.slice(offset + HEADER_SIZE, offset + HEADER_SIZE + payloadSize);
+      const isKey = Boolean(flags & FLAG_KEY);
+
+      if (frameType === FRAME_WIDE) {
+        this._decodeVideo('wide', payload, isKey, timestamp, targetSeq);
+      } else if (frameType === FRAME_DRIVER) {
+        this._decodeVideo('driver', payload, isKey, timestamp, targetSeq);
+      }
+
+      offset += HEADER_SIZE + payloadSize;
+    }
+    this.realStreams.receiveBuffer = buf.slice(offset);
+  }
+
+  _decoderFor(name, targetSeq) {
+    const stream = this.realStreams[name];
+    if (stream.decoder && stream.decoder.state !== 'closed') return stream.decoder;
+    const isEn = this.lang === 'en';
+
+    const decoder = new VideoDecoder({
+      output: (frame) => {
+        if (this.sessionSeq !== targetSeq || !this.isOpen) {
+          frame.close();
+          return;
+        }
+        if (stream.frame) stream.frame.close();
+        stream.frame = frame;
+        stream.ready = true;
+        this._checkStreamsReady(targetSeq);
+      },
+      error: (err) => {
+        console.error(`Carrot 360 ${name} decoder error:`, err);
+        this.handlePlaybackFailure(isEn ? `${name} video decoding error.` : `${name} 비디오 디코딩 오류.`);
+      }
+    });
+
+    decoder.configure({
+      codec: 'avc1.640020',
+      hardwareAcceleration: 'prefer-hardware',
+      optimizeForLatency: true,
+    });
+
+    stream.decoder = decoder;
+    return decoder;
+  }
+
+  _resetDecoder(name, targetSeq) {
+    const stream = this.realStreams[name];
+    if (!stream) return;
+    if (stream.frame) {
+      try { stream.frame.close(); } catch (_) {}
+      stream.frame = null;
+    }
+    if (stream.decoder && stream.decoder.state !== 'closed') {
+      try { stream.decoder.close(); } catch (_) {}
+    }
+    stream.decoder = null;
+    stream.keySeen = false;
+    stream.droppingUntilKey = false;
+    stream.lastTimestamp = -1;
+  }
+
+  _decodeVideo(name, payload, isKey, timestamp, targetSeq) {
+    const stream = this.realStreams[name];
+    if (!stream) return;
+
+    if (stream.droppingUntilKey && !isKey) return;
+
+    if (!isKey && stream.decoder?.decodeQueueSize > MAX_DECODE_QUEUE) {
+      stream.droppingUntilKey = true;
       return;
     }
+    if (isKey && (stream.droppingUntilKey || stream.decoder?.decodeQueueSize > MAX_DECODE_QUEUE)) {
+      this._resetDecoder(name, targetSeq);
+    }
+    if (!stream.keySeen && !isKey) return;
+    if (isKey) stream.keySeen = true;
 
-    throw new Error(isEn ? 'Browser does not support HLS video playback.' : '브라우저가 HLS 비디오 재생을 지원하지 않습니다.');
+    const decoder = this._decoderFor(name, targetSeq);
+    const safeTimestamp = Math.max(stream.lastTimestamp + 1, timestamp);
+    stream.lastTimestamp = safeTimestamp;
+
+    try {
+      decoder.decode(new EncodedVideoChunk({
+        type: isKey ? 'key' : 'delta',
+        timestamp: safeTimestamp,
+        data: payload,
+      }));
+    } catch (err) {
+      console.warn(`Carrot 360 decode chunk error on ${name}:`, err);
+    }
+  }
+
+  _checkStreamsReady(targetSeq) {
+    if (this.sessionSeq !== targetSeq || !this.isOpen) return;
+    const wideReady = Boolean(this.realStreams.wide.ready && this.realStreams.wide.frame);
+    const driverReady = Boolean(this.realStreams.driver.ready && this.realStreams.driver.frame);
+    const isEn = this.lang === 'en';
+
+    if (wideReady && driverReady) {
+      if (this.firstFrameTimer) {
+        clearTimeout(this.firstFrameTimer);
+        this.firstFrameTimer = null;
+      }
+      if (this.state !== 'playing') {
+        this.setState('playing');
+        this.startRealRenderLoop(targetSeq);
+      }
+    } else if (wideReady && !driverReady) {
+      this.setState('waiting_for_frames', isEn ? 'Front ready. Waiting for Cabin camera...' : '전방 수신 완료. 실내 카메라 대기 중...');
+    } else if (!wideReady && driverReady) {
+      this.setState('waiting_for_frames', isEn ? 'Cabin ready. Waiting for Front camera...' : '실내 수신 완료. 전방 카메라 대기 중...');
+    }
   }
 
   startRealRenderLoop(targetSeq) {
     const isEn = this.lang === 'en';
-    const { frontVideo, rearVideo } = this.realStreams;
 
     const loop = () => {
       if (this.sessionSeq !== targetSeq || !this.isOpen) return;
 
-      if (this.renderer && frontVideo && rearVideo) {
-        if (frontVideo.readyState >= 2) this.renderer.updateTexture(0, frontVideo);
-        if (rearVideo.readyState >= 2) this.renderer.updateTexture(1, rearVideo);
+      const wideFrame = this.realStreams.wide.frame;
+      const driverFrame = this.realStreams.driver.frame;
+
+      if (this.renderer && wideFrame && driverFrame) {
+        this.renderer.updateTexture(0, wideFrame);
+        this.renderer.updateTexture(1, driverFrame);
         this.renderer.render();
 
-        // Calculate PTS / mediaTime sync delta if available
-        const frontTime = frontVideo.currentTime || 0;
-        const rearTime = rearVideo.currentTime || 0;
-        const delta = Math.abs(frontTime - rearTime);
-        if (delta > 0.5) {
-          this.syncWarn.style.display = 'inline-flex';
-          this.syncWarn.textContent = `⚠️ ${isEn ? 'Sync Delta' : '동기화 편차'}: ${delta.toFixed(2)}s`;
-        } else {
-          this.syncWarn.style.display = 'none';
+        const wideTs = this.realStreams.wide.lastTimestamp;
+        const driverTs = this.realStreams.driver.lastTimestamp;
+        if (wideTs > 0 && driverTs > 0) {
+          const deltaUs = Math.abs(wideTs - driverTs);
+          if (deltaUs > FRAME_SYNC_TOLERANCE_US) {
+            this.syncWarn.style.display = 'inline-flex';
+            this.syncWarn.textContent = `⚠️ ${isEn ? 'Sync Delta' : '동기화 편차'}: ${(deltaUs / 1000).toFixed(0)}ms`;
+          } else {
+            this.syncWarn.style.display = 'none';
+          }
         }
       }
 
@@ -1520,7 +1555,6 @@ export class CarrotCamera360Modal {
   }
 
   cleanupSession() {
-    // Invalidate callbacks BEFORE load()/destroy() can emit stale errors.
     this.sessionSeq++;
     clearTimeout(this.retryTimer);
     this.retryTimer = null;
@@ -1538,22 +1572,32 @@ export class CarrotCamera360Modal {
     }
     this.mockFeed = null;
 
-    // Teardown real stream video elements & HLS players
-    if (this.realStreams.frontVideo) {
-      this.realStreams.frontVideo._cancelLoad?.();
-      if (this.realStreams.frontVideo._hls) this.realStreams.frontVideo._hls.destroy();
-      this.realStreams.frontVideo.pause();
-      this.realStreams.frontVideo.removeAttribute('src');
-      this.realStreams.frontVideo.load();
-      this.realStreams.frontVideo = null;
+    if (this.realStreams.heartbeatTimer) {
+      clearInterval(this.realStreams.heartbeatTimer);
+      this.realStreams.heartbeatTimer = null;
     }
-    if (this.realStreams.rearVideo) {
-      this.realStreams.rearVideo._cancelLoad?.();
-      if (this.realStreams.rearVideo._hls) this.realStreams.rearVideo._hls.destroy();
-      this.realStreams.rearVideo.pause();
-      this.realStreams.rearVideo.removeAttribute('src');
-      this.realStreams.rearVideo.load();
-      this.realStreams.rearVideo = null;
+    if (this.realStreams.socket) {
+      try { this.realStreams.socket.close(1000, 'cleanup'); } catch (_) {}
+      this.realStreams.socket = null;
+    }
+    this.realStreams.receiveBuffer = new Uint8Array(0);
+
+    for (const name of ['wide', 'driver']) {
+      const stream = this.realStreams[name];
+      if (stream) {
+        if (stream.frame) {
+          try { stream.frame.close(); } catch (_) {}
+          stream.frame = null;
+        }
+        if (stream.decoder && stream.decoder.state !== 'closed') {
+          try { stream.decoder.close(); } catch (_) {}
+        }
+        stream.decoder = null;
+        stream.ready = false;
+        stream.keySeen = false;
+        stream.droppingUntilKey = false;
+        stream.lastTimestamp = -1;
+      }
     }
   }
 

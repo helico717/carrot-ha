@@ -25,8 +25,9 @@ async def async_setup(hass, config):
     hass.http.register_view(SettingsView(hass))
     hass.http.register_view(ParamSetView(hass))
     hass.http.register_view(ParamStatusView(hass))
-    from .camera_http import CameraDeviceView
+    from .camera_http import CameraDeviceView, CameraLiveView
     hass.http.register_view(CameraDeviceView(hass))
+    hass.http.register_view(CameraLiveView(hass))
     from .terminal_http import TerminalDeviceView
     hass.http.register_view(TerminalDeviceView(hass))
     from .terminal_ws import async_register as async_register_terminal_ws
