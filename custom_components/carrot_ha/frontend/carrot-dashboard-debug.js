@@ -1722,6 +1722,61 @@ export default class CarrotDebugDashboard extends HTMLElement {
       dev[`${role}State`] = stateObj.state;
     }
 
+    // If no camera/image entities were found, discover Carrot devices from telemetry sensors
+    if (devicesMap.size === 0) {
+      for (const [entityId, stateObj] of Object.entries(states)) {
+        const uid = stateObj?.attributes?.unique_id || '';
+        let deviceId = '';
+        if (uid) {
+          const match = uid.match(/^(.*?)_(?:comma_online|storage_used_percent|memory_used_percent|cpu_temp_c|fan_speed_percent|soc_percent|odometer_km|battery|location|charging)$/);
+          if (match && match[1]) deviceId = match[1];
+        }
+        if (!deviceId) {
+          const match = entityId.match(/^(?:sensor|binary_sensor)\.([a-zA-Z0-9_\-]+)_comma_/);
+          if (match && match[1]) deviceId = match[1];
+        }
+        if (!deviceId && (entityId.startsWith('sensor.comma_') || entityId.startsWith('binary_sensor.comma_'))) {
+          deviceId = 'comma';
+        }
+
+        if (deviceId && deviceId.endsWith('_comma')) {
+          deviceId = deviceId.slice(0, -6);
+        }
+
+        if (deviceId && !devicesMap.has(deviceId)) {
+          const friendlyName = stateObj?.attributes?.friendly_name || '';
+          const devName = friendlyName.includes('Comma') || deviceId === 'comma'
+            ? 'Comma'
+            : (deviceId.charAt(0).toUpperCase() + deviceId.slice(1));
+
+          devicesMap.set(deviceId, {
+            id: deviceId,
+            name: devName,
+            wide: `/api/carrot_ha/v1/camera/${deviceId}/live`,
+            driver: `/api/carrot_ha/v1/camera/${deviceId}/live`,
+            road: null,
+            wideState: 'ready',
+            driverState: 'ready',
+            roadState: null
+          });
+        }
+      }
+
+      if (devicesMap.size === 0 && this.config?.device_id) {
+        const devId = this.config.device_id;
+        devicesMap.set(devId, {
+          id: devId,
+          name: devId.charAt(0).toUpperCase() + devId.slice(1),
+          wide: `/api/carrot_ha/v1/camera/${devId}/live`,
+          driver: `/api/carrot_ha/v1/camera/${devId}/live`,
+          road: null,
+          wideState: 'ready',
+          driverState: 'ready',
+          roadState: null
+        });
+      }
+    }
+
     return Array.from(devicesMap.values());
   }
 
@@ -1777,19 +1832,21 @@ export default class CarrotDebugDashboard extends HTMLElement {
             <span style="color:#f87171;font-weight:600;">⚠️ ${isEn ? 'Not found' : '미설정'}</span>
           </div>`;
       }
-      const isOnline = state && state !== 'unavailable';
+      const isDirectStream = typeof entityId === 'string' && (entityId.startsWith('/api/') || entityId.startsWith('ws:'));
+      const displayId = isDirectStream ? 'WebCodecs WSS Relay' : entityId;
+      const isOnline = isDirectStream ? true : (state && state !== 'unavailable');
       const stateBadge = isOnline
-        ? `<span style="color:#34d399;font-weight:600;">● ${state}</span>`
+        ? `<span style="color:#34d399;font-weight:600;">● ${isDirectStream ? (isEn ? 'Stream Ready' : '스트림 연결 준비') : state}</span>`
         : `<span style="color:#f87171;font-weight:600;">● ${state || 'offline'}</span>`;
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <span style="color:#cbd5e1;font-weight:500;">${label}: <code style="font-size:10.5px;color:#93c5fd;">${entityId}</code></span>
+          <span style="color:#cbd5e1;font-weight:500;">${label}: <code style="font-size:10.5px;color:#93c5fd;">${displayId}</code></span>
           ${stateBadge}
         </div>`;
     };
 
-    const wideState = this._hass?.states?.[camEntities.wide]?.state;
-    const driverState = this._hass?.states?.[camEntities.driver]?.state;
+    const wideState = this._hass?.states?.[camEntities.wide]?.state || (typeof camEntities.wide === 'string' && camEntities.wide.startsWith('/api/') ? 'ready' : null);
+    const driverState = this._hass?.states?.[camEntities.driver]?.state || (typeof camEntities.driver === 'string' && camEntities.driver.startsWith('/api/') ? 'ready' : null);
     const roadState = this._hass?.states?.[camEntities.road]?.state;
 
     return `

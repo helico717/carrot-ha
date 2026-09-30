@@ -359,4 +359,40 @@ assert.ok(statusHtml.includes('360° 합성 준비 완료'));
 
 console.log('Non-Carrot camera rejection and Comma device grouping passed.');
 
+// 7. Test Pure Telemetry Device Discovery (When No camera.* or image.* Entities Exist)
+console.log('Testing pure telemetry device discovery (no snapshot entities)...');
+const telemetryMockStates = {
+  'sensor.test_id4_soc_percent': {
+    state: '80',
+    attributes: { unique_id: 'test-id4_soc_percent', friendly_name: 'ID.4 배터리 잔량' }
+  },
+  'binary_sensor.test_id4_comma_online': {
+    state: 'on',
+    attributes: { unique_id: 'test-id4_comma_online', friendly_name: 'Comma 온라인 상태' }
+  },
+  'sensor.test_id4_storage_used_percent': {
+    state: '45',
+    attributes: { unique_id: 'test-id4_comma_storage_used_percent', friendly_name: 'Comma 저장소 사용량' }
+  }
+};
+debug._hass = { states: telemetryMockStates };
+debug.state.selectedCameraDevice = '';
+debug.state.cameraMode = 'auto';
+
+const discoveredTelemetryDevices = debug.getCarrotCameraDevices();
+assert.equal(discoveredTelemetryDevices.length, 1, 'Must discover 1 Carrot device from telemetry unique_id');
+assert.equal(discoveredTelemetryDevices[0].id, 'test-id4');
+assert.ok(discoveredTelemetryDevices[0].wide.includes('/api/carrot_ha/v1/camera/test-id4/live'), 'Must construct live WSS endpoint for wide');
+assert.ok(discoveredTelemetryDevices[0].driver.includes('/api/carrot_ha/v1/camera/test-id4/live'), 'Must construct live WSS endpoint for driver');
+
+const resolvedTelemetryCam = debug.findCarrotCameraEntities();
+assert.ok(resolvedTelemetryCam.wide);
+assert.ok(resolvedTelemetryCam.driver);
+assert.equal(debug.getEffectiveCameraMode(), 'real', 'Must resolve to real mode when Carrot telemetry device is detected');
+
+const telemetryStatusHtml = debug.renderCameraEntitiesStatusHtml();
+assert.ok(telemetryStatusHtml.includes('WebCodecs WSS Relay'));
+assert.ok(telemetryStatusHtml.includes('360° 합성 준비 완료'));
+console.log('Pure telemetry device discovery passed.');
+
 console.log('\n=== ALL 360 CAMERA UNIT TESTS PASSED SUCCESSFULLY ===\n');

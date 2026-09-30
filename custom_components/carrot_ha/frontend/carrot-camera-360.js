@@ -1482,20 +1482,37 @@ export class CarrotCamera360Modal {
 
   async startRealSession(targetSeq) {
     const isEn = this.lang === 'en';
+    let deviceId = this.deviceId;
     const wideEntity = this.cameraEntities?.wide;
     const driverEntity = this.cameraEntities?.driver;
 
-    if (!wideEntity || !driverEntity) {
-      this.setState('error', isEn ? 'Carrot HA wide and driver camera entities not configured.' : 'Carrot HA 전방 광각 및 실내 카메라 엔터티가 설정되지 않았습니다.');
+    if (!deviceId) {
+      if (typeof wideEntity === 'string' && wideEntity.includes('/api/carrot_ha/v1/camera/')) {
+        const match = wideEntity.match(/\/camera\/(.+?)\/live/);
+        if (match) deviceId = match[1];
+      } else {
+        const entityId = wideEntity || driverEntity || '';
+        const match = entityId.match(/(?:camera|image)\.(.+?)_(?:camera|image)_/);
+        if (match) deviceId = match[1];
+      }
+    }
+    if (!deviceId && this.cameraEntities?.device?.id) {
+      deviceId = this.cameraEntities.device.id;
+    }
+
+    if (!deviceId && (!wideEntity || !driverEntity)) {
+      this.setState('error', isEn ? 'Comma device ID not found.' : 'Comma 장치 식별자를 찾을 수 없습니다.');
       return;
     }
 
-    // Safety offroad / parking check via HA state
-    const wideState = this.hass?.states?.[wideEntity];
-    const driverState = this.hass?.states?.[driverEntity];
-    if (wideState?.state === 'unavailable' || driverState?.state === 'unavailable') {
-      this.setState('error', isEn ? 'Comma camera service is currently offline or offroad check pending.' : 'Comma 카메라 서비스가 오프라인이거나 주차 상태 확인이 필요합니다.');
-      return;
+    // Safety offroad / parking check via HA state (if legacy entities exist)
+    if (wideEntity && !wideEntity.includes('/api/')) {
+      const wideState = this.hass?.states?.[wideEntity];
+      const driverState = this.hass?.states?.[driverEntity];
+      if (wideState?.state === 'unavailable' || driverState?.state === 'unavailable') {
+        this.setState('error', isEn ? 'Comma camera service is currently offline or offroad check pending.' : 'Comma 카메라 서비스가 오프라인이거나 주차 상태 확인이 필요합니다.');
+        return;
+      }
     }
 
     // WebCodecs support validation
@@ -1515,17 +1532,22 @@ export class CarrotCamera360Modal {
 
     try {
       // Determine WebSocket live URL
-      const livePath = wideState?.attributes?.live_ws_url || driverState?.attributes?.live_ws_url;
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       let wsUrl = '';
-      if (livePath) {
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${proto}//${window.location.host}${livePath}`;
-      } else {
-        const entityId = wideEntity || driverEntity || '';
-        const match = entityId.match(/camera\.(.+)_camera_/);
-        const deviceId = match ? match[1] : '';
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      if (deviceId) {
         wsUrl = `${proto}//${window.location.host}/api/carrot_ha/v1/camera/${deviceId}/live`;
+      } else {
+        const wideState = this.hass?.states?.[wideEntity];
+        const driverState = this.hass?.states?.[driverEntity];
+        const livePath = wideState?.attributes?.live_ws_url || driverState?.attributes?.live_ws_url;
+        if (livePath) {
+          wsUrl = `${proto}//${window.location.host}${livePath}`;
+        } else {
+          const entityId = wideEntity || driverEntity || '';
+          const match = entityId.match(/camera\.(.+)_camera_/);
+          const devId = match ? match[1] : '';
+          wsUrl = `${proto}//${window.location.host}/api/carrot_ha/v1/camera/${devId}/live`;
+        }
       }
 
       const socket = new WebSocket(wsUrl);
