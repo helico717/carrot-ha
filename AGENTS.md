@@ -46,19 +46,22 @@ The Carrot HA system is strictly divided into two independent repositories:
 │  • WSS Relay: Parked reverse terminal bridging        │
 └──────────────────────────▲─────────────────────────────┘
                            │ Inbound HTTPS / WSS
-┌──────────────────────────┴─────────────────────────────┐
+┌────────────────────────────────────────────────────────┐
 │               Home Assistant Server                    │
 │                                                        │
 │  Repository: helico717/carrot-ha                       │
 │  Branch:     main                                      │
 │                                                        │
 │  • custom_components/carrot_ha/ (HA Integration)       │
-│    - sensor, camera, device_tracker, switch            │
+│    - sensor, device_tracker, switch                    │
 │    - websocket_api (Terminal & Param Sync bridge)      │
+│    - camera_http.py (WebCodecs WSS Relay endpoint)     │
 │    - frontend/ (Lovelace Cards)                        │
-│      * carrot-dashboard.js                             │
+│      * carrot-dashboard.js (ko/en main dashboards)     │
+│      * carrot-camera-360.js (WebGL 360° modal & WSS)   │
 │      * carrot-params-card.js                           │
 │      * carrot-terminal-card.js                         │
+│      * carrot-dashboard-debug.js                       │
 │  • cloudflare/ (Worker code & D1 schema)               │
 └────────────────────────────────────────────────────────┘
 ```
@@ -167,3 +170,29 @@ The Carrot HA system is strictly divided into two independent repositories:
 - **Auto-Sync Workflow**:
   - The GitHub Action `.github/workflows/sync_upstream_model_selector.yml` automatically pulls upstream changes from `ajouatom/openpilot:carrot-wip-model_selector` while preserving our `carrot_ha` daemon commits.
   - Keeping `/data/openpilot` clean ensures that auto-sync merges never encounter conflicts on the physical device.
+
+---
+
+## 6. 360° Parked Camera Monitoring Architecture & Dashboard Guidelines
+
+1. **Streaming Architecture & Protocols**:
+   - **WebCodecs Hardware Video Decoding**: Delivers ultra-low latency hardware H.264/HEVC decoding directly inside the browser using the modern `VideoDecoder` API.
+   - **WSS Relay (`camera_http.py`)**: Streams live frames from the Comma 3/3X parked camera daemon through Home Assistant (`/api/carrot_ha/v1/camera/{deviceId}/live`). Supports alias resolution (`'comma'`, `'default'`, or exact device ID).
+   - **Binary Framing (WLV1 protocol)**: Front (Wide) and Cabin (Driver) video streams are packed into binary payloads and rendered onto a 3D WebGL sphere with dual fisheye spherical projection.
+   - **Interactive Navigation & PTZ Controls**: Users can drag to rotate 360°, use viewpoint buttons (360° View, Front, Cabin), or use the bottom-right PTZ directional pad (Up, Down, Left, Right, Center Reset). Double-click resets pitch to level (0°). Pitch is clamped to `[-20°, 25°]`.
+
+2. **Dashboard Integration (Both Korean & English)**:
+   - **Production Dashboards**: Both `carrot-dashboard-ko.js` and `carrot-dashboard-en.js` provide the `#camera360Trigger` button inside `mini-condition` (slot 3) during `parked` and `charging` states.
+   - **Driving Safety Interlock**: If the vehicle transitions to `driving` or `onroad`, the camera button is hidden and slot 3 gracefully falls back to climate status (`공조` / `Climate`). If the 360° monitoring modal is currently open when driving begins, streaming automatically ceases with a safety notification (`차량 주행 감지됨 — 안전을 위해 카메라 모니터링이 자동 종료되었습니다.` / `Driving detected: camera monitoring automatically stopped for safety.`).
+   - **Visual Styling**: Button uses the vehicle battery SOC blue gradient (`linear-gradient(135deg, #1260e8 0%, #0c43ad 100%)`) with 10px rounded corners, matching the dashboard curvature and adapting to dark/light themes.
+
+3. **Snapshot & Legacy Entity Deprecation**:
+   - Comma 3/3X does not provide an offroad still snapshot API without running full camera pipelines. Legacy `image.*_snapshot` and polling `camera.*` entities have been permanently removed.
+   - `entity_migration.py` purges any leftover `camera.*` and `image.*` entities from Home Assistant entity registry upon boot.
+
+---
+
+## 7. Version Management Policy
+
+- **Current Minor Version**: `0.8.x` (e.g., `0.8.4`).
+- **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.

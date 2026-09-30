@@ -1,4 +1,5 @@
 import {DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import { CarrotCamera360Modal } from './carrot-camera-360.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('en-GB',{maximumFractionDigits:digits}) : '—';
@@ -68,7 +69,7 @@ function leaflet() {
 }
 
 class CarrotDashboard extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;this._mergeTripsEnabled=true;this._tripPage=1;this._maxTripPages=1;this._rawTrips=[];this._mergedTrips=[];}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;this._mergeTripsEnabled=true;this._tripPage=1;this._maxTripPages=1;this._rawTrips=[];this._mergedTrips=[];this.cameraModal=null;}
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -102,10 +103,11 @@ class CarrotDashboard extends HTMLElement {
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
     this.setAttribute('data-theme',dark?'dark':'light');
+    if(this.cameraModal)this.cameraModal.setTheme(dark?'dark':'light');
   }
   set hass(hass){const oldCharging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state;const previous=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;this._hass=hass;this.applyTheme();if(!this.initialized){this.initialized=true;if(!this.v||!Object.keys(this.v).length)this.loadCache();this.load();}else if(oldCharging!==hass.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state||previous!==hass.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state){this.render();}}
   connectedCallback(){this.timer=setInterval(()=>{if(this._hass&&!document.hidden)this.load(true);},60000);}
-  disconnectedCallback(){this.clearMiniMaps();clearInterval(this.timer);if(this.map){this.map.remove();this.map=null;}}
+  disconnectedCallback(){this.clearMiniMaps();clearInterval(this.timer);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   getCardSize(){return 8;}
   getGridOptions(){return {columns:36,rows:"auto",min_columns:6};}
   async load(quiet=false){
@@ -539,7 +541,33 @@ class CarrotDashboard extends HTMLElement {
 :host([data-theme="light"]) .raw-content pre{background:#f4f6f8;color:#24292f}
 @container(max-width:700px){.status-groups{grid-template-columns:1fr;gap:12px}.raw-content{padding:12px 14px 14px}}
 `;
+    themeStyle.textContent+=`
+      .mini-condition-camera-btn{display:inline-flex !important;align-items:center !important;gap:6px !important;background:linear-gradient(135deg,#1260e8 0%,#0c43ad 100%) !important;color:#ffffff !important;border:1px solid rgba(255,255,255,0.25) !important;box-shadow:0 2px 8px rgba(18,96,232,0.35) !important;padding:6px 14px !important;border-radius:10px !important;font-size:12px !important;font-weight:700 !important;cursor:pointer !important;min-height:38px !important;min-width:44px !important;box-sizing:border-box !important;transition:all 0.18s ease !important}
+      .mini-condition-camera-btn svg{stroke:#ffffff !important}
+      .mini-condition-camera-btn:hover{background:linear-gradient(135deg,#1b6ef3 0%,#124ec2 100%) !important;border-color:rgba(255,255,255,0.4) !important;box-shadow:0 4px 14px rgba(18,96,232,0.5) !important;color:#ffffff !important;transform:translateY(-1px) !important}
+      .mini-condition-camera-btn:focus-visible{outline:2px solid #60a5fa !important;outline-offset:2px !important}
+      :host([data-theme="light"]) .mini-condition-camera-btn{background:linear-gradient(135deg,#1260e8 0%,#0c43ad 100%) !important;color:#ffffff !important;border:1px solid rgba(18,96,232,0.35) !important;box-shadow:0 2px 8px rgba(18,96,232,0.3) !important}
+      :host([data-theme="light"]) .mini-condition-camera-btn:hover{background:linear-gradient(135deg,#1b6ef3 0%,#124ec2 100%) !important;box-shadow:0 4px 14px rgba(18,96,232,0.45) !important;color:#ffffff !important}
+      .mini-condition-camera-disabled{display:inline-flex !important;align-items:center !important;gap:5px !important;color:#64748b !important;font-size:11.5px !important;cursor:not-allowed !important;padding:6px 8px !important;min-height:38px !important;box-sizing:border-box !important}
+      .mini-condition-camera.is-hidden{display:inline-block !important;visibility:hidden !important;min-width:44px !important;min-height:38px !important}
+    `;
     this.shadowRoot.append(themeStyle);
+    if(this.cameraModal?.wrapper&&!this.shadowRoot.contains(this.cameraModal.wrapper)){
+      this.shadowRoot.appendChild(this.cameraModal.wrapper);
+    }
+    const isDrivingState=state.key==='driving'||v.onroad===true;
+    if(isDrivingState&&this.cameraModal&&this.cameraModal.isOpen){
+      this.cameraModal.setState('stopped','Driving detected: camera monitoring automatically stopped for safety.');
+      this.cameraModal.cleanupSession();
+    }
+    const camBtn=this.shadowRoot.querySelector('#camera360Trigger');
+    if(camBtn){
+      camBtn.onclick=(e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        this.openCamera360(camBtn);
+      };
+    }
     this.shadowRoot.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{
       const idx=Number(b.dataset.day);
       this.batteryDay=idx;
@@ -1126,7 +1154,39 @@ class CarrotDashboard extends HTMLElement {
 
     const socState=!charging&&soc!==null?(soc<15?'is-critical soc-critical':soc<30?'is-low soc-low':''):'';
 
-    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span><span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span></div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at, tz)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
+    let cameraConditionSlotHtml='';
+    if(isDriving||v.onroad===true||displayState.key==='driving'){
+      cameraConditionSlotHtml=`<span>Climate <b>${v.ac_on==null?'—':v.ac_on?'ON':'OFF'}</b></span>`;
+    }else if(displayState.key==='parked'||displayState.key==='charging'){
+      cameraConditionSlotHtml=`
+        <button type="button" class="mini-condition-camera-btn" id="camera360Trigger" aria-label="View 360° Camera">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+          <span>View Camera</span>
+        </button>`;
+    }else if(displayState.key==='stale'){
+      cameraConditionSlotHtml=`
+        <span class="mini-condition-camera-disabled" title="Data delayed. Camera disabled.">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>Data Delayed</span>
+        </span>`;
+    }else if(displayState.key==='offline'){
+      cameraConditionSlotHtml=`
+        <span class="mini-condition-camera-disabled" title="Device offline. Camera unavailable.">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+          <span>Camera Offline</span>
+        </span>`;
+    }else{
+      cameraConditionSlotHtml=`
+        <span class="mini-condition-camera-disabled" title="Checking vehicle status...">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" opacity="0.6"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <span>Checking Status</span>
+        </span>`;
+    }
+
+    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span>${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at, tz)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
@@ -1145,6 +1205,25 @@ class CarrotDashboard extends HTMLElement {
     if(driving)return {key:'driving',label:'Driving'};
     if(driving===false)return {key:'parked',label:'Parked'};
     return {key:'unknown',label:online==='on'?'Checking status':'Checking connection'};
+  }
+  openCamera360(triggerBtn){
+    if(!this.cameraModal){
+      this.cameraModal=new CarrotCamera360Modal({
+        container:this.shadowRoot,
+        lang:'en',
+        theme:this.getAttribute('data-theme')||'dark'
+      });
+    }else{
+      this.cameraModal.setTheme(this.getAttribute('data-theme')||'dark');
+      this.cameraModal.setLanguage('en');
+    }
+    const deviceId=this.device?.device_id||this.config?.device_id||'comma';
+    this.cameraModal.open({
+      mode:'real',
+      hass:this._hass,
+      deviceId,
+      returnFocusElem:triggerBtn
+    });
   }
   async drawMiniMaps(v){
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];

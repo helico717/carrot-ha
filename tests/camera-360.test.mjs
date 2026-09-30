@@ -48,11 +48,11 @@ console.log('Orientation math passed.');
 console.log('Testing Debug Dashboard 360 camera slot rules in mini-condition...');
 const debugSource = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js', 'utf8');
 
-// Ensure production dashboards do NOT expose the 360 camera button by default
+// Ensure production dashboards and debug dashboard expose the 360 camera button
 const koSource = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-ko.js', 'utf8');
 const enSource = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-en.js', 'utf8');
-assert.equal(koSource.includes('camera360Trigger'), false, 'carrot-dashboard-ko must not contain camera360Trigger');
-assert.equal(enSource.includes('camera360Trigger'), false, 'carrot-dashboard-en must not contain camera360Trigger');
+assert.equal(koSource.includes('camera360Trigger'), true, 'carrot-dashboard-ko must contain camera360Trigger');
+assert.equal(enSource.includes('camera360Trigger'), true, 'carrot-dashboard-en must contain camera360Trigger');
 assert.equal(debugSource.includes('camera360Trigger'), true, 'carrot-dashboard-debug must contain camera360Trigger');
 
 // Set up VM to execute CarrotDebugDashboard logic
@@ -393,6 +393,91 @@ assert.equal(debug.getEffectiveCameraMode(), 'real', 'Must resolve to real mode 
 const telemetryStatusHtml = debug.renderCameraEntitiesStatusHtml();
 assert.ok(telemetryStatusHtml.includes('WebCodecs WSS Relay'));
 assert.ok(telemetryStatusHtml.includes('360° 합성 준비 완료'));
-console.log('Pure telemetry device discovery passed.');
+// 8. Test Production Dashboards (KO and EN) Overview Mini-Condition 360 Button
+console.log('Testing Production Dashboards (KO and EN) mini-condition rendering...');
+
+const cleanKo = koSource
+  .replace(/import\s+.*?;\r?\n/g, '')
+  .replace(/import\.meta\.url/g, '"http://localhost/"')
+  .replace('class CarrotDashboard extends HTMLElement', 'class CarrotDashboardKo extends HTMLElement')
+  .replace('export default CarrotDashboard;', '');
+const cleanEn = enSource
+  .replace(/import\s+.*?;\r?\n/g, '')
+  .replace(/import\.meta\.url/g, '"http://localhost/"')
+  .replace('class CarrotDashboard extends HTMLElement', 'class CarrotDashboardEn extends HTMLElement')
+  .replace('export default CarrotDashboard;', '');
+
+const createProdContext = () => vm.createContext({
+  DEFAULT_SOC_CAPACITY_KWH,
+  tripDays: () => [],
+  loadRecentTrips: async () => ({ events: [] }),
+  mergeConsecutiveCharges: () => [],
+  mergeConsecutiveTrips: () => [],
+  tripTimeline: () => '',
+  CarrotCamera360Modal: class {},
+  HTMLElement: class {},
+  document: mockDocument,
+  window: mockWindow,
+  Date,
+  URL,
+  console
+});
+
+const prodContextKo = createProdContext();
+const prodContextEn = createProdContext();
+
+vm.runInContext(cleanKo + '\nglobalThis.CarrotDashboardKo = CarrotDashboardKo;', prodContextKo);
+vm.runInContext(cleanEn + '\nglobalThis.CarrotDashboardEn = CarrotDashboardEn;', prodContextEn);
+
+const { CarrotDashboardKo } = prodContextKo;
+const { CarrotDashboardEn } = prodContextEn;
+
+const koInstance = Object.create(CarrotDashboardKo.prototype);
+koInstance.trips = [];
+koInstance.vehicleImage = () => '<img class="car-image">';
+koInstance.config = { vehicle_name: 'ID.4' };
+koInstance._hass = { states: { 'binary_sensor.comma_online': { state: 'on' } }, config: { time_zone: 'Asia/Seoul' } };
+
+const enInstance = Object.create(CarrotDashboardEn.prototype);
+enInstance.trips = [];
+enInstance.vehicleImage = () => '<img class="car-image">';
+enInstance.config = { vehicle_name: 'ID.4' };
+enInstance._hass = { states: { 'binary_sensor.comma_online': { state: 'on' } }, config: { time_zone: 'UTC' } };
+
+// KO Parked
+koInstance.vehicleStatus = () => ({ key: 'parked', label: '주차중' });
+const koParkedHtml = koInstance.overview({ onroad: false, charging: false, outside_temp_c: 20, aux_voltage: 13.5, soc_percent: 80 });
+assert.ok(koParkedHtml.includes('id="camera360Trigger"'), 'KO Parked must have camera360Trigger');
+assert.ok(koParkedHtml.includes('카메라 보기'), 'KO Parked must have "카메라 보기"');
+
+// EN Parked
+enInstance.vehicleStatus = () => ({ key: 'parked', label: 'Parked' });
+const enParkedHtml = enInstance.overview({ onroad: false, charging: false, outside_temp_c: 20, aux_voltage: 13.5, soc_percent: 80 });
+assert.ok(enParkedHtml.includes('id="camera360Trigger"'), 'EN Parked must have camera360Trigger');
+assert.ok(enParkedHtml.includes('View Camera'), 'EN Parked must have "View Camera"');
+
+// KO Charging
+koInstance.vehicleStatus = () => ({ key: 'charging', label: '충전중' });
+const koChargingHtml = koInstance.overview({ onroad: false, charging: true, outside_temp_c: 18, aux_voltage: 14.0, soc_percent: 50 });
+assert.ok(koChargingHtml.includes('id="camera360Trigger"'), 'KO Charging must have camera360Trigger');
+
+// EN Charging
+enInstance.vehicleStatus = () => ({ key: 'charging', label: 'Charging' });
+const enChargingHtml = enInstance.overview({ onroad: false, charging: true, outside_temp_c: 18, aux_voltage: 14.0, soc_percent: 50 });
+assert.ok(enChargingHtml.includes('id="camera360Trigger"'), 'EN Charging must have camera360Trigger');
+
+// KO Driving (Must NOT have button, must show Climate)
+koInstance.vehicleStatus = () => ({ key: 'driving', label: '주행 중' });
+const koDrivingHtml = koInstance.overview({ onroad: true, charging: false, outside_temp_c: 22, aux_voltage: 14.1, soc_percent: 78, ac_on: true });
+assert.equal(koDrivingHtml.includes('id="camera360Trigger"'), false, 'KO Driving must NOT have camera360Trigger');
+assert.ok(koDrivingHtml.includes('공조 <b>ON</b>'), 'KO Driving must show climate status');
+
+// EN Driving (Must NOT have button, must show Climate)
+enInstance.vehicleStatus = () => ({ key: 'driving', label: 'Driving' });
+const enDrivingHtml = enInstance.overview({ onroad: true, charging: false, outside_temp_c: 22, aux_voltage: 14.1, soc_percent: 78, ac_on: true });
+assert.equal(enDrivingHtml.includes('id="camera360Trigger"'), false, 'EN Driving must NOT have camera360Trigger');
+assert.ok(enDrivingHtml.includes('Climate <b>ON</b>'), 'EN Driving must show climate status');
+
+console.log('Production Dashboards (KO and EN) mini-condition tests passed.');
 
 console.log('\n=== ALL 360 CAMERA UNIT TESTS PASSED SUCCESSFULLY ===\n');
