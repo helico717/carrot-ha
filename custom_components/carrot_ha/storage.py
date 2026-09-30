@@ -482,6 +482,15 @@ class Archive:
                 distance_m = data.get('distance_m')
                 if energy_wh > 0 and isinstance(distance_m, (int, float)) and distance_m > 0:
                     data['efficiency_km_kwh'] = round((distance_m / 1000) / (energy_wh / 1000), 1)
+            elif start_sample is not None or end_sample is not None:
+                sample = start_sample if start_sample is not None else end_sample
+                wh, soc = sample[1], sample[2]
+                data['start_battery_wh'] = round(wh, 1)
+                data['end_battery_wh'] = round(wh, 1)
+                data['start_soc_percent'] = round(min(100.0, max(0.0, soc)), 1)
+                data['end_soc_percent'] = round(min(100.0, max(0.0, soc)), 1)
+                data['energy_wh'] = 0.0
+                data['soc_used_percent'] = 0.0
 
         return trips
 

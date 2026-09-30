@@ -216,10 +216,11 @@ def derive(data, samples, old=None):
         result.pop('energy', None)
         boundary_gap = a['gap_s']+b['gap_s']
         energy = a['value']-b['value']
-        valid = (energy_eligible and not contaminated and a['at'] < b['at']
-                 and boundary_gap <= min(90, (end-start)*0.1)
-                 and abs(energy)*3600/(end-start) <= 250000)
-        result['energy_rejected'] = not valid
+        implausible_power = (end > start) and (abs(energy)*3600/(end-start) > 250000)
+        if implausible_power:
+            result['energy_rejected'] = True
+        valid = (energy_eligible and not contaminated and not implausible_power and a['at'] < b['at']
+                 and boundary_gap <= min(90, max(45, (end-start)*0.1)))
         if valid:
             result['energy'] = {'start': a, 'end': b, 'energy_wh': round(energy,1),
                                'summary_eligible': a['at'] >= start and b['at'] <= end}

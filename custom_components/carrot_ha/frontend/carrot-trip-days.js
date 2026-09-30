@@ -184,16 +184,43 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
       pd.ended_at = td.ended_at || new Date(endMs).toISOString();
       pd.duration_s = (pd.duration_s || 0) + durS;
       pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
+      if (endSoc != null) {
+        pd.end_soc_percent = endSoc;
+      }
+      if (td.end_battery_wh != null) {
+        pd.end_battery_wh = td.end_battery_wh;
+      }
+      if (pd.start_soc_percent == null && startSoc != null) {
+        pd.start_soc_percent = startSoc;
+      }
+      if (pd.start_battery_wh == null && td.start_battery_wh != null) {
+        pd.start_battery_wh = td.start_battery_wh;
+      }
+
+      if (Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)) {
+        pd.soc_used_percent = Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10;
+      } else if (pd.start_soc_percent != null && pd.end_soc_percent != null) {
+        pd.soc_used_percent = Math.max(0, Math.round((pd.start_soc_percent - pd.end_soc_percent) * 10) / 10);
+      } else {
+        pd.soc_used_percent = pd.soc_used_percent ?? td.soc_used_percent ?? null;
+      }
+
       const completeEnergy = Number.isFinite(pd.energy_wh) && Number.isFinite(td.energy_wh)
         && !pd.energy_rejected && !td.energy_rejected;
-      pd.energy_wh = completeEnergy ? pd.energy_wh + td.energy_wh : null;
+      if (completeEnergy) {
+        pd.energy_wh = Math.round((pd.energy_wh + td.energy_wh) * 10) / 10;
+        pd.energy_verified = Boolean(pd.energy_verified && td.energy_verified);
+      } else if (!pd.energy_rejected && !td.energy_rejected
+          && Number.isFinite(pd.start_battery_wh) && Number.isFinite(pd.end_battery_wh)
+          && (pd.start_battery_wh - pd.end_battery_wh > 0)) {
+        pd.energy_wh = Math.round(pd.start_battery_wh - pd.end_battery_wh);
+        pd.energy_verified = false;
+      } else {
+        pd.energy_wh = null;
+        pd.energy_verified = false;
+      }
       pd.energy_rejected = Boolean(pd.energy_rejected || td.energy_rejected);
-      pd.energy_verified = completeEnergy && Boolean(pd.energy_verified && td.energy_verified);
       pd.distance_estimated = Boolean(pd.distance_estimated || td.distance_estimated);
-      pd.soc_used_percent = Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)
-        ? Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10 : null;
-      pd.end_soc_percent = endSoc;
-      pd.end_battery_wh = td.end_battery_wh ?? null;
 
       if (pd.distance_m > 0 && pd.energy_wh > 0) {
         pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;

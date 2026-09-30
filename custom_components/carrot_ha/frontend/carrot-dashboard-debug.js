@@ -2217,6 +2217,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     card.tripHistory = function(isTrip) {
       const currentTz = this._hass?.config?.time_zone;
+      const capacity = (this.v && this.v.soc_capacity_kwh) || BMS_CAPACITY;
       const isEnglish = isEn || card.lang === 'en';
       const days = tripDays(this.trips, currentTz);
       if (this.tripDay && !days.some(d => d.key === this.tripDay)) {
@@ -2247,8 +2248,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
         const ed = e?.data || {};
         const {leftPct, widthPct} = tripTimeline(e, currentTz);
         const isSel = isTrip && i === this.selected;
-        const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
-        const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
+        const startSoc = ed.start_soc_percent != null
+          ? Math.round(ed.start_soc_percent)
+          : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+        const endSoc = ed.end_soc_percent != null
+          ? Math.round(ed.end_soc_percent)
+          : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
         const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
         const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
         const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}${isEnglish ? ' merged' : '건 병합'})` : ''}`;
@@ -2287,8 +2292,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
           const e = this.trips[i];
           const ed = e?.data || {};
           const durText = tripDurationKo(ed.duration_s, isEnglish);
-          const startSoc = ed.start_soc_percent != null ? Math.round(ed.start_soc_percent) : null;
-          const endSoc = ed.end_soc_percent != null ? Math.round(ed.end_soc_percent) : null;
+          const startSoc = ed.start_soc_percent != null
+            ? Math.round(ed.start_soc_percent)
+            : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+          const endSoc = ed.end_soc_percent != null
+            ? Math.round(ed.end_soc_percent)
+            : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
           const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
           const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
           const isSel = isTrip && i === this.selected;

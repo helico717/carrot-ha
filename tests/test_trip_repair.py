@@ -100,6 +100,20 @@ class RepairTests(fixtures.TestTripEnergy):
             db.execute("UPDATE events SET body=json_set(body,'$.data.stale',json('true')) WHERE kind='state'")
         self.assertEqual(self.archive.history(self.device,'trip')[0]['data']['distance_m'],12000)
 
+    def test_short_trip_does_not_reject_energy(self):
+        self.archive.put(self._make_state('s1', 15, 22620))
+        self.archive.put(self._make_state('s2', 195, 22460))
+        trip = self._make_trip('cloud-short', 0, 180, 1060)
+        self.archive.put_cloud(trip)
+        trips = self.archive.history(self.device, 'trip')
+        enriched = self.archive.enrich_trips_energy(self.device, trips, 78.0)
+        d = enriched[0]['data']
+        self.assertFalse(d['energy_rejected'])
+        self.assertEqual(d['start_soc_percent'], 29.0)
+        self.assertEqual(d['end_soc_percent'], 28.8)
+        self.assertEqual(d['energy_wh'], 160.0)
+        self.assertEqual(d['efficiency_km_kwh'], 6.6)
+
 
 class RevisionTests(unittest.TestCase):
     setUp = fixtures.TestTripEnergy.setUp

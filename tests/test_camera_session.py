@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 from pathlib import Path
 import sys
@@ -14,10 +15,16 @@ TS = b"\x47" + bytes(187)
 
 class SessionTests(unittest.TestCase):
     def setUp(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
         self.now = 0
         self.session = module.CameraSession(lambda: self.now)
         self.generation = self.session.connect()
         self.session.device_status(self.generation, offroad=True)
+
+    def tearDown(self):
+        self.loop.close()
+        asyncio.set_event_loop(None)
 
     def test_idle_connection_produces_no_start_or_renew(self):
         self.assertEqual(self.session.tick(), [])

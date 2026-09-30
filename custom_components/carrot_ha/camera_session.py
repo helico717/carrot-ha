@@ -4,6 +4,8 @@ All methods run on one asyncio event loop. The transport adapter must call tick
 regularly, deliver commands to the device, and close failed readers. No camera
 or network connection is started by importing this module.
 """
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass, field
 import struct
