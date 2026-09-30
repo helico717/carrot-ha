@@ -28,7 +28,7 @@ console.log('Testing Camera360 orientation clamping and wrapping...');
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
 
-const clampPitch = (pDeg) => Math.max(-75, Math.min(75, pDeg));
+const clampPitch = (pDeg) => Math.max(-20, Math.min(25, pDeg));
 const wrapYaw = (yDeg) => {
   let y = yDeg % 360;
   if (y < 0) y += 360;
@@ -36,8 +36,8 @@ const wrapYaw = (yDeg) => {
 };
 
 assert.equal(clampPitch(0), 0);
-assert.equal(clampPitch(80), 75);
-assert.equal(clampPitch(-90), -75);
+assert.equal(clampPitch(80), 25);
+assert.equal(clampPitch(-90), -20);
 assert.equal(wrapYaw(0), 0);
 assert.equal(wrapYaw(360), 0);
 assert.equal(wrapYaw(450), 90);

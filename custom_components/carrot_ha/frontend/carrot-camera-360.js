@@ -43,7 +43,8 @@ export class Camera360Renderer {
       frontCenter: [0.5, 0.5],
       rearCenter: [0.5, 0.5],
       frontDist: [0.0, 0.0],
-      rearDist: [0.0, 0.0]
+      rearDist: [0.0, 0.0],
+      rearPitch: -15.0 * DEG2RAD // Compensates for downward-looking driver camera mount tilt on windshield
     };
 
     this.sourceAspect = [1344 / 760, 1344 / 760];
@@ -81,6 +82,7 @@ export class Camera360Renderer {
       uniform float u_frontMaxAngle;
       uniform float u_rearMaxAngle;
       uniform vec2 u_sourceAspect;
+      uniform float u_rearPitch;
 
       vec3 getRay(vec2 uv, float aspect) {
         vec2 ndc = uv * 2.0 - 1.0;
@@ -143,6 +145,13 @@ export class Camera360Renderer {
           bg += vec3(0.10, 0.16, 0.20);
         }
 
+        // Rear camera orientation with mount pitch compensation
+        float sPitch = sin(u_rearPitch);
+        float cPitch = cos(u_rearPitch);
+        vec3 rearForward = normalize(vec3(0.0, sPitch, -cPitch));
+        vec3 rearUp = normalize(vec3(0.0, cPitch, sPitch));
+        vec3 rearRight = vec3(-1.0, 0.0, 0.0);
+
         if (u_viewMode == 1) { // Front only
           vec4 f = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, u_sourceAspect.x, false);
           gl_FragColor = vec4(mix(bg, f.rgb, f.a), 1.0);
@@ -150,14 +159,14 @@ export class Camera360Renderer {
         }
 
         if (u_viewMode == 2) { // Cabin only
-          vec4 r = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
+          vec4 r = sampleFisheye(u_rearTex, ray, rearForward, rearRight, rearUp, u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
           gl_FragColor = vec4(mix(bg, r.rgb, r.a), 1.0);
           return;
         }
 
         // 360 Stitched Mode
         vec4 frontCol = sampleFisheye(u_frontTex, ray, vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_frontMaxAngle * 0.5, u_frontCenter, u_frontDist, u_sourceAspect.x, false);
-        vec4 rearCol = sampleFisheye(u_rearTex, ray, vec3(0.0, 0.0, -1.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
+        vec4 rearCol = sampleFisheye(u_rearTex, ray, rearForward, rearRight, rearUp, u_rearMaxAngle * 0.5, u_rearCenter, u_rearDist, u_sourceAspect.y, false);
 
         float wFront = frontCol.a;
         float wRear = rearCol.a;
@@ -209,7 +218,8 @@ export class Camera360Renderer {
       frontDist: gl.getUniformLocation(program, 'u_frontDist'),
       rearDist: gl.getUniformLocation(program, 'u_rearDist'),
       frontMaxAngle: gl.getUniformLocation(program, 'u_frontMaxAngle'),
-      rearMaxAngle: gl.getUniformLocation(program, 'u_rearMaxAngle')
+      rearMaxAngle: gl.getUniformLocation(program, 'u_rearMaxAngle'),
+      rearPitch: gl.getUniformLocation(program, 'u_rearPitch')
     };
 
     this.frontTexture = this.createTexture();
@@ -289,6 +299,7 @@ export class Camera360Renderer {
     gl.uniform2fv(this.uniforms.rearDist, this.calibration.rearDist);
     gl.uniform1f(this.uniforms.frontMaxAngle, this.calibration.frontFov);
     gl.uniform1f(this.uniforms.rearMaxAngle, this.calibration.rearFov);
+    gl.uniform1f(this.uniforms.rearPitch, this.calibration.rearPitch);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
     const posLoc = gl.getAttribLocation(this.program, 'a_position');
@@ -300,7 +311,7 @@ export class Camera360Renderer {
 
   setOrientation(yawDeg, pitchDeg) {
     this.yaw = (yawDeg * DEG2RAD) % (2 * Math.PI);
-    this.pitch = Math.max(-75 * DEG2RAD, Math.min(75 * DEG2RAD, pitchDeg * DEG2RAD));
+    this.pitch = Math.max(-20 * DEG2RAD, Math.min(25 * DEG2RAD, pitchDeg * DEG2RAD));
   }
 
   resetOrientation() {
@@ -1022,10 +1033,11 @@ export class CarrotCamera360Modal {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       const rect = this.viewport.getBoundingClientRect();
-      const sensitivity = this.renderer.fov / Math.max(rect.width, rect.height, 1);
+      const sensitivityX = this.renderer.fov / Math.max(rect.width, rect.height, 1);
+      const sensitivityY = sensitivityX * 0.35;
 
-      this.renderer.yaw = (initialYaw - dx * sensitivity) % (2 * Math.PI);
-      this.renderer.pitch = Math.max(-75 * DEG2RAD, Math.min(75 * DEG2RAD, initialPitch - dy * sensitivity));
+      this.renderer.yaw = (initialYaw - dx * sensitivityX) % (2 * Math.PI);
+      this.renderer.pitch = Math.max(-20 * DEG2RAD, Math.min(25 * DEG2RAD, initialPitch - dy * sensitivityY));
       this.updateHud();
     };
 
@@ -1044,6 +1056,11 @@ export class CarrotCamera360Modal {
     this.viewport.addEventListener('pointerup', onPointerUp);
     this.viewport.addEventListener('pointercancel', onPointerUp);
     this.viewport.addEventListener('lostpointercapture', onPointerUp);
+    this.viewport.addEventListener('dblclick', () => {
+      if (!this.renderer) return;
+      this.renderer.pitch = 0.0;
+      this.updateHud();
+    });
 
     // Escape key listener
     this._onKeyDown = (e) => {
