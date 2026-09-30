@@ -1161,17 +1161,35 @@ export class CarrotCamera360Modal {
       btn.addEventListener('click', (e) => e.stopPropagation());
     };
 
-    setupPtzButton(this.ptzUp, () => this.panBy(0, 2.5));
-    setupPtzButton(this.ptzDown, () => this.panBy(0, -2.5));
+    const ptzContainer = this.wrapper.querySelector('#cam360Ptz');
+    if (ptzContainer) {
+      ptzContainer.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      ptzContainer.addEventListener('pointerdown', (e) => e.stopPropagation());
+    }
+
+    setupPtzButton(this.ptzUp, () => this.panBy(0, -2.5));
+    setupPtzButton(this.ptzDown, () => this.panBy(0, 2.5));
     setupPtzButton(this.ptzLeft, () => this.panBy(-4, 0));
     setupPtzButton(this.ptzRight, () => this.panBy(4, 0));
     if (this.ptzCenter) {
-      this.ptzCenter.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const resetPitch = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         if (this.renderer) {
           this.renderer.pitch = 0.0;
           this.updateHud();
         }
+      };
+      this.ptzCenter.addEventListener('pointerdown', resetPitch);
+      this.ptzCenter.addEventListener('click', resetPitch);
+      this.ptzCenter.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
       });
     }
 
@@ -1184,6 +1202,7 @@ export class CarrotCamera360Modal {
     let initialPitch = 0;
 
     const onPointerDown = (e) => {
+      if (e.target && e.target.closest('#cam360Ptz')) return;
       if (!this.renderer || this.state !== 'playing' || isDragging || e.button > 0) return;
       dragPointer = e.pointerId;
       e.preventDefault();
@@ -1224,7 +1243,8 @@ export class CarrotCamera360Modal {
     this.viewport.addEventListener('pointerup', onPointerUp);
     this.viewport.addEventListener('pointercancel', onPointerUp);
     this.viewport.addEventListener('lostpointercapture', onPointerUp);
-    this.viewport.addEventListener('dblclick', () => {
+    this.viewport.addEventListener('dblclick', (e) => {
+      if (e.target && e.target.closest('#cam360Ptz')) return;
       if (!this.renderer) return;
       this.renderer.pitch = 0.0;
       this.updateHud();
