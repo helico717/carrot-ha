@@ -1736,8 +1736,21 @@ export default class CarrotDebugDashboard extends HTMLElement {
           if (match && match[1]) deviceId = match[1];
         }
         if (!deviceId) {
-          const match = entityId.match(/^(?:sensor|binary_sensor)\.([a-zA-Z0-9_\-]+)_comma_/);
-          if (match && match[1]) deviceId = match[1];
+          const CARROT_SUFFIXES = [
+            '_battery', '_soc_percent', '_odometer', '_odometer_km', '_parked',
+            '_estimated_range_km', '_range_km', '_outside_temp_c', '_aux_voltage',
+            '_comma_online', '_storage_used_percent'
+          ];
+          for (const suffix of CARROT_SUFFIXES) {
+            if (entityId.endsWith(suffix)) {
+              const rawId = entityId.replace(/^(?:sensor|binary_sensor)\./, '');
+              const prefix = rawId.slice(0, -suffix.length);
+              if (prefix && prefix !== 'comma') {
+                deviceId = prefix;
+                break;
+              }
+            }
+          }
         }
         if (!deviceId && (entityId.startsWith('sensor.comma_') || entityId.startsWith('binary_sensor.comma_'))) {
           deviceId = 'comma';
@@ -1767,12 +1780,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
 
       if (devicesMap.size === 0 && this.config?.device_id) {
-        const devId = this.config.device_id;
-        devicesMap.set(devId, {
-          id: devId,
-          name: devId.charAt(0).toUpperCase() + devId.slice(1),
-          wide: `/api/carrot_ha/v1/camera/${devId}/live`,
-          driver: `/api/carrot_ha/v1/camera/${devId}/live`,
+        const fallbackId = this.config.device_id;
+        devicesMap.set(fallbackId, {
+          id: fallbackId,
+          name: fallbackId.charAt(0).toUpperCase() + fallbackId.slice(1),
+          wide: `/api/carrot_ha/v1/camera/${fallbackId}/live`,
+          driver: `/api/carrot_ha/v1/camera/${fallbackId}/live`,
           road: null,
           wideState: 'ready',
           driverState: 'ready',
@@ -1792,9 +1805,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     let dev = null;
     if (deviceId) {
-      dev = devices.find(d => d.id === deviceId);
-    }
-    if (!dev) {
+      dev = devices.find(d => d.id === deviceId) || null;
+    } else {
       dev = devices.find(d => d.wide && d.driver) || devices[0];
     }
 

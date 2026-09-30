@@ -1,0 +1,3 @@
+purge_database:
+  name: Purge Database
+  description: Purges expired telemetry history and vacuums the database.
