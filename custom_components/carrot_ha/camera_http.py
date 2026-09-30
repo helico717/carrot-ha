@@ -12,11 +12,15 @@ class CameraDeviceView(HomeAssistantView):
         self.hass = hass
 
     async def get(self, request, device_id):
-        for runtime in self.hass.data.get('carrot_ha', {}).values():
-            if (isinstance(runtime, dict) and 'entry' in runtime
-                    and runtime['entry'].data['device_id'] == device_id
-                    and (relay := runtime.get('camera_relay')) is not None):
-                return await relay.device(request)
+        runtimes = [
+            r for r in self.hass.data.get('carrot_ha', {}).values()
+            if isinstance(r, dict) and 'entry' in r and r.get('camera_relay') is not None
+        ]
+        for runtime in runtimes:
+            if runtime['entry'].data.get('device_id') == device_id:
+                return await runtime['camera_relay'].device(request)
+        if runtimes and (len(runtimes) == 1 or device_id in ('comma', 'default', 'live')):
+            return await runtimes[0]['camera_relay'].device(request)
         raise web.HTTPNotFound()
 
 
@@ -29,10 +33,14 @@ class CameraLiveView(HomeAssistantView):
         self.hass = hass
 
     async def get(self, request, device_id):
-        for runtime in self.hass.data.get('carrot_ha', {}).values():
-            if (isinstance(runtime, dict) and 'entry' in runtime
-                    and runtime['entry'].data['device_id'] == device_id
-                    and (relay := runtime.get('camera_relay')) is not None):
-                return await relay.live_ws(request)
+        runtimes = [
+            r for r in self.hass.data.get('carrot_ha', {}).values()
+            if isinstance(r, dict) and 'entry' in r and r.get('camera_relay') is not None
+        ]
+        for runtime in runtimes:
+            if runtime['entry'].data.get('device_id') == device_id:
+                return await runtime['camera_relay'].live_ws(request)
+        if runtimes and (len(runtimes) == 1 or device_id in ('comma', 'default', 'live')):
+            return await runtimes[0]['camera_relay'].live_ws(request)
         raise web.HTTPNotFound()
 
