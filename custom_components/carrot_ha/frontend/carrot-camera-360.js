@@ -649,40 +649,55 @@ export class CarrotCamera360Modal {
         .camera360-pill {
           display: inline-flex;
           align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 20px;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 8px;
           font-size: 11.5px;
-          font-weight: 600;
-        }
-        .pill-mode-mock {
-          background: rgba(245, 158, 11, 0.15);
-          color: #fbbf24;
-          border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-        .pill-mode-real {
-          background: rgba(59, 130, 246, 0.15);
-          color: #60a5fa;
-          border: 1px solid rgba(59, 130, 246, 0.3);
+          font-weight: 700;
+          letter-spacing: -0.2px;
+          transition: all 0.15s ease;
         }
         .pill-status {
           background: rgba(148, 163, 184, 0.15);
           color: #cbd5e1;
+          border: 1px solid rgba(148, 163, 184, 0.35);
         }
         .pill-status.status-playing {
-          background: rgba(34, 197, 94, 0.15);
-          color: #4ade80;
-          border: 1px solid rgba(34, 197, 94, 0.3);
+          background: rgba(16, 185, 129, 0.22) !important;
+          color: #34d399 !important;
+          border: 1px solid rgba(16, 185, 129, 0.5) !important;
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.25) !important;
         }
         .pill-status.status-error {
-          background: rgba(239, 68, 68, 0.15);
-          color: #f87171;
-          border: 1px solid rgba(239, 68, 68, 0.3);
+          background: rgba(239, 68, 68, 0.22) !important;
+          color: #f87171 !important;
+          border: 1px solid rgba(239, 68, 68, 0.5) !important;
         }
         .pill-status.status-waiting {
-          background: rgba(234, 179, 8, 0.15);
-          color: #fde047;
-          border: 1px solid rgba(234, 179, 8, 0.3);
+          background: rgba(245, 158, 11, 0.22) !important;
+          color: #fbbf24 !important;
+          border: 1px solid rgba(245, 158, 11, 0.5) !important;
+        }
+        .camera360-modal-root[data-theme="light"] .pill-status {
+          background: #f1f5f9;
+          color: #334155;
+          border: 1px solid #cbd5e1;
+        }
+        .camera360-modal-root[data-theme="light"] .pill-status.status-playing {
+          background: #ecfdf5 !important;
+          color: #065f46 !important;
+          border: 1px solid #34d399 !important;
+          box-shadow: 0 1px 4px rgba(5, 150, 105, 0.2) !important;
+        }
+        .camera360-modal-root[data-theme="light"] .pill-status.status-waiting {
+          background: #fffbeb !important;
+          color: #92400e !important;
+          border: 1px solid #f59e0b !important;
+        }
+        .camera360-modal-root[data-theme="light"] .pill-status.status-error {
+          background: #fef2f2 !important;
+          color: #991b1b !important;
+          border: 1px solid #ef4444 !important;
         }
         .pill-sync-warn {
           background: rgba(239, 68, 68, 0.2);
@@ -725,6 +740,9 @@ export class CarrotCamera360Modal {
           cursor: grab;
           touch-action: none;
         }
+        .camera360-modal-root[data-theme="light"] .camera360-viewport {
+          background: #f8fafc;
+        }
         .camera360-viewport.is-dragging {
           cursor: grabbing;
         }
@@ -735,25 +753,93 @@ export class CarrotCamera360Modal {
         }
         .camera360-hud {
           position: absolute;
-          top: 12px;
-          left: 12px;
-          background: rgba(0, 0, 0, 0.65);
-          backdrop-filter: blur(4px);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
-          padding: 6px 12px;
-          font-size: 12px;
+          top: 14px;
+          left: 14px;
+          background: rgba(15, 23, 42, 0.8) !important;
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.25) !important;
+          border-radius: 8px !important;
+          padding: 6px 12px !important;
+          font-size: 12px !important;
+          font-weight: 700 !important;
+          color: #ffffff !important;
+          letter-spacing: -0.2px;
           pointer-events: none;
           display: flex;
           align-items: center;
           gap: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+          z-index: 5;
+        }
+        .camera360-hud span {
+          color: #ffffff !important;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
         }
         .hud-dot {
           width: 8px;
           height: 8px;
           border-radius: 50%;
-          background: #22c55e;
+          background: #10b981;
+          box-shadow: 0 0 8px #10b981;
         }
+        .camera360-ptz {
+          position: absolute;
+          right: 14px;
+          bottom: 14px;
+          display: grid;
+          grid-template-columns: repeat(3, 34px);
+          grid-template-rows: repeat(3, 34px);
+          gap: 3px;
+          background: rgba(15, 23, 42, 0.78);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 10px;
+          padding: 4px;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+          z-index: 6;
+          user-select: none;
+          touch-action: none;
+        }
+        .camera360-modal-root[data-theme="light"] .camera360-ptz {
+          background: rgba(255, 255, 255, 0.88);
+          border-color: rgba(0, 0, 0, 0.12);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+        .ptz-btn {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #ffffff;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          padding: 0;
+        }
+        .camera360-modal-root[data-theme="light"] .ptz-btn {
+          background: rgba(0, 0, 0, 0.05);
+          border-color: rgba(0, 0, 0, 0.08);
+          color: #1e293b;
+        }
+        .ptz-btn:hover {
+          background: linear-gradient(135deg, #1260e8 0%, #0c43ad 100%) !important;
+          border-color: #3b82f6 !important;
+          color: #ffffff !important;
+          transform: scale(1.05);
+        }
+        .ptz-btn:active {
+          background: #0c43ad !important;
+          transform: scale(0.95);
+        }
+        .ptz-up     { grid-column: 2; grid-row: 1; }
+        .ptz-left   { grid-column: 1; grid-row: 2; }
+        .ptz-center { grid-column: 2; grid-row: 2; background: rgba(255, 255, 255, 0.14); }
+        .camera360-modal-root[data-theme="light"] .ptz-center { background: rgba(0, 0, 0, 0.08); }
+        .ptz-right  { grid-column: 3; grid-row: 2; }
+        .ptz-down   { grid-column: 2; grid-row: 3; }
         .camera360-overlay {
           position: absolute;
           inset: 0;
@@ -767,38 +853,52 @@ export class CarrotCamera360Modal {
           gap: 14px;
           z-index: 10;
         }
+        .camera360-modal-root[data-theme="light"] .camera360-overlay {
+          background: rgba(248, 250, 252, 0.95);
+        }
         .camera360-spinner {
-          width: 38px;
-          height: 38px;
-          border: 3px solid rgba(255, 255, 255, 0.15);
+          width: 40px;
+          height: 40px;
+          border: 3.5px solid rgba(255, 255, 255, 0.15);
           border-top-color: #38bdf8;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
+        }
+        .camera360-modal-root[data-theme="light"] .camera360-spinner {
+          border-color: rgba(18, 96, 232, 0.15);
+          border-top-color: #1260e8;
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
         .camera360-msg {
           font-size: 14px;
+          font-weight: 500;
           color: #cbd5e1;
           max-width: 440px;
           line-height: 1.5;
         }
+        .camera360-modal-root[data-theme="light"] .camera360-msg {
+          color: #334155;
+          font-weight: 600;
+        }
         .camera360-retry-btn {
-          background: #2563eb;
+          background: linear-gradient(135deg, #1260e8 0%, #0c43ad 100%);
           color: #ffffff;
           border: none;
           padding: 10px 20px;
           border-radius: 10px;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
           min-height: 44px;
           min-width: 44px;
-          transition: background 0.15s;
+          box-shadow: 0 2px 8px rgba(18, 96, 232, 0.35);
+          transition: transform 0.15s, box-shadow 0.15s;
         }
         .camera360-retry-btn:hover {
-          background: #1d4ed8;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(18, 96, 232, 0.5);
         }
         .camera360-bottombar {
           display: flex;
@@ -847,9 +947,10 @@ export class CarrotCamera360Modal {
           transition: background 0.15s, color 0.15s;
         }
         .view-btn.is-active {
-          background: #3b82f6;
-          color: #ffffff;
-          font-weight: 600;
+          background: linear-gradient(135deg, #1260e8 0%, #0c43ad 100%) !important;
+          color: #ffffff !important;
+          font-weight: 700;
+          box-shadow: 0 2px 8px rgba(18, 96, 232, 0.35);
         }
         .reset-btn {
           background: rgba(255, 255, 255, 0.08);
@@ -910,7 +1011,6 @@ export class CarrotCamera360Modal {
               </svg>
               <span>${isEn ? '360° Camera Monitoring' : '360° 카메라 모니터링'}</span>
             </h2>
-            <span class="camera360-pill pill-mode-mock" id="cam360ModePill">🧪 ${isEn ? 'Simulation Mode' : '모의 모드'}</span>
             <span class="camera360-pill pill-status" id="cam360StatusPill">${isEn ? 'Connecting...' : '연결 중...'}</span>
             <span class="camera360-pill pill-sync-warn" id="cam360SyncWarn">⚠️ ${isEn ? 'Sync Delta' : '동기화 편차'}</span>
           </div>
@@ -927,6 +1027,23 @@ export class CarrotCamera360Modal {
           <div class="camera360-hud">
             <div class="hud-dot" id="cam360HudDot"></div>
             <span id="cam360HudYaw">0° (정면 · FRONT)</span>
+          </div>
+          <div class="camera360-ptz" id="cam360Ptz">
+            <button type="button" class="ptz-btn ptz-up" id="ptzUp" aria-label="${isEn ? 'Tilt Up' : '위로 회전'}" title="${isEn ? 'Tilt Up' : '위로'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg>
+            </button>
+            <button type="button" class="ptz-btn ptz-left" id="ptzLeft" aria-label="${isEn ? 'Pan Left' : '왼쪽으로 회전'}" title="${isEn ? 'Pan Left' : '왼쪽'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <button type="button" class="ptz-btn ptz-center" id="ptzCenter" aria-label="${isEn ? 'Center Level' : '수평 정렬'}" title="${isEn ? 'Level Horizon' : '수평 지평선 정렬'}">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line></svg>
+            </button>
+            <button type="button" class="ptz-btn ptz-right" id="ptzRight" aria-label="${isEn ? 'Pan Right' : '오른쪽으로 회전'}" title="${isEn ? 'Pan Right' : '오른쪽'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <button type="button" class="ptz-btn ptz-down" id="ptzDown" aria-label="${isEn ? 'Tilt Down' : '아래로 회전'}" title="${isEn ? 'Tilt Down' : '아래로'}">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
           </div>
           <div class="camera360-overlay" id="cam360Overlay">
             <div class="camera360-spinner" id="cam360Spinner"></div>
@@ -980,6 +1097,11 @@ export class CarrotCamera360Modal {
     this.closeBtn = wrapper.querySelector('#cam360CloseBtn');
     this.resetBtn = wrapper.querySelector('#cam360ResetBtn');
     this.viewButtons = Array.from(wrapper.querySelectorAll('.view-btn'));
+    this.ptzUp = wrapper.querySelector('#ptzUp');
+    this.ptzDown = wrapper.querySelector('#ptzDown');
+    this.ptzLeft = wrapper.querySelector('#ptzLeft');
+    this.ptzRight = wrapper.querySelector('#ptzRight');
+    this.ptzCenter = wrapper.querySelector('#ptzCenter');
   }
 
   bindEvents() {
@@ -1006,6 +1128,52 @@ export class CarrotCamera360Modal {
         }
       });
     });
+
+    // PTZ Directional Controller
+    const setupPtzButton = (btn, action) => {
+      if (!btn) return;
+      let intervalId = null;
+      let isPressed = false;
+
+      const start = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isPressed) return;
+        isPressed = true;
+        action();
+        intervalId = setInterval(action, 60);
+      };
+
+      const stop = (e) => {
+        if (e) e.stopPropagation();
+        if (!isPressed) return;
+        isPressed = false;
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      };
+
+      btn.addEventListener('pointerdown', start);
+      btn.addEventListener('pointerup', stop);
+      btn.addEventListener('pointercancel', stop);
+      btn.addEventListener('pointerleave', stop);
+      btn.addEventListener('click', (e) => e.stopPropagation());
+    };
+
+    setupPtzButton(this.ptzUp, () => this.panBy(0, 2.5));
+    setupPtzButton(this.ptzDown, () => this.panBy(0, -2.5));
+    setupPtzButton(this.ptzLeft, () => this.panBy(-4, 0));
+    setupPtzButton(this.ptzRight, () => this.panBy(4, 0));
+    if (this.ptzCenter) {
+      this.ptzCenter.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.renderer) {
+          this.renderer.pitch = 0.0;
+          this.updateHud();
+        }
+      });
+    }
 
     // Pointer events for dragging
     let isDragging = false;
@@ -1071,6 +1239,14 @@ export class CarrotCamera360Modal {
     window.addEventListener('keydown', this._onKeyDown);
   }
 
+  panBy(dYawDeg, dPitchDeg) {
+    if (!this.renderer) return;
+    this.renderer.yaw = (this.renderer.yaw + dYawDeg * DEG2RAD) % (2 * Math.PI);
+    if (this.renderer.yaw < 0) this.renderer.yaw += 2 * Math.PI;
+    this.renderer.pitch = Math.max(-20 * DEG2RAD, Math.min(25 * DEG2RAD, this.renderer.pitch + dPitchDeg * DEG2RAD));
+    this.updateHud();
+  }
+
   updateHud() {
     if (!this.renderer || !this.hudYaw) return;
     const { yaw, pitch } = this.renderer.getOrientationDeg();
@@ -1124,12 +1300,14 @@ export class CarrotCamera360Modal {
 
     // Mode Pill update
     const isEn = this.lang === 'en';
-    if (this.mode === 'mock') {
-      this.modePill.className = 'camera360-pill pill-mode-mock';
-      this.modePill.textContent = `🧪 ${isEn ? 'Mock Simulation' : '모의 시뮬레이션'}`;
-    } else {
-      this.modePill.className = 'camera360-pill pill-mode-real';
-      this.modePill.textContent = `🚗 ${isEn ? 'Live Vehicle' : '실기기 연결'}`;
+    if (this.modePill) {
+      if (this.mode === 'mock') {
+        this.modePill.className = 'camera360-pill pill-mode-mock';
+        this.modePill.textContent = `🧪 ${isEn ? 'Mock Simulation' : '모의 시뮬레이션'}`;
+      } else {
+        this.modePill.className = 'camera360-pill pill-mode-real';
+        this.modePill.textContent = `🚗 ${isEn ? 'Live Vehicle' : '실기기 연결'}`;
+      }
     }
 
     this.startSession(currentSeq);

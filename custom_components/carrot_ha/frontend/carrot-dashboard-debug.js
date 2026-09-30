@@ -1572,7 +1572,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
   }
 
   isCarrotCameraEntity(entityId, stateObj) {
-    if (!entityId || !entityId.startsWith('camera.')) return false;
+    if (!entityId || (!entityId.startsWith('camera.') && !entityId.startsWith('image.'))) return false;
     const attr = stateObj?.attributes || {};
     const name = attr.friendly_name || '';
     const brand = (attr.brand || '').toLowerCase();
@@ -1582,17 +1582,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (entityId.includes('192_168_') || entityId.includes('gm_house') || entityId.includes('live_view')) return false;
     if (attr.model && attr.model.toLowerCase().includes('bambu')) return false;
 
-    // 2. Offroad viewing mode and HLS transport are exclusive signatures of CarrotCamera (custom_components/carrot_ha/camera.py)
-    if (attr.viewing_mode === 'offroad_only' || attr.transport === 'https_hls') return true;
+    // 2. Offroad viewing mode and HLS transport are exclusive signatures of CarrotCamera / CarrotImage
+    if (attr.viewing_mode === 'offroad_only' || attr.viewing_mode === 'snapshot_only' || attr.transport === 'https_hls') return true;
 
     // 3. Korean entity naming pattern from Carrot HA setup:
-    // camera.comma_gwanggag_kamera, camera.comma_silnae_kamera, camera.comma_mangweon_kamera
-    if (entityId.includes('_gwanggag_kamera') || entityId.includes('_silnae_kamera') || entityId.includes('_mangweon_kamera')) return true;
+    // camera.comma_gwanggag_kamera, image.comma_wide_snapshot, etc.
+    if (entityId.includes('_gwanggag_kamera') || entityId.includes('_silnae_kamera') || entityId.includes('_mangweon_kamera') || entityId.includes('_snapshot')) return true;
 
     // 4. Standard Carrot HA unique_id / suffix patterns
     const uid = attr.unique_id || '';
-    if (uid.includes('_camera_wide') || uid.includes('_camera_driver') || uid.includes('_camera_road')) return true;
-    if (entityId.endsWith('_camera_wide') || entityId.endsWith('_camera_driver') || entityId.endsWith('_camera_road')) return true;
+    if (uid.includes('_camera_wide') || uid.includes('_camera_driver') || uid.includes('_camera_road') || uid.includes('_image_wide') || uid.includes('_image_driver') || uid.includes('_image_road')) return true;
+    if (entityId.endsWith('_camera_wide') || entityId.endsWith('_camera_driver') || entityId.endsWith('_camera_road') || entityId.endsWith('_image_wide') || entityId.endsWith('_image_driver') || entityId.endsWith('_image_road')) return true;
 
     // 5. Friendly name matching Comma
     if (name.includes('Comma') && (name.includes('광각') || name.includes('실내') || name.includes('망원') || name.toLowerCase().includes('wide') || name.toLowerCase().includes('driver') || name.toLowerCase().includes('road'))) {
@@ -1610,8 +1610,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (
       entityId.endsWith('_gwanggag_kamera') ||
       entityId.endsWith('_camera_wide') ||
+      entityId.endsWith('_image_wide') ||
       entityId.endsWith('_wide') ||
       uid.endsWith('_camera_wide') ||
+      uid.endsWith('_image_wide') ||
       name.includes('광각') ||
       name.toLowerCase().includes('wide')
     ) {
@@ -1621,8 +1623,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (
       entityId.endsWith('_silnae_kamera') ||
       entityId.endsWith('_camera_driver') ||
+      entityId.endsWith('_image_driver') ||
       entityId.endsWith('_driver') ||
       uid.endsWith('_camera_driver') ||
+      uid.endsWith('_image_driver') ||
       name.includes('실내') ||
       name.includes('운전자') ||
       name.toLowerCase().includes('driver')
@@ -1633,8 +1637,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (
       entityId.endsWith('_mangweon_kamera') ||
       entityId.endsWith('_camera_road') ||
+      entityId.endsWith('_image_road') ||
       entityId.endsWith('_road') ||
       uid.endsWith('_camera_road') ||
+      uid.endsWith('_image_road') ||
       name.includes('망원') ||
       name.toLowerCase().includes('road')
     ) {
@@ -1648,12 +1654,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const attr = stateObj?.attributes || {};
     const uid = attr.unique_id || '';
 
-    if (uid && uid.includes('_camera_')) {
-      const match = uid.match(/^(.*?)_camera_(?:wide|driver|road)$/);
+    if (uid && (uid.includes('_camera_') || uid.includes('_image_'))) {
+      const match = uid.match(/^(.*?)_(?:camera|image)_(?:wide|driver|road)$/);
       if (match && match[1]) return match[1];
     }
 
-    const idWithoutDomain = entityId.replace(/^camera\./, '');
+    const idWithoutDomain = entityId.replace(/^(?:camera|image)\./, '');
     const suffixes = [
       '_gwanggag_kamera',
       '_silnae_kamera',
@@ -1661,6 +1667,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       '_camera_wide',
       '_camera_driver',
       '_camera_road',
+      '_image_wide',
+      '_image_driver',
+      '_image_road',
       '_wide_kamera',
       '_driver_kamera',
       '_road_kamera',
@@ -3728,38 +3737,44 @@ export default class CarrotDebugDashboard extends HTMLElement {
           display: inline-flex !important;
           align-items: center !important;
           gap: 6px !important;
-          background: rgba(59, 130, 246, 0.15) !important;
-          color: #60a5fa !important;
-          border: 1px solid rgba(59, 130, 246, 0.35) !important;
-          padding: 6px 12px !important;
-          border-radius: 20px !important;
+          background: linear-gradient(135deg, #1260e8 0%, #0c43ad 100%) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.25) !important;
+          box-shadow: 0 2px 8px rgba(18, 96, 232, 0.35) !important;
+          padding: 6px 14px !important;
+          border-radius: 10px !important;
           font-size: 12px !important;
-          font-weight: 600 !important;
+          font-weight: 700 !important;
           cursor: pointer !important;
-          min-height: 44px !important;
+          min-height: 38px !important;
           min-width: 44px !important;
           box-sizing: border-box !important;
-          transition: all 0.15s ease !important;
+          transition: all 0.18s ease !important;
+        }
+        .mini-condition-camera-btn svg {
+          stroke: #ffffff !important;
         }
         .mini-condition-camera-btn:hover {
-          background: rgba(59, 130, 246, 0.25) !important;
-          border-color: #3b82f6 !important;
-          color: #93c5fd !important;
+          background: linear-gradient(135deg, #1b6ef3 0%, #124ec2 100%) !important;
+          border-color: rgba(255, 255, 255, 0.4) !important;
+          box-shadow: 0 4px 14px rgba(18, 96, 232, 0.5) !important;
+          color: #ffffff !important;
           transform: translateY(-1px) !important;
         }
         .mini-condition-camera-btn:focus-visible {
-          outline: 2px solid #3b82f6 !important;
+          outline: 2px solid #60a5fa !important;
           outline-offset: 2px !important;
         }
         :host([data-theme="light"]) .mini-condition-camera-btn {
-          background: rgba(37, 99, 235, 0.1) !important;
-          color: #1d4ed8 !important;
-          border-color: rgba(37, 99, 235, 0.3) !important;
+          background: linear-gradient(135deg, #1260e8 0%, #0c43ad 100%) !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(18, 96, 232, 0.35) !important;
+          box-shadow: 0 2px 8px rgba(18, 96, 232, 0.3) !important;
         }
         :host([data-theme="light"]) .mini-condition-camera-btn:hover {
-          background: rgba(37, 99, 235, 0.18) !important;
-          border-color: #2563eb !important;
-          color: #1e40af !important;
+          background: linear-gradient(135deg, #1b6ef3 0%, #124ec2 100%) !important;
+          box-shadow: 0 4px 14px rgba(18, 96, 232, 0.45) !important;
+          color: #ffffff !important;
         }
         .mini-condition-camera-disabled, .mini-condition-camera.is-unconfigured {
           display: inline-flex !important;
