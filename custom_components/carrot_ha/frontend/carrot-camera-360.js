@@ -1566,14 +1566,34 @@ export class CarrotCamera360Modal {
         this._appendChunk(event.data, targetSeq);
       };
 
-      socket.onerror = () => {
+      socket.onerror = async () => {
         if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-        this.handlePlaybackFailure(isEn ? 'Camera WebSocket connection failed.' : '카메라 웹소켓 연결에 실패했습니다.');
+        let detail = isEn ? 'Camera WebSocket connection failed.' : '카메라 웹소켓 연결에 실패했습니다.';
+        if (deviceId) {
+          try {
+            const checkUrl = `${window.location.protocol}//${window.location.host}/api/carrot_ha/v1/camera/${deviceId}/live`;
+            const resp = await fetch(checkUrl);
+            if (resp.status === 503) {
+              detail = isEn
+                ? 'Comma camera is currently offline (HTTP 503). Check if vehicle is parked and Comma is online.'
+                : '차량(Comma) 카메라가 오프라인 상태입니다 (503). 기기 전원 및 주차 연결을 확인하세요.';
+            } else if (resp.status === 404) {
+              detail = isEn
+                ? `Camera relay not configured or device (${deviceId}) not found (HTTP 404). Check HA integration settings.`
+                : `HA에 기기(${deviceId}) 카메라가 활성화되어 있지 않습니다 (404). HA 설정을 확인하세요.`;
+            } else if (resp.status === 400) {
+              detail = isEn
+                ? 'WebSocket upgrade blocked (HTTP 400). Enable "Websockets Support" in your Nginx reverse proxy.'
+                : 'Nginx 프록시에서 웹소켓이 차단되었습니다 (400). Nginx의 "Websockets Support"를 켜주세요.';
+            }
+          } catch (_) {}
+        }
+        this.handlePlaybackFailure(detail);
       };
 
       socket.onclose = (ev) => {
         if (this.sessionSeq !== targetSeq || !this.isOpen) return;
-        if (ev.code !== 1000) {
+        if (ev.code !== 1000 && this.state !== 'error' && this.state !== 'retrying') {
           this.handlePlaybackFailure(isEn ? 'Camera stream disconnected.' : '카메라 스트림 연결이 종료되었습니다.');
         }
       };

@@ -1561,11 +1561,15 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (effectiveMode === 'real') {
       cameraEntities = this.findCarrotCameraEntities(this.state.selectedCameraDevice);
     }
+    const resolvedDevId = this.state.selectedCameraDevice || cameraEntities?.device?.id || '';
+    if (!this.state.selectedCameraDevice && resolvedDevId) {
+      this.state.selectedCameraDevice = resolvedDevId;
+    }
 
     this.cameraModal.open({
       mode: effectiveMode,
       hass: this._hass,
-      deviceId: this.state.selectedCameraDevice || '',
+      deviceId: resolvedDevId,
       cameraEntities,
       returnFocusElem: triggerBtn
     });
