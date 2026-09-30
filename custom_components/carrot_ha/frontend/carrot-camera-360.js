@@ -975,19 +975,22 @@ export class CarrotCamera360Modal {
         }
         @media (max-width: 640px) {
           .camera360-modal-root {
-            padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+            padding: max(10px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
             align-items: center;
             justify-content: center;
           }
           .camera360-card {
             width: 100%;
-            max-height: min(90vh, calc(100dvh - 28px));
-            border-radius: 16px;
+            height: min(85vh, calc(100dvh - 24px));
+            max-height: 820px;
+            border-radius: 18px;
             border: 1px solid rgba(255, 255, 255, 0.16);
             box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+            display: flex;
+            flex-direction: column;
           }
           .camera360-topbar {
-            padding: 12px 14px;
+            padding: 10px 14px;
             flex-wrap: nowrap;
             flex-shrink: 0;
             gap: 8px;
@@ -1017,17 +1020,20 @@ export class CarrotCamera360Modal {
             background: #f1f5f9;
           }
           .camera360-viewport {
+            position: relative;
             width: 100%;
-            aspect-ratio: 16 / 9;
-            min-height: 220px;
-            max-height: 52vh;
-            flex: none;
+            flex: 1 1 0;
+            min-height: 200px;
+            max-height: none;
+            aspect-ratio: auto;
+            overflow: hidden;
           }
           .camera360-canvas {
-            position: relative;
-            inset: auto;
+            position: absolute;
+            inset: 0;
             width: 100%;
             height: 100%;
+            display: block;
           }
           .camera360-bottombar {
             padding: 10px 14px;
@@ -1036,6 +1042,14 @@ export class CarrotCamera360Modal {
           .camera360-controls {
             width: 100%;
             justify-content: space-between;
+          }
+          .camera360-ptz {
+            right: 10px;
+            bottom: 10px;
+            grid-template-columns: repeat(3, 30px);
+            grid-template-rows: repeat(3, 30px);
+            gap: 2px;
+            padding: 3px;
           }
         }
       </style>

@@ -2298,8 +2298,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
     };
 
     card.tripHistory = function(isTrip) {
+      const v = this.v || {};
       const currentTz = this._hass?.config?.time_zone;
-      const capacity = (this.v && this.v.soc_capacity_kwh) || BMS_CAPACITY;
+      const capacity = v.soc_capacity_kwh || BMS_CAPACITY;
       const isEnglish = isEn || card.lang === 'en';
       const days = tripDays(this.trips, currentTz);
       if (this.tripDay && !days.some(d => d.key === this.tripDay)) {
@@ -2314,7 +2315,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const labels = d => d.date.getUTCDate() + (isEnglish ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.date.getUTCDay()]})` : `일(${['일','월','화','수','목','금','토'][d.date.getUTCDay()]})`);
 
       const daysHtml = days.map(d => `
-        <button class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 
+        <button type="button" class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 
                 data-trip-day="${d.key}" 
                 aria-pressed="${d.key === this.tripDay}" 
                 aria-label="${d.key}, ${d.indices.length} ${isEnglish ? 'trips' : '회 주행'}">
@@ -2576,12 +2577,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
                   socBadgeHtml = `<span class="charge-soc ${isRetro ? 'retro-mode' : ''}">${batterySvg} +${chargedSoc}%${isRetro ? ` <small class="retro-tag">(${isEnglish ? 'est.' : '소급 추산'})</small>` : ''}</span>`;
                 }
 
+                const chargeEnd = ed.ended_at || (ed.started_at && ed.duration_s ? new Date(new Date(ed.started_at).getTime() + (ed.duration_s * 1000)).toISOString() : null);
+                const timeRangeStr = chargeEnd ? `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(chargeEnd)}` : timeOnly(ed.started_at || e.observed_at);
+                const unitPrice = fast ? 320 : 280;
+                const cost = ed.cost_krw != null ? Math.round(ed.cost_krw) : Math.round((ed.energy_kwh || 0) * unitPrice);
+
                 return `
                   <div class="row charge-row">
                     <div class="charge-meta">
                       <span class="charge-icon-wrap ${fast ? 'fast' : ''}">${boltSvg}</span>
                       <div>
-                        <b class="charge-date">${timeOnly(ed.started_at || e.observed_at)}</b>
+                        <b class="charge-date">${timeRangeStr}</b>
                         <div class="charge-info-sub">
                           <span class="speed-badge ${fast ? 'fast' : 'slow'}">${fast ? (isEnglish ? 'Fast' : '급속') : (isEnglish ? 'Slow' : '완속')}</span>
                           <span class="charge-dur">${formatChargeDuration(ed.duration_s, isEnglish)}</span>
@@ -2593,7 +2599,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                     <div class="charge-val">
                       <strong>${n(ed.energy_kwh, 2)} <small>kWh</small></strong>
                       <span class="charge-sub" title="${ed.merged ? (ed.merge_parts || []).map(p => `${n(p.energy_kwh, 1)} kWh`).join(' + ') : ''}">
-                        ${ed.merged ? (isEnglish ? `Reconnected in ${Math.max(1, Math.round((ed.merge_gap_s || 0) / 60))}m` : `${Math.max(1, Math.round((ed.merge_gap_s || 0) / 60))}분 간격 재연결`) : (ed.partial ? (isEnglish ? 'Partial data' : '일부 구간만 수집') : (isEnglish ? 'Recorded energy' : '기록된 충전량'))}
+                        ${isEnglish ? 'Est. Cost ₩' : '충전요금(추정) '}${n(cost, 0)}${isEnglish ? '' : '원'}
                       </span>
                     </div>
                   </div>`;
@@ -3159,12 +3165,27 @@ export default class CarrotDebugDashboard extends HTMLElement {
         };
       }
 
-      // Reset trip pagination page when switching day
+      // Reset trip pagination page and set tripDay when switching day
       card.shadowRoot?.querySelectorAll('[data-trip-day]').forEach(b => {
-        const orig = b.onclick;
         b.onclick = (e) => {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          card.tripDay = b.dataset.tripDay;
+          card.selected = null;
           card._tripPage = 1;
-          if (orig) orig.call(b, e);
+          card.render();
+        };
+      });
+
+      card.shadowRoot?.querySelectorAll('[data-charge-day]').forEach(b => {
+        b.onclick = (e) => {
+          if (e) { e.preventDefault(); e.stopPropagation(); }
+          card.chargeDay = b.dataset.chargeDay;
+          const bDays = card.v?.battery_history;
+          if (Array.isArray(bDays)) {
+            const bIdx = bDays.findIndex(x => x.date === card.chargeDay);
+            if (bIdx !== -1) card.batteryDay = bIdx;
+          }
+          card.render();
         };
       });
 
