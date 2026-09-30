@@ -17,7 +17,7 @@ async def async_setup(hass, config):
     from homeassistant.components.http import StaticPathConfig
     await hass.http.async_register_static_paths([StaticPathConfig('/carrot_ha_static', str(Path(__file__).parent / 'frontend'), False)])
     version = await hass.async_add_executor_job(_read_frontend_version)
-    hass.http.register_view(FrontendVersionView(version))
+    hass.http.register_view(FrontendVersionView(hass, version))
     hass.http.register_view(ReceiveView(hass))
     hass.http.register_view(HistoryView(hass))
     hass.http.register_view(DevicesView(hass))
@@ -262,12 +262,13 @@ class FrontendVersionView(HomeAssistantView):
     name = 'api:carrot_ha:frontend_version'
     requires_auth = False
 
-    def __init__(self, version):
+    def __init__(self, hass, version):
+        self.hass = hass
         self.version = version
 
     async def get(self, request):
         try:
-            version = _read_frontend_version()
+            version = await self.hass.async_add_executor_job(_read_frontend_version)
         except Exception:
             version = self.version
         return web.json_response({'version': version}, headers={'Cache-Control': 'no-store'})
