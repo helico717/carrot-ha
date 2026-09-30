@@ -112,23 +112,28 @@ class CarrotDashboard extends HTMLElement {
   getGridOptions(){return {columns:36,rows:"auto",min_columns:6};}
   async load(quiet=false){
     if(this.busy)return;this.busy=true;this.error='';
+    const refBtn=this.shadowRoot?.querySelector('.refresh');if(refBtn)refBtn.textContent='Refreshing…';
     try{
-      if(!quiet&&(!this.v||!Object.keys(this.v).length))this.render();
+      if(!this.v||!Object.keys(this.v).length){
+        this.loadCache();
+        if(!this.v||!Object.keys(this.v).length)this.render();
+      }
       const devices=await this._hass.callApi('GET','carrot_ha/v1/devices');
       const requested=this.config?.device_id;
       this.device=devices.devices.find(d=>d.device_id===requested)||(!requested?devices.devices[0]:null);
       if(!this.device)throw Error('Carrot HA device not found. Check the device_id in card configuration.');
       const id=encodeURIComponent(this.device.entry_id);
-      const dash=await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`);
-      this.v=dash.values;this.isFromCache=false;this.saveCache();this.render();
-      const [trips,charges]=await Promise.all([
+      const [dash,tripsRes,chargesRes]=await Promise.all([
+        this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`),
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
-        this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)]);
+        this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)
+      ]);
+      this.v=dash.values;this.isFromCache=false;
       const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
-      this._rawTrips=trips.events||[];
+      this._rawTrips=tripsRes.events||[];
       this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
       this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
-      this.charges=mergeConsecutiveCharges(charges.events);
+      this.charges=mergeConsecutiveCharges(chargesRes.events);
       if(selectedStart!=null){
         const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
         this.selected=idx!==-1?idx:null;
@@ -139,10 +144,16 @@ class CarrotDashboard extends HTMLElement {
     }catch(e){this.error=e instanceof Error?e.message:'HA request failed. Check your administrator account and integration version.';}
     finally{this.busy=false;this.render();}
   }
-  clearMiniMaps(){const maps=this.miniMaps||[];this.miniMaps=[];for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}}
+  clearMiniMaps(){
+    if(this._mapResizeObserver){try{this._mapResizeObserver.disconnect();}catch(e){}}
+    if(this._resizeRaf){cancelAnimationFrame(this._resizeRaf);this._resizeRaf=null;}
+    const maps=this.miniMaps||[];this.miniMaps=[];
+    for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
+  }
   render(){
+    this._renderId=(this._renderId||0)+1;
     this.clearMiniMaps();
-    if(this.map){this.map.remove();this.map=null;}
+    if(this.map){try{this.map.remove();}catch(e){}this.map=null;}
     if(this.tab==='trips'){
       const days=tripDays(this.trips,this._hass?.config?.time_zone);
       if(!this.tripDay||!days.some(d=>d.key===this.tripDay)){
@@ -637,15 +648,18 @@ class CarrotDashboard extends HTMLElement {
     };
     if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
     if (typeof window !== 'undefined' && window.ResizeObserver) {
-      if (!this._mapResizeObserver) {
-        this._mapResizeObserver = new ResizeObserver(() => {
-          if (this.miniMaps && this.miniMaps.length) {
-            this.miniMaps.forEach(m => {
-              try { m.invalidateSize(); } catch (e) {}
-            });
-          }
-        });
-      }
+      this._mapResizeObserver = new ResizeObserver(() => {
+        if (!this._resizeRaf) {
+          this._resizeRaf = requestAnimationFrame(() => {
+            this._resizeRaf = null;
+            if (this.miniMaps && this.miniMaps.length) {
+              this.miniMaps.forEach(m => {
+                try { m.invalidateSize(); } catch (e) {}
+              });
+            }
+          });
+        }
+      });
       this.shadowRoot?.querySelectorAll('.mini-map').forEach(el => {
         this._mapResizeObserver.observe(el);
       });
@@ -1197,13 +1211,13 @@ class CarrotDashboard extends HTMLElement {
   vehicleStatus(v){
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'Offline'};
-    if(online!=='on'&&!this.isFromCache)return {key:'unknown',label:'Checking connection'};
-    const isMoving=(v.speed_kph>5)||(typeof v.wheel_speed_mps==='number'&&v.wheel_speed_mps>1.5);
-    const isCharging=(Boolean(v.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving;
+    const isMoving=(v?.speed_kph>5)||(typeof v?.wheel_speed_mps==='number'&&v?.wheel_speed_mps>1.5);
+    const isCharging=(Boolean(v?.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving;
     if(isCharging)return {key:'charging',label:'Charging'};
-    const driving=Object.prototype.hasOwnProperty.call(v,'driving')?v.driving:v.onroad;
+    const driving=Object.prototype.hasOwnProperty.call(v||{},'driving')?v?.driving:v?.onroad;
     if(driving)return {key:'driving',label:'Driving'};
     if(driving===false)return {key:'parked',label:'Parked'};
+    if(online!=='on'&&!this.isFromCache&&(!v||!Object.keys(v).length))return {key:'unknown',label:'Checking connection'};
     return {key:'unknown',label:online==='on'?'Checking status':'Checking connection'};
   }
   openCamera360(triggerBtn){
@@ -1226,8 +1240,10 @@ class CarrotDashboard extends HTMLElement {
     });
   }
   async drawMiniMaps(v){
+    const currentRenderId=this._renderId;
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];
     const L=await leaflet();
+    if(this._renderId!==currentRenderId)return;
     nodes.forEach((node,i)=>{
       if(!node?.isConnected)return;
       const map=L.map(node,{zoomControl:false,attributionControl:true,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false});
@@ -1240,7 +1256,9 @@ class CarrotDashboard extends HTMLElement {
       else{this.miniMaps=this.miniMaps.filter(item=>item!==map);map.remove();node.textContent='No location data';}
     });
     setTimeout(()=>{
-      this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
+      if(this._renderId===currentRenderId){
+        this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
+      }
     },100);
   }
 
