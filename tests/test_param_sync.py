@@ -29,9 +29,11 @@ class ParamSyncTest(unittest.TestCase):
             self.assertEqual(http.call_count, 1)
 
     def test_idempotent_store_skips_duplicate_write(self):
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.sqlite3') as tmp:
-            store = sync.ProcessedQueueStore(tmp.name)
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix='.sqlite3', delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            store = sync.ProcessedQueueStore(tmp_path)
             self.assertIsNone(store.get(101))
             store.record(101, 'dev1', 'ParamA', 5, 5, 'applied')
             item = store.get(101)
@@ -43,11 +45,17 @@ class ParamSyncTest(unittest.TestCase):
             # Test mark_acked
             store.mark_acked([101])
             self.assertTrue(store.get(101)['acked'])
+        finally:
+            if os.path.exists(tmp_path):
+                try: os.unlink(tmp_path)
+                except OSError: pass
 
     def test_requeued_id_resends_ack_without_local_apply(self):
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.sqlite3') as tmp:
-            store = sync.ProcessedQueueStore(tmp.name)
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(suffix='.sqlite3', delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            store = sync.ProcessedQueueStore(tmp_path)
             store.record(202, 'test-dev', 'SpeedLimit', 60, 60, 'applied')
 
             # Mock pending response returning the same id 202
@@ -77,6 +85,10 @@ class ParamSyncTest(unittest.TestCase):
                 self.assertEqual(ack_calls[0]['applied_ids'], [202])
                 self.assertEqual(ack_calls[0]['current_values'], {'SpeedLimit': 60})
                 self.assertTrue(store.get(202)['acked'])
+        finally:
+            if os.path.exists(tmp_path):
+                try: os.unlink(tmp_path)
+                except OSError: pass
 
 
 if __name__ == '__main__':

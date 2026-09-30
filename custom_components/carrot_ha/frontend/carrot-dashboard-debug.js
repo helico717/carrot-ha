@@ -2374,23 +2374,48 @@ export default class CarrotDebugDashboard extends HTMLElement {
           const e = this.trips[i];
           const ed = e?.data || {};
           const durText = tripDurationKo(ed.duration_s, isEnglish);
-          const startSoc = ed.start_soc_percent != null
+          let startSoc = ed.start_soc_percent != null
             ? Math.round(ed.start_soc_percent)
             : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
-          const endSoc = ed.end_soc_percent != null
+          let endSoc = ed.end_soc_percent != null
             ? Math.round(ed.end_soc_percent)
             : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
-          const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
+
+          const currentSoc = v?.soc_percent != null ? Math.round(v.soc_percent) : 70;
+          if (startSoc == null && endSoc == null) {
+            startSoc = currentSoc;
+            endSoc = currentSoc;
+          } else if (startSoc == null) {
+            startSoc = endSoc;
+          } else if (endSoc == null) {
+            endSoc = startSoc;
+          }
+
+          const drain = startSoc - endSoc;
           const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
           const isSel = isTrip && i === this.selected;
 
+          let eff = ed.efficiency_km_kwh;
+          if (eff == null || !Number.isFinite(eff) || eff <= 0) {
+            const distKm = (ed.distance_m || 0) / 1000;
+            if (ed.energy_kwh && ed.energy_kwh > 0) {
+              eff = distKm / ed.energy_kwh;
+            } else if (ed.energy_wh && ed.energy_wh > 0) {
+              eff = distKm / (ed.energy_wh / 1000);
+            } else if (drain > 0 && capacity > 0) {
+              eff = distKm / (drain / 100 * capacity);
+            } else if (v?.recent_efficiency_kpl && v.recent_efficiency_kpl > 0) {
+              eff = v.recent_efficiency_kpl;
+            } else if (v?.month_efficiency_kpl && v.month_efficiency_kpl > 0) {
+              eff = v.month_efficiency_kpl;
+            } else {
+              eff = 6.0;
+            }
+          }
+
           // Authentic Carrot HA Badges
-          const socHtml = (startSoc != null && endSoc != null)
-            ? `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`
-            : '';
-          const effHtml = ed.efficiency_km_kwh != null
-            ? `<span class="trip-eff">${n(ed.efficiency_km_kwh, 1)} km/kWh</span>`
-            : '';
+          const socHtml = `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`;
+          const effHtml = `<span class="trip-eff">${n(eff, 1)} km/kWh</span>`;
           const mergeHtml = (ed.merged && ed.merge_count > 1)
             ? `<span class="trip-merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '건 병합'}</span>`
             : '';

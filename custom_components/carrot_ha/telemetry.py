@@ -9,7 +9,6 @@ BINARY_FIELDS = {
 }
 SENSOR_FIELDS = {
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
-    'bms_target_soc_percent': ('BMS 목표 SOC 신호', '%', 'mdi:battery-charging-80', None, 1),
     'dcdc_temperature_c': ('DC-DC 컨버터 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_cpu_temperature_c': ('콤마 CPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_gpu_temperature_c': ('콤마 GPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),

@@ -29,7 +29,6 @@ FIELDS = {
  'eta_100':('100% 충전 완료시각 (추정)',None,'mdi:clock-end','timestamp',None),
  'battery_kwh':('배터리 저장 에너지','kWh','mdi:battery-high','energy',1),
  'hv_voltage':('고전압 배터리 전압','V','mdi:lightning-bolt','voltage',1),
- 'measured_capacity_kwh':('BMS 용량 (추정)','kWh','mdi:battery-heart-variant','energy',1),
  'soc_capacity_kwh':('SOC 계산 용량','kWh','mdi:battery-sync','energy',1),
  'range_km':('주행가능거리 (추정)','km','mdi:map-marker-distance','distance',0),
  'blower_volt':('송풍 제어 전압','V','mdi:fan','voltage',2),
@@ -38,7 +37,6 @@ FIELDS = {
  'seat_heat_right':('조수석 열선 단계',None,'mdi:car-seat-heater',None,0),
  'recirc':('내기순환 신호',None,'mdi:car-windshield',None,0),
  'speed_kph':('현재 속도','km/h','mdi:speedometer','speed',0),
- 'wheel_speed_kph':('실차 휠 차속','km/h','mdi:speedometer','speed',0),
  'gps_accuracy_m':('GPS 정확도','m','mdi:crosshairs-gps','distance',1),
  'bearing_deg':('진행 방향','°','mdi:compass',None,0),
  'month_efficiency_kpl':('이번 달 주행 전비 (추정)','km/kWh','mdi:chart-line',None,2),
@@ -69,6 +67,12 @@ FIELDS.pop('bms_mode', None)
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()])
 
+ID4_DIAGNOSTIC_KEYS = {
+    'aux_voltage', 'hv_voltage', 'recirc', 'blower_level', 'blower_volt',
+    'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh'
+}
+
 class VehicleSensor(VehicleEntity,SensorEntity):
     def __init__(self,entry,key,name,unit,icon,device_class,precision=None):
         self.configure(entry,key,name,icon)
@@ -77,7 +81,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if precision is not None:
             self._attr_suggested_display_precision=precision
         if unit is not None and device_class not in ('monetary','energy'): self._attr_state_class='measurement'
-        if key.startswith('comma_') or key == 'bms_target_soc_percent':
+        if key.startswith('comma_') or key in ID4_DIAGNOSTIC_KEYS:
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
         if key in ('month_charge_kwh','month_slow_kwh','month_fast_kwh'):self._attr_state_class='total_increasing'
     @property
@@ -114,8 +118,6 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                          distance_km=self.data.get('month_energy_distance_km'),
                          energy_kwh=self.data.get('month_drive_energy_kwh'),
                          calculation_version=2)
-        elif self.key == 'bms_target_soc_percent':
-            attrs.update(source='BMS_04.BMS_Soll_SOC_HiRes', vehicle_charge_limit_verified=False)
         elif self.key=='gear':
             attrs['raw_gear']=self.data.get('gear')
         elif self.key=='range_km':

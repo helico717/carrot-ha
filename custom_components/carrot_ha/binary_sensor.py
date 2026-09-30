@@ -1,4 +1,5 @@
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import BINARY_FIELDS
 from .connectivity import connection_status
@@ -13,6 +14,7 @@ async def async_setup_entry(hass,entry,async_add_entities):
 
 class EmergencyCharging(VehicleEntity, BinarySensorEntity):
     _attr_device_class = 'problem'
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry):
         self.configure(entry, 'emergency_charging', '비상 충전 모드 (추정)', 'mdi:power-plug-off')

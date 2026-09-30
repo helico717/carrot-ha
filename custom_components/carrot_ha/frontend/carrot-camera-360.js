@@ -974,24 +974,64 @@ export class CarrotCamera360Modal {
           border-color: #cbd5e1;
         }
         @media (max-width: 640px) {
-          .camera360-modal-root { padding: 0; }
+          .camera360-modal-root {
+            padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+            align-items: center;
+            justify-content: center;
+          }
           .camera360-card {
-            height: 100dvh;
-            max-height: 100dvh;
-            border-radius: 0;
-            border: 0;
+            width: 100%;
+            max-height: min(90vh, calc(100dvh - 28px));
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
           }
-          .camera360-topbar { padding-top: max(12px, env(safe-area-inset-top)); flex-shrink: 0; }
-          .camera360-bottombar { padding-bottom: max(12px, env(safe-area-inset-bottom)); flex-shrink: 0; }
-          .camera360-viewport {
+          .camera360-topbar {
+            padding: 12px 14px;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+            gap: 8px;
+          }
+          .camera360-header-info {
+            min-width: 0;
             flex: 1;
-            aspect-ratio: auto;
-            min-height: 0;
-            max-height: none;
+            overflow: hidden;
+            gap: 6px;
           }
-          .camera360-canvas { position: absolute; inset: 0; }
-          .camera360-topbar, .camera360-bottombar {
+          .camera360-title {
+            font-size: 15px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .camera360-close-btn {
+            flex-shrink: 0;
+            position: relative;
+            z-index: 25;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+          }
+          .camera360-modal-root[data-theme="light"] .camera360-close-btn {
+            background: #f1f5f9;
+          }
+          .camera360-viewport {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            min-height: 220px;
+            max-height: 52vh;
+            flex: none;
+          }
+          .camera360-canvas {
+            position: relative;
+            inset: auto;
+            width: 100%;
+            height: 100%;
+          }
+          .camera360-bottombar {
             padding: 10px 14px;
+            flex-shrink: 0;
           }
           .camera360-controls {
             width: 100%;
@@ -1106,6 +1146,12 @@ export class CarrotCamera360Modal {
 
   bindEvents() {
     this.closeBtn.addEventListener('click', () => this.close());
+    // Light-dismiss: click/tap on backdrop outside the modal card closes the modal
+    this.wrapper.addEventListener('click', (e) => {
+      if (e.target === this.wrapper) {
+        this.close();
+      }
+    });
     this.resetBtn.addEventListener('click', () => {
       if (this.renderer) {
         this.renderer.resetOrientation();

@@ -2,7 +2,15 @@
 import logging
 
 DOMAIN = 'carrot_ha'
-REMOVED_SENSORS = {'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh'}
+REMOVED_SENSORS = {
+    'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
+    'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
+}
+DIAGNOSTIC_KEYS = {
+    'aux_voltage', 'emergency_charging', 'hv_voltage', 'recirc', 'blower_level',
+    'blower_volt', 'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh'
+}
 ESTIMATED_OBJECT_IDS = {
     'range_km': 'estimated_range_km',
     'measured_capacity_kwh': 'estimated_measured_capacity_kwh',
@@ -44,6 +52,10 @@ def migrate_entities(hass, entry):
         updates = {}
         if key.startswith('comma_'):
             updates['device_id'] = comma.id
+        if key in DIAGNOSTIC_KEYS:
+            from homeassistant.const import EntityCategory
+            if entity.entity_category != EntityCategory.DIAGNOSTIC:
+                updates['entity_category'] = EntityCategory.DIAGNOSTIC
         # Preserve user-chosen IDs; only rename the known generated suffix.
         object_id = entity.entity_id.split('.', 1)[1]
         if key in ESTIMATED_OBJECT_IDS and 'estimated_' not in object_id:

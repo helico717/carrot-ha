@@ -720,8 +720,13 @@ function storedGps(rawJson, state) {
 }
 
 async function resolveTelemetryGps(env, deviceId, gps) {
-  const gpsHasLocation = hasLocation(gps);
-  if (gpsHasLocation && gps.fresh === true) return gps;
+  if (hasLocation(gps)) {
+    return {
+      ...gps,
+      fresh: gps.fresh !== false,
+      source: gps.source || "telemetry",
+    };
+  }
 
   const latestTrip = await env.DB.prepare(`
     SELECT end_lat, end_lon, ended_at
@@ -739,8 +744,6 @@ async function resolveTelemetryGps(env, deviceId, gps) {
       source: "latestTrip",
     };
   }
-
-  if (gpsHasLocation) return gps;
 
   const currentState = await env.DB.prepare(`
     SELECT latitude, longitude, bearing_deg, gps_accuracy_m, raw_json

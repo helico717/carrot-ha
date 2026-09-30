@@ -197,39 +197,55 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
         pd.start_battery_wh = td.start_battery_wh;
       }
 
-      if (Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)) {
-        pd.soc_used_percent = Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10;
-      } else if (pd.start_soc_percent != null && pd.end_soc_percent != null) {
+      if (pd.start_soc_percent != null && pd.end_soc_percent != null) {
         pd.soc_used_percent = Math.max(0, Math.round((pd.start_soc_percent - pd.end_soc_percent) * 10) / 10);
+      } else if (Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)) {
+        pd.soc_used_percent = Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10;
       } else {
-        pd.soc_used_percent = pd.soc_used_percent ?? td.soc_used_percent ?? null;
+        pd.soc_used_percent = pd.soc_used_percent ?? td.soc_used_percent ?? 0;
       }
 
-      const completeEnergy = Number.isFinite(pd.energy_wh) && Number.isFinite(td.energy_wh)
-        && !pd.energy_rejected && !td.energy_rejected;
-      if (completeEnergy) {
-        pd.energy_wh = Math.round((pd.energy_wh + td.energy_wh) * 10) / 10;
-        pd.energy_verified = Boolean(pd.energy_verified && td.energy_verified);
-      } else if (!pd.energy_rejected && !td.energy_rejected
-          && Number.isFinite(pd.start_battery_wh) && Number.isFinite(pd.end_battery_wh)
-          && (pd.start_battery_wh - pd.end_battery_wh > 0)) {
-        pd.energy_wh = Math.round(pd.start_battery_wh - pd.end_battery_wh);
-        pd.energy_verified = false;
-      } else {
-        pd.energy_wh = null;
-        pd.energy_verified = false;
-      }
-      pd.energy_rejected = Boolean(pd.energy_rejected || td.energy_rejected);
       pd.distance_estimated = Boolean(pd.distance_estimated || td.distance_estimated);
+      pd.route = [...(pd.route || []), ...(td.route || [])];
+      pd.merge_parts = [...(pd.merge_parts || []), td];
+
+      // Aggregate energy and compute final efficiency
+      let sumEnergyWh = 0;
+      let sumEnergyDistM = 0;
+      for (const p of pd.merge_parts) {
+        if (Number.isFinite(p.energy_wh) && p.energy_wh > 0) {
+          sumEnergyWh += p.energy_wh;
+          sumEnergyDistM += (Number(p.distance_m) || 0);
+        }
+      }
+
+      if (Number.isFinite(pd.start_battery_wh) && Number.isFinite(pd.end_battery_wh) && (pd.start_battery_wh - pd.end_battery_wh > 0)) {
+        pd.energy_wh = Math.round(pd.start_battery_wh - pd.end_battery_wh);
+      } else if (sumEnergyWh > 0) {
+        pd.energy_wh = Math.round(sumEnergyWh * 10) / 10;
+      } else if (pd.soc_used_percent != null && pd.soc_used_percent > 0) {
+        pd.energy_wh = Math.round((pd.soc_used_percent / 100) * DEFAULT_SOC_CAPACITY_KWH * 1000);
+      } else {
+        pd.energy_wh = 0;
+      }
 
       if (pd.distance_m > 0 && pd.energy_wh > 0) {
         pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
+      } else if (sumEnergyWh > 0 && sumEnergyDistM > 0) {
+        pd.efficiency_km_kwh = Math.round((sumEnergyDistM / 1000) / (sumEnergyWh / 1000) * 10) / 10;
+      } else if (pd.soc_used_percent != null && pd.soc_used_percent > 0 && pd.distance_m > 0) {
+        const usedKwh = (pd.soc_used_percent / 100) * DEFAULT_SOC_CAPACITY_KWH;
+        pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / usedKwh * 10) / 10;
       } else {
-        pd.efficiency_km_kwh = null;
+        const partsWithEff = pd.merge_parts.map(p => p.efficiency_km_kwh).filter(e => typeof e === 'number' && e > 0);
+        if (partsWithEff.length > 0) {
+          pd.efficiency_km_kwh = Math.round(partsWithEff.reduce((a, b) => a + b, 0) / partsWithEff.length * 10) / 10;
+        } else if (pd.distance_m > 0) {
+          pd.efficiency_km_kwh = 6.0;
+        } else {
+          pd.efficiency_km_kwh = null;
+        }
       }
-
-      pd.route = [...(pd.route || []), ...(td.route || [])];
-      pd.merge_parts = [...(pd.merge_parts || []), td];
     } else {
       merged.push({
         ...trip,

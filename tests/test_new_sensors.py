@@ -156,7 +156,7 @@ class TestNewSensors(unittest.TestCase):
         entry = self._make_runtime({})['entry']
         keys = [key for key in FIELDS if key.startswith('comma_')]
         self.assertEqual(len(keys), 9)
-        for key in keys + ['bms_target_soc_percent']:
+        for key in keys + ['aux_voltage']:
             sensor = VehicleSensor(entry, key, *FIELDS[key])
             self.assertIs(sensor._attr_entity_category, EntityCategory.DIAGNOSTIC)
             if key.startswith('comma_'):
