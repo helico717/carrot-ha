@@ -120,23 +120,24 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 Home Assistant 개발 시에는 작업 성격에 따라 **[트랙 1: 개발/트러블슈팅 빠른 반영]**과 **[트랙 2: 정식 릴리즈 배포]**의 두 가지 워크플로우로 나누어 관리합니다.
 
-#### 🛠️ 트랙 1. 자잘한 트윅 & 트러블슈팅 (버전 태그 없이 최신 커밋으로 빠른 확인)
-UI 위치 미세조정, 버그 디버깅, 로그 추가 등 자잘한 수정 시에는 **버전을 올리지 않고 최신 커밋 상태(`main` 브랜치)를 HA로 바로 땡겨서 테스트**합니다:
+#### 🛠️ 트랙 1. 개발/트러블슈팅 빠른 반영 (HACS 베타 Pre-release 워크플로우 또는 직접 동기화)
+HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다운로드합니다. 따라서 개발 중 테스트 시에는 다음 두 가지 방법 중 하나를 사용합니다:
 
-1. **로컬 수정 후 `main` 푸시**:
-   ```bash
-   git add <modified-files>
-   git commit -m "fix(frontend): adjust layout or fix bug"
-   git push origin main
-   ```
-2. **HA에서 최신 커밋으로 즉시 덮어쓰기 (HACS Redownload 기능)**:
-   - Home Assistant → **HACS** → **Carrot HA** 저장소 진입.
-   - 우측 상단 점 3개 메뉴(**`⋮`**) 클릭 → **`다시 다운로드 (Redownload)`** 클릭.
-   - 팝업창 드롭다운에서 최신 버전 대신 **`main (default branch)`** 선택 후 다운로드.
-3. **HA 빠른 재로드 & 브라우저 새로고침**:
-   - **개발자 도구 → YAML → 다시 시작** (또는 필요한 컴포넌트 재로드).
-   - 프론트엔드 JS 수정 시 브라우저 강력 새로고침(`Ctrl + F5` 또는 `Cmd + Shift + R`).
-   *(태그나 릴리즈를 일일이 생성하지 않고도 최신 커밋이 HA에 즉각 반영되어 검증 가능)*
+- **방법 A (HACS 베타 Pre-release 배포 — 원격 HACS 권장)**:
+  1. `manifest.json` 버전을 베타로 설정 (예: `"0.8.8-beta.1"`).
+  2. 커밋 및 태그 푸시:
+     ```bash
+     git add custom_components/carrot_ha/manifest.json <modified-files>
+     git commit -m "chore: bump version to 0.8.8-beta.1"
+     git push origin main
+     git tag v0.8.8-beta.1
+     git push origin v0.8.8-beta.1
+     ```
+  3. GitHub Actions가 `prerelease: true` 플래그로 릴리스를 자동 생성합니다. (일반 사용자에게는 업데이트 알림이 뜨지 않음).
+  4. HA의 HACS → Carrot HA → 우측 상단 점 3개 메뉴(**`⋮`**)에서 **`베타 버전 표시 (Show beta versions)`** 토글을 켜면 `0.8.8-beta.1`이 나타나며 즉시 업데이트/다시 다운로드할 수 있습니다.
+
+- **방법 B (HA 서버 직접 동기화 — SSH/Samba 접근 가능 시 최속)**:
+  - SSH `rsync`나 Samba 네트워크 드라이브를 통해 로컬 `custom_components/carrot_ha/`를 HA 서버의 `/config/custom_components/carrot_ha/`로 즉시 동기화 후 HA 재시작. (태그 발행 불필요).
 
 ---
 
@@ -223,7 +224,7 @@ UI 위치 미세조정, 버그 디버깅, 로그 추가 등 자잘한 수정 시
 
 ## 7. Version Management & HACS Release Policy
 
-- **Current Minor Version**: `0.8.x` (current: `0.8.7`).
+- **Current Minor Version**: `0.8.x` (current: `0.8.8-beta.1`).
 - **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.
 
 ### A. HACS Versioning & Changelog Visibility
