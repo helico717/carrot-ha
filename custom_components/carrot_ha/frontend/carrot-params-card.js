@@ -531,7 +531,7 @@ class CarrotParamsCard extends HTMLElement {
           <div class="icon">📡</div>
           <div class="title">차량 동기화 대기 중</div>
           <div class="desc">
-            차량(Comma 3X)에서 CarrotPilot 파라미터가 아직 클라우드로 동기화되지 않았습니다.<br>
+            차량(Comma 4)에서 CarrotPilot 파라미터가 아직 클라우드로 동기화되지 않았습니다.<br>
             차량 전원이 켜지고 네트워크가 연결되면 자동으로 업로드됩니다.
           </div>
           <button class="btn" id="btnRetrySync">다시 확인</button>

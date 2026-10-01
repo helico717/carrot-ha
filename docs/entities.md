@@ -1,6 +1,6 @@
 # Carrot HA 엔티티 전체 레퍼런스 가이드
 
-이 문서는 **Carrot HA (당근 Home Assistant 통합구성요소)**가 폭스바겐 ID.4 및 지원 전기차(EV)와 Comma 3/3X 장치로부터 수집하여 Home Assistant(HA)에 등록하는 모든 엔티티의 상세 구조, 속성(Attributes), 데이터 출처 및 자동화 활용법을 설명합니다.
+이 문서는 **Carrot HA (당근 Home Assistant 통합구성요소)**가 폭스바겐 ID.4 및 지원 전기차(EV)와 Comma 4 장치로부터 수집하여 Home Assistant(HA)에 등록하는 모든 엔티티의 상세 구조, 속성(Attributes), 데이터 출처 및 자동화 활용법을 설명합니다.
 
 ---
 
@@ -13,7 +13,7 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 - **위치 추적 (`device_tracker`)**: `device_tracker.<vehicle_name>_<key>` (예: `device_tracker.id_4_vehicle_position`)
 
 ### B. 데이터 수집 및 Free-Plan 성능 계약 (Zero Query Amplification)
-- **차량 CAN 버스**: 주행/충전 중 Comma 3/3X의 오픈파일럿/당근파일럿 데몬(`openpilot/selfdrive/carrot/ha/`)이 차량 CAN 텔레메트리를 고속 수집합니다.
+- **차량 CAN 버스**: 주행/충전 중 Comma 4의 오픈파일럿/당근파일럿 데몬(`openpilot/selfdrive/carrot/ha/`)이 차량 CAN 텔레메트리를 고속 수집합니다.
 - **클라우드 릴레이**: Cloudflare Worker 및 D1 데이터베이스에 증분 동기화(Incremental Sync)로 안전하게 적재됩니다.
 - **HA 로컬 코디네이터**: Home Assistant는 백그라운드 코디네이터를 통해 로컬 SQLite DB 및 인메모리 런타임에 데이터를 유지합니다.
 - **단일 소스 소비**: 새로 추가된 복합 요약 센서(`last_trip`, `charging_session`, `today_summary` 등)를 포함한 모든 엔티티는 **로컬 코디네이터 메모리에서 직접 데이터를 구독**하므로, 클라우드 API를 추가로 호출하지 않아 Cloudflare Worker 무료 플랜 한도를 완벽하게 보호합니다.
@@ -152,14 +152,14 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 | `recorded_distance_km` | 기록된 누적 거리 | `km` | `measurement` | Carrot HA 로컬 데이터베이스에 보존된 전체 기간 주행 거리 합계 |
 | `trip_count` | 저장된 주행 횟수 | - | `measurement` | Carrot HA 로컬 데이터베이스에 저장된 전체 트립 개수 |
 
-### E. Comma 3/3X 하드웨어 모니터링 센서 (진단 카테고리)
+### E. Comma 4 하드웨어 모니터링 센서 (진단 카테고리)
 | 엔티티 키 | 센서 이름 | 단위 | 설명 |
 | :--- | :--- | :---: | :--- |
-| `comma_cpu_temperature_c` | 콤마 CPU 최고 온도 | `°C` | Comma 3/3X 메인 프로세서의 최고 코어 온도 |
-| `comma_gpu_temperature_c` | 콤마 GPU 최고 온도 | `°C` | Comma 3/3X 아드레노(Adreno) GPU 온도 |
-| `comma_cpu_usage_percent` | 콤마 CPU 평균 사용률 | `%` | Comma 3/3X 전체 코어의 평균 연산 부하율 |
-| `comma_memory_usage_percent` | 콤마 메모리 사용률 | `%` | Comma 3/3X 시스템 RAM 메모리 점유율 |
-| `comma_storage_free_percent` | 콤마 저장공간 잔여율 | `%` | Comma 3/3X eMMC/NVMe 드라이브의 남은 스토리지 비율 |
+| `comma_cpu_temperature_c` | 콤마 CPU 최고 온도 | `°C` | Comma 4 메인 프로세서의 최고 코어 온도 |
+| `comma_gpu_temperature_c` | 콤마 GPU 최고 온도 | `°C` | Comma 4 GPU 온도 |
+| `comma_cpu_usage_percent` | 콤마 CPU 평균 사용률 | `%` | Comma 4 전체 코어의 평균 연산 부하율 |
+| `comma_memory_usage_percent` | 콤마 메모리 사용률 | `%` | Comma 4 시스템 RAM 메모리 점유율 |
+| `comma_storage_free_percent` | 콤마 저장공간 잔여율 | `%` | Comma 4 eMMC/NVMe 드라이브의 남은 스토리지 비율 |
 | `comma_fan_requested_percent` | 콤마 팬 목표 출력 | `%` | 발열 해소를 위해 기기가 자체 제어하는 내부 쿨링팬 RPM 듀티비 |
 | `comma_thermal_status` | 콤마 발열 상태 | - | 기기 발열 단계 (`green`, `yellow`, `red`, `danger`) |
 | `comma_network_type` | 콤마 네트워크 종류 | - | 기기 인터넷 연결 방식 (`wifi`, `cell`, `ethernet`, `none`) |
@@ -196,7 +196,7 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 | `binary_sensor.<vehicle>_door_rear_driver_open` | 운전석 뒤 도어 열림 | `door` | 2열 좌측 도어가 열려 있을 때 `on` |
 | `binary_sensor.<vehicle>_door_rear_passenger_open` | 조수석 뒤 도어 열림 | `door` | 2열 우측 도어가 열려 있을 때 `on` |
 | `binary_sensor.<vehicle>_trunk_open` | 트렁크 열림 | `opening` | 트렁크(테일게이트)가 열려 있을 때 `on` |
-| `binary_sensor.<vehicle>_comma_online` | 콤마 연결 상태 | `connectivity` | Comma 3/3X 장치가 온라인 상태로 HA와 웹소켓/클라우드 통신 중일 때 `on` |
+| `binary_sensor.<vehicle>_comma_online` | 콤마 연결 상태 | `connectivity` | Comma 4 장치가 온라인 상태로 HA와 웹소켓/클라우드 통신 중일 때 `on` |
 
 ---
 

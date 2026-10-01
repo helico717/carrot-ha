@@ -68,7 +68,7 @@
 ┌───────────────────────────────────┴────────────────────────────────────┐
 │                   Layer 1. Carrot Data Engine (CAN & Cloud Ingestion)  │
 │                                                                        │
-│   • Openpilot Comma 3/3X CAN Telemetry (1Hz 실시간)                    │
+│   • Openpilot Comma 4 CAN Telemetry (1Hz 실시간)                       │
 │   • Cloudflare Worker D1 Database (초단위 기록 & 이력)                  │
 │   • Python Calculation Engine (trip_repair, battery_history)           │
 └────────────────────────────────────────────────────────────────────────┘

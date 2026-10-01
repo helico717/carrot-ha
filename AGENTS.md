@@ -5,7 +5,7 @@
 > Do **NOT** connect via SSH/SCP to manually copy, edit, patch, or `mv` files in `/data` or `/data/openpilot` on the Comma device.
 >
 > **Why? (The Hard-Learned Lesson from Astra / Past Iterations):**
-> Comma 3/3X runs openpilot directly out of a Git repository (`/data/openpilot`). Manually copying scripts into `/data`, injecting files into `/data/continue.sh`, or modifying python files on the device:
+> Comma 4 runs openpilot directly out of a Git repository (`/data/openpilot`). Manually copying scripts into `/data`, injecting files into `/data/continue.sh`, or modifying python files on the device:
 > 1. Dirties the working tree and breaks `git pull --ff-only`.
 > 2. Gets erased or creates nasty merge conflicts whenever upstream updates or branch changes occur.
 > 3. Disconnects local changes from git history, causing duplicated work, broken deployments, and confusion across AI sessions.
@@ -20,7 +20,7 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│               Comma 3 / 3X Device                      │
+│               Comma 4 Device                           │
 │                                                        │
 │  Repository: helico717/openpilot                       │
 │  Branch:     carrot-wip-model_selector-ha              │
@@ -206,7 +206,7 @@ UI 위치 미세조정, 버그 디버깅, 로그 추가 등 자잘한 수정 시
 
 1. **Streaming Architecture & Protocols**:
    - **WebCodecs Hardware Video Decoding**: Delivers ultra-low latency hardware H.264/HEVC decoding directly inside the browser using the modern `VideoDecoder` API.
-   - **WSS Relay (`camera_http.py`)**: Streams live frames from the Comma 3/3X parked camera daemon through Home Assistant (`/api/carrot_ha/v1/camera/{deviceId}/live`). Supports alias resolution (`'comma'`, `'default'`, or exact device ID).
+   - **WSS Relay (`camera_http.py`)**: Streams live frames from the Comma 4 parked camera daemon through Home Assistant (`/api/carrot_ha/v1/camera/{deviceId}/live`). Supports alias resolution (`'comma'`, `'default'`, or exact device ID).
    - **Binary Framing (WLV1 protocol)**: Front (Wide) and Cabin (Driver) video streams are packed into binary payloads and rendered onto a 3D WebGL sphere with dual fisheye spherical projection.
    - **Interactive Navigation & PTZ Controls**: Users can drag to rotate 360°, use viewpoint buttons (360° View, Front, Cabin), or use the bottom-right PTZ directional pad (Up, Down, Left, Right, Center Reset). Double-click resets pitch to level (0°). Pitch is clamped to `[-20°, 25°]`.
 
@@ -216,7 +216,7 @@ UI 위치 미세조정, 버그 디버깅, 로그 추가 등 자잘한 수정 시
    - **Visual Styling**: Button uses the vehicle battery SOC blue gradient (`linear-gradient(135deg, #1260e8 0%, #0c43ad 100%)`) with 10px rounded corners, matching the dashboard curvature and adapting to dark/light themes.
 
 3. **Snapshot & Legacy Entity Deprecation**:
-   - Comma 3/3X does not provide an offroad still snapshot API without running full camera pipelines. Legacy `image.*_snapshot` and polling `camera.*` entities have been permanently removed.
+   - Comma 4 does not provide an offroad still snapshot API without running full camera pipelines. Legacy `image.*_snapshot` and polling `camera.*` entities have been permanently removed.
    - `entity_migration.py` purges any leftover `camera.*` and `image.*` entities from Home Assistant entity registry upon boot.
 
 ---

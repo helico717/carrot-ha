@@ -1823,7 +1823,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const devices = this.getCarrotCameraDevices();
 
     if (devices.length === 0) {
-      return `<option value="">${isEn ? 'Comma 3X / Carrot Device (Not detected)' : 'Comma 3X / 당근 기기 (감지되지 않음)'}</option>`;
+      return `<option value="">${isEn ? 'Comma 4 / Carrot Device (Not detected)' : 'Comma 4 / 당근 기기 (감지되지 않음)'}</option>`;
     }
 
     return devices.map(dev => {

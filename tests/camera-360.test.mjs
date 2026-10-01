@@ -276,7 +276,7 @@ const liveHaMockStates = {
     state: 'unavailable',
     attributes: { friendly_name: 'Gm House' }
   },
-  // Genuine Carrot HA Cameras (Comma 3 / 3X)
+  // Genuine Carrot HA Cameras (Comma 4)
   'camera.comma_gwanggag_kamera': {
     state: 'idle',
     attributes: {

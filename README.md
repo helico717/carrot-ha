@@ -18,7 +18,7 @@ ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른
 
 ## 아키텍처 및 처음 설치
 
-1. **Comma 3/3X (Git 기반 내장 데몬)**:
+1. **Comma 4 (Git 기반 내장 데몬)**:
    - Comma 기기 소프트웨어로 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치를 사용합니다.
    - 수집기, 파라미터 동기화, 역방향 터미널 데몬이 `selfdrive/carrot/ha`에 이미 내장되어 있어 별도의 파일 복사가 필요 없습니다.
    - [설치 안내](docs/INSTALL.md)에 따라 개인 Cloudflare 서버와 연결 정보(`connection.json`)를 등록합니다.

@@ -17,7 +17,7 @@ The implementation was used on an ID.4 and adapted for configurable MEB vehicles
 
 ## Architecture & Installation
 
-1. **Comma 3/3X (Git-Managed Native Daemon)**:
+1. **Comma 4 (Git-Managed Native Daemon)**:
    - Use [`helico717/openpilot`](https://github.com/helico717/openpilot) on branch `carrot-wip-model_selector-ha`.
    - The collector, param sync, and reverse terminal daemons are natively built into `selfdrive/carrot/ha`. No manual file copy or SSH installation needed.
    - Follow the [installation guide](docs/INSTALL.en.md) to register connection info (`connection.json`) and prepare your Cloudflare worker.

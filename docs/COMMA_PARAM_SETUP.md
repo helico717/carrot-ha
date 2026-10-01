@@ -1,4 +1,4 @@
-# 콤마(Comma 3/3X) 파라미터 원격 제어 가이드
+# 콤마(Comma 4) 파라미터 원격 제어 가이드
 
 홈 어시스턴트(HA)에서 CarrotPilot 파라미터를 원격으로 제어하고 튜닝하기 위한 아키텍처 및 안전 설정 안내입니다.
 
@@ -27,7 +27,7 @@
                        │ HTTPS Polling (매 5~10초 주기)
                        ▼
 ┌──────────────────────────────────────────────┐
-│  Comma 3/3X (selfdrive/carrot/ha/param_sync) │
+│  Comma 4 (selfdrive/carrot/ha/param_sync)    │
 │  1. 큐에서 변경 요청 확인                     │
 │  2. 로컬 carrot_server(:7000) 검증 및 적용   │
 │  3. 적용 후 실제 저장값 역조회 검증          │
