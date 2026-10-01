@@ -118,33 +118,48 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 ### B. Deploying Home Assistant Changes (`helico717/carrot-ha`)
 
-1. **Local Development**:
-   - Work in `custom_components/carrot_ha/`.
-   - If updating JS cards, validate syntax with `node --check <file>.js`.
-2. **Version Bump in Manifest**:
-   - Bump `"version"` in `custom_components/carrot_ha/manifest.json` (e.g. `"0.8.7"`).
-3. **Commit & Push**:
+Home Assistant 개발 시에는 작업 성격에 따라 **[트랙 1: 개발/트러블슈팅 빠른 반영]**과 **[트랙 2: 정식 릴리즈 배포]**의 두 가지 워크플로우로 나누어 관리합니다.
+
+#### 🛠️ 트랙 1. 자잘한 트윅 & 트러블슈팅 (버전 태그 없이 최신 커밋으로 빠른 확인)
+UI 위치 미세조정, 버그 디버깅, 로그 추가 등 자잘한 수정 시에는 **버전을 올리지 않고 최신 커밋 상태(`main` 브랜치)를 HA로 바로 땡겨서 테스트**합니다:
+
+1. **로컬 수정 후 `main` 푸시**:
    ```bash
    git add <modified-files>
-   git commit -m "feat: <descriptive message>"
+   git commit -m "fix(frontend): adjust layout or fix bug"
    git push origin main
    ```
-4. **Publish GitHub Release (Mandatory for HACS Version & Changelog)**:
-   > ⚠️ **CRITICAL FOR HACS DISPLAY:**
-   > If you only push commits without a GitHub Release, HACS falls back to *main branch tracking mode*, displaying **commit hashes instead of version numbers** and **empty release notes** in Home Assistant's update card/dialog.
-   - **Method A (Automated via Tag)**:
-     ```bash
-     git tag v0.8.7
-     git push origin v0.8.7
-     ```
-     *(The `.github/workflows/release.yml` action will automatically publish a GitHub Release with auto-generated changelog notes).*
-   - **Method B (Manual GitHub Web UI)**:
-     - Go to GitHub repo → **Releases** → **Draft a new release**.
-     - Tag: `v0.8.7`, Title: `v0.8.7`, click **[Generate release notes]** or write changelog markdown, then **Publish release**.
-5. **Deploy & Apply in Home Assistant**:
-   - Open Home Assistant → **HACS** → **Carrot HA** → Update to the new version.
-   - Restart Home Assistant: **Developer Tools → YAML → Restart**.
-   - If frontend cards were updated, hard-reload browser cache (`Ctrl + F5` or `Cmd + Shift + R`).
+2. **HA에서 최신 커밋으로 즉시 덮어쓰기 (HACS Redownload 기능)**:
+   - Home Assistant → **HACS** → **Carrot HA** 저장소 진입.
+   - 우측 상단 점 3개 메뉴(**`⋮`**) 클릭 → **`다시 다운로드 (Redownload)`** 클릭.
+   - 팝업창 드롭다운에서 최신 버전 대신 **`main (default branch)`** 선택 후 다운로드.
+3. **HA 빠른 재로드 & 브라우저 새로고침**:
+   - **개발자 도구 → YAML → 다시 시작** (또는 필요한 컴포넌트 재로드).
+   - 프론트엔드 JS 수정 시 브라우저 강력 새로고침(`Ctrl + F5` 또는 `Cmd + Shift + R`).
+   *(태그나 릴리즈를 일일이 생성하지 않고도 최신 커밋이 HA에 즉각 반영되어 검증 가능)*
+
+---
+
+#### 🚀 트랙 2. 정식 버전 배포 (유의미한 기능 완료 시 릴리즈 발행)
+기능 구현이나 안정화가 완료되어 사용자(또는 본인의 정식 업데이트 알림)에게 정식 버전으로 배포할 때만 실행합니다:
+
+1. **Manifest 버전 갱신**:
+   - `custom_components/carrot_ha/manifest.json`의 `"version"` 값 올림 (예: `"0.8.8"`).
+2. **커밋 및 푸시**:
+   ```bash
+   git add custom_components/carrot_ha/manifest.json <other-files>
+   git commit -m "chore: bump version to 0.8.8"
+   git push origin main
+   ```
+3. **태그 푸시 (GitHub Actions가 Release 및 체인지로그 자동 생성)**:
+   ```bash
+   git tag v0.8.8
+   git push origin v0.8.8
+   ```
+   > ⚠️ **HACS 버전 & 체인지로그 연동 필수 규칙:**
+   > 태그를 푸시하면 `.github/workflows/release.yml`이 자동으로 GitHub Release와 커밋 내역 체인지로그를 생성합니다. GitHub Release가 있어야만 HA 업데이트 카드에 커밋 해시가 아닌 **정식 버전 번호(`0.8.8`)**와 **[릴리스 공지 읽기]** 링크가 정상 노출됩니다.
+4. **HA에서 업데이트 적용**:
+   - HA 업데이트 알림 카드 또는 **HACS → Carrot HA → [업데이트]** 클릭 후 HA 재시작.
 
 ### C. Deploying Cloudflare Worker Changes
 
