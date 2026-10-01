@@ -290,6 +290,10 @@ optimization is impossible or that post-deployment account quotas have been veri
   scroll positions, open details, focus, selected dates/trips/pages, and map view.
   Reuse an unchanged interactive map; never periodically reset its zoom/position.
   New trip indices must not be mistaken for a user selecting another trip.
+  Do not replace the entire shadowRoot HTML during refresh: preserve existing DOM
+  and stylesheet nodes. Check scroll after async responses AND subsequent animation
+  frames in Chromium; a synchronous mock or screenshot before completion is insufficient.
+  Follow assignedSlot as well as parentNode/host when finding HA scroll ancestors.
 - **Parameter polling:** idle 15s, active editing/pending work 3s, failures back off
   up to 120s. Active leases must expire and hidden cards must not renew them.
   Initial idle-to-active discovery can take 15s plus transport/processing time;

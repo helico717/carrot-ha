@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Dashboard reading continuity regression</title>
+<style>body{margin:0;background:#eee;font:16px system-ui}.tools{position:fixed;top:0;z-index:10000;background:white;padding:8px;border:1px solid #999}#host{padding-top:70px;max-width:1000px;margin:auto}button{padding:10px}output{white-space:pre-wrap}</style>
+<div class="tools"><button id="run">Test asynchronous refresh</button><output id="result">Ready</output></div><div id="host"></div>
+<script type="module">
+import Card from '../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js';
+customElements.define('scroll-test-card',Card);
+const card=document.createElement('scroll-test-card');document.querySelector('#host').append(card);
+card.setConfig({language:'ko'});
+const hours=Array.from({length:24},()=>({soc:60}));
+const days=Array.from({length:7},(_,i)=>({date:`2026-09-${24+i}`,used:10+i,hours,drive_s:3600,charge_s:600}));
+const values={soc_percent:60,battery_history:days,measured_at:'2026-09-30T00:00:00Z',onroad:false,charging:false};
+card.hass={locale:{language:'ko'},themes:{darkMode:false},states:{},config:{time_zone:'Asia/Seoul'},callApi:async(m,path)=>{
+if(path.endsWith('devices'))return {devices:[{entry_id:'fixture'}]};
+if(path.includes('live=1'))return {values};
+await new Promise(r=>setTimeout(r,250));return path.includes('/dashboard/')?{values}:{events:[]};
+}};
+card.tab='charge';card.v=structuredClone(values);card.render();
+document.querySelector('#run').onclick=async()=>{
+  card.tab='charge';card.render();
+  window.scrollTo(0,400);
+  await new Promise(requestAnimationFrame);
+  const before=window.scrollY;
+  const panel=card.shadowRoot.querySelector('ha-card');
+  await card.load(true);
+  await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
+  const after=window.scrollY;
+  document.querySelector('#result').textContent=JSON.stringify({before,after,samePanel:panel===card.shadowRoot.querySelector('ha-card'),pass:before>0&&before===after&&panel===card.shadowRoot.querySelector('ha-card')});
+};
+</script>

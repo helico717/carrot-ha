@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {preserveView} from '../custom_components/carrot_ha/frontend/carrot-view-state.js';
 test('refresh preserves HA shadow-host scroll, internal scroll, disclosure and focus even on failure',()=>{
   const parent={nodeType:1,scrollLeft:4,scrollTop:850};
-  const card={nodeType:1,scrollLeft:0,scrollTop:0,parentNode:{host:parent},style:{minHeight:''},getBoundingClientRect:()=>({height:1000})};
+  const card={nodeType:1,scrollLeft:0,scrollTop:0,parentNode:{host:{nodeType:1,scrollTop:0,scrollLeft:0}},assignedSlot:{parentNode:parent},style:{minHeight:''},getBoundingClientRect:()=>({height:1000})};
   const root={children:[],querySelectorAll(selector){return selector==='details'?this.children.filter(n=>n.tagName==='DETAILS'):this.children;}};
   const make=()=>{
     const nodes=[{tagName:'DETAILS',open:false},{tagName:'PRE',scrollTop:0,scrollLeft:0},{tagName:'INPUT',id:'filter',selectionStart:2,selectionEnd:4,focus(opts){this.focusOptions=opts;},setSelectionRange(a,b){this.range=[a,b];}}];

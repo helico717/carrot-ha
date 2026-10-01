@@ -248,3 +248,17 @@ e96fd20a 2026-09-29 feat(carrot-ha): bootstrap remote terminal config automatica
 663fc996 2026-09-29 feat(carrot-ha): add native remote terminal client
 07be35fe 2026-09-28 feat(carrot-ha): integrate Carrot HA as native openpilot daemon with auto-sync workflow
 ```
+
+
+## 2026-10-01 운영 시크릿 브라우저 재검증 및 정정
+
+사용자의 재검증 요청으로 Chrome 시크릿 창을 새로 열고 사용자가 HA에 직접 로그인했다.
+실제 `/lovelace/6`에서 충전 → 9월 25일을 선택하고 하단으로 스크롤한 뒤 재조회했다.
+조회 중에는 위치가 유지됐지만 조회 완료/최신 확인 16:52 → 16:53 이후 화면이 맨 위로 이동했다.
+날짜 선택은 유지됐다. **기존 로컬 동기식 검증은 이 운영 회귀를 잡지 못했다.**
+
+추가 수정은 shadowRoot 전체 innerHTML 교체를 DOM 차이 갱신으로 바꿔 기존 ha-card,
+스타일시트, 동일한 버튼/텍스트/지도 노드를 유지한다. HA slot을 통과하는 스크롤 조상도 포함한다.
+새 `tests/dashboard-scroll-browser.html`은 실제 KO 카드의 비동기 load 완료 및 2개 후속
+animation frame까지 기다린다. Chrome 로컬 fixture에서 before 398 / after 398,
+samePanel=true를 확인했다. 이 수정본의 운영 재배포 후 검증 결과와는 구분해야 한다.
