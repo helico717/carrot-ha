@@ -1,16 +1,38 @@
 const version=new URL(import.meta.url).searchParams.get('v');
 if(!version)throw new Error('Carrot HA: load carrot-dashboard.js, not the runtime directly.');
 const moduleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',version);return url.href;};
-const [{default:KoreanDashboard},{default:EnglishDashboard},{default:DebugDashboard},{default:ParamsCard}]=await Promise.all([
-  import(moduleURL('./carrot-dashboard-ko.js')),
-  import(moduleURL('./carrot-dashboard-en.js')),
-  import(moduleURL('./carrot-dashboard-debug.js')),
-  import(moduleURL('./carrot-params-card.js'))
-]);
-if(!customElements.get('carrot-dashboard-ko'))customElements.define('carrot-dashboard-ko', KoreanDashboard);
-if(!customElements.get('carrot-dashboard-en'))customElements.define('carrot-dashboard-en', EnglishDashboard);
-if(!customElements.get('carrot-dashboard-debug-card'))customElements.define('carrot-dashboard-debug-card', DebugDashboard);
-if(!customElements.get('carrot-params-card'))customElements.define('carrot-params-card', ParamsCard);
+// Register lightweight shells synchronously; load only cards actually mounted.
+function lazyCard(tag, filename) {
+  if(customElements.get(tag))return;
+  customElements.define(tag,class extends HTMLElement {
+    static getStubConfig(){return {device_id:''};}
+    connectedCallback(){this.style.display='block';this.mount();}
+    setConfig(config){this.config=config;if(this.card)this.card.setConfig(config);else this.mount();}
+    set hass(hass){this._hass=hass;if(this.card)this.card.hass=hass;else this.mount();}
+    getCardSize(){return this.card?.getCardSize?.()??8;}
+    getGridOptions(){return this.card?.getGridOptions?.()??{columns:36,rows:'auto',min_columns:6};}
+    async mount(){
+      if(this.loading||this.card||!this.config||!this.isConnected)return;
+      this.loading=true;
+      try{
+        const {default:Card}=await import(moduleURL(filename));
+        if(!this.isConnected)return;
+        const implementation=tag+'-implementation';
+        if(!customElements.get(implementation))customElements.define(implementation,Card);
+        this.card=document.createElement(implementation);
+        this.card.setConfig(this.config);
+        this.replaceChildren(this.card);
+        if(this._hass)this.card.hass=this._hass;
+      }catch(error){
+        this.textContent='Carrot HA: '+error.message;
+      }finally{this.loading=false;}
+    }
+  });
+}
+lazyCard('carrot-dashboard-ko','./carrot-dashboard-ko.js');
+lazyCard('carrot-dashboard-en','./carrot-dashboard-en.js');
+lazyCard('carrot-dashboard-debug-card','./carrot-dashboard-debug.js');
+lazyCard('carrot-params-card','./carrot-params-card.js');
 class LocalizedDashboard extends HTMLElement {
   constructor(){super();}
   connectedCallback(){this.style.display='block';}
@@ -21,6 +43,7 @@ class LocalizedDashboard extends HTMLElement {
   updateLanguage(){
     if(!this.config)return;
     const requested=this.config.language;
+    if((!requested||requested==='auto')&&!this._hass)return;
     const language=(!requested||requested==='auto')?(this._hass?.locale?.language||this._hass?.language||navigator.language):requested;
     const lang=String(language).toLowerCase().startsWith('ko')?'ko':'en';
     if(this.lang!==lang){

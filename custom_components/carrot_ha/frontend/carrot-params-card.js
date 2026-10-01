@@ -35,6 +35,7 @@ class CarrotParamsCard extends HTMLElement {
     this._snapshotData = null;
 
     this._onWindowMessage = this._handleWindowMessage.bind(this);
+    this._onVisible = () => { if (!document.hidden && this._hass) this._loadData(); };
     this._onViewportResize = () => this._updateViewportHeight();
   }
 
@@ -67,6 +68,7 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   connectedCallback() {
+    document.addEventListener('visibilitychange', this._onVisible);
     window.addEventListener('message', this._onWindowMessage);
     window.addEventListener('resize', this._onViewportResize);
     window.visualViewport?.addEventListener('resize', this._onViewportResize);
@@ -77,6 +79,7 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    document.removeEventListener('visibilitychange', this._onVisible);
     window.removeEventListener('message', this._onWindowMessage);
     window.removeEventListener('resize', this._onViewportResize);
     window.visualViewport?.removeEventListener('resize', this._onViewportResize);
@@ -91,7 +94,7 @@ class CarrotParamsCard extends HTMLElement {
     this._lastSnapshotFetch = 0;
     this._pollTimer = setInterval(() => {
       this._renderHeaderStatus();
-      if (!this._entryId || document.hidden) return;
+      if (!this._entryId || document.hidden || this.getClientRects?.().length === 0) return;
       if (this._pending.size) this._checkPendingStatus();
       if (Date.now() - this._lastSnapshotFetch >= 15000) this._loadData();
     }, 4000);
@@ -186,6 +189,7 @@ class CarrotParamsCard extends HTMLElement {
     this._waitingForSync = false;
     this._renderHeaderStatus();
 
+    let unchanged = false;
     try {
       const entryId = await this._resolveDevice();
       if (!entryId) {
@@ -195,7 +199,11 @@ class CarrotParamsCard extends HTMLElement {
         return;
       }
 
-      const res = await this._hass.callApi('GET', `carrot_ha/v1/settings/${encodeURIComponent(entryId)}`);
+      const query = new URLSearchParams();
+      if (!document.hidden && this.getClientRects?.().length !== 0) query.set('active', '1');
+      if (this._updatedAt && this._snapshotData) query.set('known', this._updatedAt);
+      const res = await this._hass.callApi('GET', `carrot_ha/v1/settings/${encodeURIComponent(entryId)}?${query}`);
+      if (res?.ok && res.unchanged) { unchanged = true; return; }
       if (res && res.ok) {
         this._catalog = res.catalog || {};
         this._values = Object.assign({}, res.values || {});
@@ -204,9 +212,6 @@ class CarrotParamsCard extends HTMLElement {
         this._waitingForSync = false;
         this._snapshotData = res;
 
-        if (this._iframeReady) {
-          this._sendSnapshotToIframe();
-        }
       } else {
         if (res && (res.error === 'settings_not_found' || res.status === 404)) {
           this._waitingForSync = true;
@@ -223,8 +228,8 @@ class CarrotParamsCard extends HTMLElement {
       }
     } finally {
       this._loading = false;
-      this._render();
-      if (this._snapshotData && this._iframeReady) {
+      if (unchanged) { this._renderHeaderStatus(); } else this._render();
+      if (!unchanged && this._snapshotData && this._iframeReady) {
         this._sendSnapshotToIframe();
       }
     }

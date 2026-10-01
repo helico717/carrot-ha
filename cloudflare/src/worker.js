@@ -1625,10 +1625,13 @@ async function handleTrip(request, env) {
   const deviceId = String(payload.deviceId || "unknown");
 
   await env.DB.prepare(`
-    INSERT OR REPLACE INTO trips (
+    INSERT INTO trips (
       id, device_id, started_at, ended_at, duration_s, distance_m, start_lat,
       start_lon, end_lat, end_lon, route_point_count, route_json, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      device_id=excluded.device_id, started_at=excluded.started_at, ended_at=excluded.ended_at, duration_s=excluded.duration_s, distance_m=excluded.distance_m, start_lat=excluded.start_lat, start_lon=excluded.start_lon, end_lat=excluded.end_lat, end_lon=excluded.end_lon, route_point_count=excluded.route_point_count, route_json=excluded.route_json, created_at=excluded.created_at
+    WHERE trips.device_id IS NOT excluded.device_id OR trips.started_at IS NOT excluded.started_at OR trips.ended_at IS NOT excluded.ended_at OR trips.duration_s IS NOT excluded.duration_s OR trips.distance_m IS NOT excluded.distance_m OR trips.start_lat IS NOT excluded.start_lat OR trips.start_lon IS NOT excluded.start_lon OR trips.end_lat IS NOT excluded.end_lat OR trips.end_lon IS NOT excluded.end_lon OR trips.route_point_count IS NOT excluded.route_point_count OR trips.route_json IS NOT excluded.route_json
   `).bind(
     id,
     deviceId,
@@ -1792,6 +1795,49 @@ async function handleLatestState(request, env) {
   } catch (err) {
     console.error("handleLatestState error:", err);
     return json({ error: "latest_state_failed", message: String(err) }, 500);
+  }
+}
+
+// Device-scoped mutable-trip feed. Cursor advances only after HA archives a page.
+async function handleTripChanges(request, env) {
+  if (!authorize(request, env, false)) return json({error: "unauthorized"}, 401);
+  // Do not silently substitute D1 for a separately configured authoritative server.
+  if (env.WAYON_SERVER_API && env.WAYON_SERVER_SYNC_TOKEN) {
+    return json({error: "trip_changes_unsupported_source"}, 409);
+  }
+  const url = new URL(request.url);
+  const device = url.searchParams.get("device_id");
+  const cursor = url.searchParams.get("after") || "0";
+  if (!device || !/^\d+$/.test(cursor) || !Number.isSafeInteger(Number(cursor))) {
+    return json({error: "invalid_cursor_or_device"}, 400);
+  }
+  const limit = boundedLimit(url.searchParams.get("limit"), 10, 50);
+  try {
+    const result = await env.DB.prepare(`
+      SELECT r.sequence AS sync_sequence, t.*, q.partial,
+             d.source AS distance_source, d.quality_json
+      FROM trip_sync_revision r
+      JOIN trips t ON t.id=r.trip_id AND t.device_id=r.device_id
+      LEFT JOIN trip_quality q ON q.id=t.id
+      LEFT JOIN trip_distance_quality d ON d.id=t.id
+      WHERE r.device_id=? AND r.sequence>?
+      ORDER BY r.sequence LIMIT ?
+    `).bind(device, Number(cursor), limit + 1).all();
+    const rows = result.results || [];
+    const trips = rows.slice(0, limit).map(row => {
+      const {quality_json, ...trip} = row;
+      let quality = null;
+      try { quality = JSON.parse(quality_json || "null"); } catch {}
+      const parsed = parseTripRoute(trip);
+      return {...parsed, max_speed_mps: maxRoutePointSpeedMps(parsed.route),
+        partial: trip.partial == null ? null : Boolean(trip.partial), distance_quality: quality};
+    });
+    return json({schema: "carrot-trip-changes-v1", trips,
+      next_cursor: trips.length ? trips.at(-1).sync_sequence : Number(cursor),
+      has_more: rows.length > limit});
+  } catch (error) {
+    // Migration must precede deployment; errors must not advance HA's cursor.
+    return json({error: "trip_changes_unavailable"}, 503);
   }
 }
 
@@ -2336,23 +2382,29 @@ async function handleTripsWithQuality(request,env,pathname) {
   const response=await handleTrips(request,env,pathname);
   if(response.status!==200)return response;
   const body=await response.json();
-  for(const trip of (body.trips||[body])) {
-    if (!trip || !trip.id) continue;
-    try {
-      const quality=await env.DB.prepare("SELECT partial FROM trip_quality WHERE id=?").bind(trip.id).first();
-      if(quality)trip.partial=Boolean(quality.partial);
-    } catch (_) {}
-    try {
-      const distance=await env.DB.prepare("SELECT source,quality_json FROM trip_distance_quality WHERE id=?").bind(trip.id).first();
-      if(distance) {
-        trip.distance_source=distance.source;
-        try {
-          trip.distance_quality=JSON.parse(distance.quality_json);
-        } catch (_) {
-          trip.distance_quality=null;
-        }
-      }
-    } catch (_) {}
+  const trips = (body.trips || [body]).filter(trip => trip?.id);
+  const ids = JSON.stringify(trips.map(trip => trip.id));
+  // Two indexed set lookups instead of two serial queries per trip. A JSON
+  // binding avoids D1's parameter limit and supports server-backed trip IDs.
+  let qualities = [], distances = [];
+  if (trips.length) {
+    const results = await Promise.allSettled([
+      env.DB.prepare('SELECT id,partial FROM trip_quality WHERE id IN (SELECT value FROM json_each(?))').bind(ids).all(),
+      env.DB.prepare('SELECT id,source,quality_json FROM trip_distance_quality WHERE id IN (SELECT value FROM json_each(?))').bind(ids).all(),
+    ]);
+    if (results[0].status === 'fulfilled') qualities = results[0].value.results || [];
+    if (results[1].status === 'fulfilled') distances = results[1].value.results || [];
+  }
+  const qualityById = new Map(qualities.map(row => [row.id, row]));
+  const distanceById = new Map(distances.map(row => [row.id, row]));
+  for (const trip of trips) {
+    const quality = qualityById.get(trip.id), distance = distanceById.get(trip.id);
+    if (quality) trip.partial = Boolean(quality.partial);
+    if (distance) {
+      trip.distance_source = distance.source;
+      try { trip.distance_quality = JSON.parse(distance.quality_json); }
+      catch { trip.distance_quality = null; }
+    }
   }
   return json(body);
 }
@@ -2373,7 +2425,10 @@ async function handleTelemetryHistory(request,env) {
   const params=new URL(request.url).searchParams;
   const after=Math.max(0,Number.parseInt(params.get("after")||"0",10)||0);
   const limit=boundedLimit(params.get("limit"),20,100);
-  const result=await env.DB.prepare("SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE sequence>? ORDER BY sequence LIMIT ?").bind(after,limit+1).all();
+  const device = params.get('device_id');
+  const result = device
+    ? await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE device_id=? AND sequence>? ORDER BY sequence LIMIT ?').bind(device,after,limit+1).all()
+    : await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE sequence>? ORDER BY sequence LIMIT ?').bind(after,limit+1).all();
   const rows=result.results||[];
   return json({events:rows.slice(0,limit),has_more:rows.length>limit});
 }
@@ -2399,6 +2454,10 @@ async function purgeExpiredData(env, options = {}) {
         "DELETE FROM trip_quality WHERE id NOT IN (SELECT id FROM trips)"
       ).run();
       results.purged_quality = qRes?.meta?.changes || 0;
+      await env.DB.prepare("DELETE FROM trip_distance_quality WHERE id NOT IN (SELECT id FROM trips)").run();
+      await env.DB.prepare("DELETE FROM carrot_param_queue WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days')").run();
+      await env.DB.prepare("DELETE FROM param_activity WHERE active_until < ?").bind(Date.now() - 86400000).run();
+
 
       const evRes = await env.DB.prepare(
         "DELETE FROM impact_events WHERE detected_at < datetime('now', '-' || ? || ' days')"
@@ -2450,22 +2509,32 @@ async function handleGetSettings(request, env) {
     const deviceId = url.searchParams.get("device_id");
 
     let row;
-    if (deviceId) {
-      row = await env.DB.prepare(`
-        SELECT device_id, catalog_json, values_json, updated_at
-        FROM carrot_settings_cache
-        WHERE device_id = ?
-      `).bind(deviceId).first();
-    } else {
-      row = await env.DB.prepare(`
-        SELECT device_id, catalog_json, values_json, updated_at
-        FROM carrot_settings_cache
-        ORDER BY updated_at DESC LIMIT 1
-      `).first();
+    const known = url.searchParams.get('known');
+    if (deviceId && known) {
+      row = await env.DB.prepare('SELECT device_id,updated_at FROM carrot_settings_cache WHERE device_id=?')
+        .bind(deviceId).first();
+    }
+    if (!row || row.updated_at !== known) {
+      row = deviceId
+        ? await env.DB.prepare('SELECT device_id,catalog_json,values_json,updated_at FROM carrot_settings_cache WHERE device_id=?').bind(deviceId).first()
+        : await env.DB.prepare('SELECT device_id,catalog_json,values_json,updated_at FROM carrot_settings_cache ORDER BY updated_at DESC LIMIT 1').first();
     }
 
     if (!row) {
       return json({ ok: false, error: "settings_not_found" }, 404);
+    }
+    if (url.searchParams.get('active') === '1') {
+      const nowMs = Date.now();
+      await env.DB.prepare(`
+        INSERT INTO param_activity(device_id,active_until) VALUES(?,?)
+        ON CONFLICT(device_id) DO UPDATE SET active_until=excluded.active_until
+        WHERE param_activity.active_until < ?
+      `).bind(row.device_id, nowMs + 120000, nowMs + 60000).run();
+    }
+
+
+    if (known && row.updated_at === known) {
+      return json({ok: true, unchanged: true, device_id: row.device_id, updated_at: row.updated_at});
     }
 
     let pendingCount = 0;
@@ -2567,7 +2636,10 @@ async function handleParamsPending(request, env) {
       ORDER BY id ASC LIMIT 50
     `).bind(deviceId).all();
 
-    return json({ ok: true, pending: rows?.results || [] });
+    const activity = await env.DB.prepare('SELECT active_until FROM param_activity WHERE device_id=?')
+      .bind(deviceId).first();
+    return json({ ok: true, pending: rows?.results || [],
+      poll_after_s: (rows?.results?.length || activity?.active_until > Date.now()) ? 3 : 15 });
   } catch (err) {
     return json({ error: "params_pending_failed", message: String(err) }, 500);
   }
@@ -2579,20 +2651,25 @@ async function handleParamsAck(request, env) {
     const body = await request.json();
     const deviceId = String(body?.device_id || "").trim();
     const appliedIds = Array.isArray(body?.applied_ids) ? body.applied_ids : [];
+    const failedIds = Array.isArray(body?.failed_ids) ? body.failed_ids : [];
+    if (!deviceId || appliedIds.length + failedIds.length > 200 ||
+        [...appliedIds, ...failedIds].some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      return json({error: 'invalid_ack'}, 400);
+    }
     const now = new Date().toISOString();
 
-    if (appliedIds.length > 0) {
-      const placeholders = appliedIds.map(() => "?").join(",");
+    for (const [status, ids] of [['applied', appliedIds], ['failed', failedIds]]) {
+      if (!ids.length) continue;
       await env.DB.prepare(`
-        UPDATE carrot_param_queue
-        SET status = 'applied', applied_at = ?
-        WHERE device_id = ? AND id IN (${placeholders})
-      `).bind(now, deviceId, ...appliedIds).run();
+        UPDATE carrot_param_queue SET status = ?, applied_at = ?
+        WHERE device_id = ? AND status = 'pending'
+          AND id IN (SELECT value FROM json_each(?))
+      `).bind(status, now, deviceId, JSON.stringify(ids)).run();
     }
 
     // Note: Parameter cache (carrot_settings_cache) is exclusively updated via
     // /api/settings/sync snapshots from the vehicle to prevent late ACKs from overwriting fresh states.
-    return json({ ok: true, acked: appliedIds.length });
+    return json({ ok: true, acked: appliedIds.length + failedIds.length });
   } catch (err) {
     return json({ error: "params_ack_failed", message: String(err) }, 500);
   }
@@ -2650,6 +2727,7 @@ export default {
       if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
       if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
       if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
+      if (request.method === "GET" && pathname === "/api/trip-changes") return handleTripChanges(request, env);
       if (request.method === "GET" && pathname === "/api/latest-state") return handleLatestState(request, env);
       if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
       return json({error: "not_found"}, 404);

@@ -196,3 +196,67 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 - **Current Minor Version**: `0.8.x` (e.g., `0.8.4`).
 - **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.
+
+---
+
+## 8. Dashboard Freshness & Free-Plan Performance Contract (2026-10-01)
+
+Treat the 0.8.6 design as the maintained baseline. Do not reopen broad caching or
+polling rewrites without a measured regression, a changed workload, or an explicit
+feature request. This is a regression-prevention contract, not a claim that future
+optimization is impossible or that post-deployment account quotas have been verified.
+
+- **Latest state is an independent path.** Never wait for trips, charge history,
+  battery-history computation, archive catch-up, catalog download, or map setup
+  before displaying the current vehicle state. Keep the lightweight `live=1`
+  endpoint free of archive work and preserve older-response rejection.
+- **Visible-only refresh:** dashboard live checks target 15 seconds; HA coalesces
+  all clients per entry and rate-limits both successful and failed cloud attempts.
+  Refresh on visibility return. Keep actual measurement time distinct from cloud
+  check time; successful checks do not make sleeping/offline measurements fresh.
+- **History is incremental:** use the device-scoped monotonic trip revision cursor.
+  Include updates to existing routes and quality metadata, not just new trip IDs.
+  Persist the cursor only after the entire page is durably saved. Never download
+  unchanged full routes each minute. Preserve HA history when cloud retention
+  deletes old trips. Do not switch an authoritative external server to D1 silently.
+- **Bound catch-up:** at most 10 telemetry pages and 10 trip pages per sync run;
+  latest-state refresh must remain available throughout catch-up. Compatibility
+  fallback applies to 404/unsupported-source 409, not arbitrary transient errors.
+- **No query amplification:** current state and unchanged trip-change checks each
+  use one indexed D1 query. Legacy trip quality uses two set queries, not per-trip
+  queries. Device-scoped history must have a matching device/cursor index.
+- **HA archive:** identical cloud events must not be rewritten or invalidate trip
+  derivations. Share battery-history calculations across clients; never cache live
+  state behind those calculations. Keep time-based cache expiration and invalidation
+  on material event changes, settings changes, and retention cleanup.
+- **Frontend:** load only mounted card implementations and the requested language.
+  Do not make production cards wait for debug/other-language modules. Unchanged
+  parameter snapshots should neither transfer the catalog nor refresh the iframe.
+- **Reading continuity:** background updates must preserve HA ancestor and internal
+  scroll positions, open details, focus, selected dates/trips/pages, and map view.
+  Reuse an unchanged interactive map; never periodically reset its zoom/position.
+  New trip indices must not be mistaken for a user selecting another trip.
+- **Parameter polling:** idle 15s, active editing/pending work 3s, failures back off
+  up to 120s. Active leases must expire and hidden cards must not renew them.
+  Initial idle-to-active discovery can take 15s plus transport/processing time;
+  do not present this as instantaneous push. Preserve validation, local readback,
+  durable queue-ID idempotency, explicit rejection, and ACK retries.
+- **Budget:** no latest-state, history-read, or parameter-poll operation may write
+  KV. A continuously visible dashboard adds at most about 5,760 latest reads/day
+  per HA entry; idle parameter polling is about 5,760/day instead of 28,800/day.
+  Include all Workers, telemetry, terminal discovery, settings, retries, index
+  writes, and retention deletes in account-wide estimates. Never claim "free-plan
+  guaranteed" from request counts alone: actual D1 rows read/written and CPU matter.
+- **Rollout:** apply `cloudflare/migration_incremental_sync.sql` before the Worker,
+  then update HA and the Git-managed Comma daemon. No manual device source edits.
+  Full operational sign-off requires actual deployed-version checks and a 24-hour
+  workload/latency/quota observation; local tests alone cannot establish that.
+- **Required regression gates:** `tests/dashboard-live-loading.test.mjs`,
+  `tests/dashboard-lazy-runtime.test.mjs`, `tests/dashboard-view-state.test.mjs`, `tests/test_cloud_live.py`,
+  `tests/test_incremental_sync.py`, `tests/test_history_cache.py`,
+  `cloudflare/test_incremental_sync.mjs`, `cloudflare/benchmark_sync.mjs`, and
+  openpilot `ha/tests/test_param_polling.py`. Preserve existing auth/isolation,
+  trip/charge calculation, and camera driving-interlock tests. Report pre-existing
+  failures separately, with baseline reproduction; never hide them as passes.
+
+Evidence and rollout details: `docs/dashboard-loading-audit-2026-10-01.md`.

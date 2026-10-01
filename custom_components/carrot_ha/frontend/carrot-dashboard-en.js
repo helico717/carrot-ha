@@ -1,3 +1,4 @@
+import {preserveView} from './carrot-view-state.js';
 import {DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 import { CarrotCamera360Modal } from './carrot-camera-360.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
@@ -106,12 +107,43 @@ class CarrotDashboard extends HTMLElement {
     if(this.cameraModal)this.cameraModal.setTheme(dark?'dark':'light');
   }
   set hass(hass){const oldCharging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state;const previous=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;this._hass=hass;this.applyTheme();if(!this.initialized){this.initialized=true;if(!this.v||!Object.keys(this.v).length)this.loadCache();this.load();}else if(oldCharging!==hass.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state||previous!==hass.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state){this.render();}}
-  connectedCallback(){this.timer=setInterval(()=>{if(this._hass&&!document.hidden)this.load(true);},60000);}
-  disconnectedCallback(){this.clearMiniMaps();clearInterval(this.timer);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  connectedCallback(){
+    clearInterval(this.timer);clearInterval(this.liveTimer);
+    this.timer=setInterval(()=>{if(this._hass&&!document.hidden&&this.getClientRects?.().length!==0)this.load(true);},60000);
+    this.liveTimer=setInterval(()=>{if(this._hass&&!document.hidden&&this.getClientRects?.().length!==0)this.loadLive();},15000);
+    this._onVisible=()=>{if(!document.hidden&&this._hass){this.loadLive();this.load(true);}};
+    document.addEventListener('visibilitychange',this._onVisible);
+    if(this.initialized)this._onVisible();
+  }
+  disconnectedCallback(){this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   getCardSize(){return 8;}
   getGridOptions(){return {columns:36,rows:"auto",min_columns:6};}
+  async loadLive(){
+    if(this.liveBusy||!this.device)return;
+    this.liveBusy=true;
+    const id=encodeURIComponent(this.device.entry_id);
+    const apply=dash=>{
+      const next={...dash.values,battery_history:this.v.battery_history};
+      // Timestamps are displayed to the minute; avoid rebuilding maps for
+      // an unchanged sample merely because its age increased by 15 seconds.
+      const signature=value=>JSON.stringify(value,(key,item)=>key==='measurement_age_s'?undefined:key==='live_checked_at'&&item?String(item).slice(0,16):item);
+      const changed=this.liveError||this.isFromCache||signature(next)!==signature(this.v);
+      this.liveError='';
+      this.v=next;this.isFromCache=false;
+      if(changed){this.saveCache();this.render();}
+    };
+    try{
+      // Publish HA's in-memory state before waiting on the cloud network.
+      if(!this._liveLoaded){
+        apply(await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}?live=1`));
+        this._liveLoaded=true;
+      }
+      apply(await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}?live=1&refresh=1`));
+    }catch(e){this.liveError=e instanceof Error?e.message:String(e);this.render();}
+    finally{this.liveBusy=false;}
+  }
   async load(quiet=false){
-    if(this.busy)return;this.busy=true;this.error='';
+    if(this.busy){this.loadLive();return;}this.busy=true;this.error='';
     const refBtn=this.shadowRoot?.querySelector('.refresh');if(refBtn)refBtn.textContent='Refreshing…';
     try{
       if(!this.v||!Object.keys(this.v).length){
@@ -123,12 +155,15 @@ class CarrotDashboard extends HTMLElement {
       this.device=devices.devices.find(d=>d.device_id===requested)||(!requested?devices.devices[0]:null);
       if(!this.device)throw Error('Carrot HA device not found. Check the device_id in card configuration.');
       const id=encodeURIComponent(this.device.entry_id);
-      const [dash,tripsRes,chargesRes]=await Promise.all([
-        this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`),
+      this.loadLive();
+      const [,tripsRes,chargesRes]=await Promise.all([
+        this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`).then(dash=>{
+          this.v={...this.v,battery_history:dash.values.battery_history};
+          this.render();return dash;
+        }),
         loadRecentTrips(this._hass.callApi.bind(this._hass),id),
         this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)
       ]);
-      this.v=dash.values;this.isFromCache=false;
       const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
       this._rawTrips=tripsRes.events||[];
       this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
@@ -137,6 +172,7 @@ class CarrotDashboard extends HTMLElement {
       if(selectedStart!=null){
         const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
         this.selected=idx!==-1?idx:null;
+        if(this.selected!==null)this._pageSelection=this.selected;
       }else{
         this.selected=null;
       }
@@ -150,10 +186,15 @@ class CarrotDashboard extends HTMLElement {
     const maps=this.miniMaps||[];this.miniMaps=[];
     for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
   }
-  render(){
+  render(){return preserveView(this,()=>this.renderContent());}
+  renderContent(){
     this._renderId=(this._renderId||0)+1;
+    const mapContext=JSON.stringify([this.tab,this.tripDay,this.selected===null?null:this.trips[this.selected]?.data?.started_at]);
+    if(this.map&&this._mapContext===mapContext){this._mapView={center:this.map.getCenter(),zoom:this.map.getZoom()};}
+    else if(this._mapContext!==mapContext){this._mapView=null;}
+    this._mapContext=mapContext;
     this.clearMiniMaps();
-    if(this.map){try{this.map.remove();}catch(e){}this.map=null;}
+    // Keep the interactive map alive until drawMap decides whether its data changed.
     if(this.tab==='trips'){
       const days=tripDays(this.trips,this._hass?.config?.time_zone);
       if(!this.tripDay||!days.some(d=>d.key===this.tripDay)){
@@ -251,7 +292,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
-</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error?`<div class="error">${esc(this.error)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.cloud_status||(this.busy?'Checking connection…':'Checking connection'))}<br>HA updated ${time(v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}${this.isFromCache?' (updating…)':''}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`;
+</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.live_status||v.cloud_status||(this.busy?'Checking connection…':'Checking connection'))}<br>Last check ${time(v.live_checked_at||v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}${this.isFromCache?' (updating…)':''}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`;
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
@@ -664,6 +705,7 @@ class CarrotDashboard extends HTMLElement {
         this._mapResizeObserver.observe(el);
       });
     }
+    if(!this.shadowRoot.querySelector('.map')&&this.map){this.map.remove();this.map=null;}
     if(this.shadowRoot.querySelector('.map')){
       const dayObj=isTrip?tripDays(this.trips,this._hass?.config?.time_zone).find(d=>d.key===this.tripDay):null;
       const dayTrips=(dayObj?.indices||[]).map(i=>this.trips[i]?.data).filter(Boolean);
@@ -1347,6 +1389,10 @@ class CarrotDashboard extends HTMLElement {
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}
   async drawMap(route,v,dayTrips=[]){
     const node=this.shadowRoot.querySelector('.map');
+    const signature=JSON.stringify([this._mapContext,route,dayTrips,v.latitude,v.longitude,v.parking_latitude,v.parking_longitude,this.vehicleStatus(v).key]);
+    if(this.map&&this._mapSignature===signature){node.replaceWith(this.map.getContainer());return;}
+    if(this.map){try{this.map.remove();}catch{}this.map=null;}
+    this._mapSignature=signature;
     try{
       const L=await leaflet();if(!node.isConnected)return;
       const points=route.filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
@@ -1398,7 +1444,8 @@ class CarrotDashboard extends HTMLElement {
         this.map.setView(targetPos,16);marker(targetPos,false,isDriving?'<span style="font-size:10px">Live</span>':'P');bounds=L.latLngBounds([targetPos]);
       }
       const reset=L.control({position:'bottomright'});reset.onAdd=()=>{const b=L.DomUtil.create('button','resetmap');b.textContent='⌖ Fit view';b.setAttribute('aria-label','Fit the entire route');L.DomEvent.disableClickPropagation(b);b.onclick=()=>this.map.fitBounds(bounds,{padding:[32,32],maxZoom:16});return b;};reset.addTo(this.map);
-      requestAnimationFrame(()=>this.map?.invalidateSize());
+      if(this._mapView)this.map.setView(this._mapView.center,this._mapView.zoom,{animate:false});
+      const renderedMap=this.map;requestAnimationFrame(()=>{if(this.map===renderedMap)renderedMap.invalidateSize({pan:false});});
     }catch(e){if(node.isConnected)node.innerHTML=`<div class="empty">${esc(e.message)}</div>`;}
   }
 }

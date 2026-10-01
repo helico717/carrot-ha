@@ -241,13 +241,20 @@ class DashboardView(HomeAssistantView):
         if runtime is None:return web.Response(status=404)
         from .vehicle import values
         from .battery_history import history
+        if request.query.get('refresh') == '1':
+            from .cloud_live import refresh_live
+            await refresh_live(self.hass, runtime)
         data=values(runtime)
+        data['live_status']=runtime.get('live_status')
+        data['live_checked_at']=runtime.get('live_checked_at')
         from homeassistant.helpers import entity_registry as er
         registry=er.async_get(self.hass)
         data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online','emergency_charging')}
         data['vehicle_model']=runtime['entry'].options.get('vehicle_model','Volkswagen MEB')
-        data['battery_history']=await self.hass.async_add_executor_job(history,runtime['archive'],runtime['entry'].data['device_id'],runtime['entry'].options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),self.hass.config.time_zone)
-        return web.json_response({'device_id':runtime['entry'].data['device_id'],'values':data})
+        if request.query.get('live') != '1':
+            from .history_cache import battery_history
+            data['battery_history']=await battery_history(self.hass, runtime, history)
+        return web.json_response({'device_id':runtime['entry'].data['device_id'],'values':data}, headers={'Cache-Control': 'no-store'})
 
 
 def _read_frontend_version():
@@ -301,7 +308,8 @@ class SettingsView(HomeAssistantView):
         session = async_get_clientsession(self.hass)
         try:
             async with session.get(
-                f"{base}/api/settings?device_id={device_id}",
+                f"{base}/api/settings",
+                params={"device_id": device_id, **({"active": "1"} if request.query.get("active") == "1" else {}), **({"known": request.query["known"]} if "known" in request.query else {})},
                 headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/json'},
                 timeout=ClientTimeout(total=15)
             ) as resp:

@@ -48,6 +48,9 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
         def get(url, **kwargs):
             calls.append(url)
             response = Response()
+            if '/api/trip-changes?' in url:
+                response.status = 404
+                return response
             if (legacy or state_500) and '/api/latest-state?' in url:
                 response.status = 500 if state_500 else 404
                 return response

@@ -31,7 +31,7 @@ statements.length = 0;
 const ackResult = await ctx.api.handleParamsAck({json: async() => ({device_id: 'a', applied_ids: [45], current_values: {Test: 4}})}, env);
 assert.equal(ackResult.status, 200);
 assert.equal(ackResult.body.acked, 1);
-assert.ok(statements.some(s => s.sql.includes("status = 'applied'")), 'ACK must update queue status to applied');
+assert.ok(statements.some(s => s.sql.includes("SET status = ?") && s.args[0] === "applied"), 'ACK must update queue status to applied');
 assert.ok(!statements.some(s => s.sql.includes('carrot_settings_cache')), 'ACK must not directly overwrite carrot_settings_cache');
 
 console.log('Worker: catalog validation, queue IDs, exact ID status, pending TTL and safe ACK passed');

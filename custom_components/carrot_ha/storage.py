@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import bisect
 import math
 import sqlite3
+import threading
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,12 +16,16 @@ class Archive:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = str(path)
         self._derived_ready = set()
+        self.revision = 0
+        self._derived_lock = threading.RLock()
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE TABLE IF NOT EXISTS trip_derivations (device TEXT, id TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE TABLE IF NOT EXISTS trip_energy (device TEXT, id TEXT, fingerprint TEXT, distance_km REAL, energy_kwh REAL, PRIMARY KEY(device,id))')
             db.execute('CREATE INDEX IF NOT EXISTS history ON events(device,observed)')
             db.execute('CREATE INDEX IF NOT EXISTS idx_events_kind_observed ON events(kind,observed)')
+            db.execute('CREATE INDEX IF NOT EXISTS events_device_kind_observed ON events(device,kind,observed DESC)')
+            db.execute("CREATE INDEX IF NOT EXISTS events_started ON events(device,kind,julianday(COALESCE(json_extract(body,'$.data.started_at'),observed)) DESC)")
 
     @contextmanager
     def connect(self):
@@ -41,36 +46,39 @@ class Archive:
                 return False
             observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (event['device_id'], event['event_id'], observed, event['kind'], body))
-        self._derived_ready.discard(event['device_id'])
+        with self._derived_lock:
+            self.revision += 1
+            self._derived_ready.discard(event['device_id'])
         return True
 
     def _ensure_derivations(self, device):
-        if device not in self._derived_ready:
-            with self.connect() as db:
-                trip_repair.refresh(db, device)
-                # Update retained caches across month boundaries, not just the
-                # currently displayed month. Missing evidence preserves kWh.
-                cached_rows = db.execute("""SELECT te.id,te.fingerprint,te.energy_kwh,e.body,d.body
-                    FROM trip_energy te JOIN events e ON e.device=te.device AND e.id=te.id
-                    JOIN trip_derivations d ON d.device=te.device AND d.id=te.id
-                    WHERE te.device=?""", (device,)).fetchall()
-                for key, cached_fp, kwh, event_body, derived_body in cached_rows:
-                    data = json.loads(event_body)['data']
-                    derived = json.loads(derived_body)
-                    old_fp = json.loads(cached_fp)
-                    new_fp = [data.get(k) for k in ('started_at','ended_at','distance_m','partial')]
-                    energy = derived.get('energy')
-                    if (old_fp[:2] != new_fp[:2] or old_fp[3:] != new_fp[3:]
-                            or derived.get('energy_rejected')
-                            or (energy and not energy.get('summary_eligible'))):
-                        db.execute('DELETE FROM trip_energy WHERE device=? AND id=?',(device,key))
-                        continue
-                    km = (derived['distance_m'] if derived.get('distance_m') is not None else data.get('distance_m',0))/1000
-                    if energy:
-                        kwh = energy['energy_wh']/1000
-                    db.execute('UPDATE trip_energy SET fingerprint=?,distance_km=?,energy_kwh=? WHERE device=? AND id=?',
-                               (json.dumps(new_fp),km,kwh,device,key))
-            self._derived_ready.add(device)
+        with self._derived_lock:
+            if device not in self._derived_ready:
+                with self.connect() as db:
+                    trip_repair.refresh(db, device)
+                    # Update retained caches across month boundaries, not just the
+                    # currently displayed month. Missing evidence preserves kWh.
+                    cached_rows = db.execute("""SELECT te.id,te.fingerprint,te.energy_kwh,e.body,d.body
+                        FROM trip_energy te JOIN events e ON e.device=te.device AND e.id=te.id
+                        JOIN trip_derivations d ON d.device=te.device AND d.id=te.id
+                        WHERE te.device=?""", (device,)).fetchall()
+                    for key, cached_fp, kwh, event_body, derived_body in cached_rows:
+                        data = json.loads(event_body)['data']
+                        derived = json.loads(derived_body)
+                        old_fp = json.loads(cached_fp)
+                        new_fp = [data.get(k) for k in ('started_at','ended_at','distance_m','partial')]
+                        energy = derived.get('energy')
+                        if (old_fp[:2] != new_fp[:2] or old_fp[3:] != new_fp[3:]
+                                or derived.get('energy_rejected')
+                                or (energy and not energy.get('summary_eligible'))):
+                            db.execute('DELETE FROM trip_energy WHERE device=? AND id=?',(device,key))
+                            continue
+                        km = (derived['distance_m'] if derived.get('distance_m') is not None else data.get('distance_m',0))/1000
+                        if energy:
+                            kwh = energy['energy_wh']/1000
+                        db.execute('UPDATE trip_energy SET fingerprint=?,distance_km=?,energy_kwh=? WHERE device=? AND id=?',
+                                   (json.dumps(new_fp),km,kwh,device,key))
+                self._derived_ready.add(device)
 
     def repair_trips(self, device):
         """Explicit backfill; source events remain byte-for-byte unchanged."""
@@ -92,9 +100,13 @@ class Archive:
         body = validate(event)
         observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
         with self.connect() as db:
-            db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body',
-                       (event['device_id'], event['event_id'], observed, event['kind'], body))
-        self._derived_ready.discard(event['device_id'])
+            changed = db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body WHERE events.body != excluded.body',
+                       (event['device_id'], event['event_id'], observed, event['kind'], body)).rowcount
+        if changed:
+            with self._derived_lock:
+                self.revision += 1
+                self._derived_ready.discard(event['device_id'])
+        return bool(changed)
 
     def history(self, device, kind, limit=100, offset=0, since=None):
         if kind not in ('state', 'trip', 'charge') or not 1 <= limit <= 500 or offset < 0:
@@ -340,6 +352,10 @@ class Archive:
                     (slim_trip_days,)
                 )
                 counts['slimmed_trip'] = cur.rowcount
+        if any(counts.values()):
+            with self._derived_lock:
+                self.revision += 1
+                self._derived_ready.clear()
         return counts
 
     def vacuum(self):

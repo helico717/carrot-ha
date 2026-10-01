@@ -16,6 +16,43 @@ class CloudHTTPError(Exception):
         self.status = status
         self.path = path.split('?')[0]
 
+async def sync_trip_changes(hass, runtime, get, save):
+    """Bounded, durable revision cursor; only compatibility errors enable legacy sync."""
+    now = datetime.now(timezone.utc).timestamp()
+    if now < runtime.get('trip_changes_retry_at', 0):
+        return False
+    archive = runtime['archive']
+    cursor = int(await hass.async_add_executor_job(archive.cursor, 'trip_changes') or 0)
+    for _ in range(10):
+        try:
+            feed = await get('/api/trip-changes?' + urlencode({
+                'device_id': runtime['entry'].data['device_id'], 'after': cursor, 'limit': 10}))
+        except CloudHTTPError as error:
+            if error.status in (404, 409):
+                runtime['trip_changes_retry_at'] = now + 3600
+                return False
+            raise
+        trips = feed.get('trips')
+        next_cursor = feed.get('next_cursor')
+        more = feed.get('has_more')
+        if (feed.get('schema') != 'carrot-trip-changes-v1' or not isinstance(trips, list)
+                or type(next_cursor) is not int or type(more) is not bool):
+            raise ValueError('Invalid trip change page')
+        sequences = [trip.get('sync_sequence') for trip in trips]
+        if (any(type(seq) is not int or seq <= cursor for seq in sequences)
+                or sequences != sorted(set(sequences))
+                or any(not isinstance(trip.get('id'), str) or not trip['id'] for trip in trips)
+                or next_cursor != (sequences[-1] if sequences else cursor)
+                or (more and not trips)):
+            raise ValueError('Trip change cursor did not advance')
+        await save({'trips': trips})
+        # On any partial write failure, retry the entire page. put_cloud is idempotent.
+        await hass.async_add_executor_job(archive.cursor, 'trip_changes', next_cursor)
+        cursor = next_cursor
+        if not more:
+            break
+    return True
+
 async def sync(hass, runtime):
     entry = runtime['entry']
     base = entry.options.get('cloud_url', '').rstrip('/')
@@ -70,10 +107,16 @@ async def sync(hass, runtime):
         await save({'state': feed.get('state')})
         if fallback_trips and isinstance(fallback_trips, list):
             await save({'trips': fallback_trips})
+        # Recent trips must not wait behind an offline telemetry backlog.
+        try:
+            incremental_trips = await sync_trip_changes(hass, runtime, get, save)
+        except CloudHTTPError as trip_error:
+            incremental_trips = True  # Never turn transient errors into a full rescan.
+            _LOGGER.warning('Carrot trip changes unavailable: HTTP %s; retrying next sync', trip_error.status)
         cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
-        while True:
+        for _ in range(10):
             try:
-                history = await get(f'/api/telemetry-history?after={cursor}&limit=20')
+                history = await get('/api/telemetry-history?' + urlencode({'after': cursor, 'limit': 100, 'device_id': entry.data['device_id']}))
             except CloudHTTPError as error:
                 if error.status == 404:
                     runtime['history_supported'] = False
@@ -88,36 +131,37 @@ async def sync(hass, runtime):
             if not history['has_more']:break
         offset = 0
         try:
-            offset = int(await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset') or 0)
-            seen = runtime.setdefault('trip_sync_seen', set())
-            if offset == 0:
-                seen.clear()
-            # Bound each run; resume the remaining pages on the next scheduled sync.
-            for _ in range(10):
-                feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
-                trips = feed.get('trips')
-                if not isinstance(trips, list):
-                    raise ValueError('Invalid trips response')
-                ids = [trip.get('id') for trip in trips]
-                if any(not isinstance(key, str) or not key for key in ids):
-                    raise ValueError('Invalid trip ID')
-                if trips and not set(ids).difference(seen):
-                    await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+            if not incremental_trips:
+                offset = int(await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset') or 0)
+                seen = runtime.setdefault('trip_sync_seen', set())
+                if offset == 0:
                     seen.clear()
-                    raise ValueError('Trip pagination did not advance')
-                await save({'trips': trips})
-                seen.update(ids)
-                offset += len(trips)
-                if len(trips) < 10:
-                    runtime['cloud_trip_count'] = offset
-                    await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
-                    seen.clear()
-                    break
-                await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', offset)
-                await asyncio.sleep(0)
+                # Bound each run; resume the remaining pages on the next scheduled sync.
+                for _ in range(10):
+                    feed = await get(f'/api/trips?limit=10&offset={offset}&include_route=true')
+                    trips = feed.get('trips')
+                    if not isinstance(trips, list):
+                        raise ValueError('Invalid trips response')
+                    ids = [trip.get('id') for trip in trips]
+                    if any(not isinstance(key, str) or not key for key in ids):
+                        raise ValueError('Invalid trip ID')
+                    if trips and not set(ids).difference(seen):
+                        await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                        seen.clear()
+                        raise ValueError('Trip pagination did not advance')
+                    await save({'trips': trips})
+                    seen.update(ids)
+                    offset += len(trips)
+                    if len(trips) < 10:
+                        runtime['cloud_trip_count'] = offset
+                        await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', 0)
+                        seen.clear()
+                        break
+                    await hass.async_add_executor_job(runtime['archive'].cursor, 'trip_offset', offset)
+                    await asyncio.sleep(0)
         except CloudHTTPError as trip_error:
             _LOGGER.warning('Carrot trip sync unavailable: HTTP %s at %s; preserving state and existing history', trip_error.status, trip_error.path)
-            if not fallback_trips and offset == 0:
+            if not fallback_trips and offset == 0 and runtime.get('trip_changes_retry_at', 0):
                 try:
                     legacy_feed = await get('/api/json')
                     if isinstance(legacy_feed.get('trips'), list):
@@ -131,11 +175,11 @@ async def sync(hass, runtime):
         raise
     except CloudHTTPError as error:
         runtime['cloud_status'] = 'HTTP_' + str(error.status)
-        _LOGGER.warning('Carrot cloud sync failed: HTTP %s at %s; will retry in 5 minutes', error.status, error.path)
+        _LOGGER.warning('Carrot cloud sync failed: HTTP %s at %s; will retry on the next scheduled sync', error.status, error.path)
     except Exception as error:
         runtime['cloud_status'] = 'error'
         # Exception messages can contain credential-bearing URLs; log only type.
-        _LOGGER.warning('Carrot cloud sync failed (%s); will retry in 5 minutes', type(error).__name__)
+        _LOGGER.warning('Carrot cloud sync failed (%s); will retry on the next scheduled sync', type(error).__name__)
     finally:
         try:
             if history_ingested:
