@@ -311,6 +311,12 @@ optimization is impossible or that post-deployment account quotas have been veri
   `cloudflare/test_incremental_sync.mjs`, `cloudflare/benchmark_sync.mjs`, and
   openpilot `ha/tests/test_param_polling.py`. Preserve existing auth/isolation,
   trip/charge calculation, and camera driving-interlock tests. Report pre-existing
-  failures separately, with baseline reproduction; never hide them as passes.
+- **Modular Sub-Cards & Universal EV Adaptation:** Any future refactoring into
+  independent sub-cards (trips, charges, 360 camera chips) or rich entity attributes
+  for third-party EV cards MUST strictly adhere to this Free-Plan Contract.
+  Individual cards must NEVER execute separate cloud queries; all frontend cards
+  must consume the shared HA local cache/coordinator (zero query amplification).
+  Details: `docs/modular-ev-dashboard-architecture.md`.
 
 Evidence and rollout details: `docs/dashboard-loading-audit-2026-10-01.md`.
+
