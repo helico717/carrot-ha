@@ -107,12 +107,16 @@ def values(runtime):
         data['session_charge_kwh'] = session_kwh
         data['session_charge_cost'] = int(round(session_kwh * unit_price))
         data['session_charge_price'] = unit_price
-    else:
+        data['session_charge_type'] = 'DC_FAST' if is_fast_charge else 'AC_SLOW'
+        data['session_start_soc'] = calibrated_soc(session_start_wh, capacity)
+    elif not is_charging:
         runtime['charge_session_start_wh'] = None
         runtime['charge_session_fast'] = False
         data['session_charge_kwh'] = None
         data['session_charge_cost'] = None
         data['session_charge_price'] = None
+        data['session_charge_type'] = None
+        data['session_start_soc'] = None
 
     # Train once per battery measurement, not once per sensor/UI property read.
     stamp = (data.get('field_measured_at') or {}).get('battery_wh') or data.get('measured_at')

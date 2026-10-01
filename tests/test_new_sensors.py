@@ -173,5 +173,124 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(GEAR_DISPLAY.get('low'), 'B')
         self.assertEqual(GEAR_DISPLAY.get('eco'), 'Eco')
 
+    def test_last_trip_sensor(self):
+        from custom_components.carrot_ha.sensors_v3 import LastTripSensor
+        entry = type('Entry', (), {'options': {'soc_capacity_kwh': 77.0}, 'data': {'device_id': 'test-id'}, 'title': 'Test Car', 'entry_id': 'test_entry'})()
+        sensor = LastTripSensor(entry)
+        sensor.hass = types.SimpleNamespace()
+        sensor.hass.data = {
+            'carrot_ha': {
+                'test_entry': {
+                    'entry': entry,
+                    'latest': {'data': {}},
+                    'summary': {
+                        'last_trip_distance_km': 15.42,
+                        'last_trip_duration_s': 1440,
+                        'last_trip_efficiency_kpl': 5.4,
+                        'last_trip_energy_kwh': 2.85,
+                        'last_trip_start_soc': 82.0,
+                        'last_trip_end_soc': 77.0,
+                        'last_trip_consumed_soc': 5.0,
+                        'last_trip_avg_kph': 38.5,
+                        'last_trip_max_kph': 85.0,
+                        'last_trip_at': '2026-10-01T14:44:00Z',
+                    }
+                }
+            }
+        }
+        self.assertEqual(sensor.native_value, 15.42)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs['distance_km'], 15.42)
+        self.assertEqual(attrs['duration_minutes'], 24.0)
+        self.assertEqual(attrs['efficiency_kpl'], 5.4)
+        self.assertEqual(attrs['energy_kwh'], 2.85)
+        self.assertEqual(attrs['start_soc'], 82.0)
+        self.assertEqual(attrs['end_soc'], 77.0)
+        self.assertEqual(attrs['consumed_soc'], 5.0)
+        self.assertEqual(attrs['avg_speed_kph'], 38.5)
+        self.assertEqual(attrs['max_speed_kph'], 85.0)
+        self.assertEqual(attrs['ended_at'], '2026-10-01T14:44:00Z')
+
+    def test_charging_session_sensor(self):
+        from custom_components.carrot_ha.sensors_v3 import ChargingSessionSensor
+        entry = type('Entry', (), {'options': {'soc_capacity_kwh': 77.0}, 'data': {'device_id': 'test-id'}, 'title': 'Test Car', 'entry_id': 'test_entry'})()
+        sensor = ChargingSessionSensor(entry)
+        sensor.hass = types.SimpleNamespace()
+        sensor.hass.data = {
+            'carrot_ha': {
+                'test_entry': {
+                    'entry': entry,
+                    'latest': {
+                        'data': {
+                            'charging': True,
+                            'soc_percent': 65.0,
+                            'session_start_soc': 25.0,
+                            'session_charge_kwh': 18.2,
+                            'session_charge_cost': 5820,
+                            'session_charge_price': 320,
+                            'session_charge_type': 'DC_FAST',
+                            'charge_power_kw': 65.4,
+                            'time_to_80_s': 900,
+                            'eta_80': '2026-10-01T16:45:00Z',
+                        }
+                    },
+                    'summary': {}
+                }
+            }
+        }
+        self.assertEqual(sensor.native_value, 'charging')
+        self.assertEqual(sensor.icon, 'mdi:ev-station')
+        attrs = sensor.extra_state_attributes
+        self.assertTrue(attrs['charging'])
+        self.assertEqual(attrs['session_charge_kwh'], 18.2)
+        self.assertEqual(attrs['session_charge_cost'], 5820)
+        self.assertEqual(attrs['charger_type'], 'DC_FAST')
+        self.assertEqual(attrs['start_soc'], 25.0)
+        self.assertEqual(attrs['current_soc'], 65.0)
+        self.assertEqual(attrs['added_soc'], 40.0)
+
+        # Test disconnected
+        sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {'charging': False}
+        self.assertEqual(sensor.native_value, 'disconnected')
+        self.assertEqual(sensor.icon, 'mdi:power-plug-off')
+
+        # Test emergency charging
+        now_iso = datetime.now(timezone.utc).isoformat()
+        sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {
+            'charging': True,
+            'charge_power_w': 1000,
+            'measured_at': now_iso,
+            'stale': False,
+        }
+        sensor.hass.data['carrot_ha']['test_entry']['low_power_charging_since'] = datetime.now(timezone.utc) - timedelta(seconds=400)
+        self.assertEqual(sensor.native_value, 'emergency')
+        self.assertEqual(sensor.icon, 'mdi:power-plug-off')
+
+    def test_today_driving_sensor(self):
+        from custom_components.carrot_ha.sensors_v3 import TodayDrivingSensor
+        entry = type('Entry', (), {'options': {'soc_capacity_kwh': 77.0}, 'data': {'device_id': 'test-id'}, 'title': 'Test Car', 'entry_id': 'test_entry'})()
+        sensor = TodayDrivingSensor(entry)
+        sensor.hass = types.SimpleNamespace()
+        sensor.hass.data = {
+            'carrot_ha': {
+                'test_entry': {
+                    'entry': entry,
+                    'latest': {'data': {}},
+                    'summary': {
+                        'today_distance_km': 45.2,
+                        'today_trip_count': 3,
+                        'today_energy_kwh': 7.8,
+                        'today_efficiency_kpl': 5.8,
+                    }
+                }
+            }
+        }
+        self.assertEqual(sensor.native_value, 45.2)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs['today_trip_count'], 3)
+        self.assertEqual(attrs['today_distance_km'], 45.2)
+        self.assertEqual(attrs['today_energy_kwh'], 7.8)
+        self.assertEqual(attrs['today_efficiency_kpl'], 5.8)
+
 if __name__ == '__main__':
     unittest.main()

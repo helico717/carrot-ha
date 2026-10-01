@@ -138,19 +138,57 @@ class Archive:
             from datetime import timedelta
             kst = timezone(timedelta(hours=9))
         month = datetime.now(kst).strftime('%Y-%m')
+        today_str = datetime.now(kst).strftime('%Y-%m-%d')
         with self.connect() as db:
             rows = db.execute("SELECT e.observed,COALESCE(json_extract(d.body,'$.distance_m'),json_extract(e.body,'$.data.distance_m')) FROM events e LEFT JOIN trip_derivations d ON e.device=d.device AND e.id=d.id WHERE e.device=? AND e.kind='trip'",(device,)).fetchall()
         def _to_kst(ts):
             try: return datetime.fromisoformat(ts).astimezone(kst).strftime('%Y-%m')
             except Exception: return ''
+        def _to_kst_day(ts):
+            try: return datetime.fromisoformat(ts).astimezone(kst).strftime('%Y-%m-%d')
+            except Exception: return ''
         current = [r for r in rows if _to_kst(r[0])==month]
-        summary = {'trip_count':len(rows),'recorded_distance_km':round(sum(r[1] or 0 for r in rows)/1000,2),'month_trip_count':len(current),'month_distance_km':round(sum(r[1] or 0 for r in current)/1000,2)}
+        today_trips = [r for r in rows if _to_kst_day(r[0]) == today_str]
+        summary = {
+            'trip_count': len(rows),
+            'recorded_distance_km': round(sum(r[1] or 0 for r in rows)/1000, 2),
+            'month_trip_count': len(current),
+            'month_distance_km': round(sum(r[1] or 0 for r in current)/1000, 2),
+            'today_trip_count': len(today_trips),
+            'today_distance_km': round(sum(r[1] or 0 for r in today_trips)/1000, 2),
+        }
         summary.update(self.driving_energy_summary(device, month, kst, summary['month_distance_km']))
         summary.update(self._recent_efficiency(device))
+
+        # Query today energy consumption from trip_energy cache
+        with self.connect() as db:
+            energy_rows = db.execute(
+                """SELECT e.observed, te.distance_km, te.energy_kwh
+                   FROM trip_energy te
+                   JOIN events e ON te.device = e.device AND te.id = e.id
+                   WHERE te.device = ? AND te.energy_kwh > 0""",
+                (device,)
+            ).fetchall()
+        today_e_rows = [r for r in energy_rows if _to_kst_day(r[0]) == today_str]
+        today_e_km = sum(r[1] for r in today_e_rows)
+        today_e_kwh = sum(r[2] for r in today_e_rows)
+        summary['today_energy_kwh'] = round(today_e_kwh, 2) if today_e_kwh > 0 else None
+        summary['today_efficiency_kpl'] = round(today_e_km / today_e_kwh, 2) if today_e_kwh >= 0.5 and today_e_km >= 1 else None
+
         trips = self.history(device,'trip',1)
         if trips:
+            self.enrich_trips_energy(device, trips)
             trip = trips[0]['data']
-            summary.update(last_trip_distance_km=round((trip.get('distance_m') or 0)/1000,2),last_trip_duration_s=int(round(trip['duration_s'])) if trip.get('duration_s') is not None else None,last_trip_at=trips[0]['observed_at'])
+            summary.update(
+                last_trip_distance_km=round((trip.get('distance_m') or 0)/1000,2),
+                last_trip_duration_s=int(round(trip['duration_s'])) if trip.get('duration_s') is not None else None,
+                last_trip_at=trips[0]['observed_at'],
+                last_trip_energy_kwh=round((trip.get('energy_wh') or 0)/1000, 2) if trip.get('energy_wh') else None,
+                last_trip_efficiency_kpl=trip.get('efficiency_km_kwh'),
+                last_trip_start_soc=trip.get('start_soc_percent'),
+                last_trip_end_soc=trip.get('end_soc_percent'),
+                last_trip_consumed_soc=trip.get('soc_used_percent'),
+            )
             route = trip.get('route') or []
             if route: summary['last_trip_parking'] = dict(route[-1],measured_at=trip.get('ended_at'))
             summary['last_trip_avg_kph'] = round(trip['distance_m']/trip['duration_s']*3.6,1) if trip.get('duration_s') and trip.get('distance_m') is not None else None

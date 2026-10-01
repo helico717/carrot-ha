@@ -65,7 +65,13 @@ FIELDS.update(SENSOR_FIELDS)
 FIELDS.pop('bms_mode', None)
 
 async def async_setup_entry(hass,entry,async_add_entities):
-    async_add_entities([VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()])
+    entities = [VehicleSensor(entry,key,*spec) for key,spec in FIELDS.items()]
+    entities.extend([
+        LastTripSensor(entry),
+        ChargingSessionSensor(entry),
+        TodayDrivingSensor(entry),
+    ])
+    async_add_entities(entities)
 
 ID4_DIAGNOSTIC_KEYS = {
     'aux_voltage', 'hv_voltage', 'recirc', 'blower_level', 'blower_volt',
@@ -132,3 +138,105 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         elif self.key=='soc_percent':
             attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
         return attrs
+
+
+class LastTripSensor(VehicleEntity, SensorEntity):
+    _attr_device_class = 'distance'
+    _attr_state_class = 'measurement'
+    _attr_native_unit_of_measurement = 'km'
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, entry):
+        self.configure(entry, 'last_trip', '최근 주행 결과', 'mdi:map-marker-distance')
+
+    @property
+    def native_value(self):
+        val = self.data.get('last_trip_distance_km')
+        return round(val, 2) if isinstance(val, (int, float)) else None
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        duration_s = self.data.get('last_trip_duration_s')
+        duration_m = round(duration_s / 60.0, 1) if isinstance(duration_s, (int, float)) else None
+        attrs.update({
+            'distance_km': self.data.get('last_trip_distance_km'),
+            'duration_s': duration_s,
+            'duration_minutes': duration_m,
+            'efficiency_kpl': self.data.get('last_trip_efficiency_kpl'),
+            'energy_kwh': self.data.get('last_trip_energy_kwh'),
+            'start_soc': self.data.get('last_trip_start_soc'),
+            'end_soc': self.data.get('last_trip_end_soc'),
+            'consumed_soc': self.data.get('last_trip_consumed_soc'),
+            'avg_speed_kph': self.data.get('last_trip_avg_kph'),
+            'max_speed_kph': self.data.get('last_trip_max_kph'),
+            'ended_at': self.data.get('last_trip_at'),
+        })
+        return attrs
+
+
+class ChargingSessionSensor(VehicleEntity, SensorEntity):
+    def __init__(self, entry):
+        self.configure(entry, 'charging_session', '충전 세션', 'mdi:ev-station')
+
+    @property
+    def native_value(self):
+        if bool(self.data.get('emergency_charging')):
+            return 'emergency'
+        if bool(self.data.get('charging')):
+            return 'charging'
+        return 'disconnected'
+
+    @property
+    def icon(self):
+        return 'mdi:ev-station' if self.native_value == 'charging' else 'mdi:power-plug-off'
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        current_soc = self.data.get('soc_percent')
+        start_soc = self.data.get('session_start_soc')
+        added_soc = round(current_soc - start_soc, 1) if isinstance(current_soc, (int, float)) and isinstance(start_soc, (int, float)) else None
+        attrs.update({
+            'charging': bool(self.data.get('charging')),
+            'session_charge_kwh': self.data.get('session_charge_kwh'),
+            'session_charge_cost': self.data.get('session_charge_cost'),
+            'unit_price_krw': self.data.get('session_charge_price'),
+            'charger_type': self.data.get('session_charge_type'),
+            'power_kw': self.data.get('charge_power_kw'),
+            'start_soc': start_soc,
+            'current_soc': current_soc,
+            'added_soc': added_soc,
+            'time_to_80_s': self.data.get('time_to_80_s'),
+            'eta_80': self.data.get('eta_80'),
+            'time_to_100_s': self.data.get('time_to_100_s'),
+            'eta_100': self.data.get('eta_100'),
+        })
+        return attrs
+
+
+class TodayDrivingSensor(VehicleEntity, SensorEntity):
+    _attr_device_class = 'distance'
+    _attr_state_class = 'measurement'
+    _attr_native_unit_of_measurement = 'km'
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, entry):
+        self.configure(entry, 'today_summary', '오늘의 주행 요약', 'mdi:calendar-today')
+
+    @property
+    def native_value(self):
+        val = self.data.get('today_distance_km')
+        return round(val, 2) if isinstance(val, (int, float)) else 0.0
+
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        attrs.update({
+            'today_trip_count': self.data.get('today_trip_count', 0),
+            'today_distance_km': self.data.get('today_distance_km', 0.0),
+            'today_energy_kwh': self.data.get('today_energy_kwh'),
+            'today_efficiency_kpl': self.data.get('today_efficiency_kpl'),
+        })
+        return attrs
+
