@@ -121,14 +121,28 @@ The Carrot HA system is strictly divided into two independent repositories:
 1. **Local Development**:
    - Work in `custom_components/carrot_ha/`.
    - If updating JS cards, validate syntax with `node --check <file>.js`.
-2. **Commit & Push**:
+2. **Version Bump in Manifest**:
+   - Bump `"version"` in `custom_components/carrot_ha/manifest.json` (e.g. `"0.8.7"`).
+3. **Commit & Push**:
    ```bash
    git add <modified-files>
    git commit -m "feat: <descriptive message>"
    git push origin main
    ```
-3. **Deploy to Home Assistant**:
-   - Pull latest changes on the HA host or re-download via HACS.
+4. **Publish GitHub Release (Mandatory for HACS Version & Changelog)**:
+   > ⚠️ **CRITICAL FOR HACS DISPLAY:**
+   > If you only push commits without a GitHub Release, HACS falls back to *main branch tracking mode*, displaying **commit hashes instead of version numbers** and **empty release notes** in Home Assistant's update card/dialog.
+   - **Method A (Automated via Tag)**:
+     ```bash
+     git tag v0.8.7
+     git push origin v0.8.7
+     ```
+     *(The `.github/workflows/release.yml` action will automatically publish a GitHub Release with auto-generated changelog notes).*
+   - **Method B (Manual GitHub Web UI)**:
+     - Go to GitHub repo → **Releases** → **Draft a new release**.
+     - Tag: `v0.8.7`, Title: `v0.8.7`, click **[Generate release notes]** or write changelog markdown, then **Publish release**.
+5. **Deploy & Apply in Home Assistant**:
+   - Open Home Assistant → **HACS** → **Carrot HA** → Update to the new version.
    - Restart Home Assistant: **Developer Tools → YAML → Restart**.
    - If frontend cards were updated, hard-reload browser cache (`Ctrl + F5` or `Cmd + Shift + R`).
 
@@ -192,10 +206,35 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 ---
 
-## 7. Version Management Policy
+## 7. Version Management & HACS Release Policy
 
-- **Current Minor Version**: `0.8.x` (e.g., `0.8.4`).
+- **Current Minor Version**: `0.8.x` (current: `0.8.7`).
 - **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.
+
+### A. HACS Versioning & Changelog Visibility
+1. **GitHub Releases are Mandatory**:
+   - HACS inspects GitHub Releases to determine available versions. If a repository has **0 releases**, HACS automatically downgrades to *default branch tracking mode*.
+   - In branch tracking mode, Home Assistant displays **commit hashes (e.g. `7e8b91a`) instead of semantic version numbers**, and the Update dialog's changelog remains completely blank.
+2. **Synchronized Versioning**:
+   - The `"version"` field in `custom_components/carrot_ha/manifest.json` must always match the GitHub Release tag (e.g. `v0.8.7`).
+3. **Release Notes (Changelog)**:
+   - When drafting a release on GitHub (or auto-generating via `.github/workflows/release.yml`), include concise release notes.
+   - Home Assistant's Update Dialog directly renders this markdown content as the update changelog.
+
+### B. Brand Assets & Logo/Icon Requirements (`custom_components/carrot_ha/brand/`)
+Home Assistant 2024.3+ serves brand images locally through its `/api/brands/integration/carrot_ha/` proxy without requiring external PRs to `home-assistant/brands`.
+
+| Asset File | Resolution | Background | Purpose & Destination |
+| :--- | :--- | :--- | :--- |
+| **`icon.png`** | **256 × 256** | Transparent | Standard square icon used in HA Devices & Integrations list |
+| **`icon@2x.png`** | **512 × 512** | Transparent | High-DPI square icon |
+| **`logo.png`** | **512 × 256** (2:1) | Transparent | **Horizontal banner logo used by HA Update Card & dialog header** |
+| **`logo@2x.png`** | **1024 × 512** (2:1)| Transparent | High-DPI horizontal banner logo |
+
+> 🛑 **RULES FOR BRAND ASSETS:**
+> 1. **Never commit multi-megabyte raw images:** Images must be compressed (<50KB for 1x, <200KB for 2x). Oversized images (e.g. 4MB+) cause HA proxy timeouts and fallback to generic placeholder icons.
+> 2. **Always transparent background:** Images must have transparent alpha channels around borders so they cleanly blend into both dark and light dashboard themes.
+> 3. **`logo.png` is required for updates:** If only `icon.png` is present, HA update banners will fail to display the brand logo.
 
 ---
 
