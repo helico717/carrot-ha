@@ -94,8 +94,8 @@ class CarrotDashboard extends HTMLElement {
   saveCache(){
     try{
       if(!this.v||!Object.keys(this.v).length)return;
-      const cachedTrips=(this._rawTrips?.length?this._rawTrips:(this.trips||[])).slice(0,5);
-      const cachedCharges=(this.charges||[]).slice(0,10);
+      const cachedTrips=(this._rawTrips?.length?this._rawTrips:(this.trips||[])).slice(0,60);
+      const cachedCharges=(this.charges||[]).slice(0,30);
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
