@@ -2579,7 +2579,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
                 const chargeEnd = ed.ended_at || (ed.started_at && ed.duration_s ? new Date(new Date(ed.started_at).getTime() + (ed.duration_s * 1000)).toISOString() : null);
                 const timeRangeStr = chargeEnd ? `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(chargeEnd)}` : timeOnly(ed.started_at || e.observed_at);
-                const unitPrice = fast ? 320 : 280;
+                const unitPrice = ed.unit_price_krw != null
+                  ? Math.round(ed.unit_price_krw)
+                  : (ed.cost_krw != null && ed.energy_kwh > 0
+                      ? Math.round(ed.cost_krw / ed.energy_kwh)
+                      : (fast ? 320 : 280));
                 const cost = ed.cost_krw != null ? Math.round(ed.cost_krw) : Math.round((ed.energy_kwh || 0) * unitPrice);
 
                 return `
@@ -2597,10 +2601,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
                       </div>
                     </div>
                     <div class="charge-val">
-                      <strong>${n(ed.energy_kwh, 2)} <small>kWh</small></strong>
-                      <span class="charge-sub" title="${ed.merged ? (ed.merge_parts || []).map(p => `${n(p.energy_kwh, 1)} kWh`).join(' + ') : ''}">
-                        ${isEnglish ? 'Est. Cost ₩' : '충전요금(추정) '}${n(cost, 0)}${isEnglish ? '' : '원'}
-                      </span>
+                      <strong>${isEnglish ? `₩${n(cost, 0)} <small>(est.)</small>` : `${n(cost, 0)}원 <small>(추정)</small>`}</strong>
+                      <strong title="${ed.merged ? (ed.merge_parts || []).map(p => `${n(p.energy_kwh, 1)} kWh`).join(' + ') : ''}">${n(ed.energy_kwh, 2)} <small>kWh</small></strong>
+                      <span class="charge-sub">${isEnglish ? `₩${n(unitPrice, 0)}/kWh` : `${n(unitPrice, 0)}원/kWh`}</span>
                     </div>
                   </div>`;
               }).join('') : `<div class="empty">${isEnglish ? 'No charges recorded.' : '기록된 충전이 없습니다.'}</div>`}
@@ -3625,6 +3628,42 @@ export default class CarrotDebugDashboard extends HTMLElement {
         width: 12px !important;
         height: 12px !important;
         margin: auto !important;
+      }
+      .charge-val {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-end !important;
+        text-align: right !important;
+        gap: 2px !important;
+        flex-shrink: 0 !important;
+        max-width: 55% !important;
+      }
+      .charge-val strong {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        color: var(--ink) !important;
+        line-height: 1.25 !important;
+        display: flex !important;
+        align-items: baseline !important;
+        justify-content: flex-end !important;
+        gap: 3px !important;
+        white-space: nowrap !important;
+      }
+      .charge-val strong small {
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        color: var(--muted) !important;
+        margin-left: 2px !important;
+      }
+      .charge-sub {
+        display: block !important;
+        font-size: 11px !important;
+        font-weight: normal !important;
+        color: var(--muted) !important;
+        margin-top: 1px !important;
+        word-break: keep-all !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
       }
 
       @media(min-width: 901px) {
