@@ -32,6 +32,8 @@ function lazyCard(tag, filename) {
 lazyCard('carrot-dashboard-ko','./carrot-dashboard-ko.js');
 lazyCard('carrot-dashboard-en','./carrot-dashboard-en.js');
 lazyCard('carrot-dashboard-debug-card','./carrot-dashboard-debug.js');
+lazyCard('carrot-dashboard-debug','./carrot-dashboard-debug.js');
+lazyCard('carrot-debug-dashboard','./carrot-dashboard-debug.js');
 lazyCard('carrot-params-card','./carrot-params-card.js');
 class LocalizedDashboard extends HTMLElement {
   constructor(){super();}

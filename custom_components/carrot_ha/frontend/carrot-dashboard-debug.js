@@ -1,4 +1,13 @@
-import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js';
+import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
+
+if (typeof customElements !== 'undefined') {
+  if (!customElements.get('carrot-dashboard-ko-debug-embed')) {
+    customElements.define('carrot-dashboard-ko-debug-embed', class extends KoreanDashboard {});
+  }
+  if (!customElements.get('carrot-dashboard-en-debug-embed')) {
+    customElements.define('carrot-dashboard-en-debug-embed', class extends EnglishDashboard {});
+  }
+}
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
@@ -1916,7 +1925,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
     if (!slot) return;
     slot.innerHTML = '';
 
-    const tagName = this.state.lang === 'ko' ? 'carrot-dashboard-ko' : 'carrot-dashboard-en';
+    const tagName = this.state.lang === 'ko' ? 'carrot-dashboard-ko-debug-embed' : 'carrot-dashboard-en-debug-embed';
     this.dashCard = document.createElement(tagName);
     this.dashCard.setConfig({
       ...(this.config || {}),
