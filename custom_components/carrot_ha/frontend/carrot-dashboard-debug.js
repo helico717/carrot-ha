@@ -2842,7 +2842,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const renderEnergyHead = (isChargingMode, isDrivingMode, socVal, cLabel, pKw, fast, rKm, rCand) => {
         const rangeNum = typeof rKm === 'number' && Number.isFinite(rKm) ? rKm : '—';
         const powerTag = pKw != null ? `<span class="charge-power-tag ${fast ? 'fast' : 'slow'}">${n(pKw, 1)} kW</span>` : '';
-        const batteryIconSvg = `<svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>`;
+        const batteryIconSvg = `<ha-icon class="battery-head-icon" icon="mdi:${batteryIconName(socVal)}"></ha-icon>`;
         const driveModeIcon = isDrivingMode ? '🛣️' : '🔋';
 
         if (isChargingMode) {
@@ -3680,8 +3680,15 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
       /* Icons in Battery Bar */
       .battery-head-icon {
-        width: 26px;
-        height: 26px;
+        --mdc-icon-size: 26px !important;
+        --iron-icon-width: 26px !important;
+        --iron-icon-height: 26px !important;
+        width: 26px !important;
+        height: 26px !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff !important;
         fill: #ffffff !important;
         flex-shrink: 0;
         opacity: 0.95;
@@ -3689,6 +3696,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       }
 
       :host([data-theme="light"]) .battery-head-icon {
+        color: #ffffff !important;
         fill: #ffffff !important;
       }
 
@@ -4149,8 +4157,11 @@ export default class CarrotDebugDashboard extends HTMLElement {
           font-size: 18px !important;
         }
         .battery-head-icon {
-          width: 22px;
-          height: 22px;
+          --mdc-icon-size: 22px !important;
+          --iron-icon-width: 22px !important;
+          --iron-icon-height: 22px !important;
+          width: 22px !important;
+          height: 22px !important;
         }
         .charge-head-bolt {
           width: 22px;

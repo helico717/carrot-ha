@@ -338,11 +338,11 @@ class CarrotDashboard extends HTMLElement {
       .energy,:host([data-theme="light"]) .energy{background:linear-gradient(90deg,#1260e8 0 var(--soc),#0c43ad var(--soc) 100%);color:#fff;border:0;min-height:115px}
       .energy-head .soc-value{display:flex;align-items:baseline;gap:8px;white-space:nowrap;flex-wrap:nowrap;font-size:48px;color:#fff}
       .energy-head .soc-value small,:host([data-theme="light"]) .energy-head .soc-value small{display:inline;font-size:24px;color:#fff}
-      .battery-label{display:flex;align-items:center;gap:10px;min-width:0}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:24px;font-weight:650;color:#fff;word-break:keep-all}.battery-label ha-icon{width:48px;height:48px;color:#fff;flex-shrink:0}
+      .battery-label{display:flex;align-items:center;gap:10px;min-width:0}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:24px;font-weight:650;color:#fff;word-break:keep-all}.battery-label ha-icon{--mdc-icon-size:26px;--iron-icon-width:26px;--iron-icon-height:26px;width:26px;height:26px;color:#fff;fill:#fff;flex-shrink:0}
       .quick-metrics .metric.charge-eta strong{font-size:20px;line-height:1.4}
       :host([data-theme="light"]) ha-card{background:#fff}
       :host([data-theme="light"]) .nav button.active{color:#1260e8}
-      @container(max-width:700px){.energy{min-height:100px}.energy-head .soc-value{font-size:44px}.battery-label ha-icon{width:32px;height:32px}.battery-label{gap:6px}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:20px}.energy-head .soc-value{font-size:36px;gap:4px}.energy-head .soc-value small{font-size:20px}.quick-metrics .metric.charge-eta strong{font-size:17px}}
+      @container(max-width:700px){.energy{min-height:100px}.energy-head .soc-value{font-size:44px}.battery-label ha-icon{--mdc-icon-size:22px;--iron-icon-width:22px;--iron-icon-height:22px;width:22px;height:22px}.battery-label{gap:6px}.energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-size:20px}.energy-head .soc-value{font-size:36px;gap:4px}.energy-head .soc-value small{font-size:20px}.quick-metrics .metric.charge-eta strong{font-size:17px}}
     `;
     themeStyle.textContent+=`
       .shortcut{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:1fr auto;padding:10px 10px 10px 14px;gap:12px;overflow:hidden;min-height:124px;align-items:stretch}
@@ -465,15 +465,15 @@ class CarrotDashboard extends HTMLElement {
       .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif !important;font-size:24px;font-weight:700;color:#fff;letter-spacing:normal}
       .energy-head .battery-label{display:flex;align-items:center;gap:10px}
       .energy-head .battery-label span,:host([data-theme="light"]) .energy-head .battery-label span{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:22px;font-weight:700;color:#fff;letter-spacing:-0.3px}
-      .battery-head-icon{width:26px;height:26px;fill:#ffffff !important;flex-shrink:0;opacity:0.95;filter:drop-shadow(0 0 4px rgba(255,255,255,0.4))}
-      :host([data-theme="light"]) .battery-head-icon{fill:#ffffff !important}
+      .battery-head-icon{--mdc-icon-size:26px !important;--iron-icon-width:26px !important;--iron-icon-height:26px !important;width:26px !important;height:26px !important;color:#ffffff !important;fill:#ffffff !important;flex-shrink:0;opacity:0.95;filter:drop-shadow(0 0 4px rgba(255,255,255,0.4));display:inline-flex;align-items:center;justify-content:center}
+      :host([data-theme="light"]) .battery-head-icon{color:#ffffff !important;fill:#ffffff !important}
       .charge-head-bolt{width:26px;height:34px;fill:#4ade80 !important;flex-shrink:0;margin-right:8px;filter:drop-shadow(0 0 6px rgba(74,222,128,0.6))}
       :host([data-theme="light"]) .charge-head-bolt{fill:#4ade80 !important}
       @container(max-width:700px){
         .energy-head .soc-value,.energy-head.charging-left .soc-value{font-size:38px !important}
         .energy-head .soc-value small,.energy-head.charging-left .soc-value small{font-size:20px !important}
         .energy-head .battery-label span{font-size:18px !important}
-        .battery-head-icon{width:22px;height:22px}
+        .battery-head-icon{--mdc-icon-size:22px !important;--iron-icon-width:22px !important;--iron-icon-height:22px !important;width:22px !important;height:22px !important}
         .charge-head-bolt{width:22px;height:30px;margin-right:6px}
         .quick-metrics .metric:nth-child(n+3){display:block !important}
       }
@@ -723,7 +723,7 @@ class CarrotDashboard extends HTMLElement {
         else if(v.aux_voltage<12.4)auxStatus='Normal · Stable voltage';
       }
       const tiles=`
-        ${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh,1)} kWh stored`)}
+        ${metric('Battery level',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh,1)} kWh stored`)}
         ${metric('Odometer',n(v.odometer_km,0),'km','counter','Odometer reading')}
         ${isDriving?metric('Current speed',n(v.speed_kph,0),'km/h','speedometer','Live cluster speed'):metric('12V battery',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
         ${metric('Outside temp',n(v.outside_temp_c,1),'°C','thermometer','Ambient temp')}
@@ -843,7 +843,7 @@ class CarrotDashboard extends HTMLElement {
               `${metric('Avg speed',spdVal,'km/h','speedometer-medium')}`;
       }
     }else{
-      tiles=`${metric('Battery level',n(v.soc_percent,0),'%','battery',`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
+      tiles=`${metric('Battery level',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000)),'kW','ev-station',v.charging?'Charging increase detected':'Based on observations')}`;
     }
 
     const panelTitle=isTrip
@@ -876,7 +876,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     const batteryItems=[
-      row('battery','Battery level',n(v.soc_percent),'%'),
+      row(batteryIconName(v.soc_percent),'Battery level',n(v.soc_percent),'%'),
       row('car-electric','Range (estimated)',n(v.range_km),'km'),
       row('flash','Battery energy',n(v.battery_kwh),'kWh'),
       row('ev-station','Estimated charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),1),'kW'),
@@ -1262,7 +1262,7 @@ class CarrotDashboard extends HTMLElement {
          </div>`
       : `<div class="energy-head range-c3">
            <div class="battery-label">
-             <svg viewBox="0 0 24 24" class="battery-head-icon"><path d="M16.67 4C17.4 4 18 4.6 18 5.33v15.34A1.33 1.33 0 0 1 16.67 22H7.33A1.33 1.33 0 0 1 6 20.67V5.33C6 4.6 6.6 4 7.33 4H9V2h6v2h1.67M16 6H8v14h8V6z"/></svg>
+             <ha-icon class="battery-head-icon" icon="mdi:${batteryIconName(soc)}"></ha-icon>
              <span>Battery level</span>
            </div>
            <div class="soc-stack-c3">
