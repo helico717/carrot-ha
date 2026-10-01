@@ -232,10 +232,15 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
    - HACS inspects GitHub Releases to determine available versions. If a repository has **0 releases**, HACS automatically downgrades to *default branch tracking mode*.
    - In branch tracking mode, Home Assistant displays **commit hashes (e.g. `7e8b91a`) instead of semantic version numbers**, and the Update dialog's changelog remains completely blank.
 2. **Synchronized Versioning**:
-   - The `"version"` field in `custom_components/carrot_ha/manifest.json` must always match the GitHub Release tag (e.g. `v0.8.7`).
+   - The `"version"` field in `custom_components/carrot_ha/manifest.json` must always match the GitHub Release tag (e.g. `v0.8.8-beta.1` or `v0.8.8`).
 3. **Release Notes (Changelog)**:
    - When drafting a release on GitHub (or auto-generating via `.github/workflows/release.yml`), include concise release notes.
    - Home Assistant's Update Dialog directly renders this markdown content as the update changelog.
+4. **HACS 2.0 Release-Only Policy (Why raw commits cannot be downloaded via HACS)**:
+   - 저장소에 GitHub Release가 1개라도 존재하는 순간, HACS는 오직 GitHub Releases만 패키지로 인식합니다.
+   - HACS의 `[다시 다운로드 (Redownload)]` 기능은 `main` 브랜치의 최신 커밋을 긁어오는 것이 아니라, 선택된 GitHub Release의 zip 파일만 내려받습니다.
+   - 따라서 개발 중인 최신 커밋을 HACS를 통해 HA에 테스트 반영하려면 반드시 **HACS 베타 Pre-release 워크플로우(`v0.8.x-beta.N`)**를 사용해야 합니다.
+   - `.github/workflows/release.yml`은 태그에 `beta`, `rc`, `dev`, `-` 등이 포함되어 있으면 자동으로 `prerelease: true` 플래그를 설정하므로 일반 사용자에게는 업데이트 알림이 노출되지 않습니다.
 
 ### B. Brand Assets & Logo/Icon Requirements (`custom_components/carrot_ha/brand/`)
 Home Assistant 2024.3+ serves brand images locally through its `/api/brands/integration/carrot_ha/` proxy without requiring external PRs to `home-assistant/brands`.
