@@ -262,7 +262,7 @@ class TestTripEnergy(unittest.TestCase):
         data = result[0]['data']
         self.assertEqual(data['start_soc_percent'], 76.2)
         self.assertEqual(data['end_soc_percent'], 73.5)
-        self.assertIn('efficiency_km_kwh', data)
+        self.assertNotIn('efficiency_km_kwh', data)  # SOC-only is not measured energy.
 
     def test_recalibration_with_capacity_when_wh_present(self):
         """When battery_wh is present alongside soc_percent, capacity_kwh takes precedence."""

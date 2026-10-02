@@ -1,4 +1,4 @@
-import {DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
+import {tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('carrot-dashboard-ko-debug-embed')) {
@@ -1196,7 +1196,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
         :host([data-theme="light"]) .sub-note {
           color: #64748b !important;
         }
-      </style>
+
+.trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
+</style>
 
       <div class="debug-container">
         <!-- Top: Live Cloned Carrot Dashboard -->
@@ -1216,7 +1218,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
           </div>
 
           <div class="controls-grid">
-            
+
             <!-- Group 1: 차량 운행/충전 모드 -->
             <div class="control-group">
               <div class="group-label">
@@ -1332,7 +1334,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                 <span>충전기 사양 (EVSE Spec)</span>
                 <span id="powerVal" class="value">${this.state.powerKw.toFixed(1)} kW</span>
               </div>
-              
+
               <!-- 완속 (AC) / 비상 충전 버튼군: 1, 3, 7, 11 kW -->
               <div class="charger-section-title">🔌 완속 충전기 (AC) & 비상 충전</div>
               <div class="btn-group">
@@ -2324,9 +2326,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const labels = d => d.date.getUTCDate() + (isEnglish ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.date.getUTCDay()]})` : `일(${['일','월','화','수','목','금','토'][d.date.getUTCDay()]})`);
 
       const daysHtml = days.map(d => `
-        <button type="button" class="trip-day ${d.key === this.tripDay ? 'active' : ''}" 
-                data-trip-day="${d.key}" 
-                aria-pressed="${d.key === this.tripDay}" 
+        <button type="button" class="trip-day ${d.key === this.tripDay ? 'active' : ''}"
+                data-trip-day="${d.key}"
+                aria-pressed="${d.key === this.tripDay}"
                 aria-label="${d.key}, ${d.indices.length} ${isEnglish ? 'trips' : '회 주행'}">
           <span class="trip-today">${d.today ? (isEnglish ? 'Today' : '오늘') : '&nbsp;'}</span>
           <b>${labels(d)}</b>
@@ -2350,9 +2352,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
         const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
         const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}${isEnglish ? ' merged' : '건 병합'})` : ''}`;
 
-        return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}" 
-                     style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;" 
-                     data-trip="${i}" 
+        return `<div class="timeline-trip-segment ${isSel ? 'selected' : ''}"
+                     style="left:${leftPct.toFixed(2)}%; width:${widthPct.toFixed(2)}%;"
+                     data-trip="${i}"
                      title="${esc(segTitle)}"></div>`;
       }).join('');
 
@@ -2384,48 +2386,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
           const e = this.trips[i];
           const ed = e?.data || {};
           const durText = tripDurationKo(ed.duration_s, isEnglish);
-          let startSoc = ed.start_soc_percent != null
-            ? Math.round(ed.start_soc_percent)
-            : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
-          let endSoc = ed.end_soc_percent != null
-            ? Math.round(ed.end_soc_percent)
-            : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
-
-          const currentSoc = v?.soc_percent != null ? Math.round(v.soc_percent) : 70;
-          if (startSoc == null && endSoc == null) {
-            startSoc = currentSoc;
-            endSoc = currentSoc;
-          } else if (startSoc == null) {
-            startSoc = endSoc;
-          } else if (endSoc == null) {
-            endSoc = startSoc;
-          }
-
-          const drain = startSoc - endSoc;
+          const startValue = tripSoc(ed, 'start', capacity), endValue = tripSoc(ed, 'end', capacity);
+          const startSoc = startValue == null ? null : Math.round(startValue);
+          const endSoc = endValue == null ? null : Math.round(endValue);
+          const drain = startSoc == null || endSoc == null ? null : startSoc - endSoc;
           const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
           const isSel = isTrip && i === this.selected;
 
-          let eff = ed.efficiency_km_kwh;
-          if (eff == null || !Number.isFinite(eff) || eff <= 0) {
-            const distKm = (ed.distance_m || 0) / 1000;
-            if (ed.energy_kwh && ed.energy_kwh > 0) {
-              eff = distKm / ed.energy_kwh;
-            } else if (ed.energy_wh && ed.energy_wh > 0) {
-              eff = distKm / (ed.energy_wh / 1000);
-            } else if (drain > 0 && capacity > 0) {
-              eff = distKm / (drain / 100 * capacity);
-            } else if (v?.recent_efficiency_kpl && v.recent_efficiency_kpl > 0) {
-              eff = v.recent_efficiency_kpl;
-            } else if (v?.month_efficiency_kpl && v.month_efficiency_kpl > 0) {
-              eff = v.month_efficiency_kpl;
-            } else {
-              eff = 6.0;
-            }
-          }
+          const eff = tripEfficiency(ed);
 
-          // Authentic Carrot HA Badges
-          const socHtml = `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`;
-          const effHtml = `<span class="trip-eff">${n(eff, 1)} km/kWh</span>`;
+          const socHtml = `<span class="trip-soc${drain == null ? ' trip-missing' : ''}"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc == null ? '—' : startSoc}% → ${endSoc == null ? '—' : endSoc}%</span><small class="soc-used-tag">(${drain == null ? (isEnglish ? 'Missing record' : '기록 누락') : usedStr})</small></span>`;
+          const effHtml = `<span class="trip-eff${eff == null && (tripEnergyWh(ed) == null || tripEnergyWh(ed) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, isEnglish) : n(eff, 1) + ' km/kWh'}</span>`;
           const mergeHtml = (ed.merged && ed.merge_count > 1)
             ? `<span class="trip-merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '건 병합'}</span>`
             : '';
@@ -2541,9 +2512,9 @@ export default class CarrotDebugDashboard extends HTMLElement {
       const labels = d => d.date.getUTCDate() + (isEnglish ? ` (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.date.getUTCDay()]})` : `일(${['일','월','화','수','목','금','토'][d.date.getUTCDay()]})`);
 
       const daysHtml = days.map(d => `
-        <button class="trip-day charge-day" 
-                data-charge-day="${d.key}" 
-                aria-pressed="${d.key === this.chargeDay}" 
+        <button class="trip-day charge-day"
+                data-charge-day="${d.key}"
+                aria-pressed="${d.key === this.chargeDay}"
                 aria-label="${d.key}, ${d.indices.length} ${isEnglish ? 'charges' : '회 충전'}">
           <span class="trip-today charge-today">${d.today ? (isEnglish ? 'Today' : '오늘') : '&nbsp;'}</span>
           <b>${labels(d)}</b>
@@ -3508,6 +3479,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         color: #166534 !important;
       }
 
+.trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
       .trip-eff {
         display: inline-flex !important;
         align-items: center !important;

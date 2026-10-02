@@ -102,7 +102,7 @@ for (const [name, DashClass, durExpected] of [
   }];
   instNoSoc.tripDay = testDay;
   const htmlNoSoc = instNoSoc.tripHistory(true);
-  assert(!htmlNoSoc.includes('class="trip-soc"'), `${name} NoSoc: Should not show trip-soc`);
+  assert(htmlNoSoc.includes('class="trip-soc trip-missing"'), `${name} NoSoc: Missing SOC stays visible as a red pill`);
   assert(htmlNoSoc.includes('class="trip-eff"'), `${name} NoSoc: Should show trip-eff`);
   assert(!htmlNoSoc.includes('00:24:54'), `${name} NoSoc: Should NOT duplicate 00:24:54 when duration text is already shown in header`);
 
@@ -151,7 +151,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('51'), 'Korean Summary: Expected average speed 51 km/h');
     assert(summaryHtml.includes(`${testDay} 주행 요약`), 'Korean Summary: Expected trip summary title');
     assert(summaryHtml.includes('총 2회 주행'), 'Korean Summary: Expected 총 2회 주행 subtitle');
-    assert(summaryHtml.includes('이날 출발(하늘색) / 이날 도착(파랑)'), 'Korean Summary: Expected 이날 출발/이날 도착 legend');
+    assert(summaryHtml.includes('legend-dot start') && summaryHtml.includes('legend-dot end'), 'Korean Summary: Expected start/arrival markers');
   } else {
     assert(summaryHtml.includes('>Distance</span>'), 'English Summary: Missing Distance metric');
     assert(summaryHtml.includes('25.6'), 'English Summary: Expected total distance 25.6 km');
@@ -162,7 +162,7 @@ for (const [name, DashClass, durExpected] of [
     assert(summaryHtml.includes('51'), 'English Summary: Expected average speed 51 km/h');
     assert(summaryHtml.includes(`${testDay} trip summary`), 'English Summary: Expected trip summary title');
     assert(summaryHtml.includes('2 trips total'), 'English Summary: Expected 2 trips total subtitle');
-    assert(summaryHtml.includes('Day start (sky blue) / Day arrival (blue)'), 'English Summary: Expected Day start/Day arrival legend');
+    assert(summaryHtml.includes('legend-dot start') && summaryHtml.includes('legend-dot end'), 'English Summary: Expected start/arrival markers');
   }
 
   // (B) Specific Trip Mode (selected === 0)

@@ -1,5 +1,5 @@
 import {preserveView,updateView} from './carrot-view-state.js';
-import {DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import {tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 import { CarrotCamera360Modal } from './carrot-camera-360.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -292,6 +292,8 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
+
+.trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
 </style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.live_status||v.cloud_status||(this.busy?'Checking connection…':'Checking connection'))}<br>Last check ${time(v.live_checked_at||v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}${this.isFromCache?' (updating…)':''}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`);
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
@@ -785,24 +787,7 @@ class CarrotDashboard extends HTMLElement {
       if(isSpecificTrip){
         const distVal=curTrip.distance_m!=null?(curTrip.distance_estimated?'≈ ':'')+n(curTrip.distance_m/1000,2):'—';
         const durVal=curTrip.duration_s!=null?duration(curTrip.duration_s):'—';
-        let eff = curTrip.efficiency_km_kwh;
-        if ((eff == null || !Number.isFinite(eff) || eff <= 0) && curTrip.distance_m > 0) {
-          const distKm = curTrip.distance_m / 1000;
-          if (curTrip.energy_kwh && curTrip.energy_kwh > 0) {
-            eff = distKm / curTrip.energy_kwh;
-          } else if (curTrip.energy_wh && curTrip.energy_wh > 0) {
-            eff = distKm / (curTrip.energy_wh / 1000);
-          } else if (curTrip.start_soc_percent != null && curTrip.end_soc_percent != null && curTrip.start_soc_percent > curTrip.end_soc_percent) {
-            const drainSoc = curTrip.start_soc_percent - curTrip.end_soc_percent;
-            eff = distKm / (drainSoc / 100 * capacity);
-          } else if (v.recent_efficiency_kpl && v.recent_efficiency_kpl > 0) {
-            eff = v.recent_efficiency_kpl;
-          } else if (v.month_efficiency_kpl && v.month_efficiency_kpl > 0) {
-            eff = v.month_efficiency_kpl;
-          } else {
-            eff = 6.0;
-          }
-        }
+        const eff = tripEfficiency(curTrip);
         const effVal=eff!=null&&Number.isFinite(eff)?n(eff,1):'—';
         const spdVal=curTrip.route?.length?n(this.maxSpeed(curTrip.route),0):'—';
         tiles=`${metric('Distance',distVal,'km','map-marker-distance')}`+
@@ -814,8 +799,8 @@ class CarrotDashboard extends HTMLElement {
         const totalDurS=dayTrips.reduce((acc,t)=>acc+(t.duration_s||0),0);
         let distWithEnergyM=0,energyWhSum=0;
         for(const t of dayTrips){
-          if(!t.energy_rejected&&Number.isFinite(t.energy_wh)&&t.distance_m>0){
-            energyWhSum+=t.energy_wh;
+          if(tripEnergyWh(t) != null&&t.distance_m>0){
+            energyWhSum+=tripEnergyWh(t);
             distWithEnergyM+=t.distance_m;
           }
         }
@@ -825,23 +810,11 @@ class CarrotDashboard extends HTMLElement {
         const distVal=dayTrips.length?(dayTrips.some(t=>t.distance_estimated)?'≈ ':'')+n(totalDistM/1000,2):'—';
         const durVal=dayTrips.length?duration(totalDurS):'—';
         let effVal=dayAvgEff!=null?n(dayAvgEff,1):'—';
-        if (effVal === '—' && totalDistM > 0) {
-          const validEffs = dayTrips.map(t => t.efficiency_km_kwh).filter(e => e != null && Number.isFinite(e) && e > 0);
-          if (validEffs.length > 0) {
-            effVal = n(validEffs.reduce((a, b) => a + b, 0) / validEffs.length, 1);
-          } else if (v.recent_efficiency_kpl && v.recent_efficiency_kpl > 0) {
-            effVal = n(v.recent_efficiency_kpl, 1);
-          } else if (v.month_efficiency_kpl && v.month_efficiency_kpl > 0) {
-            effVal = n(v.month_efficiency_kpl, 1);
-          } else {
-            effVal = '6.0';
-          }
-        }
         const spdVal=dayAvgSpeed!=null?n(dayAvgSpeed,0):'—';
 
         tiles=`${metric('Distance',distVal,'km','map-marker-distance')}`+
               `${metric('Duration',durVal,'','timer-outline')}`+
-              `${metric('Avg efficiency',effVal,'km/kWh','leaf')}`+
+              `${metric('Avg efficiency',effVal,'km/kWh','leaf',distWithEnergyM < totalDistM ? 'Measured trips only' : '')}`+
               `${metric('Avg speed',spdVal,'km/h','speedometer-medium')}`;
       }
     }else{
@@ -1015,47 +988,17 @@ class CarrotDashboard extends HTMLElement {
         const e = this.trips[i];
         const ed = e?.data || {};
         const durText = tripDurationEn(ed.duration_s);
-        let startSoc = ed.start_soc_percent != null
-          ? Math.round(ed.start_soc_percent)
-          : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
-        let endSoc = ed.end_soc_percent != null
-          ? Math.round(ed.end_soc_percent)
-          : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
-
-        const currentSoc = v?.soc_percent != null ? Math.round(v.soc_percent) : 70;
-        if (startSoc == null && endSoc == null) {
-          startSoc = currentSoc;
-          endSoc = currentSoc;
-        } else if (startSoc == null) {
-          startSoc = endSoc;
-        } else if (endSoc == null) {
-          endSoc = startSoc;
-        }
-
-        const drain = startSoc - endSoc;
+        const startValue = tripSoc(ed, 'start', capacity), endValue = tripSoc(ed, 'end', capacity);
+          const startSoc = startValue == null ? null : Math.round(startValue);
+          const endSoc = endValue == null ? null : Math.round(endValue);
+          const drain = startSoc == null || endSoc == null ? null : startSoc - endSoc;
         const usedStr = drain > 0 ? `${drain}% used` : (drain < 0 ? `+${Math.abs(drain)}% regen` : '0% used');
         const isSel = isTrip && i === this.selected;
 
-        let eff = ed.efficiency_km_kwh;
-        if (eff == null || !Number.isFinite(eff) || eff <= 0) {
-          const distKm = (ed.distance_m || 0) / 1000;
-          if (ed.energy_kwh && ed.energy_kwh > 0) {
-            eff = distKm / ed.energy_kwh;
-          } else if (ed.energy_wh && ed.energy_wh > 0) {
-            eff = distKm / (ed.energy_wh / 1000);
-          } else if (drain > 0 && capacity > 0) {
-            eff = distKm / (drain / 100 * capacity);
-          } else if (v?.recent_efficiency_kpl && v.recent_efficiency_kpl > 0) {
-            eff = v.recent_efficiency_kpl;
-          } else if (v?.month_efficiency_kpl && v.month_efficiency_kpl > 0) {
-            eff = v.month_efficiency_kpl;
-          } else {
-            eff = 6.0;
-          }
-        }
+        const eff = tripEfficiency(ed);
 
-        const socHtml = `<span class="trip-soc"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc}% → ${endSoc}%</span><small class="soc-used-tag">(${usedStr})</small></span>`;
-        const effHtml = `<span class="trip-eff">${n(eff, 1)} km/kWh</span>`;
+        const socHtml = `<span class="trip-soc${drain == null ? ' trip-missing' : ''}"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc == null ? '—' : startSoc}% → ${endSoc == null ? '—' : endSoc}%</span><small class="soc-used-tag">(${drain == null ? 'Missing record' : usedStr})</small></span>`;
+        const effHtml = `<span class="trip-eff${eff == null && (tripEnergyWh(ed) == null || tripEnergyWh(ed) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, true) : n(eff, 1) + ' km/kWh'}</span>`;
         const mergeHtml = (ed.merged && ed.merge_count > 1)
           ? `<span class="trip-merge-badge">${ed.merge_count} merged</span>`
           : '';
@@ -1221,6 +1164,7 @@ class CarrotDashboard extends HTMLElement {
       : Math.round(sessionKwh * sessionUnitPrice);
     const sessionCostSub = `+${n(sessionKwh, 1)} kWh (est.)`;
 
+    if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · Last estimate held (${v.charging_eta_hold_age_s ?? 0}s)`;
     const quickMetrics = charging
       ? `${renderLockMetric(isLocked, true, openDoors)}` +
         `${metric(etaCardTitle, etaCardMainVal, '', 'clock-end', etaCardSubText, 'charge-eta')}` +
@@ -1391,17 +1335,21 @@ class CarrotDashboard extends HTMLElement {
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}
   async drawMap(route,v,dayTrips=[]){
     const node=this.shadowRoot.querySelector('.map');
-    const signature=JSON.stringify([this._mapContext,route,dayTrips,v.latitude,v.longitude,v.parking_latitude,v.parking_longitude,this.vehicleStatus(v).key]);
+    const mapVehicle=this.tab==='trips'?{}:v;
+    const signature=JSON.stringify([this._mapContext,route,dayTrips,mapVehicle.latitude,mapVehicle.longitude,mapVehicle.parking_latitude,mapVehicle.parking_longitude,this.tab==='trips'?null:this.vehicleStatus(v).key]);
     if(this.map&&this._mapSignature===signature){node.replaceWith(this.map.getContainer());return;}
     if(this.map){try{this.map.remove();}catch{}this.map=null;}
     this._mapSignature=signature;
+    if(this.tab==='trips' && ![route,...dayTrips.map(t=>t.route||[])].some(points=>points.some(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180))){
+      node.innerHTML='<div class="empty">'+(dayTrips.length||this.selected!==null?'No location recorded for this trip.':'No trips recorded for this date.')+'</div>';return;
+    }
     try{
-      const L=await leaflet();if(!node.isConnected)return;
+      const L=await leaflet();if(!node.isConnected||this._mapSignature!==signature)return;
       const points=route.filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude)&&Math.abs(p.latitude)<=90&&Math.abs(p.longitude)<=180);
       const isDriving=this.vehicleStatus(v).key==='driving';
       const liveCoord=(isDriving&&Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)&&Math.abs(v.latitude)<=90&&Math.abs(v.longitude)<=180)?[v.latitude,v.longitude]:null;
       const parkingCoord=(Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)&&Math.abs(v.parking_latitude)<=90&&Math.abs(v.parking_longitude)<=180)?[v.parking_latitude,v.parking_longitude]:null;
-      const targetPos=liveCoord||parkingCoord;
+      const targetPos=this.tab!=='trips' ? liveCoord||parkingCoord : null;
       const hasDayRoutes=!points.length&&dayTrips.length>0&&dayTrips.some(t=>(t.route||[]).some(p=>Number.isFinite(p.latitude)));
       if(!points.length&&!hasDayRoutes&&!targetPos){node.innerHTML='<div class="empty">Waiting for valid coordinates.</div>';return;}
       this.map=L.map(node,{scrollWheelZoom:false,zoomControl:true});

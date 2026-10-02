@@ -74,3 +74,30 @@ assert.equal((await call(`/api/params/status?device_id=car&ids=${failedId}`)).bo
 assert.equal((await call('/api/params/ack',{device_id:'car',applied_ids:['bad']})).status,400);
 assert.equal((await call('/api/params/pending?device_id=car',null,'upload')).body.pending.length,0);
 console.log('PASS rejection ACK drains queue and terminal statuses cannot be overwritten');
+// Boundary corrections must be durable and visible on the existing one-query feed.
+const mtrip={...trip('measured','car'),tripMeasurements:{start:{at:'2026-09-30T00:00:00Z',battery_wh:50000},end:{at:'2026-09-30T00:10:00Z',battery_wh:48500},complete:true}};
+await call('/api/trips',mtrip);
+let mp=(await call('/api/trip-changes?device_id=car&after=0&limit=50')).body;
+assert.equal(mp.trips.find(t=>t.id==='measured').trip_measurements.end.battery_wh,48500);
+const previous=mp.next_cursor;
+mtrip.tripMeasurements.end.battery_wh=48000;
+await call('/api/trips',mtrip);
+queries=[];
+mp=(await call(`/api/trip-changes?device_id=car&after=${previous}&limit=50`)).body;
+assert.equal(queries.length,1);assert.equal(mp.trips.length,1);
+assert.equal(mp.trips[0].trip_measurements.end.battery_wh,48000);
+const measurementCursor=mp.next_cursor;
+await call('/api/trips',mtrip);
+assert.equal((await call(`/api/trip-changes?device_id=car&after=${measurementCursor}`)).body.trips.length,0);
+console.log('PASS persisted trip boundaries, metadata-only revision, replay idempotency and one indexed read');
+const legacyDb=new DatabaseSync(':memory:');
+const legacySchema=readFileSync(new URL('./schema.sql',import.meta.url),'utf8')
+  .replace('created_at TEXT NOT NULL,\n  measurements_json TEXT','created_at TEXT NOT NULL')
+  .replace(' OR OLD.measurements_json IS NOT NEW.measurements_json','');
+legacyDb.exec(legacySchema);
+legacyDb.exec(readFileSync(new URL('./migration_trip_measurements.sql',import.meta.url),'utf8'));
+legacyDb.exec("INSERT INTO trips(id,device_id,started_at,ended_at,created_at,route_json) VALUES('m','car','2026-10-01','2026-10-01','2026-10-01','[]')");
+const migratedSequence=legacyDb.prepare("SELECT sequence FROM trip_sync_revision WHERE trip_id='m'").get().sequence;
+legacyDb.exec("UPDATE trips SET measurements_json='{}' WHERE id='m'");
+assert.ok(legacyDb.prepare("SELECT sequence FROM trip_sync_revision WHERE trip_id='m'").get().sequence>migratedSequence);
+console.log('PASS deployed legacy schema migration advances metadata-only corrections');

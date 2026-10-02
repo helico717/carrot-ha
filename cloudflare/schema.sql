@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS trips (
   end_lon REAL,
   route_point_count INTEGER NOT NULL DEFAULT 0,
   route_json TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  measurements_json TEXT
 );
 
 CREATE INDEX IF NOT EXISTS trips_device_ended_idx
@@ -187,7 +188,7 @@ BEGIN
   DELETE FROM trip_sync_revision WHERE trip_id=NEW.id;
   INSERT INTO trip_sync_revision(trip_id,device_id) VALUES(NEW.id,NEW.device_id);
 END;
-CREATE TRIGGER IF NOT EXISTS trip_revision_update AFTER UPDATE ON trips WHEN OLD.device_id IS NOT NEW.device_id OR OLD.started_at IS NOT NEW.started_at OR OLD.ended_at IS NOT NEW.ended_at OR OLD.duration_s IS NOT NEW.duration_s OR OLD.distance_m IS NOT NEW.distance_m OR OLD.start_lat IS NOT NEW.start_lat OR OLD.start_lon IS NOT NEW.start_lon OR OLD.end_lat IS NOT NEW.end_lat OR OLD.end_lon IS NOT NEW.end_lon OR OLD.route_point_count IS NOT NEW.route_point_count OR OLD.route_json IS NOT NEW.route_json
+CREATE TRIGGER IF NOT EXISTS trip_revision_update AFTER UPDATE ON trips WHEN OLD.device_id IS NOT NEW.device_id OR OLD.started_at IS NOT NEW.started_at OR OLD.ended_at IS NOT NEW.ended_at OR OLD.duration_s IS NOT NEW.duration_s OR OLD.distance_m IS NOT NEW.distance_m OR OLD.start_lat IS NOT NEW.start_lat OR OLD.start_lon IS NOT NEW.start_lon OR OLD.end_lat IS NOT NEW.end_lat OR OLD.end_lon IS NOT NEW.end_lon OR OLD.route_point_count IS NOT NEW.route_point_count OR OLD.route_json IS NOT NEW.route_json OR OLD.measurements_json IS NOT NEW.measurements_json
 BEGIN
   DELETE FROM trip_sync_revision WHERE trip_id=NEW.id;
   INSERT INTO trip_sync_revision(trip_id,device_id) VALUES(NEW.id,NEW.device_id);

@@ -102,11 +102,12 @@ class TestChargeSocEnrichment(unittest.TestCase):
         data = self.archive.enrich_charges_soc(self.device, [charge])[0]['data']
         self.assertEqual(data['start_soc_percent'], 52.2)
         self.assertEqual(data['end_soc_percent'], 100.0)
-        trip = {'data': {'started_at': charge['data']['started_at'],
-                         'ended_at': charge['data']['ended_at'], 'distance_m': 1000}}
+        trip = dict(charge, kind='trip', event_id='trip-capacity', data={'started_at': charge['data']['started_at'],
+                         'ended_at': charge['data']['ended_at'], 'distance_m': 1000})
+        self.archive.put(trip)
         td = self.archive.enrich_trips_energy(self.device, [trip])[0]['data']
         self.assertEqual(td['start_soc_percent'], data['start_soc_percent'])
-        self.assertEqual(td['end_soc_percent'], data['end_soc_percent'])
+        self.assertIsNone(td['end_soc_percent'])  # Historical SOC must not clamp invalid capacity to 100%.
 
     def test_empty_and_graceful(self):
         self.assertEqual(self.archive.enrich_charges_soc(self.device, []), [])

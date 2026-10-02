@@ -112,7 +112,7 @@ test('daily summary uses repaired source trips regardless of display merging', (
   }
 });
 
-test('merged trips retain previous end_soc_percent when second trip has null end_soc_percent', () => {
+test('merged trips never substitute an intermediate SOC for the missing final boundary', () => {
   const t1 = trip('07:47', '09:11', {
     duration_s: 5040, distance_m: 75000, start_soc_percent: 46.0, end_soc_percent: 29.0,
     start_battery_wh: 35880, end_battery_wh: 22620, energy_wh: 10870, efficiency_km_kwh: 6.9, soc_used_percent: 17.0
@@ -124,8 +124,8 @@ test('merged trips retain previous end_soc_percent when second trip has null end
   const merged = mergeConsecutiveTrips([t1, t2], 'Asia/Seoul')[0].data;
   assert.equal(merged.distance_m, 76060);
   assert.equal(merged.start_soc_percent, 46.0);
-  assert.equal(merged.end_soc_percent, 29.0);
-  assert.equal(merged.soc_used_percent, 17.0);
+  assert.equal(merged.end_soc_percent, null);
+  assert.equal(merged.soc_used_percent, null);
   assert.equal(merged.merged, true);
   assert.equal(merged.merge_count, 2);
 });
@@ -148,7 +148,7 @@ test('merged trips combine battery usage and energy when second trip has valid e
   assert.equal(merged.efficiency_km_kwh, 6.9);
 });
 
-test('merged trips derive energy from boundary battery Wh when sub-trip energy_wh is missing', () => {
+test('merged trips do not include parked energy or substitute missing sub-trip energy', () => {
   const t1 = trip('07:47', '09:11', {
     duration_s: 5040, distance_m: 75000, start_soc_percent: 46.0, end_soc_percent: 29.0,
     start_battery_wh: 35880, end_battery_wh: 22620, energy_wh: 10870, efficiency_km_kwh: 6.9, soc_used_percent: 17.0
@@ -159,8 +159,8 @@ test('merged trips derive energy from boundary battery Wh when sub-trip energy_w
   });
   const merged = mergeConsecutiveTrips([t1, t2], 'Asia/Seoul')[0].data;
   assert.equal(merged.distance_m, 76060);
-  assert.equal(merged.energy_wh, 13420);
-  assert.equal(merged.efficiency_km_kwh, 5.7);
+  assert.equal(merged.energy_wh, null);
+  assert.equal(merged.efficiency_km_kwh, null);
   assert.equal(merged.start_soc_percent, 46.0);
   assert.equal(merged.end_soc_percent, 28.8);
 });
@@ -181,8 +181,9 @@ test('merged trips with 3 trips preserve end SoC across intermediate and final s
   const merged = mergeConsecutiveTrips([t1, t2, t3], 'Asia/Seoul')[0].data;
   assert.equal(merged.distance_m, 76560);
   assert.equal(merged.start_soc_percent, 46.0);
-  assert.equal(merged.end_soc_percent, 28.8);
-  assert.equal(merged.soc_used_percent, 17.2);
+  assert.equal(merged.end_soc_percent, null);
+  assert.equal(merged.soc_used_percent, null);
+  assert.equal(merged.energy_wh, null);
   assert.equal(merged.merge_count, 3);
 });
 

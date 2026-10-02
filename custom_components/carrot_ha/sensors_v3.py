@@ -118,6 +118,9 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                          source=self.data.get('charge_power_source'),
                          hold_age_s=self.data.get('charge_power_hold_age_s'),
                          hold_limit_s=self.data.get('charge_power_hold_limit_s'))
+        elif self.key in ('time_to_80_s','time_to_100_s','eta_80','eta_100'):
+            attrs.update(source=self.data.get('charging_eta_source'),
+                         hold_age_s=self.data.get('charging_eta_hold_age_s'), hold_limit_s=180)
         elif self.key == 'month_efficiency_kpl':
             attrs.update(calculation='matched_trip_distance / net_battery_depletion',
                          coverage_percent=self.data.get('month_energy_coverage_percent'),

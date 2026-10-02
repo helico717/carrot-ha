@@ -133,138 +133,80 @@ export function mergeConsecutiveCharges(events, maxGapSeconds = 900) {
   return merged.sort((a, b) => getStart(b) - getStart(a));
 }
 
+// Only energy belonging to this entire trip can represent its efficiency.
+export function tripEnergyWh(data) {
+  if (data.energy_rejected || data.energy_complete === false) return null;
+  if (Number.isFinite(data.energy_wh)) return data.energy_wh;
+  if (Number.isFinite(data.energy_kwh)) return data.energy_kwh * 1000;
+  return null;
+}
+export function tripEfficiency(data) {
+  const wh = tripEnergyWh(data);
+  if (wh != null) return wh > 0 && data.distance_m > 0 ? data.distance_m / wh : null;
+  return !data.energy_rejected && data.energy_complete !== false && !data.merged
+    && Number.isFinite(data.efficiency_km_kwh) && data.efficiency_km_kwh > 0 ? data.efficiency_km_kwh : null;
+}
+export function tripEnergyLabel(data, english = false) {
+  const energy = tripEnergyWh(data);
+  if (energy == null) return english ? 'Efficiency missing' : '전비 기록 누락';
+  if (energy < 0) return english ? 'Net regeneration' : '순회생';
+  if (energy === 0) return english ? 'No net consumption' : '순소비 없음';
+  return english ? 'Efficiency missing' : '전비 기록 누락';
+}
+export function tripSoc(data, boundary, capacity = DEFAULT_SOC_CAPACITY_KWH) {
+  const wh = data[boundary + '_battery_wh'];
+  const soc = Number.isFinite(wh) && wh >= 0 && capacity > 0
+    ? wh / (capacity * 1000) * 100 : data[boundary + '_soc_percent'];
+  return Number.isFinite(soc) && soc >= 0 && soc <= 100 ? soc : null;
+}
 export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) {
-  if (!Array.isArray(rawTrips) || rawTrips.length <= 1) return rawTrips || [];
-  const getStart = e => new Date(e.data?.started_at || e.observed_at || 0).getTime();
-  const getEnd = e => {
-    if (e.data?.ended_at) return new Date(e.data.ended_at).getTime();
-    const dur = Number(e.data?.duration_s) || 0;
-    return getStart(e) + dur * 1000;
-  };
-
-  const sorted = [...rawTrips].sort((a, b) => getStart(a) - getStart(b));
+  const start = e => new Date(e.data?.started_at || e.observed_at).getTime();
+  const end = e => e.data?.ended_at ? new Date(e.data.ended_at).getTime() : start(e) + (e.data?.duration_s || 0) * 1000;
+  const seen = new Set();
+  const sorted = (rawTrips || []).filter(e => {
+    if (!e?.data || !Number.isFinite(start(e)) || !Number.isFinite(end(e))) return false;
+    const id = e.event_id || e.id;
+    if (id && seen.has(id)) return false;
+    if (id) seen.add(id);
+    return true;
+  }).sort((a,b) => start(a)-start(b));
   const merged = [];
-
-  for (const trip of sorted) {
-    if (!trip || !trip.data) continue;
-    const td = trip.data;
-    const startMs = getStart(trip);
-    const endMs = getEnd(trip);
-    const durS = Number(td.duration_s) || Math.round((endMs - startMs) / 1000);
-    const startSoc = td.start_soc_percent != null ? Number(td.start_soc_percent) : null;
-    const endSoc = td.end_soc_percent != null ? Number(td.end_soc_percent) : null;
-
-    if (merged.length === 0) {
-      merged.push({
-        ...trip,
-        data: {
-          ...td,
-          merged: false,
-          merge_count: 1,
-          started_at: td.started_at || new Date(startMs).toISOString(),
-          ended_at: td.ended_at || new Date(endMs).toISOString(),
-          duration_s: durS,
-          merge_parts: [td]
-        }
-      });
+  for (const event of sorted) {
+    const td = event.data, prev = merged.at(-1), pd = prev?.data;
+    const gap = prev ? (start(event)-end(prev))/1000 : Infinity;
+    // Preserve the existing day boundary and charging discontinuity guard.
+    const a = pd?.end_soc_percent, b = td.start_soc_percent;
+    const noCharge = !Number.isFinite(a) || !Number.isFinite(b) || b <= a + 1;
+    if (!prev || gap < 0 || gap > maxGapSeconds || !noCharge
+        || tripDateKey(start(event),timeZone) !== tripDateKey(start(prev),timeZone)) {
+      merged.push({...event, data:{...td, merged:false, merge_count:1,
+        started_at:td.started_at || new Date(start(event)).toISOString(),
+        ended_at:td.ended_at || new Date(end(event)).toISOString(), merge_parts:[td]}});
       continue;
     }
-
-    const prev = merged[merged.length - 1];
-    const pd = prev.data;
-    const prevEndMs = getEnd(prev);
-    const gapS = (startMs - prevEndMs) / 1000;
-    const prevEndSoc = pd.end_soc_percent != null ? Number(pd.end_soc_percent) : null;
-    const isNoCharging = (startSoc == null || prevEndSoc == null) || (startSoc <= prevEndSoc + 1.0);
-    const isSameDay = tripDateKey(startMs, timeZone) === tripDateKey(prevEndMs, timeZone);
-
-    if (gapS >= 0 && gapS <= maxGapSeconds && isNoCharging && isSameDay) {
-      pd.merged = true;
-      pd.merge_count = (pd.merge_count || 1) + 1;
-      pd.ended_at = td.ended_at || new Date(endMs).toISOString();
-      pd.duration_s = (pd.duration_s || 0) + durS;
-      pd.distance_m = (pd.distance_m || 0) + (Number(td.distance_m) || 0);
-      if (endSoc != null) {
-        pd.end_soc_percent = endSoc;
-      }
-      if (td.end_battery_wh != null) {
-        pd.end_battery_wh = td.end_battery_wh;
-      }
-      if (pd.start_soc_percent == null && startSoc != null) {
-        pd.start_soc_percent = startSoc;
-      }
-      if (pd.start_battery_wh == null && td.start_battery_wh != null) {
-        pd.start_battery_wh = td.start_battery_wh;
-      }
-
-      if (pd.start_soc_percent != null && pd.end_soc_percent != null) {
-        pd.soc_used_percent = Math.max(0, Math.round((pd.start_soc_percent - pd.end_soc_percent) * 10) / 10);
-      } else if (Number.isFinite(pd.soc_used_percent) && Number.isFinite(td.soc_used_percent)) {
-        pd.soc_used_percent = Math.round((pd.soc_used_percent + td.soc_used_percent) * 10) / 10;
-      } else {
-        pd.soc_used_percent = pd.soc_used_percent ?? td.soc_used_percent ?? 0;
-      }
-
-      pd.distance_estimated = Boolean(pd.distance_estimated || td.distance_estimated);
-      pd.route = [...(pd.route || []), ...(td.route || [])];
-      pd.merge_parts = [...(pd.merge_parts || []), td];
-
-      // Aggregate energy and compute final efficiency
-      let sumEnergyWh = 0;
-      let sumEnergyDistM = 0;
-      for (const p of pd.merge_parts) {
-        if (Number.isFinite(p.energy_wh) && p.energy_wh > 0) {
-          sumEnergyWh += p.energy_wh;
-          sumEnergyDistM += (Number(p.distance_m) || 0);
-        }
-      }
-
-      if (Number.isFinite(pd.start_battery_wh) && Number.isFinite(pd.end_battery_wh) && (pd.start_battery_wh - pd.end_battery_wh > 0)) {
-        pd.energy_wh = Math.round(pd.start_battery_wh - pd.end_battery_wh);
-      } else if (sumEnergyWh > 0) {
-        pd.energy_wh = Math.round(sumEnergyWh * 10) / 10;
-      } else if (pd.soc_used_percent != null && pd.soc_used_percent > 0) {
-        pd.energy_wh = Math.round((pd.soc_used_percent / 100) * DEFAULT_SOC_CAPACITY_KWH * 1000);
-      } else {
-        pd.energy_wh = 0;
-      }
-
-      if (pd.distance_m > 0 && pd.energy_wh > 0) {
-        pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / (pd.energy_wh / 1000) * 10) / 10;
-      } else if (sumEnergyWh > 0 && sumEnergyDistM > 0) {
-        pd.efficiency_km_kwh = Math.round((sumEnergyDistM / 1000) / (sumEnergyWh / 1000) * 10) / 10;
-      } else if (pd.soc_used_percent != null && pd.soc_used_percent > 0 && pd.distance_m > 0) {
-        const usedKwh = (pd.soc_used_percent / 100) * DEFAULT_SOC_CAPACITY_KWH;
-        pd.efficiency_km_kwh = Math.round((pd.distance_m / 1000) / usedKwh * 10) / 10;
-      } else {
-        const partsWithEff = pd.merge_parts.map(p => p.efficiency_km_kwh).filter(e => typeof e === 'number' && e > 0);
-        if (partsWithEff.length > 0) {
-          pd.efficiency_km_kwh = Math.round(partsWithEff.reduce((a, b) => a + b, 0) / partsWithEff.length * 10) / 10;
-        } else if (pd.distance_m > 0) {
-          pd.efficiency_km_kwh = 6.0;
-        } else {
-          pd.efficiency_km_kwh = null;
-        }
-      }
-    } else {
-      merged.push({
-        ...trip,
-        data: {
-          ...td,
-          merged: false,
-          merge_count: 1,
-          started_at: td.started_at || new Date(startMs).toISOString(),
-          ended_at: td.ended_at || new Date(endMs).toISOString(),
-          duration_s: durS,
-          merge_parts: [td]
-        }
-      });
-    }
+    pd.merged = true;
+    pd.merge_parts = [...pd.merge_parts, td];
+    pd.merge_count = pd.merge_parts.length;
+    pd.ended_at = td.ended_at || new Date(end(event)).toISOString();
+    pd.duration_s = pd.merge_parts.reduce((sum,p)=>sum+(p.duration_s || 0),0);
+    pd.distance_m = pd.merge_parts.reduce((sum,p)=>sum+(p.distance_m || 0),0);
+    // Never substitute an intermediate boundary for a missing outer endpoint.
+    pd.end_soc_percent = td.end_soc_percent ?? null;
+    pd.end_battery_wh = td.end_battery_wh ?? null;
+    pd.soc_used_percent = Number.isFinite(pd.start_soc_percent) && Number.isFinite(pd.end_soc_percent)
+      ? Math.round((pd.start_soc_percent-pd.end_soc_percent)*10)/10 : null;
+    pd.distance_estimated = pd.merge_parts.some(p=>p.distance_estimated);
+    pd.route = pd.merge_parts.flatMap(p=>p.route || []);
+    const energies = pd.merge_parts.map(tripEnergyWh);
+    pd.energy_complete = energies.every(e=>e != null);
+    pd.energy_wh = pd.energy_complete ? energies.reduce((sum,e)=>sum+e,0) : null;
+    pd.energy_kwh = pd.energy_wh == null ? null : pd.energy_wh/1000;
+    pd.energy_rejected = pd.merge_parts.some(p=>p.energy_rejected);
+    const efficiency = tripEfficiency(pd);
+    pd.efficiency_km_kwh = efficiency == null ? null : Math.round(efficiency*10)/10;
   }
-
-  return merged.sort((a, b) => getStart(b) - getStart(a));
+  return merged.sort((a,b)=>start(b)-start(a));
 }
-
 
 // Position a trip on a local 24-hour clock; driving duration excludes stops.
 export function tripTimeline(event, timeZone) {

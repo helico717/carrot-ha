@@ -129,27 +129,55 @@ def values(runtime):
     except (ValueError, TypeError, AttributeError):
         measured_time = now_utc
         estimate_valid = False
+    session = (capacity, runtime.get('charge_session_start_wh'))
+    active_estimate = data.get('charging') is True and not data.get('onroad') and estimate_valid
+    held = runtime.get('charging_eta_hold')
+    if held and (not active_estimate or held['session'] != session):
+        held = None
+        runtime.pop('charging_eta_hold', None)
+    previous_model = runtime.get('charging_smooth_state')
     charging_est = estimate_charging_times(
         battery_wh / 1000 if type(battery_wh) in (int, float) else None,
-        capacity,
-        # A held display value is not a new power measurement.
-        # Keep ETA training independent of display holding (including expiry).
-        raw_power,
-        base_time=measured_time,
-        smooth_state=runtime.get('charging_smooth_state'),
-        is_charging=is_charging and estimate_valid
+        capacity, raw_power, base_time=measured_time,
+        smooth_state=previous_model, is_charging=active_estimate
     )
+    # Missing/quantized zero power is a display interruption, not training data.
+    # A model rejection with otherwise valid power is an anomaly, never held.
     runtime['charging_smooth_state'] = charging_est['smooth_state']
+    valid_result = charging_est['eta_100'] is not None
+    if valid_result and active_estimate:
+        if held is None or measured_time.timestamp() > held['measured']:
+            held = {'session':session, 'measured':measured_time.timestamp(),
+                    'eta_80':charging_est['eta_80'], 'eta_100':charging_est['eta_100'], 'battery_wh':battery_wh}
+            runtime['charging_eta_hold'] = held
+    temporary_gap = raw_power is None or (type(raw_power) in (int, float)
+        and math.isfinite(raw_power) and 0 <= raw_power < 300)
+    hold_age = now_utc.timestamp()-held['measured'] if held else None
+    elapsed = measured_time.timestamp()-held['measured'] if held else 0
+    anomaly = bool(held and type(battery_wh) in (int,float) and (
+        not math.isfinite(battery_wh) or battery_wh < 0 or battery_wh > capacity*1000
+        or (elapsed > 0 and ((battery_wh-held['battery_wh']) < -50
+            or (battery_wh-held['battery_wh'])*3600/elapsed > 250000))))
+    holding = bool(not valid_result and active_estimate and temporary_gap and not anomaly and held
+                   and 0 <= hold_age < 180)
+    if not valid_result and not holding:
+        runtime.pop('charging_eta_hold', None)
+    data['charging_eta_source'] = 'held_last_valid' if holding else ('measured' if valid_result else 'unavailable')
+    data['charging_eta_hold_age_s'] = round(hold_age) if holding else None
     for target in (80, 100):
-        seconds_key = f'time_to_{target}_s'
-        eta_key = f'eta_{target}'
-        seconds = charging_est[seconds_key]
-        eta = charging_est[eta_key]
-        # Reads may advance the display countdown but never the model state.
-        if seconds is not None and seconds > 0:
-            seconds = max(1, round((datetime.fromisoformat(eta) - now_utc).total_seconds()))
-        data[seconds_key] = seconds
-        data[eta_key] = eta
+        seconds_key, eta_key = f'time_to_{target}_s', f'eta_{target}'
+        seconds, eta = charging_est[seconds_key], charging_est[eta_key]
+        if holding:
+            eta = held[eta_key]
+            seconds = round((datetime.fromisoformat(eta)-now_utc).total_seconds()) if eta else None
+            if seconds is not None and seconds <= 0:
+                seconds, eta = None, None
+        elif seconds is not None and seconds > 0:
+            seconds = max(1, round((datetime.fromisoformat(eta)-now_utc).total_seconds()))
+        # Reaching a target requires a fresh current measurement, not expiry of ETA.
+        if active_estimate and not anomaly and type(battery_wh) in (int,float) and math.isfinite(battery_wh) and battery_wh <= capacity*1000 and battery_wh >= capacity*1000*target/100:
+            seconds, eta = 0, now_utc.isoformat()
+        data[seconds_key], data[eta_key] = seconds, eta
     try:
         from zoneinfo import ZoneInfo
         kst = ZoneInfo('Asia/Seoul')

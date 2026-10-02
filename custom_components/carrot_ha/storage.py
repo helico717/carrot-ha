@@ -406,146 +406,40 @@ class Archive:
             conn.close()
 
     def enrich_trips_energy(self, device, trips, capacity_kwh=DEFAULT_SOC_CAPACITY_KWH):
-        """Enrich trip events with energy consumption data from nearby state events.
-
-        For each trip, finds the nearest battery_wh readings around the start and
-        end times from state events. Adds energy_wh, efficiency_km_kwh, and
-        soc_used_percent to trip data in-memory (does not modify the database).
-        """
+        """Format persisted trip measurements; never fill history from live state."""
         if not trips:
             return trips
-        for trip in trips:
-            data = trip.get('data', {})
-            if data.get('energy_verified'):
-                self._format_trip_energy(data, capacity_kwh)
-
-        # Collect all trip time boundaries to determine query range
-        boundaries = []
-        for trip in trips:
-            data = trip.get('data', {})
-            for key in ('started_at', 'ended_at'):
-                ts = data.get(key)
-                if ts:
-                    boundaries.append(ts)
-        if not boundaries:
-            return trips
-
-        def _parse_ts(ts):
-            return datetime.fromisoformat(ts.replace('Z', '+00:00')).astimezone(timezone.utc)
-
-        parsed = []
-        for b in boundaries:
-            try:
-                parsed.append(_parse_ts(b))
-            except (ValueError, TypeError):
-                continue
-        if not parsed:
-            return trips
-
-        # Expand range by 5 minutes on each side for nearest-neighbor lookup
-        from datetime import timedelta
-        min_time = (min(parsed) - timedelta(minutes=5)).isoformat()
-        max_time = (max(parsed) + timedelta(minutes=5)).isoformat()
-
-        # Single query: fetch all state events with battery_wh or soc_percent in the range
+        self._ensure_derivations(device)
         with self.connect() as db:
-            rows = db.execute(
-                """SELECT
-                    COALESCE(
-                        json_extract(body, '$.data.field_measured_at.battery_wh'),
-                        json_extract(body, '$.data.field_measured_at.soc_percent'),
-                        observed
-                    ) AS ts,
-                    json_extract(body, '$.data.battery_wh') AS wh,
-                    json_extract(body, '$.data.soc_percent') AS soc
-                FROM events
-                WHERE device=? AND kind='state'
-                    AND julianday(observed) >= julianday(?) AND julianday(observed) <= julianday(?)
-                    AND (json_extract(body, '$.data.battery_wh') IS NOT NULL
-                         OR json_extract(body, '$.data.soc_percent') IS NOT NULL)
-                ORDER BY observed""",
-                (device, min_time, max_time)
-            ).fetchall()
-
-        if not rows:
-            return trips
-
-        # Build sorted (epoch, battery_wh, soc_percent) samples
-        samples = []
-        for ts_str, wh, soc in rows:
-            if wh is None and soc is None:
-                continue
-            try:
-                t = _parse_ts(ts_str).timestamp()
-                if wh is not None:
-                    wh_val = float(wh)
-                    soc_val = min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
-                else:
-                    soc_val = float(soc)
-                    wh_val = (soc_val / 100.0) * (capacity_kwh * 1000)
-                samples.append((t, wh_val, soc_val))
-            except (ValueError, TypeError):
-                continue
-        if not samples:
-            return trips
-
-        samples.sort(key=lambda sample: sample[0])
-        sample_times = [s[0] for s in samples]
-
-        def _nearest_sample(target_ts, max_gap_s=300):
-            """Find (battery_wh, soc_percent) closest to target_ts within max_gap_s."""
-            try:
-                t = _parse_ts(target_ts).timestamp()
-            except (ValueError, TypeError):
-                return None
-            idx = bisect.bisect_left(sample_times, t)
-            best_sample = None
-            best_gap = max_gap_s + 1
-            for i in (idx - 1, idx):
-                if 0 <= i < len(samples):
-                    gap = abs(samples[i][0] - t)
-                    if gap < best_gap:
-                        best_sample = samples[i]
-                        best_gap = gap
-            return best_sample if best_gap <= max_gap_s else None
-
+            derived = {key: json.loads(body) for key, body in db.execute(
+                'SELECT id,body FROM trip_derivations WHERE device=?', (device,))}
         for trip in trips:
-            data = trip.get('data', {})
-            if data.get('energy_verified') or data.get('energy_rejected'):
-                continue
-            started = data.get('started_at')
-            ended = data.get('ended_at')
-            if not started or not ended:
-                continue
-
-            start_sample = _nearest_sample(started)
-            end_sample = _nearest_sample(ended)
-
-            if start_sample is not None and end_sample is not None:
-                start_wh, start_soc = start_sample[1], start_sample[2]
-                end_wh, end_soc = end_sample[1], end_sample[2]
-                energy_wh = round(start_wh - end_wh, 1)
-                data['start_battery_wh'] = round(start_wh, 1)
-                data['end_battery_wh'] = round(end_wh, 1)
-                data['start_soc_percent'] = round(min(100.0, max(0.0, start_soc)), 1)
-                data['end_soc_percent'] = round(min(100.0, max(0.0, end_soc)), 1)
-                data['energy_wh'] = energy_wh
-                data['soc_used_percent'] = round(energy_wh / (capacity_kwh * 1000) * 100, 1)
-
-                distance_m = data.get('distance_m')
-                if energy_wh > 0 and isinstance(distance_m, (int, float)) and distance_m > 0:
-                    data['efficiency_km_kwh'] = round((distance_m / 1000) / (energy_wh / 1000), 1)
-
+            trip_repair.apply(trip, derived.get(trip.get('event_id') or trip.get('id')))
+            self._format_trip_energy(trip.get('data', {}), capacity_kwh)
         return trips
-
 
     @staticmethod
     def _format_trip_energy(data, capacity_kwh):
         for boundary in ('start', 'end'):
-            data[boundary+'_soc_percent'] = round(min(100,max(0,data[boundary+'_battery_wh']/(capacity_kwh*1000)*100)),1)
-        data['soc_used_percent'] = round(data['energy_wh']/(capacity_kwh*1000)*100,1)
-        if data['energy_wh'] > 0 and data.get('distance_m',0) > 0:
-            data['efficiency_km_kwh'] = round(data['distance_m']/data['energy_wh'],1)
+            wh = data.get(boundary+'_battery_wh')
+            if trip_repair.finite(wh) and 0 <= wh <= capacity_kwh*1000:
+                data[boundary+'_soc_percent'] = round(wh/(capacity_kwh*1000)*100, 1)
+            elif trip_repair.finite(wh):
+                # Out-of-range Wh must not silently clamp a historical trip to 100%.
+                data[boundary+'_soc_percent'] = None
+                data[boundary+'_battery_wh'] = None
+        a, b = data.get('start_soc_percent'), data.get('end_soc_percent')
+        if trip_repair.finite(a) and trip_repair.finite(b):
+            data['soc_used_percent'] = round(a-b, 1)
+        if data.get('energy_rejected'):
+            data.pop('energy_wh', None)
+            data.pop('efficiency_km_kwh', None)
+            return
+        wh = data.get('energy_wh')
+        if trip_repair.finite(wh):
+            data.pop('efficiency_km_kwh', None)
+            if wh > 0 and data.get('distance_m', 0) > 0:
+                data['efficiency_km_kwh'] = round(data['distance_m']/wh, 1)
 
     def enrich_charges_soc(self, device, charges, capacity_kwh=DEFAULT_SOC_CAPACITY_KWH):
         """Enrich charge events with start/end SoC and charged percentage.

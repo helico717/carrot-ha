@@ -3,9 +3,9 @@ import bisect
 import hashlib
 import json
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
-VERSION = 2
+VERSION = 3
 
 
 def timestamp(value):
@@ -77,10 +77,12 @@ def route_summary(route, start, end):
 
 class Samples:
     def __init__(self, rows):
-        self.fields = {'odometer_km': {}, 'battery_wh': {}}
+        self.fields = {'odometer_km': {}, 'battery_wh': {}, 'soc_percent': {}}
         self.invalid = {key: set() for key in self.fields}
-        for observed, odo, odo_at, wh, wh_at, measured, stale, charging, driving in rows:
-            for key, value, at in [('odometer_km', odo, odo_at), ('battery_wh', wh, wh_at)]:
+        for row in rows:
+            observed, odo, odo_at, wh, wh_at, measured, stale, charging, driving = row[:9]
+            soc, soc_at = row[9:] if len(row) > 9 else (None, None)
+            for key, value, at in [('odometer_km', odo, odo_at), ('battery_wh', wh, wh_at), ('soc_percent', soc, soc_at)]:
                 t = timestamp(at or measured or observed)
                 if t is None:
                     continue
@@ -88,7 +90,7 @@ class Samples:
                     if value is not None:
                         self.invalid[key].add(t)
                     continue
-                if key == 'battery_wh' and value > 150000:
+                if (key == 'battery_wh' and value > 150000) or (key == 'soc_percent' and value > 100):
                     continue
                 # A repeated field measurement is one sample, not new evidence.
                 self.fields[key].setdefault(t, (value, bool(charging), driving))
@@ -119,7 +121,17 @@ class Samples:
 
 
 def source_fingerprint(data):
-    return json.dumps([data.get('distance_source'), data.get('distance_quality')], sort_keys=True)
+    return json.dumps([data.get('distance_source'), data.get('distance_quality'), data.get('trip_measurements')], sort_keys=True)
+
+
+def compatible_source(old_fp, new_fp):
+    try:
+        previous, current = json.loads(old_fp), json.loads(new_fp)
+        if len(previous) == 2:
+            previous.append(None)
+        return previous == current
+    except (TypeError, ValueError):
+        return False
 
 
 def derive(data, samples, old=None):
@@ -137,7 +149,7 @@ def derive(data, samples, old=None):
     # and changed available routes do invalidate it. Version-1 records had no
     # source fingerprint, so migrate them only for the legacy GPS source.
     compatible = (old and old.get('fingerprint') == fp
-                  and old.get('source_fingerprint', json.dumps([None, None])) == source_fp
+                  and compatible_source(old.get('source_fingerprint', json.dumps([None, None, None])), source_fp)
                   and (not digest or old.get('route_digest') == digest))
     if compatible:
         result.update(old)
@@ -146,6 +158,28 @@ def derive(data, samples, old=None):
             result['distance_version'] = old.get('distance_version', old.get('version', 1))
         if old.get('energy'):
             result['energy_version'] = old.get('energy_version', old.get('version', 1))
+
+    # Recover boundary SOC independently from distance/energy eligibility. This
+    # is persisted so it survives raw-state retention and is never live SOC.
+    for boundary, target in (('start', start), ('end', end)):
+        key = boundary + '_measurement'
+        wh = samples.nearest('battery_wh', target, maximum=30)
+        soc = samples.nearest('soc_percent', target, maximum=30)
+        if wh or soc:
+            result[key] = {'battery_wh': wh['value'] if wh else None,
+                           'soc_percent': soc['value'] if soc else None,
+                           'at': wh['at'] if wh else soc['at']}
+        elif samples.has_invalid('battery_wh', target-30, target+30):
+            result.pop(key, None)
+    measured = data.get('trip_measurements') or {}
+    for boundary, target in (('start', start), ('end', end)):
+        point = measured.get(boundary) or {}
+        at = timestamp(point.get('at'))
+        if at is not None and abs(at-target) <= 30:
+            wh, soc = point.get('battery_wh'), point.get('soc_percent')
+            if (finite(wh) and 0 <= wh <= 150000) or (finite(soc) and 0 <= soc <= 100):
+                result[boundary+'_measurement'] = {'battery_wh':wh if finite(wh) and 0 <= wh <= 150000 else None,
+                    'soc_percent':soc if finite(soc) and 0 <= soc <= 100 else None, 'at':at}
 
     # Distance-only revisions do not change the battery measurement window.
     # Preserve its endpoints separately from the distance fingerprint.
@@ -225,6 +259,20 @@ def derive(data, samples, old=None):
             result['energy'] = {'start': a, 'end': b, 'energy_wh': round(energy,1),
                                'summary_eligible': a['at'] >= start and b['at'] <= end}
             result['energy_version'] = VERSION
+    # The daemon records high-cadence boundaries outside the telemetry cadence.
+    ma, mb = measured.get('start') or {}, measured.get('end') or {}
+    ta, tb = timestamp(ma.get('at')), timestamp(mb.get('at'))
+    wa, wb = ma.get('battery_wh'), mb.get('battery_wh')
+    if (measured.get('complete') is True and energy_eligible and not contaminated
+            and finite(wa) and finite(wb) and 0 <= wa <= 150000 and 0 <= wb <= 150000
+            and ta is not None and tb is not None and ta < tb
+            and abs(ta-start) <= 30 and abs(tb-end) <= 30
+            and abs(wa-wb)*3600/(tb-ta) <= 250000):
+        result['energy'] = {'start':{'value':wa,'at':ta}, 'end':{'value':wb,'at':tb},
+                           'energy_wh':round(wa-wb,1),'summary_eligible':True}
+        result['energy_version'] = VERSION
+    if measured and measured.get('complete') is not True:
+        result['energy_rejected'] = True
     if result['energy_rejected']:
         result.pop('energy', None)
         result.pop('energy_version', None)
@@ -239,7 +287,8 @@ def refresh(db, device):
         json_extract(body,'$.data.odometer_km'), json_extract(body,'$.data.field_measured_at.odometer_km'),
         json_extract(body,'$.data.battery_wh'), json_extract(body,'$.data.field_measured_at.battery_wh'),
         json_extract(body,'$.data.measured_at'), json_extract(body,'$.data.stale'),
-        json_extract(body,'$.data.charging'), json_extract(body,'$.data.driving')
+        json_extract(body,'$.data.charging'), json_extract(body,'$.data.driving'),
+        json_extract(body,'$.data.soc_percent'), json_extract(body,'$.data.field_measured_at.soc_percent')
         FROM events WHERE device=? AND kind='state' ORDER BY observed""", (device,)).fetchall()
     samples = Samples(rows)
     old = {key: json.loads(body) for key,body in db.execute('SELECT id,body FROM trip_derivations WHERE device=?',(device,))}
@@ -266,6 +315,16 @@ def apply(event, derived):
         data['distance_source'] = derived['reason']
         data['distance_estimated'] = True
         data['distance_correction_version'] = derived.get('distance_version', derived['version'])
+    for boundary in ('start', 'end'):
+        point = derived.get(boundary+'_measurement')
+        if point:
+            data[boundary+'_battery_wh'] = point.get('battery_wh')
+            data[boundary+'_soc_percent'] = point.get('soc_percent')
+            data[boundary+'_measured_at'] = datetime.fromtimestamp(point['at'], timezone.utc).isoformat()
+    if data['energy_rejected']:
+        data.pop('energy_wh', None)
+        data.pop('energy_kwh', None)
+        data.pop('efficiency_km_kwh', None)
     if derived.get('energy'):
         energy = derived['energy']
         data['start_battery_wh'] = energy['start']['value']

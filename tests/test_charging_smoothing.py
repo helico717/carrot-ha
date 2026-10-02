@@ -171,8 +171,14 @@ class TestChargingRegression(unittest.TestCase):
             result = values(runtime)
             self.assertEqual(result['charge_power_w'], 1500)
             self.assertEqual(result['charge_power_source'], 'held_last_positive')
-            self.assertIsNone(result['eta_80'])
-            self.assertIsNone(result['eta_100'])
+            if elapsed < 180:
+                self.assertEqual(result['eta_80'], first['eta_80'])
+                self.assertEqual(result['eta_100'], first['eta_100'])
+                self.assertEqual(result['charging_eta_source'], 'held_last_valid')
+                self.assertEqual(result['time_to_80_s'], first['time_to_80_s']-elapsed)
+            else:
+                self.assertIsNone(result['eta_80'])
+                self.assertIsNone(result['eta_100'])
             self.assertIsNone(runtime['charging_smooth_state'])
         # Recovery uses the newly reported lower rate, not the held 1.5 kW.
         MockDateTime.current_time = self.base_time + timedelta(seconds=240)
@@ -285,3 +291,29 @@ class TestChargingRegression(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestEtaHoldBoundaries(TestChargingRegression):
+    def test_session_stale_capacity_and_anomaly_reset(self):
+        for change in ({'charging':False},{'onroad':True},{'stale':True},{'battery_wh':38000}):
+            r=self.runtime(39000);values(r)
+            MockDateTime.current_time=self.base_time+timedelta(seconds=30)
+            r['latest']['data'].update(measured_at=MockDateTime.current_time.isoformat(),charge_power_w=0,**change)
+            self.assertIsNone(values(r)['eta_100'])
+            MockDateTime.current_time=self.base_time
+        r=self.runtime(39000);values(r);r['entry'].options['soc_capacity_kwh']=64
+        r['latest']['data']['charge_power_w']=0
+        self.assertIsNone(values(r)['eta_100'])
+
+    def test_repeated_reads_cannot_extend_hold_ttl_and_reached_target_requires_measurement(self):
+        r=self.runtime(39000);first=values(r)
+        for elapsed in (30,60,120):
+            MockDateTime.current_time=self.base_time+timedelta(seconds=elapsed)
+            r['latest']['data'].update(measured_at=MockDateTime.current_time.isoformat(),charge_power_w=0)
+            result=values(r)
+            self.assertEqual(result['eta_100'],first['eta_100'])
+            self.assertEqual(result['charging_eta_hold_age_s'],elapsed)
+        MockDateTime.current_time=self.base_time+timedelta(seconds=180)
+        r['latest']['data']['measured_at']=MockDateTime.current_time.isoformat()
+        self.assertIsNone(values(r)['eta_100'])
+        r['latest']['data']['battery_wh']=62400
+        self.assertEqual(values(r)['time_to_80_s'],0)

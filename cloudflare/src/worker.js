@@ -1612,6 +1612,18 @@ async function handleLiveCapture(request, env) {
   });
 }
 
+// Persist only bounded measurement fields, never arbitrary uploader metadata.
+function tripMeasurements(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const point = p => {
+    if (!p || !Number.isFinite(Date.parse(p.at))) return null;
+    const wh = typeof p.battery_wh === 'number' && Number.isFinite(p.battery_wh) && p.battery_wh >= 0 && p.battery_wh <= 150000 ? p.battery_wh : null;
+    const soc = typeof p.soc_percent === 'number' && Number.isFinite(p.soc_percent) && p.soc_percent >= 0 && p.soc_percent <= 100 ? p.soc_percent : null;
+    return wh == null && soc == null ? null : {at:p.at,battery_wh:wh,soc_percent:soc};
+  };
+  return {start:point(raw.start),end:point(raw.end),complete:raw.complete === true};
+}
+
 async function handleTrip(request, env) {
   if (!authorize(request, env, true)) {
     return json({ error: "unauthorized" }, 401);
@@ -1627,11 +1639,11 @@ async function handleTrip(request, env) {
   await env.DB.prepare(`
     INSERT INTO trips (
       id, device_id, started_at, ended_at, duration_s, distance_m, start_lat,
-      start_lon, end_lat, end_lon, route_point_count, route_json, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      start_lon, end_lat, end_lon, route_point_count, route_json, created_at, measurements_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
-      device_id=excluded.device_id, started_at=excluded.started_at, ended_at=excluded.ended_at, duration_s=excluded.duration_s, distance_m=excluded.distance_m, start_lat=excluded.start_lat, start_lon=excluded.start_lon, end_lat=excluded.end_lat, end_lon=excluded.end_lon, route_point_count=excluded.route_point_count, route_json=excluded.route_json, created_at=excluded.created_at
-    WHERE trips.device_id IS NOT excluded.device_id OR trips.started_at IS NOT excluded.started_at OR trips.ended_at IS NOT excluded.ended_at OR trips.duration_s IS NOT excluded.duration_s OR trips.distance_m IS NOT excluded.distance_m OR trips.start_lat IS NOT excluded.start_lat OR trips.start_lon IS NOT excluded.start_lon OR trips.end_lat IS NOT excluded.end_lat OR trips.end_lon IS NOT excluded.end_lon OR trips.route_point_count IS NOT excluded.route_point_count OR trips.route_json IS NOT excluded.route_json
+      device_id=excluded.device_id, started_at=excluded.started_at, ended_at=excluded.ended_at, duration_s=excluded.duration_s, distance_m=excluded.distance_m, start_lat=excluded.start_lat, start_lon=excluded.start_lon, end_lat=excluded.end_lat, end_lon=excluded.end_lon, route_point_count=excluded.route_point_count, route_json=excluded.route_json, created_at=excluded.created_at, measurements_json=COALESCE(excluded.measurements_json,trips.measurements_json)
+    WHERE trips.device_id IS NOT excluded.device_id OR trips.started_at IS NOT excluded.started_at OR trips.ended_at IS NOT excluded.ended_at OR trips.duration_s IS NOT excluded.duration_s OR trips.distance_m IS NOT excluded.distance_m OR trips.start_lat IS NOT excluded.start_lat OR trips.start_lon IS NOT excluded.start_lon OR trips.end_lat IS NOT excluded.end_lat OR trips.end_lon IS NOT excluded.end_lon OR trips.route_point_count IS NOT excluded.route_point_count OR trips.route_json IS NOT excluded.route_json OR (excluded.measurements_json IS NOT NULL AND trips.measurements_json IS NOT excluded.measurements_json)
   `).bind(
     id,
     deviceId,
@@ -1646,6 +1658,7 @@ async function handleTrip(request, env) {
     route.length,
     JSON.stringify(route),
     nowIso(),
+    payload.tripMeasurements ? JSON.stringify(tripMeasurements(payload.tripMeasurements)) : null,
   ).run();
 
   return json({ ok: true, id });
@@ -1709,6 +1722,7 @@ function parseTripRoute(trip) {
   }
   return {
     ...rest,
+    trip_measurements: tripMeasurements(parseJsonObject(rest.measurements_json)),
     route: Array.isArray(route) ? route : [],
   };
 }
