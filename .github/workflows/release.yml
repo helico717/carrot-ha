@@ -17,9 +17,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Select Release Notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          notes=".github/release-notes/${RELEASE_TAG}.md"
+          if [ -f "$notes" ]; then
+            echo "path=$notes" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') || contains(github.ref_name, 'alpha') || contains(github.ref_name, '-') || contains(github.ref_name, 'dev') }}

@@ -11,15 +11,15 @@
 
 ## 소급 적용과 배포 경계
 
-HA 새 코드 시작 후 파생 기록을 재계산하고, 기존 history API도 같은 결과를 표시한다. 당시 원측정이 없는 기록은 복구 숫자를 생성하지 않는다. 운영 SQLite DB/Comma/Worker 배포는 수행하지 않았다. 첨부 원격 마운트 DB의 전체 backup replay는 접근 지연으로 완료하지 못했으며, 실제 전체 복구 건수는 아직 미검증이다.
+HA 새 코드 시작 후 파생 기록을 재계산하고, 기존 history API도 같은 결과를 표시한다. 당시 원측정이 없는 기록은 복구 숫자를 생성하지 않는다. 운영 SQLite DB와 Comma 설치는 수행하지 않았다. 첨부 원격 마운트 DB의 전체 backup replay는 접근 지연으로 완료하지 못했으며, 실제 전체 복구 건수는 아직 미검증이다.
 
-후속 배포에서는 기존 incremental migration이 적용된 D1에 `cloudflare/migration_trip_measurements.sql`을 **한 번**, Worker보다 먼저 적용한다. 이후 Worker → HA → Git 관리 Comma 수집기를 업데이트한다. HA/Comma만 업데이트하면 새 trip 경계 데이터 저장 경로가 완성되지 않는다. 사용자 요청대로 이번 작업은 commit/push까지만 수행하며 manifest 변경/태그/릴리스/배포는 하지 않는다.
+후속 배포에서는 기존 incremental migration이 적용된 D1에 `cloudflare/migration_trip_measurements.sql`을 **한 번**, Worker보다 먼저 적용한다. 이후 Worker → HA → Git 관리 Comma 수집기를 업데이트한다. HA/Comma만 업데이트하면 새 trip 경계 데이터 저장 경로가 완성되지 않는다. 후속 사용자 요청으로 D1 마이그레이션 및 Worker 배포를 완료했고, HA 정식 릴리스 버전을 0.8.8로 설정했다. HA 서버 업데이트 및 Comma 설치는 별도로 필요하다. Worker 배포 버전: `d73bcf6c-1ac4-48cd-84ae-0eaeec74a866`.
 
 ## 검증
 
 - carrot-ha Python suite: 191 tests, 통과(2 skipped). cloud live, incremental sync, history cache, auth/isolation, trip/charge, camera interlock 포함.
 - 관련 Node gates: 32 tests 통과. live/lazy/view state, trip history/병합/결측, camera lifecycle 및 driving interlock.
-- 전체 Node suite: 45/47 통과. 기존 실패 2건은 수정 전 HEAD에서도 재현: `motion-status.test.mjs`의 parked/unknown 기대 불일치, `range-c3-and-fixes.test.mjs`의 prerelease를 허용하지 않는 버전 정규식. manifest는 기존 `0.8.8-beta.3` 유지.
+- 전체 Node suite: 45/47 통과. 기존 실패 2건은 수정 전 HEAD에서도 재현: `motion-status.test.mjs`의 parked/unknown 기대 불일치, `range-c3-and-fixes.test.mjs`의 prerelease를 허용하지 않는 버전 정규식. 이후 정식 릴리스에서 manifest를 `0.8.8`로 변경하고 버전 검증을 다시 수행한다.
 - Worker incremental test: 측정 필드 보존, metadata-only revision, 중복 재전송, 기기 격리, 단일 증분 read 및 기존 D1 schema migration 검증. history/auth test 통과.
 - Worker benchmark: unchanged incremental 1 request/1 query/81 bytes (기존 100 trips × 1000 points fixture). 운영 quota 보장은 아님.
 - 변경된 Comma engine을 사용한 기존 recorder tests: 25 tests 통과. 새 trip 경계 tests 및 필수 param polling tests: 6 tests 통과.
