@@ -84,6 +84,39 @@ The Carrot HA system is strictly divided into two independent repositories:
 
 ## 3. How to Deploy Changes
 
+### 기본 담당 범위 — 사용자는 설치·재시작만 수행 (2026-10-03)
+
+Carrot HA 기능 수정·버그 해결 요청은 **업데이트 가능한 배포 준비까지** 포함합니다.
+사용자가 해당 요청에서 명시적으로 로컬 작업만 요구한 경우를 제외하면,
+에이전트는 아래 작업을 끝까지 수행해야 합니다. 커밋·푸시·릴리즈 발행을 사용자에게
+넘기거나 로컬 수정만 남겨 둔 상태를 완료로 보고하지 마세요.
+
+| 대상 | 에이전트가 완료할 작업 | 사용자가 수행할 작업 |
+| --- | --- | --- |
+| HA 통합·대시보드 | 수정, 관련 검증, `0.8.x` 버전 및 릴리즈 노트 갱신, `main` 커밋·푸시, 태그 푸시, GitHub Release 생성·Actions 성공 확인 | HACS에서 신규 릴리즈 업데이트 → HA 재시작 |
+| Comma 수집기·데몬·카메라 | 로컬 openpilot 수정·검증, `carrot-wip-model_selector-ha` 커밋·푸시, 원격 브랜치의 커밋 확인 | 기기에서 `git pull --ff-only` → 재부팅 |
+| Cloudflare Worker·D1 | 필요한 변경·검증, Git 커밋·푸시, 필요한 마이그레이션을 먼저 적용한 뒤 Worker 배포, 배포 결과 확인 | 별도 작업 없음 |
+
+- HA 실행 코드가 변경되면 HACS에서 받을 수 있는 **새 GitHub Release**까지 발행합니다.
+  기존 태그를 덮어쓰지 말고, manifest 버전과 새 태그를 일치시키세요.
+  완료된 수정은 정식 패치 릴리즈를 기본으로 하며, 베타 테스트가 필요한 경우에만
+  pre-release로 발행하고 HACS의 베타 표시 설정이 필요함을 안내하세요.
+- AGENTS.md 등 지침·문서만 변경된 경우에는 커밋·푸시하고, 실행 코드 변경이 없는
+  불필요한 버전 상승·HACS 릴리즈·Worker 배포는 하지 마세요.
+- Worker나 D1 변경이 필요하지 않은 작업은 그대로 두고 최종 보고에 그 사실을 명시하세요.
+- 사용자에게 로컬 `git add`, `git commit`, `git push`, 태그 발행, Wrangler 실행,
+  HA 파일 직접 복사·동기화를 요구하지 마세요. 직접 동기화는 사용자가 명시적으로
+  요청한 예외 경로입니다.
+- 에이전트는 HA·Comma 업데이트 버튼이나 실제 기기 재부팅을 대신 실행하지 않습니다.
+  최종 보고에는 HA 릴리즈 링크·버전, Comma 원격 커밋, 검증 결과와 사용자가 실행할
+  pull·재부팅 명령을 제공하세요. 필요 없는 대상의 업데이트는 요구하지 마세요.
+- 기본 Comma 명령은 `cd /data/openpilot && git pull --ff-only && sudo reboot`입니다.
+  변경사항을 버리는 `git reset --hard`는 기본 명령에 추가하지 마세요.
+- 인증·네트워크·자동 승인 심사 등으로 실제 발행이 막히면, 완료한 작업과 막힌 단계를
+  정확히 보고하세요. 푸시·릴리즈·배포가 실패했는데 사용자가 업데이트만 하면 된다고
+  안내하거나 완료로 주장하지 마세요.
+
+
 ### A. Deploying Comma Device Changes (`helico717/openpilot`)
 
 1. **Local Development**:
@@ -113,10 +146,12 @@ The Carrot HA system is strictly divided into two independent repositories:
      - Open `http://<comma-ip>:7000` in a browser and click the update button.
    - **Method 3 (Command Line if already in terminal)**:
      ```bash
-     cd /data/openpilot && git reset --hard && git pull --ff-only && sudo reboot
+     cd /data/openpilot && git pull --ff-only && sudo reboot
      ```
 
 ### B. Deploying Home Assistant Changes (`helico717/carrot-ha`)
+
+아래 버전 갱신·커밋·푸시·태그·릴리즈 확인은 **에이전트의 작업**이고, HACS 설치·HA 재시작만 사용자 작업입니다.
 
 Home Assistant 개발 시에는 작업 성격에 따라 **[트랙 1: 개발/트러블슈팅 빠른 반영]**과 **[트랙 2: 정식 릴리즈 배포]**의 두 가지 워크플로우로 나누어 관리합니다.
 
@@ -136,7 +171,7 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
   3. GitHub Actions가 `prerelease: true` 플래그로 릴리스를 자동 생성합니다. (일반 사용자에게는 업데이트 알림이 뜨지 않음).
   4. HA의 HACS → Carrot HA → 우측 상단 점 3개 메뉴(**`⋮`**)에서 **`베타 버전 표시 (Show beta versions)`** 토글을 켜면 `0.8.8-beta.1`이 나타나며 즉시 업데이트/다시 다운로드할 수 있습니다.
 
-- **방법 B (HA 서버 직접 동기화 — SSH/Samba 접근 가능 시 최속)**:
+- **방법 B (사용자가 명시적으로 요청한 경우에만: HA 서버 직접 동기화)**:
   - SSH `rsync`나 Samba 네트워크 드라이브를 통해 로컬 `custom_components/carrot_ha/`를 HA 서버의 `/config/custom_components/carrot_ha/`로 즉시 동기화 후 HA 재시작. (태그 발행 불필요).
 
 ---
@@ -164,17 +199,19 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 
 ### C. Deploying Cloudflare Worker Changes
 
+아래 작업은 에이전트가 수행합니다. 필요한 D1 마이그레이션을 Worker 배포보다 먼저 적용하세요.
+
 1. Navigate to the `cloudflare/` directory:
    ```bash
    cd cloudflare
    ```
-2. Deploy via Wrangler:
-   ```bash
-   npx wrangler deploy
-   ```
-3. If D1 database migrations are needed:
+2. If D1 database migrations are needed, apply them **before** deploying the Worker:
    ```bash
    npx wrangler d1 execute id4-ha-db --remote --file migration.sql
+   ```
+3. Deploy via Wrangler, then verify the deployed version and relevant endpoint behavior:
+   ```bash
+   npx wrangler deploy
    ```
 
 ---
@@ -224,7 +261,7 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 
 ## 7. Version Management & HACS Release Policy
 
-- **Current Minor Version**: `0.8.x` (current: `0.8.8-beta.1`).
+- **Current Minor Version**: `0.8.x` (current: `0.8.9`).
 - **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.
 
 ### A. HACS Versioning & Changelog Visibility
