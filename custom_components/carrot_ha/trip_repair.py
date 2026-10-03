@@ -1,11 +1,12 @@
 """Conservative, reproducible historical trip derivation; never rewrites events."""
+from .battery import MEB_INVALID_ENERGY_WH
 import bisect
 import hashlib
 import json
 import math
 from datetime import datetime, timezone
 
-VERSION = 4
+VERSION = 5
 
 
 def timestamp(value):
@@ -89,6 +90,9 @@ class Samples:
                 if not finite(value) or value < 0 or stale:
                     if value is not None:
                         self.invalid[key].add(t)
+                    continue
+                if key == 'battery_wh' and value in MEB_INVALID_ENERGY_WH:
+                    self.invalid[key].add(t)
                     continue
                 if (key == 'battery_wh' and value > 150000) or (key == 'soc_percent' and value > 100):
                     continue
@@ -264,7 +268,8 @@ def derive(data, samples, old=None):
     ta, tb = timestamp(ma.get('at')), timestamp(mb.get('at'))
     wa, wb = ma.get('battery_wh'), mb.get('battery_wh')
     if (measured.get('complete') is True and energy_eligible and not contaminated
-            and finite(wa) and finite(wb) and 0 <= wa <= 150000 and 0 <= wb <= 150000
+            and finite(wa) and finite(wb) and wa not in MEB_INVALID_ENERGY_WH and wb not in MEB_INVALID_ENERGY_WH
+            and 0 <= wa <= 150000 and 0 <= wb <= 150000
             and ta is not None and tb is not None and ta < tb
             and abs(ta-start) <= 35 and abs(tb-end) <= 35
             and abs(wa-wb)*3600/(tb-ta) <= 250000):

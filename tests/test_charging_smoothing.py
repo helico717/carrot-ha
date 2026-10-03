@@ -317,3 +317,15 @@ class TestEtaHoldBoundaries(TestChargingRegression):
         self.assertIsNone(values(r)['eta_100'])
         r['latest']['data']['battery_wh']=62400
         self.assertEqual(values(r)['time_to_80_s'],0)
+
+class InvalidBatteryTests(unittest.TestCase):
+    def test_bms_init_code_never_displays_full_soc(self):
+        from types import SimpleNamespace
+        runtime={'entry':SimpleNamespace(options={}), 'latest':{'data':{
+            'battery_wh':102350,'soc_percent':100,'charging':False}}, 'summary':{}}
+        data=values(runtime)
+        self.assertIsNone(data['soc_percent'])
+        self.assertIsNone(data['battery_kwh'])
+        self.assertIsNone(data['battery_wh'])
+    def test_real_full_charge_calibration_still_works(self):
+        self.assertEqual(mod_battery.calibrated_soc(64000,64),100)

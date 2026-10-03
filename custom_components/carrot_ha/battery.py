@@ -2,6 +2,8 @@
 import math
 from datetime import datetime, timezone
 
+MEB_INVALID_ENERGY_WH = {102250, 102300, 102350, 102375}
+
 DEFAULT_SOC_CAPACITY_KWH = 64.0
 NET_CAPACITY_KWH = 78.0
 GROSS_CAPACITY_KWH = 82.0
@@ -28,7 +30,7 @@ HISTORY_S = 300.0
 def calibrated_soc(energy_wh, capacity_kwh):
     if not _finite(energy_wh) or not _finite(capacity_kwh):
         return None
-    if energy_wh < 0 or not 20 <= capacity_kwh <= 150:
+    if energy_wh < 0 or energy_wh in MEB_INVALID_ENERGY_WH or not 20 <= capacity_kwh <= 150:
         return None
     return round(min(100, energy_wh / (capacity_kwh * 1000) * 100), 1)
 

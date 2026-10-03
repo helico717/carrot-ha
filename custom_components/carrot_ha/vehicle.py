@@ -1,4 +1,4 @@
-from .battery import DEFAULT_SOC_CAPACITY_KWH
+from .battery import DEFAULT_SOC_CAPACITY_KWH, MEB_INVALID_ENERGY_WH
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
 from .charging_power import charging_power
@@ -10,6 +10,9 @@ def values(runtime):
     latest = runtime.get('latest', {})
     data = dict(latest.get('data', {}))
     data.update(runtime.get('summary', {}))
+    if data.get('battery_wh') in MEB_INVALID_ENERGY_WH:
+        data.update(battery_wh=None, soc_percent=None, charge_power_w=None,
+                    charge_power_kw=None, charging=None)
     capacity = runtime['entry'].options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)
     if type(data.get('battery_wh')) in (int, float) and math.isfinite(data['battery_wh']) and data['battery_wh'] >= 0:
         data['soc_percent'] = calibrated_soc(data['battery_wh'], capacity)
