@@ -38,3 +38,34 @@ class BoundaryTruthTests(fixtures.TestTripEnergy):
         self.archive.put(self._make_trip('t',0,900,10000))
         d=self.archive.enrich_trips_energy(self.device,self.archive.history(self.device,'trip'),64)[0]['data']
         self.assertIsNone(d['start_soc_percent']);self.assertIsNone(d['end_soc_percent'])
+
+    def test_incomplete_daemon_does_not_veto_independent_archive_energy(self):
+        self.archive.put(self._make_state('a',0,50000))
+        self.archive.put(self._make_state('b',900,48000))
+        t=self._make_trip('t',0,900,10000)
+        t['data'].update(partial=True,distance_source='odometer_gap_recovery',
+            distance_quality={'complete':False,'estimated':True},
+            trip_measurements={'complete':False})
+        self.archive.put(t)
+        data=self.archive.enrich_trips_energy(self.device,self.archive.history(self.device,'trip'),78)[0]['data']
+        self.assertFalse(data['energy_rejected'])
+        self.assertEqual(data['energy_wh'],2000)
+        self.assertEqual(data['efficiency_km_kwh'],5)
+
+    def test_incomplete_daemon_alone_cannot_establish_energy(self):
+        t=self._make_trip('t',0,900,10000)
+        t['data']['trip_measurements']={'complete':False,
+            'start':{'at':t['data']['started_at'],'battery_wh':50000},
+            'end':{'at':t['data']['ended_at'],'battery_wh':48000}}
+        self.archive.put(t)
+        data=self.archive.enrich_trips_energy(self.device,self.archive.history(self.device,'trip'),78)[0]['data']
+        self.assertNotIn('energy_wh',data)
+
+    def test_complete_daemon_accepts_one_can_cycle_at_each_boundary(self):
+        t=self._make_trip('t',0,900,10000)
+        t['data']['trip_measurements']={'complete':True,
+            'start':{'at':self._make_state('a',34,50000)['observed_at'],'battery_wh':50000},
+            'end':{'at':self._make_state('b',866,48000)['observed_at'],'battery_wh':48000}}
+        self.archive.put(t)
+        data=self.archive.enrich_trips_energy(self.device,self.archive.history(self.device,'trip'),78)[0]['data']
+        self.assertEqual(data['energy_wh'],2000)

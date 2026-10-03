@@ -5,7 +5,7 @@ import json
 import math
 from datetime import datetime, timezone
 
-VERSION = 3
+VERSION = 4
 
 
 def timestamp(value):
@@ -266,13 +266,14 @@ def derive(data, samples, old=None):
     if (measured.get('complete') is True and energy_eligible and not contaminated
             and finite(wa) and finite(wb) and 0 <= wa <= 150000 and 0 <= wb <= 150000
             and ta is not None and tb is not None and ta < tb
-            and abs(ta-start) <= 30 and abs(tb-end) <= 30
+            and abs(ta-start) <= 35 and abs(tb-end) <= 35
             and abs(wa-wb)*3600/(tb-ta) <= 250000):
         result['energy'] = {'start':{'value':wa,'at':ta}, 'end':{'value':wb,'at':tb},
                            'energy_wh':round(wa-wb,1),'summary_eligible':True}
         result['energy_version'] = VERSION
-    if measured and measured.get('complete') is not True:
-        result['energy_rejected'] = True
+    # An incomplete daemon sequence does not invalidate independently verified
+    # archive boundaries. Keep its endpoints for SOC, but require archive
+    # evidence (or a complete daemon sequence) to establish trip energy.
     if result['energy_rejected']:
         result.pop('energy', None)
         result.pop('energy_version', None)
