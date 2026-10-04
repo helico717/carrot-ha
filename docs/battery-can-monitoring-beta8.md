@@ -51,3 +51,8 @@ CAN 수신 당시 차량이 보고한 팩 내부 측정 지점의 최저·최고
 ## 배포 커밋
 
 Comma 브랜치 `carrot-wip-model_selector-ha`: `62d4da12`. HA 릴리즈 `v0.8.12-beta.8`.
+
+2026-10-05 발행 확인: [beta.8 Release](https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.8),
+[Release Actions 성공](https://github.com/helico717/carrot-ha/actions/runs/37225869509).
+HA 태그 커밋 `32ec24dbbc431f155c709f73892cb8d304dcda01`, 공개 manifest0.8.12-beta.8 및
+prerelease=true/draft=false 확인. Comma 원격 `62d4da12a26479084b97e5f73bb7fec97e7b8671` 확인.
