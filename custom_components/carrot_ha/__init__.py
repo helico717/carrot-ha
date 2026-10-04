@@ -38,6 +38,8 @@ async def async_setup(hass, config):
     async_register_terminal_ws(hass)
     from .charge_ws import async_register as async_register_charge_ws
     async_register_charge_ws(hass)
+    from .can_capture import register as register_can_capture
+    register_can_capture(hass)
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -103,6 +105,9 @@ async def async_setup_entry(hass, entry):
             await relay.close()
         entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_camera_relay))
     runtime['terminal_options'] = (entry.options.get('terminal_enabled', False), entry.options.get('terminal_token', ''))
+    from .can_capture import CaptureFiles
+    runtime['can_capture'] = await hass.async_add_executor_job(CaptureFiles,
+        hass.config.path('carrot_ha', 'can-analysis', entry.entry_id))
     if runtime['terminal_options'][0] and len(runtime['terminal_options'][1]) >= 32:
         from .terminal_relay import TerminalRelay
         from homeassistant.const import EVENT_HOMEASSISTANT_STOP

@@ -451,3 +451,13 @@ Evidence and rollout details: `docs/dashboard-loading-audit-2026-10-01.md`.
 - 백업과 변환 후 DB에 공통으로 남은 불변 이벤트를 codec으로 복원해 원문/hash와 비교한다. 새로 추가되거나 정상 보존기간에 따라 삭제된 행을 손실로 오인하지 않는다. API/그래프/전비/충전 내역도 별도 검증한다.
 - 백업을 유지하면 운영 DB가 줄어도 합산 디스크 사용량은 늘 수 있다. 검증 목적으로 백업을 자동 삭제하지 않는다.
 - 압축을 아직 실행하지 않았다면 ‘기능 설치됨, 실제 운영 절감 미검증’으로 보고한다. 압축 실행은 운영 DB 변환이므로 사용자 요청 범위를 확인하고, 실행 전 백업·여유 공간과 서비스 entry_id를 검증한다. 원격 SSH에서 수동 SQL 변환 대신 통합의 compress_archive/restore_archive 서비스를 사용한다.
+
+## Temporary raw CAN capture — 2026-10-04
+
+Raw CAN analysis is stored in separate gzip files, never the HA archive SQLite.
+Read [docs/raw-can-capture.md](docs/raw-can-capture.md) before activating or analyzing
+it. After HA and Git-managed Comma updates, start `carrot_ha.start_can_capture`
+with the relevant entry ID. Verify real `.json.gz` arrival and frame timestamps
+before claiming capture is running. Use the existing HA SSH access guide to read
+`/config/carrot_ha/can-analysis/<entry_id>/`; do not patch Comma source remotely.
+Physical CPU/load and stream completeness require device evidence.

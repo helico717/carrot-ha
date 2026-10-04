@@ -20,3 +20,34 @@ restore_archive:
       required: true
       selector:
         text:
+
+start_can_capture:
+  name: Start temporary raw CAN logging
+  description: Store raw CAN batches in separate gzip analysis files on HA, with a configurable storage ceiling (default 20 GiB). Requires updated Comma and configured remote terminal discovery. No archive DB writes.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
+    hours:
+      default: 12
+      selector:
+        number:
+          min: 0.01
+          max: 24
+          mode: box
+    max_gb:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+stop_can_capture:
+  name: Stop temporary raw CAN logging
+  description: Stop collecting new batches; keep captured files for analysis.
+  fields:
+    entry_id:
+      required: true
+      selector:
+        text:
