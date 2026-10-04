@@ -102,3 +102,19 @@ python3 scripts/restore_archive_json.py current.sqlite3 restored.sqlite3
 - 한국 시간 15:39:45 게시, `prerelease=true`, `draft=false`, 지정 릴리즈 노트 존재 확인.
 - Release Actions: https://github.com/helico717/carrot-ha/actions/runs/37183447459 — completed / success.
 - 운영 DB 활성화는 아직 실행하지 않았으며 기존 DB의 내용/파일을 변경하지 않았다. 사용자의 HACS 베타 업데이트와 HA 재시작 후, 에이전트가 실제 설치 버전과 baseline을 확인하여 활성화·사후 검증을 수행한다.
+
+### 운영 압축·원격 검증 — 2026-10-04 16:14~16:20 KST
+
+사용자가 운영 압축 실행과 대시보드/DB 사용 기능 검증을 승인했다. 설치 beta.3, 여유 공간 약 171GB 확인. 기존 Supervisor 토큰을 출력 없이 사용하여 compress_archive 서비스를 호출했다. 코드/DB 수동 패치 없음.
+
+- 작업 시작 16:14:21, complete 16:17:57(약 216초). HTTP 호출은 180초 timeout이었지만 상태 파일에서 진행 확인 후 중복 호출 없이 완료 확인.
+- 백업 415,420,416 bytes -> 운영 DB 완료 213,381,120 bytes(약 48.6% 감소). 새 이벤트 수집 후 조회 시 213,417,984 bytes. 백업은 유지했으므로 둘의 합은 약 628.8MB, 압축 전보다 총디스크 사용량은 증가.
+- 압축 25,745행. 백업 공통 25,946개 이벤트 전체 codec 복원 비교: 누락 0, 원문 불일치 0. 비교 시 새 이벤트 4개.
+- 운영 quick_check=ok, 백업 integrity_check=ok.
+- 공통 이벤트 본문 원문 368,099,979 -> 저장 176,228,123 bytes. 상태 projection+압축 원문을 함께 보존하므로 과거 zlib-only 실험의 84% 절감과 비교하면 안 된다.
+- 주행 API 100개 및 충전 API 39개 응답 전후 완전 동일. 상태 API의 공통 96개 중 1개 차이는 cloud_raw_state의 cloud feed 표현(str/dict 및 메타키)과 gps.source이며, 저장 백업 비교는 모든 원문 일치. 배터리 이력은 오늘 received_samples/stale_samples만 증가; SOC/사용량/주행·충전시간/그래프 데이터는 동일.
+- API 단회 응답시간 전->후: live 0.123->0.104s, dashboard 13.034->5.221s, trip 13.429->2.001s, charge 4.096->2.156s, state 1.660->0.360s. 캐시/부하/워밍업이 달라 성능 향상률로 일반화 금지. 작업 중 live도 0.297s 정상.
+- 실제 Chrome에서 주행 경로·전비·배터리 날짜 선택·충전 내역·결제 입력창 열기/취소 확인. 결제 값은 변경하지 않음.
+- 이후 새로고침에서는 tripDisplayEfficiency export 오류 발생. 설치 파일 및 내부/외부 HTTP에서 해당 export 존재를 확인. 상위 모듈은 ?v=버전이 있으나 하위 정적 import는 버전 없는 URL이라 캐시 혼합 재발 경로가 존재한다. 압축 DB 내용과 별개의 프론트엔드 로딩 문제이며 새로고침 후 사용성 전체 성공으로 보고하면 안 된다. 근본 해결은 하위 의존 모듈까지 동일 release version URL을 전파하는 것이다. 브라우저 재설치는 권하지 않는다.
+
+운영 압축 완료/무손실 및 API 동등성은 확인. 프론트엔드 캐시 문제와 장기 성능 관찰은 별도 과제로 남는다. compression-enabled가 있어 신규 기록도 압축 저장한다. 되돌릴 필요 시 restore_archive 서비스로 새 기록 포함 복원; 백업을 운영 DB 위에 덮어쓰지 않는다.
