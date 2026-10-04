@@ -11,14 +11,15 @@ for(const lang of ['ko','en']){
     const c=new Card(); c._hass={config:{time_zone:'Asia/Seoul'}}; c.trips=[t('missing','08:00','08:10')];c.tripDay=day;
     c.v={soc_percent:92,recent_efficiency_kpl:6.1};
     const html=c.tripHistory(true);
-    assert.match(html,/trip-soc trip-missing/);assert.match(html,/trip-eff trip-missing/);
+    assert.match(html,/trip-soc trip-missing/);assert.doesNotMatch(html,/class="trip-eff/);
     assert.doesNotMatch(html,/92%|6\.1 km\/kWh/);
     c.v.soc_percent=51; assert.equal(c.tripHistory(true),html);
     c.trips=[t('measured','08:00','08:10',{start_soc_percent:71,end_soc_percent:48,energy_wh:1500})];
     assert.match(c.tripHistory(true),/71% → 48%/);assert.match(c.tripHistory(true),/6[.,]7 km\/kWh/);
     c.trips=[t('fallback','08:00','08:10',{distance_m:60270,start_soc_percent:69,end_soc_percent:53,energy_rejected:true})];
     c.v.soc_capacity_kwh=64;
-    assert.match(c.tripHistory(true),/추정 5[.,]9|Estimated 5[.,]9/);
+    assert.match(c.tripHistory(true),/5[.,]9 km\/kWh/);
+    assert.doesNotMatch(c.tripHistory(true),/추정 |Estimated |순회생|Net regeneration/);
     assert.doesNotMatch(c.tripHistory(true),/전비 기록 누락|Efficiency missing/);
   });
   test(`${lang}: empty trip day or missing GPS never displays the current parked position`,async()=>{

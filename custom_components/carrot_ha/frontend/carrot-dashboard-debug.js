@@ -2396,7 +2396,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
           const eff = tripDisplayEfficiency(ed, capacity);
 
           const socHtml = `<span class="trip-soc${drain == null ? ' trip-missing' : ''}"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc == null ? '—' : startSoc}% → ${endSoc == null ? '—' : endSoc}%</span><small class="soc-used-tag">(${drain == null ? (isEnglish ? 'Missing record' : '기록 누락') : usedStr})</small></span>`;
-          const effHtml = `<span class="trip-eff${eff == null && (tripDisplayEnergyWh(ed, capacity) == null || tripDisplayEnergyWh(ed, capacity) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, isEnglish) : (tripDisplayEstimated(ed) ? (isEnglish ? 'Estimated ' : '추정 ') : '') + n(eff, 1) + ' km/kWh'}</span>`;
+          const effHtml = eff == null ? '' : `<span class="trip-eff">${n(eff, 1)} km/kWh</span>`;
           const mergeHtml = (ed.merged && ed.merge_count > 1)
             ? `<span class="trip-merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '건 병합'}</span>`
             : '';
