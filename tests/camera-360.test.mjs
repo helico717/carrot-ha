@@ -96,7 +96,9 @@ const context = vm.createContext({
 
 // Strip module imports for vm evaluation
 const cleanSource = debugSource
-  .replace(/import\s+.*?;\r?\n/g, '')
+  .replace(/const dependencyURL = name => \{[\s\S]*?\n\};\n/g, '')
+    .replace(/const \{[^}]*\} = await import\(dependencyURL\('[^']+'\)\);\s*/g, '')
+    .replace(/import\s+.*?;\r?\n/g, '')
   .replace('export const DEBUG_FRESHNESS', 'const DEBUG_FRESHNESS')
   .replace('export const DEBUG_MODES', 'const DEBUG_MODES')
   .replace('export function debugDisplay', 'function debugDisplay')
@@ -398,12 +400,16 @@ assert.ok(telemetryStatusHtml.includes('360° 합성 준비 완료'));
 console.log('Testing Production Dashboards (KO and EN) mini-condition rendering...');
 
 const cleanKo = koSource
-  .replace(/import\s+.*?;\r?\n/g, '')
+  .replace(/const dependencyURL = name => \{[\s\S]*?\n\};\n/g, '')
+    .replace(/const \{[^}]*\} = await import\(dependencyURL\('[^']+'\)\);\s*/g, '')
+    .replace(/import\s+.*?;\r?\n/g, '')
   .replace(/import\.meta\.url/g, '"http://localhost/"')
   .replace('class CarrotDashboard extends HTMLElement', 'class CarrotDashboardKo extends HTMLElement')
   .replace('export default CarrotDashboard;', '');
 const cleanEn = enSource
-  .replace(/import\s+.*?;\r?\n/g, '')
+  .replace(/const dependencyURL = name => \{[\s\S]*?\n\};\n/g, '')
+    .replace(/const \{[^}]*\} = await import\(dependencyURL\('[^']+'\)\);\s*/g, '')
+    .replace(/import\s+.*?;\r?\n/g, '')
   .replace(/import\.meta\.url/g, '"http://localhost/"')
   .replace('class CarrotDashboard extends HTMLElement', 'class CarrotDashboardEn extends HTMLElement')
   .replace('export default CarrotDashboard;', '');

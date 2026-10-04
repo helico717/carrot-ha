@@ -12,6 +12,8 @@ const context = vm.createContext({DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrip
 
 vm.runInContext(
   source
+    .replace(/const dependencyURL = name => \{[\s\S]*?\n\};\n/g, '')
+    .replace(/const \{[^}]*\} = await import\(dependencyURL\('[^']+'\)\);\s*/g, '')
     .replace(/^import .*;\r?\n/m, '')
     .replace('export const DEBUG_FRESHNESS', 'const DEBUG_FRESHNESS')
     .replace('export const DEBUG_MODES', 'const DEBUG_MODES')

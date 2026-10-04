@@ -1,7 +1,15 @@
-import {bindChargePayments, chargeCostLabel} from './carrot-charge-payment.js';
-import {preserveView,updateView} from './carrot-view-state.js';
-import {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
-import { CarrotCamera360Modal } from './carrot-camera-360.js';
+// A parent's query string is not inherited by relative imports.
+// Version every dependency so browser caches cannot mix different releases.
+const dependencyURL = name => {
+  const url = new URL(name, import.meta.url);
+  const version = new URL(import.meta.url).searchParams.get('v');
+  if (version) url.searchParams.set('v', version);
+  return url.href;
+};
+const {bindChargePayments, chargeCostLabel} = await import(dependencyURL('./carrot-charge-payment.js'));
+const {preserveView,updateView} = await import(dependencyURL('./carrot-view-state.js'));
+const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} = await import(dependencyURL('./carrot-trip-days.js'));
+const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';

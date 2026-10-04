@@ -1,4 +1,15 @@
-import {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
+// A parent's query string is not inherited by relative imports.
+// Version every dependency so browser caches cannot mix different releases.
+const dependencyURL = name => {
+  const url = new URL(name, import.meta.url);
+  const version = new URL(import.meta.url).searchParams.get('v');
+  if (version) url.searchParams.set('v', version);
+  return url.href;
+};
+const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} = await import(dependencyURL('./carrot-trip-days.js'));
+const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
+const {default: KoreanDashboard} = await import(dependencyURL('./carrot-dashboard-ko.js'));
+const {default: EnglishDashboard} = await import(dependencyURL('./carrot-dashboard-en.js'));
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('carrot-dashboard-ko-debug-embed')) {

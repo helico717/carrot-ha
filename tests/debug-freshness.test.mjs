@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js','utf8');
 const context=vm.createContext({DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline, HTMLElement:class {},Date,console});
-vm.runInContext(source.replace(/^import .*;\r?\n/m, '').replace('export const DEBUG_FRESHNESS','const DEBUG_FRESHNESS').replace('export const DEBUG_MODES','const DEBUG_MODES').replace('export function debugDisplay','function debugDisplay').replace('export default class CarrotDebugDashboard','class CarrotDebugDashboard')+'\nglobalThis.api={debugDisplay,CarrotDebugDashboard,DEBUG_MODES};',context);
+vm.runInContext(source.replace(/const dependencyURL = name => \{[\s\S]*?\n\};\n/g, '')
+    .replace(/const \{[^}]*\} = await import\(dependencyURL\('[^']+'\)\);\s*/g, '')
+    .replace(/^import .*;\r?\n/m, '').replace('export const DEBUG_FRESHNESS','const DEBUG_FRESHNESS').replace('export const DEBUG_MODES','const DEBUG_MODES').replace('export function debugDisplay','function debugDisplay').replace('export default class CarrotDebugDashboard','class CarrotDebugDashboard')+'\nglobalThis.api={debugDisplay,CarrotDebugDashboard,DEBUG_MODES};',context);
 const {debugDisplay,CarrotDebugDashboard}=context.api;
 const now=Date.now(), stamp=seconds=>new Date(now-seconds*1000).toISOString();
 const raw={measured_at:stamp(0),last_received:stamp(30),last_sync:stamp(0),cloud_status:'ok',charging:true,onroad:false,charge_power_w:9900,charge_power_kw:9.9,eta_100:stamp(-100),time_to_100_s:100,speed_kph:0,soc_percent:74,latitude:37,longitude:127,gps_measured_at:stamp(0)};
