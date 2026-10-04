@@ -6,7 +6,7 @@ import json
 import math
 from datetime import datetime, timezone
 
-VERSION = 5
+VERSION = 6
 
 
 def timestamp(value):
@@ -240,7 +240,11 @@ def derive(data, samples, old=None):
             result.pop('estimated', None)
             result.pop('distance_version', None)
 
-    result['distance_incomplete'] = incomplete_can and result.get('distance_m') is None
+    # A corroborated route/odometer window validates existing CAN distance
+    # even when no distance correction was necessary.
+    result['distance_incomplete'] = (incomplete_can and result.get('distance_m') is None
+                                     and not result.get('route_verified', False))
+    result['efficiency_estimated'] = incomplete_can and result.get('route_verified', False)
     energy_eligible = (not result['distance_incomplete']
                        and (not data.get('partial') or trusted_distance or result.get('route_verified', False)))
     a, b = samples.nearest('battery_wh', start), samples.nearest('battery_wh', end)
@@ -249,6 +253,7 @@ def derive(data, samples, old=None):
     contaminated = any(v[1] for _,v in window) or samples.has_invalid('battery_wh', start, end)
     # Missing raw samples preserve prior evidence. Present conflicting evidence
     # clears it explicitly, including summary caches and legacy UI enrichment.
+    result['energy_charging'] = any(v[1] for _,v in window)
     result['energy_rejected'] = not energy_eligible or contaminated
     if a and b:
         result.pop('energy', None)
@@ -258,7 +263,8 @@ def derive(data, samples, old=None):
         if implausible_power:
             result['energy_rejected'] = True
         valid = (energy_eligible and not contaminated and not implausible_power and a['at'] < b['at']
-                 and boundary_gap <= min(90, max(45, (end-start)*0.1)))
+                 and (boundary_gap <= min(90, max(45, (end-start)*0.1))
+                      or (a['gap_s'] <= 35 and b['gap_s'] <= 35 and boundary_gap <= (end-start)*0.5)))
         if valid:
             result['energy'] = {'start': a, 'end': b, 'energy_wh': round(energy,1),
                                'summary_eligible': a['at'] >= start and b['at'] <= end}
@@ -313,8 +319,10 @@ def apply(event, derived):
     if (not derived or derived.get('fingerprint') != fingerprint(data)
             or derived.get('source_fingerprint', source_fingerprint(data)) != source_fingerprint(data)):
         return event
+    data['energy_charging'] = derived.get('energy_charging', False)
     data['energy_rejected'] = derived.get('energy_rejected', False)
     data['distance_incomplete'] = derived.get('distance_incomplete', False)
+    data['efficiency_estimated'] = derived.get('efficiency_estimated', False)
     if derived.get('distance_m') is not None:
         data['distance_raw_m'] = data['distance_m']
         data['distance_m'] = derived['distance_m']

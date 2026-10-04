@@ -60,3 +60,31 @@ and apply through a clean device Git update/restart. No Worker changes or new
 D1 migrations are needed for this fix. Never copy or
 patch Comma source through SSH/SCP. Physical-device and deployed-dashboard results
 remain unverified.
+
+
+## October 4 follow-up — reliable display (0.8.11)
+
+The refreshed archive reproduces today's missing display even with yesterday's
+fix installed. Both morning CAN trips are marked incomplete, although GPS and
+odometer corroborate their distance. The eligibility check incorrectly rejected
+unchanged but corroborated distance. The 173-second first trip also exceeds the
+combined boundary-gap rule despite each boundary being within one sampling cycle.
+Version 6 derivation fixes both cases. Replay on a temporary archive copy yields
+50 Wh and 10,000 Wh for the two morning segments: 60.2736 km / 10.05 kWh,
+approximately 6.0 km/kWh. Original SQLite inputs remain unchanged.
+
+At the user's explicit request, display now falls back to recorded boundary
+battery energy, or SOC difference times configured capacity, and labels the
+result as estimated. Strict validated energy remains separate for summaries.
+Merged display estimates sum individual segments, excluding parking gaps and
+charge gains between segments. Missing boundaries and detected charging within
+a segment remain unavailable; zero/negative consumption is not divided into a
+positive efficiency. No current SOC is substituted into historical trips.
+
+The earlier deployment-status paragraph records the initial handoff; subsequently
+Comma fixes were committed and pushed. This follow-up needs only HACS 0.8.11,
+HA restart and browser refresh. No new Comma or Worker changes are required.
+
+Validation: HA Python 199 tests (197 passed, 2 skipped); dashboard regression
+suite 27 passed; Worker incremental tests and sync benchmark passed. Deployed
+HA display remains to be checked after the user installs the release.

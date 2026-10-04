@@ -1,5 +1,5 @@
 import {preserveView,updateView} from './carrot-view-state.js';
-import {tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
+import {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js';
 import { CarrotCamera360Modal } from './carrot-camera-360.js';
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -787,7 +787,7 @@ class CarrotDashboard extends HTMLElement {
       if(isSpecificTrip){
         const distVal=curTrip.distance_m!=null?(curTrip.distance_estimated?'≈ ':'')+n(curTrip.distance_m/1000,2):'—';
         const durVal=curTrip.duration_s!=null?duration(curTrip.duration_s):'—';
-        const eff = tripEfficiency(curTrip);
+        const eff = tripDisplayEfficiency(curTrip, capacity);
         const effVal=eff!=null&&Number.isFinite(eff)?n(eff,1):'—';
         const spdVal=curTrip.route?.length?n(this.maxSpeed(curTrip.route),0):'—';
         tiles=`${metric('주행거리',distVal,'km','map-marker-distance')}`+
@@ -995,10 +995,10 @@ class CarrotDashboard extends HTMLElement {
         const usedStr = drain > 0 ? `${drain}% 사용` : (drain < 0 ? `+${Math.abs(drain)}% 회생` : '0% 사용');
         const isSel = isTrip && i === this.selected;
 
-        const eff = tripEfficiency(ed);
+        const eff = tripDisplayEfficiency(ed, capacity);
 
         const socHtml = `<span class="trip-soc${drain == null ? ' trip-missing' : ''}"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc == null ? '—' : startSoc}% → ${endSoc == null ? '—' : endSoc}%</span><small class="soc-used-tag">(${drain == null ? '기록 누락' : usedStr})</small></span>`;
-        const effHtml = `<span class="trip-eff${eff == null && (tripEnergyWh(ed) == null || tripEnergyWh(ed) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, false) : n(eff, 1) + ' km/kWh'}</span>`;
+        const effHtml = `<span class="trip-eff${eff == null && (tripDisplayEnergyWh(ed, capacity) == null || tripDisplayEnergyWh(ed, capacity) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, false, capacity) : (tripDisplayEstimated(ed) ? '추정 ' : '') + n(eff, 1) + ' km/kWh'}</span>`;
         const mergeHtml = (ed.merged && ed.merge_count > 1)
           ? `<span class="trip-merge-badge">${ed.merge_count}건 병합</span>`
           : '';

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeConsecutiveTrips, tripDays, tripEfficiency} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
+import {tripDisplayEfficiency, tripDisplayEnergyWh, tripDisplayEstimated, mergeConsecutiveTrips, tripDays, tripEfficiency} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
 globalThis.HTMLElement=class {attachShadow(){return {};}};
 globalThis.customElements={get(){},define(){}};
 const day=tripDays([], 'Asia/Seoul').at(-1).key;
@@ -16,6 +16,10 @@ for(const lang of ['ko','en']){
     c.v.soc_percent=51; assert.equal(c.tripHistory(true),html);
     c.trips=[t('measured','08:00','08:10',{start_soc_percent:71,end_soc_percent:48,energy_wh:1500})];
     assert.match(c.tripHistory(true),/71% → 48%/);assert.match(c.tripHistory(true),/6[.,]7 km\/kWh/);
+    c.trips=[t('fallback','08:00','08:10',{distance_m:60270,start_soc_percent:69,end_soc_percent:53,energy_rejected:true})];
+    c.v.soc_capacity_kwh=64;
+    assert.match(c.tripHistory(true),/추정 5[.,]9|Estimated 5[.,]9/);
+    assert.doesNotMatch(c.tripHistory(true),/전비 기록 누락|Efficiency missing/);
   });
   test(`${lang}: empty trip day or missing GPS never displays the current parked position`,async()=>{
     const c=new Card(),node={innerHTML:'',isConnected:true};c.shadowRoot={querySelector:()=>node};c.tab='trips';c.selected=null;
@@ -38,4 +42,33 @@ test('merge uses all matched energies and strict outer boundaries, never parking
   assert.equal(tripEfficiency(missing),null);
   raw[1].data.started_at=`${day}T08:40:01+09:00`;
   assert.equal(mergeConsecutiveTrips(raw,'Asia/Seoul').length,2);
+});
+
+test('merged validated estimates retain all measured energies and estimate label',()=>{
+ const trips=mergeConsecutiveTrips([
+  t('estimate-a','08:00','08:10',{energy_wh:50,efficiency_estimated:true}),
+  t('estimate-b','08:15','08:25',{energy_wh:10000})
+ ],'Asia/Seoul');
+ assert.equal(trips.length,1);
+ assert.equal(trips[0].data.energy_wh,10050);
+ assert.equal(trips[0].data.efficiency_estimated,true);
+ assert.ok(tripEfficiency(trips[0].data)>0);
+});
+
+
+test('display falls back to recorded SOC with configured capacity despite rejected strict energy',()=>{
+ const d={distance_m:60270,start_soc_percent:69,end_soc_percent:53,energy_rejected:true};
+ assert.equal(tripDisplayEnergyWh(d,64),10240);
+ assert.ok(Math.abs(tripDisplayEfficiency(d,64)-5.8857)<0.001);
+ assert.equal(tripDisplayEstimated(d),true);
+ assert.equal(tripDisplayEfficiency({...d,start_soc_percent:null},64),null);
+ assert.equal(tripDisplayEfficiency({...d,energy_charging:true},64),null);
+});
+test('display estimates each merged segment and excludes parking and charge gain',()=>{
+ const a={distance_m:10000,start_soc_percent:80,end_soc_percent:75,energy_rejected:true};
+ const b={distance_m:20000,start_soc_percent:95,end_soc_percent:85,energy_rejected:true};
+ const merged={merged:true,merge_parts:[a,b],distance_m:30000,start_soc_percent:80,end_soc_percent:85};
+ assert.equal(tripDisplayEnergyWh(merged,64),9600);
+ assert.equal(tripDisplayEfficiency(merged,64),3.125);
+ assert.equal(tripDisplayEstimated(merged),true);
 });

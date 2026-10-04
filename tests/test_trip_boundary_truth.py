@@ -69,3 +69,11 @@ class BoundaryTruthTests(fixtures.TestTripEnergy):
         self.archive.put(t)
         data=self.archive.enrich_trips_energy(self.device,self.archive.history(self.device,'trip'),78)[0]['data']
         self.assertEqual(data['energy_wh'],2000)
+
+    def test_short_trip_accepts_independent_one_cycle_archive_boundaries(self):
+        self.archive.put(self._make_state('a',26,44200))
+        self.archive.put(self._make_state('b',147,44250))
+        t=self._make_trip('t',0,175,949.5)
+        self.archive.put(t)
+        d=self.archive.history(self.device,'trip')[0]['data']
+        self.assertEqual(d['energy_wh'],-50)

@@ -244,3 +244,25 @@ class RevisionTests(unittest.TestCase):
         with self.archive.connect() as db:
             self.assertEqual(db.execute('SELECT energy_kwh FROM trip_energy').fetchone()[0],4)
         self.assertEqual(self.archive.overview(self.device)['recent_efficiency_kpl'],4.5)
+
+    def test_corroborated_incomplete_can_retains_energy_without_distance_repair(self):
+        trip=self.corrected_trip()
+        trip['data'].update(distance_m=17800,distance_source='can_speed',
+            distance_quality={'complete':False},trip_measurements={'complete':False})
+        self.archive.put_cloud(trip)
+        d=self.archive.history(self.device,'trip')[0]['data']
+        self.assertEqual(d['distance_m'],17800)
+        self.assertNotIn('distance_raw_m',d)
+        self.assertFalse(d['distance_incomplete'])
+        self.assertFalse(d['energy_rejected'])
+        self.assertTrue(d['efficiency_estimated'])
+        self.assertEqual(d['energy_wh'],3000)
+
+    def test_conflicting_route_cannot_authorize_incomplete_can_energy(self):
+        trip=self.corrected_trip()
+        trip['data'].update(distance_m=17800,distance_source='can_speed',distance_quality={'complete':False})
+        trip['data']['route'][1]['longitude']=150
+        self.archive.put_cloud(trip)
+        d=self.archive.history(self.device,'trip')[0]['data']
+        self.assertTrue(d['energy_rejected'])
+        self.assertNotIn('energy_wh',d)

@@ -146,8 +146,37 @@ export function tripEfficiency(data) {
   return !data.energy_rejected && data.energy_complete !== false && !data.merged
     && Number.isFinite(data.efficiency_km_kwh) && data.efficiency_km_kwh > 0 ? data.efficiency_km_kwh : null;
 }
-export function tripEnergyLabel(data, english = false) {
-  const energy = tripEnergyWh(data);
+// Display estimates use recorded trip boundaries, never the current vehicle SOC.
+export function tripDisplayEnergyWh(data, capacity = DEFAULT_SOC_CAPACITY_KWH) {
+  if (data.merged && data.merge_parts?.length) {
+    const parts = data.merge_parts.map(p => tripDisplayEnergyWh(p, capacity));
+    return parts.every(p => p != null) ? parts.reduce((sum,p) => sum+p, 0) : null;
+  }
+  const measured = tripEnergyWh(data);
+  if (measured != null) return measured;
+  if (data.energy_charging || data.charging === true) return null;
+  const validWh = v => Number.isFinite(v) && v >= 0 && v <= 150000
+    && ![102250,102300,102350,102375].includes(v);
+  const a = data.start_battery_wh, b = data.end_battery_wh;
+  if (validWh(a) && validWh(b)) return a-b;
+  const start = data.start_soc_percent, end = data.end_soc_percent;
+  if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && start <= 100
+      && end >= 0 && end <= 100 && capacity >= 20 && capacity <= 150)
+    return (start-end) * capacity * 10;
+  return null;
+}
+export function tripDisplayEfficiency(data, capacity = DEFAULT_SOC_CAPACITY_KWH) {
+  const wh = tripDisplayEnergyWh(data, capacity);
+  return wh != null ? (wh > 0 && data.distance_m > 0 ? data.distance_m/wh : null)
+    : tripEfficiency(data);
+}
+export function tripDisplayEstimated(data) {
+  return !!(data.efficiency_estimated || data.distance_estimated
+    || (data.merged && data.merge_parts?.some(tripDisplayEstimated))
+    || (tripEnergyWh(data) == null && tripDisplayEnergyWh(data) != null));
+}
+export function tripEnergyLabel(data, english = false, capacity = DEFAULT_SOC_CAPACITY_KWH) {
+  const energy = tripDisplayEnergyWh(data, capacity);
   if (energy == null) return english ? 'Efficiency missing' : '전비 기록 누락';
   if (energy < 0) return english ? 'Net regeneration' : '순회생';
   if (energy === 0) return english ? 'No net consumption' : '순소비 없음';
@@ -196,6 +225,7 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
     pd.soc_used_percent = Number.isFinite(pd.start_soc_percent) && Number.isFinite(pd.end_soc_percent)
       ? Math.round((pd.start_soc_percent-pd.end_soc_percent)*10)/10 : null;
     pd.distance_estimated = pd.merge_parts.some(p=>p.distance_estimated);
+    pd.efficiency_estimated = pd.merge_parts.some(p=>p.efficiency_estimated || p.distance_estimated);
     pd.route = pd.merge_parts.flatMap(p=>p.route || []);
     const energies = pd.merge_parts.map(tripEnergyWh);
     pd.energy_complete = energies.every(e=>e != null);

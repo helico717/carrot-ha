@@ -1,4 +1,4 @@
-import {tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
+import {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, mergeConsecutiveTrips, tripTimeline} from './carrot-trip-days.js'; import { CarrotCamera360Modal } from './carrot-camera-360.js'; import KoreanDashboard from './carrot-dashboard-ko.js'; import EnglishDashboard from './carrot-dashboard-en.js';
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('carrot-dashboard-ko-debug-embed')) {
@@ -2393,10 +2393,10 @@ export default class CarrotDebugDashboard extends HTMLElement {
           const usedStr = drain > 0 ? `${drain}% ${isEnglish ? 'used' : '사용'}` : (drain < 0 ? `+${Math.abs(drain)}% ${isEnglish ? 'regen' : '회생'}` : `0% ${isEnglish ? 'used' : '사용'}`);
           const isSel = isTrip && i === this.selected;
 
-          const eff = tripEfficiency(ed);
+          const eff = tripDisplayEfficiency(ed, capacity);
 
           const socHtml = `<span class="trip-soc${drain == null ? ' trip-missing' : ''}"><ha-icon icon="mdi:${batteryIconName(startSoc)}"></ha-icon> <span>${startSoc == null ? '—' : startSoc}% → ${endSoc == null ? '—' : endSoc}%</span><small class="soc-used-tag">(${drain == null ? (isEnglish ? 'Missing record' : '기록 누락') : usedStr})</small></span>`;
-          const effHtml = `<span class="trip-eff${eff == null && (tripEnergyWh(ed) == null || tripEnergyWh(ed) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, isEnglish) : n(eff, 1) + ' km/kWh'}</span>`;
+          const effHtml = `<span class="trip-eff${eff == null && (tripDisplayEnergyWh(ed, capacity) == null || tripDisplayEnergyWh(ed, capacity) > 0) ? ' trip-missing' : ''}">${eff == null ? tripEnergyLabel(ed, isEnglish) : (tripDisplayEstimated(ed) ? (isEnglish ? 'Estimated ' : '추정 ') : '') + n(eff, 1) + ' km/kWh'}</span>`;
           const mergeHtml = (ed.merged && ed.merge_count > 1)
             ? `<span class="trip-merge-badge">${ed.merge_count}${isEnglish ? ' merged' : '건 병합'}</span>`
             : '';
