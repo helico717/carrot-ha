@@ -8,6 +8,12 @@ BINARY_FIELDS = {
     'doors_locked': ('차량 잠김 상태', None),
 }
 SENSOR_FIELDS = {
+    'battery_charge_temperature_status': ('충전 온도 상태', None, 'mdi:thermometer-check', None, None),
+    'battery_min_temperature_c': ('배터리 최저 온도', '°C', 'mdi:thermometer-low', 'temperature', 1),
+    'battery_max_temperature_c': ('배터리 최고 온도', '°C', 'mdi:thermometer-high', 'temperature', 1),
+    'battery_cell_min_voltage_v': ('셀 최저 전압', 'V', 'mdi:battery-minus', 'voltage', 3),
+    'battery_cell_max_voltage_v': ('셀 최고 전압', 'V', 'mdi:battery-plus', 'voltage', 3),
+    'battery_cell_voltage_delta_mv': ('셀 전압 차이', 'mV', 'mdi:battery-sync', 'voltage', 0),
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
     'dcdc_temperature_c': ('DC-DC 컨버터 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_cpu_temperature_c': ('콤마 CPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
@@ -72,3 +78,24 @@ def charge_plug_indication(data):
     codes = [data.get(f'charge_can_plug_text_bus{bus}') for bus in (0, 1)]
     valid = [code for code in codes if type(code) is int and 0 <= code <= 7]
     return any(code == 2 for code in valid) if valid else None
+
+
+BATTERY_MONITOR_FIELDS = {key for key in SENSOR_FIELDS if key.startswith('battery_')}
+CHARGE_TEMPERATURE_DISPLAY = {'below_optimal': '적정 미만', 'optimal': '적정', 'above_optimal': '적정 초과'}
+
+def battery_monitor_attributes(key, data):
+    if key not in BATTERY_MONITOR_FIELDS:
+        return {}
+    from datetime import datetime, timezone
+    measured = (data.get('field_measured_at') or {}).get(key)
+    try:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(measured.replace('Z', '+00:00'))).total_seconds()
+    except (TypeError, ValueError, AttributeError):
+        age = None
+    return {'source': 'passive_can',
+            'can_id': '0x1A5555B2' if key == 'battery_charge_temperature_status' else '0x16A954A6',
+            'measurement_basis': 'vehicle_report_at_can_receipt',
+            'validation': 'dbc_and_one_dc_capture; independent_measurement_pending',
+            'measured_at': measured, 'measurement_age_s': round(age, 1) if age is not None else None,
+            'stale': age is None or not 0 <= age <= FRESHNESS_SECONDS,
+            'freshness_limit_s': FRESHNESS_SECONDS}

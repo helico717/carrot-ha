@@ -46,6 +46,27 @@ class TestNewSensors(unittest.TestCase):
             'summary': summary or {}
         }
 
+    def test_battery_monitoring_entities_freshness_and_attributes(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
+        from custom_components.carrot_ha.telemetry import BATTERY_MONITOR_FIELDS
+        self.assertEqual(len(BATTERY_MONITOR_FIELDS), 6)
+        now = datetime.now(timezone.utc)
+        for key in BATTERY_MONITOR_FIELDS:
+            value = 'optimal' if key == 'battery_charge_temperature_status' else 13
+            runtime = self._make_runtime({key: value, 'field_measured_at': {key: now.isoformat()}})
+            entry = runtime['entry']; entry.entry_id = 'battery-test'
+            sensor = VehicleSensor(entry, key, *FIELDS[key])
+            sensor.hass = types.SimpleNamespace(data={'carrot_ha': {'battery-test': runtime}})
+            self.assertEqual(sensor.native_value, '적정' if isinstance(value, str) else value)
+            attrs = sensor.extra_state_attributes
+            self.assertEqual(attrs['source'], 'passive_can')
+            self.assertEqual(attrs['measured_at'], now.isoformat())
+            self.assertFalse(attrs['stale'])
+            runtime['latest']['data']['field_measured_at'][key] = (now - timedelta(seconds=181)).isoformat()
+            self.assertIsNone(sensor.native_value)
+            self.assertTrue(sensor.extra_state_attributes['stale'])
+            self.assertNotEqual(sensor.extra_state_attributes['measured_at'], now.isoformat())
+
     def test_wheel_speed_conversion(self):
         # 25 m/s = 90.0 km/h
         runtime = self._make_runtime({'wheel_speed_mps': 25.0})

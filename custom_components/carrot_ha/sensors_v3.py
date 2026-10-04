@@ -3,7 +3,7 @@ from datetime import datetime
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
-from .telemetry import SENSOR_FIELDS
+from .telemetry import SENSOR_FIELDS, CHARGE_TEMPERATURE_DISPLAY, battery_monitor_attributes
 
 GEAR_DISPLAY = {
     'park': 'P',
@@ -96,6 +96,8 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def native_value(self):
         value=self.data.get(self.key)
+        if self.key == 'battery_charge_temperature_status':
+            return CHARGE_TEMPERATURE_DISPLAY.get(value)
         if self.key=='gear':
             if not value:
                 return None
@@ -116,6 +118,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
     @property
     def extra_state_attributes(self):
         attrs=super().extra_state_attributes
+        attrs.update(battery_monitor_attributes(self.key, self.data))
         if self.key == 'charge_power_w':
             attrs.update(raw_power_w=self.data.get('charge_power_raw_w'),
                          source=self.data.get('charge_power_source'),
