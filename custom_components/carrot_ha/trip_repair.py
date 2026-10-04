@@ -3,6 +3,7 @@ from .battery import MEB_INVALID_ENERGY_WH
 import bisect
 import hashlib
 import json
+from . import archive_codec
 import math
 from datetime import datetime, timezone
 
@@ -305,7 +306,7 @@ def refresh(db, device):
     samples = Samples(rows)
     old = {key: json.loads(body) for key,body in db.execute('SELECT id,body FROM trip_derivations WHERE device=?',(device,))}
     for key, body in trips:
-        data = json.loads(body)['data']
+        data = archive_codec.loads(body)['data']
         result = derive(data, samples, old.get(key))
         db.execute('INSERT INTO trip_derivations VALUES (?,?,?) ON CONFLICT(device,id) DO UPDATE SET body=excluded.body',
                    (device,key,json.dumps(result,allow_nan=False)))

@@ -2,6 +2,8 @@ from .battery import DEFAULT_SOC_CAPACITY_KWH
 import asyncio
 import hmac
 import json
+import logging
+from pathlib import Path
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import callback
@@ -11,6 +13,7 @@ from .charge_costs import refresh_runtime_costs
 from .protocol import MAX_BYTES
 
 DOMAIN = 'carrot_ha'
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass, config):
     hass.data.setdefault(DOMAIN, {})
@@ -44,6 +47,38 @@ async def async_setup(hass, config):
                 runtime['summary'] = await hass.async_add_executor_job(runtime['archive'].overview, runtime['entry'].data['device_id'])
                 async_dispatcher_send(hass, DOMAIN + runtime['entry'].entry_id)
 
+    async def async_handle_archive_compression(call):
+        entry_id = call.data['entry_id']
+        runtime = hass.data.get(DOMAIN, {}).get(entry_id)
+        if not isinstance(runtime, dict) or 'archive' not in runtime:
+            raise ValueError('Unknown Carrot HA entry')
+        lock = runtime.setdefault('archive_compression_lock', asyncio.Lock())
+        if lock.locked():
+            raise ValueError('An archive compression operation is already running')
+        async with lock:
+            method = (runtime['archive'].compact_lossless if call.service == 'compress_archive'
+                      else runtime['archive'].restore_lossless)
+            archive = runtime['archive']
+            try:
+                result = await hass.async_add_executor_job(method)
+                # Conversion is committed before reclamation; failure is recoverable.
+                await hass.async_add_executor_job(archive.compression_status, 'vacuuming')
+                await hass.async_add_executor_job(archive.vacuum)
+                from functools import partial
+                await hass.async_add_executor_job(partial(archive.compression_status, 'complete',
+                    operation=call.service, database_bytes=Path(archive.path).stat().st_size, **result))
+            except Exception as error:
+                _LOGGER.exception('Archive %s failed for entry %s', call.service, entry_id)
+                from functools import partial
+                try:
+                    await hass.async_add_executor_job(partial(archive.compression_status, 'failed',
+                        operation=call.service, error=str(error)))
+                except OSError:
+                    _LOGGER.warning('Could not persist archive failure status; see original traceback')
+                raise
+
+    hass.services.async_register(DOMAIN, 'compress_archive', async_handle_archive_compression)
+    hass.services.async_register(DOMAIN, 'restore_archive', async_handle_archive_compression)
     hass.services.async_register(DOMAIN, 'purge_database', async_handle_purge)
     return True
 

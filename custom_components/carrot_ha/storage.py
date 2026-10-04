@@ -9,6 +9,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from .protocol import validate
+from . import archive_codec
+import logging
+import shutil
+
+_LOGGER = logging.getLogger(__name__)
 from . import trip_repair
 
 from .charge_costs import ChargeCosts
@@ -21,6 +26,7 @@ class Archive(ChargeCosts):
         self._derived_ready = set()
         self.revision = 0
         self._derived_lock = threading.RLock()
+        self._compression_write_lock = threading.RLock()
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE TABLE IF NOT EXISTS trip_derivations (device TEXT, id TEXT, body TEXT, PRIMARY KEY(device,id))')
@@ -35,22 +41,135 @@ class Archive(ChargeCosts):
     @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=15)
+        db.create_function("carrot_unpack", 1, archive_codec.unpack, deterministic=True)
         try:
             with db:
                 yield db
         finally:
             db.close()
 
+    @property
+    def compression_enabled(self):
+        return Path(self.path + '.compression-enabled').exists()
+
+    def _stored_body(self, body):
+        return archive_codec.pack(body) if self.compression_enabled else body
+
+    def set_compression(self, enabled):
+        with self._compression_write_lock:
+            self._set_compression(enabled)
+
+    def _set_compression(self, enabled):
+        marker = Path(self.path + '.compression-enabled')
+        if enabled:
+            marker.touch()
+        else:
+            marker.unlink(missing_ok=True)
+
+    def compression_status(self, phase, **details):
+        status = {'phase': phase, 'updated_at': datetime.now(timezone.utc).isoformat(),
+                  'compression_enabled': self.compression_enabled, **details}
+        path = Path(self.path + '.compression-status.json')
+        temporary = Path(str(path) + '.partial')
+        temporary.write_text(json.dumps(status, sort_keys=True), encoding='utf-8')
+        temporary.replace(path)
+        _LOGGER.info('Archive compression %s: %s', phase, details)
+
+    def compact_lossless(self):
+        """Explicit opt-in: durable backup, bounded transactions, then enable writes.
+
+        Conditional updates preserve newer cloud records and never invalidate
+        logical caches. This operation does not change retention or event rowids.
+        """
+        self.compression_status('backing_up')
+        backup = Path(self.path + '.before-compression.sqlite3')
+        required = Path(self.path).stat().st_size * (2 if backup.exists() else 3)
+        if shutil.disk_usage(Path(self.path).parent).free < required:
+            raise OSError('Insufficient free disk space for archive backup and compaction')
+        if backup.exists():
+            with sqlite3.connect(backup.resolve().as_uri() + '?mode=ro', uri=True) as existing:
+                if existing.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                    raise ValueError('Existing archive backup failed integrity check')
+        else:
+            temporary = Path(str(backup) + '.partial')
+            try:
+                with self.connect() as source:
+                    target = sqlite3.connect(temporary)
+                    try:
+                        source.backup(target, pages=256)
+                        if target.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                            raise ValueError('Archive backup integrity check failed')
+                    finally:
+                        target.close()
+                temporary.replace(backup)
+            finally:
+                temporary.unlink(missing_ok=True)
+        self.compression_status('compressing', backup=str(backup))
+        changed = 0
+        after = 0
+        with self.connect() as db:
+            upper = db.execute("SELECT COALESCE(MAX(rowid),0) FROM events").fetchone()[0]
+        while True:
+            with self.connect() as db:
+                rows = db.execute("SELECT rowid,body FROM events WHERE kind='state' AND rowid>? AND rowid<=? ORDER BY rowid LIMIT 200", (after, upper)).fetchall()
+            if not rows:
+                break
+            updates = []
+            for rowid, body in rows:
+                packed = archive_codec.pack(body)
+                if packed != body:
+                    if archive_codec.unpack(packed) != body:
+                        raise ValueError('Archive compression roundtrip failed')
+                    updates.append((packed, rowid, body))
+            with self.connect() as db:
+                for packed, rowid, body in updates:
+                    changed += db.execute('UPDATE events SET body=? WHERE rowid=? AND body=?', (packed, rowid, body)).rowcount
+            after = rows[-1][0]
+            if changed and changed % 1000 == 0:
+                self.compression_status('compressing', compressed_rows=changed, last_rowid=after)
+        # Mixed text/wrapper storage is supported if interrupted before this point.
+        self.set_compression(True)
+        _LOGGER.info('Lossless archive compression complete: %s rows; backup=%s', changed, backup)
+        return {'compressed_rows': changed, 'backup': str(backup)}
+
+    def restore_lossless(self):
+        """Exclude concurrent compressed inserts while returning to legacy storage."""
+        with self._compression_write_lock:
+            return self._restore_lossless()
+
+    def _restore_lossless(self):
+        self.set_compression(False)
+        self.compression_status('restoring')
+        with self.connect() as db:
+            original_bytes = db.execute('SELECT COALESCE(SUM(length(CAST(carrot_unpack(body) AS BLOB))),0) FROM events').fetchone()[0]
+        if shutil.disk_usage(Path(self.path).parent).free < original_bytes * 2:
+            raise OSError('Insufficient free disk space to restore and vacuum archive')
+        after = 0
+        changed = 0
+        while True:
+            with self.connect() as db:
+                rows = db.execute('SELECT rowid,body FROM events WHERE rowid>? ORDER BY rowid LIMIT 200', (after,)).fetchall()
+            if not rows:
+                break
+            with self.connect() as db:
+                for rowid, body in rows:
+                    original = archive_codec.unpack(body)
+                    if original != body:
+                        changed += db.execute('UPDATE events SET body=? WHERE rowid=? AND body=?', (original, rowid, body)).rowcount
+            after = rows[-1][0]
+        _LOGGER.info('Archive restored to plain JSON: %s rows', changed)
+        return {'restored_rows': changed}
+
     def put(self, event):
         body = validate(event)
-        with self.connect() as db:
+        with self._compression_write_lock, self.connect() as db:
             existing = db.execute('SELECT body FROM events WHERE device=? AND id=?', (event['device_id'], event['event_id'])).fetchone()
             if existing:
-                if existing[0] != body:
+                if archive_codec.unpack(existing[0]) != body:
                     raise ValueError('Event ID reused with different content')
                 return False
             observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
-            db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (event['device_id'], event['event_id'], observed, event['kind'], body))
+            db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (event['device_id'], event['event_id'], observed, event['kind'], self._stored_body(body)))
             self.capture_charge(db, event)
         if event['kind'] == 'charge':
             self.invalidate_charge_costs()
@@ -71,7 +190,7 @@ class Archive(ChargeCosts):
                         JOIN trip_derivations d ON d.device=te.device AND d.id=te.id
                         WHERE te.device=?""", (device,)).fetchall()
                     for key, cached_fp, kwh, event_body, derived_body in cached_rows:
-                        data = json.loads(event_body)['data']
+                        data = archive_codec.loads(event_body)['data']
                         derived = json.loads(derived_body)
                         old_fp = json.loads(cached_fp)
                         new_fp = [data.get(k) for k in ('started_at','ended_at','distance_m','partial')]
@@ -99,7 +218,7 @@ class Archive(ChargeCosts):
     def latest(self, device):
         with self.connect() as db:
             row = db.execute("SELECT body FROM events WHERE device=? AND kind='state' ORDER BY observed DESC, rowid DESC LIMIT 1", (device,)).fetchone()
-        return json.loads(row[0]) if row else {}
+        return archive_codec.loads(row[0]) if row else {}
 
     def put_cloud(self, event):
         """Cloud trip IDs represent mutable records; direct upload remains immutable."""
@@ -107,9 +226,9 @@ class Archive(ChargeCosts):
             raise ValueError('Not a cloud event')
         body = validate(event)
         observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
-        with self.connect() as db:
-            changed = db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body WHERE events.body != excluded.body',
-                       (event['device_id'], event['event_id'], observed, event['kind'], body)).rowcount
+        with self._compression_write_lock, self.connect() as db:
+            changed = db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body WHERE carrot_unpack(events.body) != carrot_unpack(excluded.body)',
+                       (event['device_id'], event['event_id'], observed, event['kind'], self._stored_body(body))).rowcount
             if changed:
                 self.capture_charge(db, event)
         if changed:
@@ -133,7 +252,7 @@ class Archive(ChargeCosts):
                 rows = db.execute('SELECT body FROM events WHERE device=? AND kind=? ORDER BY observed DESC, rowid DESC LIMIT ? OFFSET ?', (device, kind, limit, offset)).fetchall()
             else:
                 rows = db.execute("SELECT body FROM events WHERE device=? AND kind=? AND julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) >= julianday(?) ORDER BY julianday(COALESCE(json_extract(body, '$.data.started_at'), observed)) DESC, rowid DESC LIMIT ? OFFSET ?", (device, kind, since, limit, offset)).fetchall()
-        events = [json.loads(row[0]) for row in rows]
+        events = [archive_codec.loads(row[0]) for row in rows]
         if kind == 'trip':
             self._ensure_derivations(device)
             with self.connect() as db:
@@ -260,7 +379,7 @@ class Archive(ChargeCosts):
             for event_id, observed, body in rows:
                 if datetime.fromisoformat(observed).astimezone(tz).strftime('%Y-%m') != month:
                     continue
-                trip = json.loads(body)['data']
+                trip = archive_codec.loads(body)['data']
                 fingerprint = json.dumps([trip.get(k) for k in ('started_at', 'ended_at', 'distance_m', 'partial')])
                 derived_row = db.execute('SELECT body FROM trip_derivations WHERE device=? AND id=?',(device,event_id)).fetchone()
                 derived = json.loads(derived_row[0]) if derived_row else None
@@ -308,7 +427,7 @@ class Archive(ChargeCosts):
                 samples = {}
                 contaminated = False
                 for (state_body,) in states:
-                    state_event = json.loads(state_body)
+                    state_event = archive_codec.calculation_event(state_body)
                     state = state_event['data']
                     try:
                         t = timestamp((state.get('field_measured_at') or {}).get('battery_wh') or state.get('measured_at') or state_event['observed_at'])

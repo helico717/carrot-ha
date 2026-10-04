@@ -1,5 +1,6 @@
 """Seven local days, measured samples only; gaps are never interpolated."""
 import json
+from . import archive_codec
 import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -15,7 +16,7 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
     with archive.connect() as db:
         rows=db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? ORDER BY observed",(device,datetime.fromtimestamp(start-300,timezone.utc).isoformat().replace('+00:00','Z')))
         for (body,) in rows:
-            e=json.loads(body);v=e.get('data',{})
+            e=archive_codec.calculation_event(body);v=e.get('data',{})
             try:
                 received=datetime.fromisoformat(e['observed_at'].replace('Z','+00:00')).astimezone(tz)
                 rd=days.get(str(received.date()))

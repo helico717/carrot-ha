@@ -1,3 +1,22 @@
 purge_database:
   name: Purge Database
   description: Purges expired telemetry history and vacuums the database.
+
+compress_archive:
+  name: Compress archive without deleting records
+  description: Creates a SQLite backup, compresses large state records losslessly, enables compressed writes, and vacuums. Explicit opt-in; requires free disk space.
+  fields:
+    entry_id:
+      name: Config entry ID
+      required: true
+      selector:
+        text:
+restore_archive:
+  name: Restore archive to plain JSON
+  description: Disables compressed writes and restores all original JSON including records received after compression. Run before installing an older release.
+  fields:
+    entry_id:
+      name: Config entry ID
+      required: true
+      selector:
+        text:

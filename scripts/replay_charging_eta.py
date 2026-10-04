@@ -34,6 +34,9 @@ def main():
     models = [('updated', load(root / 'custom_components/carrot_ha/battery.py', 'updated'))]
     if args.baseline:
         models.insert(0, ('baseline', load(args.baseline, 'baseline')))
+    codec_spec = importlib.util.spec_from_file_location('archive_codec', root / 'custom_components/carrot_ha/archive_codec.py')
+    codec = importlib.util.module_from_spec(codec_spec)
+    codec_spec.loader.exec_module(codec)
     samples, sessions, failed = {}, [], 0
     with sqlite3.connect(args.database.resolve().as_uri() + '?mode=ro', uri=True) as db:
         # The export's last table page can be damaged while its primary-key
@@ -43,7 +46,7 @@ def main():
         for rowid in ids:
             try:
                 kind, body = db.execute('SELECT kind,body FROM events WHERE rowid=?', (rowid,)).fetchone()
-                event = json.loads(body)
+                event = codec.loads(body)
             except (sqlite3.DatabaseError, ValueError, TypeError):
                 failed += 1
                 continue
