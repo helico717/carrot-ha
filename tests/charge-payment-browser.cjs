@@ -5,7 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
  const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
   for(const lang of ['ko','en'])for(const width of [390,1200])for(const dark of [false,true]){
-   const page=await browser.newPage({viewport:{width,height:850}});const errors=[];
+   const page=await browser.newPage({viewport:{width,height:850},hasTouch:width===390});const errors=[];
    page.on('pageerror',e=>errors.push(e.message));
    await page.route('**/*',route=>{
     const url=new URL(route.request().url());
@@ -40,7 +40,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
      writes.push(msg);await new Promise(r=>setTimeout(r,80));
      if(rejectWrite)throw {code:'save_failed'};
      const d=rows.find(e=>e.data.payment_id===msg.payment_id).data;
-     if(msg.type==='carrot_ha/charge_record/exclude'){d.excluded=msg.excluded;d.payment_version++;return {payment_version:d.payment_version};}
+     if(msg.type==='carrot_ha/charge_record/delete'){rows=rows.filter(e=>e.data.payment_id!==msg.payment_id);totals.effective_cost_krw=rows.reduce((s,e)=>s+e.data.effective_cost_krw,0);return {deleted:true};}
      d.actual_cost_krw=msg.type.endsWith('/delete')?null:msg.actual_cost_krw;
      d.effective_cost_krw=d.actual_cost_krw??d.estimated_cost_krw;d.payment_version++;
      d.cost_source=d.actual_cost_krw==null?'estimated':'actual';
@@ -77,14 +77,30 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.waitForFunction(lang=>card.shadowRoot.querySelector('[data-charge-payment="0"]').textContent.includes(lang==='ko'?'직접 입력':'Enter amount'),lang);
    assert((await pill.textContent()).includes(lang==='ko'?'직접 입력':'Enter amount'));
    assert.equal(await page.evaluate(()=>card.v.charge_cost_totals.effective_cost_krw),33600);
-   await pill.click();await page.locator('dialog .exclude').click();
-   await page.waitForFunction(()=>!document.querySelector('dialog')&&card.charges[0].data.excluded===true);
-   await page.waitForFunction(()=>!card.shadowRoot.querySelector('[data-charge-payment="0"]'));
-   await page.locator('payment-test-card [data-charge-excluded-toggle]').click();
-   await pill.click();await page.locator('dialog .exclude').click();
-   await page.waitForFunction(()=>!document.querySelector('dialog')&&card.charges[0].data.excluded===false);
-   await page.locator('payment-test-card [data-charge-excluded-toggle]').click();
-   await page.waitForFunction(()=>card.shadowRoot.querySelector('[data-charge-payment="0"]'));
+   const row=page.locator('payment-test-card [data-charge-record="0"]');
+   const bounds=await row.boundingBox();
+   if(width===390){
+     const session=await page.context().newCDPSession(page);
+     const point=x=>({x,y:bounds.y+bounds.height/2});
+     await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point(bounds.x+25)]});
+     for(let dx=45;dx<=125;dx+=20)await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[point(bounds.x+dx)]});
+     await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+     await session.detach();
+   }else{
+     await page.mouse.move(bounds.x+25,bounds.y+bounds.height/2);await page.mouse.down();
+     await page.mouse.move(bounds.x+125,bounds.y+bounds.height/2,{steps:6});await page.mouse.up();
+   }
+   await page.waitForFunction(()=>{const el=card.shadowRoot.querySelector('[data-charge-record="0"]>.charge-meta');return Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41)===84;});
+   if(width===390)await page.screenshot({path:`/private/tmp/carrot-swipe-delete-${lang}-${dark?'dark':'light'}.png`});
+   await page.locator('payment-test-card [data-charge-delete="0"]').click();
+   assert((await page.locator('dialog .warning').textContent()).includes(lang==='ko'?'복원이 불가':'cannot be restored'));
+   await page.locator('dialog .cancel').click();
+   assert.equal(await page.evaluate(()=>rows.length),12);
+   await page.locator('payment-test-card [data-charge-delete="0"]').click();
+   await page.locator('dialog .confirm').click();
+   await page.waitForFunction(()=>!document.querySelector('dialog')&&card.charges.length===11);
+   assert.equal(await page.evaluate(()=>rows.some(e=>e.data.payment_id==='payment-0')),false);
+   assert.equal(await page.evaluate(()=>writes.filter(e=>e.type==='carrot_ha/charge_record/delete').length),1);
    const overflow=await page.evaluate(()=>card.shadowRoot.querySelector('.charge-history').scrollWidth>card.shadowRoot.querySelector('.charge-history').clientWidth+1);assert.equal(overflow,false);
    if(width===390)await page.screenshot({path:`/private/tmp/carrot-payment-${lang}-${dark?'dark':'light'}.png`});
    assert.deepEqual(errors,[]);console.log(`PASS ${lang} ${width}px ${dark?'dark':'light'}: save/edit/zero/delete/failure/async continuity`);await page.close();

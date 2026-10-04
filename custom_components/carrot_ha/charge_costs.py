@@ -40,11 +40,45 @@ class ChargeCosts:
         db.execute('''CREATE TABLE IF NOT EXISTS charge_exclusions (
             device TEXT, event_id TEXT, excluded INTEGER NOT NULL, updated TEXT,
             PRIMARY KEY(device,event_id))''')
+        db.execute('''CREATE TABLE IF NOT EXISTS charge_deletions (
+            device TEXT, event_id TEXT, correction TEXT NOT NULL, deleted TEXT NOT NULL,
+            PRIMARY KEY(device,event_id))''')
         for (body,) in db.execute("SELECT body FROM events WHERE kind='charge'").fetchall():
             self.capture_charge(db, json.loads(body))
 
+    def is_charge_deleted(self, db, event):
+        return event['kind'] == 'charge' and db.execute(
+            'SELECT 1 FROM charge_deletions WHERE device=? AND event_id=?',
+            (event['device_id'], event['event_id'])).fetchone() is not None
+
+    def delete_charge(self, device, payment_id, ids, expected_version):
+        if (not isinstance(ids, list) or not ids or len(ids)>500 or len(set(ids))!=len(ids)
+                or any(not isinstance(key,str) for key in ids)
+                or type(expected_version) is not int or expected_version<0):
+            raise ValueError('Invalid charge deletion')
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            group=next((e['data'] for e in self._charge_groups(db,device) if e['event_id']==payment_id),None)
+            if group is None or sorted(group['source_event_ids'])!=sorted(ids) or group['payment_version']!=expected_version:
+                raise PaymentConflict('Charge changed; reload before deleting')
+            for key in ids:
+                row=db.execute('SELECT day,body FROM charge_summaries WHERE device=? AND id=?',(device,key)).fetchone()
+                data=json.loads(row[1])
+                correction={k:data[k] for k in ('started_at','ended_at','energy_kwh','duration_s','cost_krw') if k in data}
+                correction['day']=row[0]
+                db.execute('INSERT INTO charge_deletions VALUES (?,?,?,?)',
+                    (device,key,json.dumps(correction),datetime.now(timezone.utc).isoformat()))
+                for table,column in [('events','id'),('charge_summaries','id'),('charge_payment_parts','event_id'),('charge_exclusions','event_id')]:
+                    db.execute(f'DELETE FROM {table} WHERE device=? AND {column}=?',(device,key))
+            db.execute('DELETE FROM charge_payments WHERE device=? AND id=?',(device,payment_id))
+        self.invalidate_charge_costs()
+        self.revision+=1
+        return dict(deleted=True)
+
     def capture_charge(self, db, event):
         if event['kind'] != 'charge':
+            return
+        if self.is_charge_deleted(db, event):
             return
         data = event['data']
         try:
@@ -160,6 +194,9 @@ class ChargeCosts:
             groups = self._charge_groups(db, device)
         items = [e['data'] for e in groups if e['data']['accounting_date'].startswith(month+'-')]
         excluded = [d for d in items if d['excluded']]
+        with self.connect() as db:
+            deleted=[json.loads(body) for body, in db.execute('SELECT correction FROM charge_deletions WHERE device=?',(device,))]
+        deleted=[d for d in deleted if d['day'].startswith(month+'-')]
         items = [d for d in items if not d['excluded']]
         actual = sum(d['actual_cost_krw'] for d in items if d['actual_cost_krw'] is not None)
         estimated = sum(d['estimated_cost_krw'] for d in items if d['actual_cost_krw'] is None)
@@ -168,9 +205,9 @@ class ChargeCosts:
                     estimated_cost_krw=estimated, actual_count=count, count=len(items),
                     cost_source='mixed' if 0 < count < len(items) else ('actual' if count else 'estimated'))
         result.update(excluded_count=len(excluded),
-                      excluded_estimated_cost_krw=sum(d['estimated_cost_krw'] for d in excluded),
-                      excluded_slow_kwh=sum(d['energy_kwh'] for d in excluded if not (d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11)),
-                      excluded_fast_kwh=sum(d['energy_kwh'] for d in excluded if d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11))
+                      excluded_estimated_cost_krw=sum(d['estimated_cost_krw'] for d in excluded)+sum(d['cost_krw'] for d in deleted),
+                      excluded_slow_kwh=sum(d['energy_kwh'] for d in excluded+deleted if not (d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11)),
+                      excluded_fast_kwh=sum(d['energy_kwh'] for d in excluded+deleted if d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11))
         self._charge_totals_cache[key] = result
         return dict(result)
 
@@ -207,6 +244,8 @@ class ChargeCosts:
             for key in ids:
                 db.execute('INSERT OR IGNORE INTO charge_payment_parts VALUES (?,?,?)', (device, key, payment_id))
         self.invalidate_charge_costs()
+        if excluded is not None:
+            self.revision += 1  # Invalidate shared battery-history calculations.
         return dict(payment_id=payment_id, payment_version=expected_version+1)
 
 

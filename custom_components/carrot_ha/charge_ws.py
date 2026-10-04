@@ -50,13 +50,33 @@ async def delete(hass, connection, msg):
     await _write(hass, connection, msg, None)
 
 
-@websocket_api.websocket_command({**_SCHEMA, vol.Required('type'): 'carrot_ha/charge_record/exclude',
-                                 vol.Required('excluded'): bool})
+@websocket_api.websocket_command({**_SCHEMA, vol.Required('type'): 'carrot_ha/charge_record/delete'})
 @websocket_api.async_response
-async def exclude(hass, connection, msg):
-    await _write(hass, connection, msg, msg['excluded'], exclusion=True)
+async def delete_record(hass, connection, msg):
+    if connection.user is None or not connection.user.is_admin:
+        connection.send_error(msg['id'], 'unauthorized', 'Administrator access required')
+        return
+    runtime=hass.data.get('carrot_ha',{}).get(msg['entry_id'])
+    if not isinstance(runtime,dict) or 'archive' not in runtime:
+        connection.send_error(msg['id'],'not_found','Vehicle entry not found')
+        return
+    try:
+        async with runtime['lock']:
+            result=await hass.async_add_executor_job(runtime['archive'].delete_charge,
+                runtime['entry'].data['device_id'],msg['payment_id'],msg['source_event_ids'],msg['expected_version'])
+            try:
+                await refresh_runtime_costs(hass,runtime)
+            except Exception:
+                pass  # The durable deletion already succeeded.
+        async_dispatcher_send(hass,'carrot_ha'+runtime['entry'].entry_id)
+        connection.send_result(msg['id'],result)
+    except PaymentConflict as error:
+        connection.send_error(msg['id'],'conflict',str(error))
+    except ValueError as error:
+        connection.send_error(msg['id'],'invalid_record',str(error))
+
 
 def async_register(hass):
     websocket_api.async_register_command(hass, save)
     websocket_api.async_register_command(hass, delete)
-    websocket_api.async_register_command(hass, exclude)
+    websocket_api.async_register_command(hass, delete_record)

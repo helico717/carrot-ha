@@ -13,6 +13,28 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
     days={str(d):dict(date=str(d),used=None,drive_s=0,charge_s=0,covered_s=0,received_samples=0,valid_samples=0,stale_samples=0,hours=[None]*24,charge_hours=[False]*24) for d in dates}
     start=datetime.combine(dates[0],datetime.min.time(),tzinfo=tz).timestamp()
     previous=None
+    # Exclusions correct inferred charging without changing measured battery energy.
+    # Collector charging flags can remain true for five minutes after the last gain.
+    with archive.connect() as db:
+        excluded_rows = db.execute("""SELECT s.id,s.started,s.ended FROM charge_summaries s
+            JOIN charge_exclusions x ON x.device=s.device AND x.event_id=s.id
+            WHERE s.device=? AND x.excluded=1""", (device,)).fetchall()
+    with archive.connect() as db:
+        for key,body in db.execute('SELECT event_id,correction FROM charge_deletions WHERE device=?',(device,)):
+            data=json.loads(body)
+            excluded_rows.append((key,data['started_at'],data['ended_at']))
+    excluded_ids = {row[0] for row in excluded_rows}
+    excluded_windows = [(datetime.fromisoformat(a.replace('Z','+00:00')).timestamp(),
+                         datetime.fromisoformat(b.replace('Z','+00:00')).timestamp()+300)
+                        for _,a,b in excluded_rows]
+    # A nearby retained charge must continue to show its own charging samples.
+    retained_windows = []
+    if excluded_windows:
+        with archive.connect() as db:
+            for key,a,b in db.execute('SELECT id,started,ended FROM charge_summaries WHERE device=?', (device,)):
+                if key not in excluded_ids:
+                    retained_windows.append((datetime.fromisoformat(a.replace('Z','+00:00')).timestamp(),
+                                             datetime.fromisoformat(b.replace('Z','+00:00')).timestamp()+300))
     with archive.connect() as db:
         rows=db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? ORDER BY observed",(device,datetime.fromtimestamp(start-300,timezone.utc).isoformat().replace('+00:00','Z')))
         for (body,) in rows:
@@ -28,11 +50,14 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                 energy=float(v['battery_wh']);soc=energy/(float(capacity)*1000)*100
                 if not math.isfinite(soc) or not 0<=soc<=110 or v.get('stale') or t>now.timestamp():continue
             except (ValueError,TypeError,KeyError):continue
+            charging=v.get('charging') in (True, 1)
+            if charging and any(a<=t<=b for a,b in excluded_windows) and not any(a<=t<=b for a,b in retained_windows):
+                charging=False
             local=datetime.fromtimestamp(t,tz);day=days.get(str(local.date()))
             if day is not None:
                 day['valid_samples']+=1
-                if v.get('charging') in (True, 1):day['charge_hours'][local.hour]=True
-                day['hours'][local.hour]={'soc':min(100,soc),'charging':v.get('charging') is True,'driving':v.get('driving',v.get('onroad')) in (True, 1)}
+                if charging:day['charge_hours'][local.hour]=True
+                day['hours'][local.hour]={'soc':min(100,soc),'charging':charging,'driving':v.get('driving',v.get('onroad')) in (True, 1)}
             if previous and t>previous[0] and t-previous[0]<=300:
                 pt,ps,pv=previous;dt=t-pt
                 cursor=max(pt,start)
@@ -63,7 +88,9 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
     intervals={'trip':[], 'charge':[]}
     with archive.connect() as db:
         for kind,body in db.execute("SELECT kind,body FROM events WHERE device=? AND kind IN ('trip','charge')",(device,)):
-            v=json.loads(body).get('data',{})
+            event=json.loads(body)
+            if kind=='charge' and event.get('event_id') in excluded_ids:continue
+            v=event.get('data',{})
             try:
                 a=datetime.fromisoformat(v['started_at'].replace('Z','+00:00')).timestamp()
                 b=datetime.fromisoformat(v['ended_at'].replace('Z','+00:00')).timestamp()

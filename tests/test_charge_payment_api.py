@@ -66,3 +66,27 @@ class ChargePaymentAPITest(ChargePaymentsTest, unittest.IsolatedAsyncioTestCase)
         await ns['_write'](hass, connection, dict(msg,expected_version=self.data()['payment_version']), 500)
         self.assertEqual(replies[-1][0], 'ok')
         self.assertEqual(self.data()['actual_cost_krw'], 500)
+
+    async def test_permanent_delete_admin_scope_conflict_and_ack(self):
+        self.charge()
+        data = self.data()
+        tree = ast.parse(Path('custom_components/carrot_ha/charge_ws.py').read_text())
+        tree.body = [n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'delete_record']
+        tree.body[0].decorator_list = []
+        ns = dict(PaymentConflict=PaymentConflict, refresh_runtime_costs=refresh_runtime_costs, async_dispatcher_send=lambda *args:None)
+        exec(compile(tree, 'charge_ws.py', 'exec'), ns)
+        async def executor(fn,*args):return fn(*args)
+        runtime = dict(entry=SimpleNamespace(entry_id='entry',data={'device_id':'car'}),archive=self.archive,lock=asyncio.Lock())
+        hass = SimpleNamespace(config=SimpleNamespace(time_zone='Asia/Seoul'), data={'carrot_ha':{'entry':runtime}},async_add_executor_job=executor)
+        replies=[]
+        connection=SimpleNamespace(user=SimpleNamespace(is_admin=False),send_error=lambda *a:replies.append(('error',a)),send_result=lambda *a:replies.append(('ok',a)))
+        msg=dict(id=1,entry_id='entry',payment_id=data['payment_id'],source_event_ids=data['source_event_ids'],expected_version=0)
+        await ns['delete_record'](hass,connection,msg)
+        self.assertEqual(replies[-1][1][1],'unauthorized')
+        self.assertEqual(len(self.archive.charge_history('car')),1)
+        connection.user.is_admin=True
+        await ns['delete_record'](hass,connection,dict(msg,expected_version=9))
+        self.assertEqual(replies[-1][1][1],'conflict')
+        await ns['delete_record'](hass,connection,msg)
+        self.assertEqual(replies[-1][0],'ok')
+        self.assertEqual(self.archive.charge_history('car'),[])

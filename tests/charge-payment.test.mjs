@@ -49,3 +49,13 @@ for(const lang of ['ko','en']) {
     }
   });
 }
+
+test('graph correction refresh follows independent live totals without cloud requests',async()=>{
+  const calls=[];const card={device:{entry_id:'entry'},v:{battery_history:['old']},saveCache(){},render(){},_hass:{async callApi(method,url){calls.push(url);return url.includes('/history/')?{events:[]}:{values:{charge_cost_totals:{effective_cost_krw:0},battery_history:['corrected']}};}}};
+  await refreshChargeCosts(card,true);
+  assert.deepEqual(card.v.battery_history,['corrected']);
+  assert.equal(calls.length,3);
+  assert(calls[1].endsWith('?live=1'));
+  assert(!calls[2].includes('?live=1'));
+  assert(calls.every(url=>!url.includes('refresh=1')));
+});

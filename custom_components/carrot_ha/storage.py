@@ -163,6 +163,8 @@ class Archive(ChargeCosts):
     def put(self, event):
         body = validate(event)
         with self._compression_write_lock, self.connect() as db:
+            if self.is_charge_deleted(db, event):
+                return False
             existing = db.execute('SELECT body FROM events WHERE device=? AND id=?', (event['device_id'], event['event_id'])).fetchone()
             if existing:
                 if archive_codec.unpack(existing[0]) != body:
@@ -227,6 +229,8 @@ class Archive(ChargeCosts):
         body = validate(event)
         observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
         with self._compression_write_lock, self.connect() as db:
+            if self.is_charge_deleted(db, event):
+                return False
             changed = db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body WHERE carrot_unpack(events.body) != carrot_unpack(excluded.body)',
                        (event['device_id'], event['event_id'], observed, event['kind'], self._stored_body(body))).rowcount
             if changed:
