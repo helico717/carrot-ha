@@ -8,6 +8,7 @@ from aiohttp import ClientTimeout
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .cloud_feed import parse_feed
+from .charge_costs import refresh_runtime_costs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -169,6 +170,7 @@ async def sync(hass, runtime):
                 except Exception as legacy_error:
                     _LOGGER.debug('Carrot fallback /api/json trip sync failed: %s', type(legacy_error).__name__)
         runtime['summary'] = await hass.async_add_executor_job(runtime['archive'].overview, entry.data['device_id'])
+        await refresh_runtime_costs(hass, runtime)
         runtime['cloud_status'] = 'ok'
         runtime['cloud_last_sync'] = datetime.now(timezone.utc).isoformat()
     except asyncio.CancelledError:

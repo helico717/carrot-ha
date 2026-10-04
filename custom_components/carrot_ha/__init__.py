@@ -7,6 +7,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .storage import Archive
+from .charge_costs import refresh_runtime_costs
 from .protocol import MAX_BYTES
 
 DOMAIN = 'carrot_ha'
@@ -32,6 +33,8 @@ async def async_setup(hass, config):
     hass.http.register_view(TerminalDeviceView(hass))
     from .terminal_ws import async_register as async_register_terminal_ws
     async_register_terminal_ws(hass)
+    from .charge_ws import async_register as async_register_charge_ws
+    async_register_charge_ws(hass)
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -45,13 +48,14 @@ async def async_setup(hass, config):
     return True
 
 async def async_setup_entry(hass, entry):
-    archive = await hass.async_add_executor_job(Archive, hass.config.path('carrot_ha', entry.entry_id + '.sqlite3'))
+    archive = await hass.async_add_executor_job(Archive, hass.config.path('carrot_ha', entry.entry_id + '.sqlite3'), hass.config.time_zone)
     latest = await hass.async_add_executor_job(archive.latest, entry.data['device_id'])
     hass.data[DOMAIN][entry.entry_id] = {'entry': entry, 'archive': archive, 'lock': asyncio.Lock(), 'latest': latest}
     hass.data[DOMAIN][entry.entry_id]['summary'] = await hass.async_add_executor_job(archive.overview, entry.data['device_id'])
     from .entity_migration import migrate_entities
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
+    await refresh_runtime_costs(hass, runtime)
     runtime['camera_options'] = (entry.options.get('camera_enabled', False), entry.options.get('camera_token', ''))
     if runtime['camera_options'][0] and len(runtime['camera_options'][1]) >= 32:
         from .camera_relay import CameraRelay
@@ -96,6 +100,12 @@ async def async_setup_entry(hass, entry):
             runtime['cloud_task'] = hass.async_create_background_task(sync(hass, runtime), 'carrot cloud sync')
     entry.async_on_unload(async_track_time_interval(hass, start_sync, timedelta(seconds=60)))
     start_sync()
+
+    async def refresh_costs(now=None):
+        async with runtime['lock']:
+            await refresh_runtime_costs(hass, runtime)
+
+    entry.async_on_unload(async_track_time_interval(hass, refresh_costs, timedelta(seconds=60)))
 
     async def run_daily_purge(now=None):
         await hass.async_add_executor_job(archive.purge_expired)
@@ -167,6 +177,8 @@ class ReceiveView(HomeAssistantView):
             async with runtime['lock']:
                 await self.hass.async_add_executor_job(runtime['archive'].put, event)
                 runtime['summary'] = await self.hass.async_add_executor_job(runtime['archive'].overview, event['device_id'])
+                if event['kind'] == 'charge':
+                    await refresh_runtime_costs(self.hass, runtime)
                 if event['kind'] == 'state':
                     from datetime import datetime
                     previous = runtime['latest']
@@ -197,7 +209,10 @@ class HistoryView(HomeAssistantView):
             kind = request.query.get('kind', 'trip')
             limit = int(request.query.get('limit', '100'))
             offset = int(request.query.get('offset', '0'))
-            rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset, request.query.get('since'))
+            if kind == 'charge':
+                rows = await self.hass.async_add_executor_job(runtime['archive'].charge_history, runtime['entry'].data['device_id'], limit, offset, request.query.get('since'))
+            else:
+                rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset, request.query.get('since'))
         except ValueError:
             return web.Response(status=400)
         if kind == 'trip' and rows:
@@ -205,12 +220,12 @@ class HistoryView(HomeAssistantView):
             rows = await self.hass.async_add_executor_job(
                 runtime['archive'].enrich_trips_energy,
                 runtime['entry'].data['device_id'], rows, capacity)
-        elif kind == 'charge' and rows:
+        elif kind == 'charge':
             capacity = runtime['entry'].options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)
             rows = await self.hass.async_add_executor_job(
                 runtime['archive'].enrich_charges_soc,
                 runtime['entry'].data['device_id'], rows, capacity)
-        return web.json_response({'events': rows, 'offset': offset, 'limit': limit})
+        return web.json_response({'events': rows, 'offset': offset, 'limit': limit, 'charge_costs_grouped': kind == 'charge'})
 
 class DevicesView(HomeAssistantView):
     url = '/api/carrot_ha/v1/devices'
@@ -245,6 +260,7 @@ class DashboardView(HomeAssistantView):
             from .cloud_live import refresh_live
             await refresh_live(self.hass, runtime)
         data=values(runtime)
+        data['charge_cost_totals'] = runtime.get('charge_cost_totals')
         data['live_status']=runtime.get('live_status')
         data['live_checked_at']=runtime.get('live_checked_at')
         from homeassistant.helpers import entity_registry as er

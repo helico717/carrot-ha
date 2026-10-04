@@ -73,7 +73,10 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
             state = feed.get('state')
             return [state if 'observed_at' in state else {'kind': 'state', 'observed_at': state['updated_at']}] if state else []
 
-        namespace = dict(asyncio=asyncio, json=json, datetime=datetime, timezone=timezone, urlencode=urlencode,
+        async def refresh_costs(hass, runtime):
+            runtime['charge_cost_totals'] = {'effective_cost_krw': 0}
+
+        namespace = dict(refresh_runtime_costs=refresh_costs, asyncio=asyncio, json=json, datetime=datetime, timezone=timezone, urlencode=urlencode,
                          ClientTimeout=lambda **kwargs: None,
                          async_get_clientsession=lambda hass: SimpleNamespace(get=get),
                          async_dispatcher_send=lambda *args: notifications.append(runtime['latest']['observed_at']),

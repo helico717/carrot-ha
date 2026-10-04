@@ -1,3 +1,4 @@
+import {chargeCostLabel} from '../custom_components/carrot_ha/frontend/carrot-charge-payment.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -408,6 +409,7 @@ const cleanEn = enSource
   .replace('export default CarrotDashboard;', '');
 
 const createProdContext = () => vm.createContext({
+  chargeCostLabel,
   DEFAULT_SOC_CAPACITY_KWH,
   tripDays: () => [],
   loadRecentTrips: async () => ({ events: [] }),

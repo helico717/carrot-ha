@@ -12,7 +12,7 @@ const debugContent = fs.readFileSync(debugPath, 'utf8');
 
 // 1. KO Dashboard Verification
 assert.ok(
-  koContent.includes('<strong>${n(cost,0)}원 <small>(추정)</small></strong>'),
+  koContent.includes('<strong>${n(cost,0)}원 <small>${ed.actual_cost_krw!=null?\'(실제)\':\'(추정)\'}</small></strong>'),
   'KO dashboard must place cost at Line 1 with "원 <small>(추정)</small>" format'
 );
 assert.ok(
@@ -20,7 +20,7 @@ assert.ok(
   'KO dashboard must place energy at Line 2 with <strong> style and "kWh" casing'
 );
 assert.ok(
-  koContent.includes('<span class="charge-sub">${n(unitPrice,0)}원/kWh</span>'),
+  koContent.includes('<span class="charge-sub">추정 단가 ${n(unitPrice,0)}원/kWh</span>'),
   'KO dashboard must place unit price at Line 3 with "원/kWh" (exact casing)'
 );
 
@@ -36,7 +36,7 @@ assert.ok(
 
 // 2. EN Dashboard Verification
 assert.ok(
-  enContent.includes('<strong>₩${n(cost,0)} <small>(est.)</small></strong>'),
+  enContent.includes('<strong>₩${n(cost,0)} <small>${ed.actual_cost_krw!=null?\'(actual)\':\'(est.)\'}</small></strong>'),
   'EN dashboard must place cost at Line 1 with "₩... <small>(est.)</small>" format'
 );
 assert.ok(
@@ -44,7 +44,7 @@ assert.ok(
   'EN dashboard must place energy at Line 2 with <strong> style and "kWh" casing'
 );
 assert.ok(
-  enContent.includes('<span class="charge-sub">₩${n(unitPrice,0)}/kWh</span>'),
+  enContent.includes('<span class="charge-sub">Est. rate ₩${n(unitPrice,0)}/kWh</span>'),
   'EN dashboard must place unit price at Line 3 with "₩.../kWh" (exact casing)'
 );
 

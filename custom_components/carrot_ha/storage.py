@@ -11,8 +11,11 @@ from pathlib import Path
 from .protocol import validate
 from . import trip_repair
 
-class Archive:
-    def __init__(self, path):
+from .charge_costs import ChargeCosts
+
+class Archive(ChargeCosts):
+    def __init__(self, path, charge_timezone="Asia/Seoul"):
+        self.charge_timezone = charge_timezone
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = str(path)
         self._derived_ready = set()
@@ -26,6 +29,8 @@ class Archive:
             db.execute('CREATE INDEX IF NOT EXISTS idx_events_kind_observed ON events(kind,observed)')
             db.execute('CREATE INDEX IF NOT EXISTS events_device_kind_observed ON events(device,kind,observed DESC)')
             db.execute("CREATE INDEX IF NOT EXISTS events_started ON events(device,kind,julianday(COALESCE(json_extract(body,'$.data.started_at'),observed)) DESC)")
+
+            self.init_charge_costs(db)
 
     @contextmanager
     def connect(self):
@@ -46,6 +51,9 @@ class Archive:
                 return False
             observed = datetime.fromisoformat(event['observed_at'].replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)', (event['device_id'], event['event_id'], observed, event['kind'], body))
+            self.capture_charge(db, event)
+        if event['kind'] == 'charge':
+            self.invalidate_charge_costs()
         with self._derived_lock:
             self.revision += 1
             self._derived_ready.discard(event['device_id'])
@@ -102,7 +110,11 @@ class Archive:
         with self.connect() as db:
             changed = db.execute('INSERT INTO events VALUES (?,?,?,?,?) ON CONFLICT(device,id) DO UPDATE SET observed=excluded.observed, kind=excluded.kind, body=excluded.body WHERE events.body != excluded.body',
                        (event['device_id'], event['event_id'], observed, event['kind'], body)).rowcount
+            if changed:
+                self.capture_charge(db, event)
         if changed:
+            if event['kind'] == 'charge':
+                self.invalidate_charge_costs()
             with self._derived_lock:
                 self.revision += 1
                 self._derived_ready.discard(event['device_id'])

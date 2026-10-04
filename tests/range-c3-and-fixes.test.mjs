@@ -133,7 +133,7 @@ assert.ok(enContent.includes('Charge cost this month'), 'English card must have 
 // 8. Verify Lock Icon Badge alignment and centering across all dashboards
 const manifestPath = path.resolve('custom_components/carrot_ha/manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-assert.match(manifest.version, /^\d+\.\d+\.\d+$/, 'manifest.json must retain a valid release version');
+assert.match(manifest.version, /^0\.8\.\d+(?:-beta\.\d+)?$/, 'manifest.json must retain a valid release version');
 
 for (const [name, content] of [['Korean', koContent], ['English', enContent], ['Debug', debugContent]]) {
   assert.ok(
