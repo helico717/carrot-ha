@@ -22,7 +22,15 @@ SENSOR_FIELDS = {
 }
 # Door/lock/trunk fields retain last-known values when the vehicle sleeps.
 # Only hardware diagnostics and BMS fields expire after FRESHNESS_SECONDS.
-OPTIONAL_FIELDS = set(SENSOR_FIELDS)
+CHARGE_CAN_SIGNALS = {
+    'plug_text': ('WBA_03', 'WBA_GE_Texte_02'),
+    'motor_text': ('Motor_26', 'MO_E_Texte'),
+    'activation_text': ('Motor_Hybrid_06', 'MO_Text_Aktivierung_Antrieb'),
+    'bms_request': ('HVK_01', 'HVK_BMS_Sollmodus'),
+    'manager_request': ('HVK_01', 'HVK_HVLM_Sollmodus'),
+}
+CHARGE_CAN_KEYS = {f'charge_can_{name}_bus{bus}' for name in CHARGE_CAN_SIGNALS for bus in (0, 1)}
+OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | {'charge_connection_evidence', 'charge_plug_indication'}
 FRESHNESS_SECONDS = 180
 
 
@@ -38,3 +46,28 @@ def combined_lock_state(data):
     if all(value is False for value in states):
         return False
     return None
+
+
+def charge_connection_evidence(raw, current):
+    """Keep last received codes/times for diagnosis; never infer plug state."""
+    evidence = {}
+    for name, (message, signal) in CHARGE_CAN_SIGNALS.items():
+        for bus in (0, 1):
+            key = f'charge_can_{name}_bus{bus}'
+            if key in raw:
+                evidence[key] = {'value': raw[key], 'bus': bus, 'message': message,
+                                 'signal': signal,
+                                 'measured_at': (raw.get('field_measured_at') or {}).get(key),
+                                 'fresh': current.get(key) is not None}
+    return evidence
+
+
+def charge_plug_indication(data):
+    """Whether a fresh WBA_03 code reports Ladestecker_gesteckt.
+
+    Other display codes mean indication absent, not proven physical disconnect.
+    Missing/expired samples are unknown rather than a false OFF.
+    """
+    codes = [data.get(f'charge_can_plug_text_bus{bus}') for bus in (0, 1)]
+    valid = [code for code in codes if type(code) is int and 0 <= code <= 7]
+    return any(code == 2 for code in valid) if valid else None

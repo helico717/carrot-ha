@@ -9,7 +9,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 async def async_setup_entry(hass,entry,async_add_entities):
     async_add_entities([Flag(entry,*spec) for spec in [('onroad','주행 모드','mdi:car'),('charging','충전 중 (추정)','mdi:ev-station'),('ac_on','에어컨 작동','mdi:snowflake'),('stale','차량 데이터 오래됨','mdi:clock-alert'),('enabled','주행 보조 활성','mdi:steering')]])
-    async_add_entities([CommaConnection(entry), EmergencyCharging(entry)])
+    async_add_entities([CommaConnection(entry), EmergencyCharging(entry), ChargePlugIndication(entry)])
     async_add_entities([TelemetryFlag(entry, key, *spec) for key, spec in BINARY_FIELDS.items()])
 
 class EmergencyCharging(VehicleEntity, BinarySensorEntity):
@@ -97,3 +97,26 @@ class TelemetryFlag(Flag):
                          calculation='external OR internal; last reported values retained')
         attrs['source'] = 'Licht_Anf_01 (request)' if self.key.startswith('light_') else 'ZV_02'
         return attrs
+
+
+class ChargePlugIndication(VehicleEntity, BinarySensorEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry):
+        self.configure(entry, 'charge_plug_indication', '충전 플러그 연결 신호', 'mdi:power-plug')
+
+    @property
+    def is_on(self):
+        from .telemetry import charge_plug_indication
+        return charge_plug_indication(self.data)
+
+    @property
+    def extra_state_attributes(self):
+        from .telemetry import charge_connection_evidence
+        raw = self.runtime.get('latest', {}).get('data', {})
+        evidence = charge_connection_evidence(raw, self.data)
+        return {'source': 'WBA_03.WBA_GE_Texte_02', 'connected_code': 2,
+                'can_id': '0x394', 'validated_on_vehicle': False,
+                'off_meaning': 'plug-connected display code absent; physical disconnect not proven',
+                'evidence': {key: value for key, value in evidence.items() if 'plug_text' in key},
+                'freshness_limit_s': 180}

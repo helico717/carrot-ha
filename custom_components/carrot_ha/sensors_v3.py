@@ -69,6 +69,7 @@ async def async_setup_entry(hass,entry,async_add_entities):
     entities.extend([
         LastTripSensor(entry),
         ChargingSessionSensor(entry),
+        ChargeConnectionEvidenceSensor(entry),
         TodayDrivingSensor(entry),
     ])
     async_add_entities(entities)
@@ -243,3 +244,26 @@ class TodayDrivingSensor(VehicleEntity, SensorEntity):
         })
         return attrs
 
+
+
+class ChargeConnectionEvidenceSensor(VehicleEntity, SensorEntity):
+    """Recorder-visible passive candidates, pending physical validation."""
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry):
+        self.configure(entry, 'charge_connection_evidence', '충전 연결 CAN 진단', 'mdi:power-plug')
+
+    @property
+    def native_value(self):
+        from .telemetry import CHARGE_CAN_KEYS
+        data = self.data
+        return 'unverified' if any(data.get(key) is not None for key in CHARGE_CAN_KEYS) else None
+
+    @property
+    def extra_state_attributes(self):
+        from .telemetry import charge_connection_evidence
+        raw = self.runtime.get('latest', {}).get('data', {})
+        return {'validated': False, 'connection_status': 'unknown',
+                'evidence': charge_connection_evidence(raw, self.data),
+                'sampling': 'existing bounded CAN sampling; not an edge event log',
+                'freshness_limit_s': 180}
