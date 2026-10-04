@@ -5,7 +5,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .charge_costs import PaymentConflict, refresh_runtime_costs
 
 
-async def _write(hass, connection, msg, actual):
+async def _write(hass, connection, msg, actual, exclusion=False):
     if connection.user is None or not connection.user.is_admin:
         connection.send_error(msg['id'], 'unauthorized', 'Administrator access required')
         return
@@ -15,7 +15,8 @@ async def _write(hass, connection, msg, actual):
         return
     try:
         async with runtime['lock']:
-            result = await hass.async_add_executor_job(runtime['archive'].set_charge_payment,
+            method = runtime['archive'].set_charge_excluded if exclusion else runtime['archive'].set_charge_payment
+            result = await hass.async_add_executor_job(method,
                 runtime['entry'].data['device_id'], msg['payment_id'], msg['source_event_ids'],
                 msg['expected_version'], actual)
             try:
@@ -49,6 +50,13 @@ async def delete(hass, connection, msg):
     await _write(hass, connection, msg, None)
 
 
+@websocket_api.websocket_command({**_SCHEMA, vol.Required('type'): 'carrot_ha/charge_record/exclude',
+                                 vol.Required('excluded'): bool})
+@websocket_api.async_response
+async def exclude(hass, connection, msg):
+    await _write(hass, connection, msg, msg['excluded'], exclusion=True)
+
 def async_register(hass):
     websocket_api.async_register_command(hass, save)
     websocket_api.async_register_command(hass, delete)
+    websocket_api.async_register_command(hass, exclude)

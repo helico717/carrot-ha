@@ -245,7 +245,7 @@ class HistoryView(HomeAssistantView):
             limit = int(request.query.get('limit', '100'))
             offset = int(request.query.get('offset', '0'))
             if kind == 'charge':
-                rows = await self.hass.async_add_executor_job(runtime['archive'].charge_history, runtime['entry'].data['device_id'], limit, offset, request.query.get('since'))
+                rows = await self.hass.async_add_executor_job(runtime['archive'].charge_history, runtime['entry'].data['device_id'], limit, offset, request.query.get('since'), request.query.get('include_excluded') == '1')
             else:
                 rows = await self.hass.async_add_executor_job(runtime['archive'].history, runtime['entry'].data['device_id'], kind, limit, offset, request.query.get('since'))
         except ValueError:

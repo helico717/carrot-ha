@@ -37,6 +37,9 @@ class ChargeCosts:
             device TEXT, event_id TEXT, payment_id TEXT,
             PRIMARY KEY(device,event_id))''')
         db.execute('CREATE INDEX IF NOT EXISTS charge_payment_members ON charge_payment_parts(device,payment_id)')
+        db.execute('''CREATE TABLE IF NOT EXISTS charge_exclusions (
+            device TEXT, event_id TEXT, excluded INTEGER NOT NULL, updated TEXT,
+            PRIMARY KEY(device,event_id))''')
         for (body,) in db.execute("SELECT body FROM events WHERE kind='charge'").fetchall():
             self.capture_charge(db, json.loads(body))
 
@@ -81,6 +84,8 @@ class ChargeCosts:
             'SELECT event_id,payment_id FROM charge_payment_parts WHERE device=?', (device,))}
         payments = {key: (actual, version, created, updated) for key, actual, version, created, updated in db.execute(
             'SELECT id,actual,version,created,updated FROM charge_payments WHERE device=?', (device,))}
+        excluded_ids = {key for key, in db.execute(
+            'SELECT event_id FROM charge_exclusions WHERE device=? AND excluded=1', (device,))}
         frozen, automatic = {}, []
         previous_automatic = False
         for key, day, body, created, updated in db.execute('SELECT id,day,body,created,updated FROM charge_summaries WHERE device=? ORDER BY started,id', (device,)):
@@ -106,6 +111,7 @@ class ChargeCosts:
                         energy_kwh=round(sum(m['data']['energy_kwh'] for m in members), 3),
                         source_event_ids=ids, payment_id=key, payment_version=version,
                         currency='KRW', accounting_date=members[0]['day'],
+                        excluded=any(key in excluded_ids for key in ids),
                         created_at=created or min(m['created'] for m in members),
                         updated_at=max([m['updated'] for m in members] + ([updated] if updated else [])),
                         estimated_cost_krw=estimated, actual_cost_krw=actual,
@@ -130,12 +136,14 @@ class ChargeCosts:
                                observed_at=data['ended_at'], data=data))
         return sorted(groups, key=lambda e: (e['data']['started_at'], e['event_id']), reverse=True)
 
-    def charge_history(self, device, limit=100, offset=0, since=None):
+    def charge_history(self, device, limit=100, offset=0, since=None, include_excluded=False):
         if not 1 <= limit <= 500 or offset < 0:
             raise ValueError('Invalid history query')
         boundary = stamp(since) if since else None
         with self.connect() as db:
             rows = self._charge_groups(db, device)
+        if not include_excluded:
+            rows = [e for e in rows if not e['data']['excluded']]
         if boundary:
             rows = [e for e in rows if stamp(e['data']['started_at']) >= boundary]
         return rows[offset:offset+limit]
@@ -151,19 +159,31 @@ class ChargeCosts:
         with self.connect() as db:
             groups = self._charge_groups(db, device)
         items = [e['data'] for e in groups if e['data']['accounting_date'].startswith(month+'-')]
+        excluded = [d for d in items if d['excluded']]
+        items = [d for d in items if not d['excluded']]
         actual = sum(d['actual_cost_krw'] for d in items if d['actual_cost_krw'] is not None)
         estimated = sum(d['estimated_cost_krw'] for d in items if d['actual_cost_krw'] is None)
         count = sum(d['actual_cost_krw'] is not None for d in items)
         result = dict(effective_cost_krw=actual+estimated, actual_cost_krw=actual,
                     estimated_cost_krw=estimated, actual_count=count, count=len(items),
                     cost_source='mixed' if 0 < count < len(items) else ('actual' if count else 'estimated'))
+        result.update(excluded_count=len(excluded),
+                      excluded_estimated_cost_krw=sum(d['estimated_cost_krw'] for d in excluded),
+                      excluded_slow_kwh=sum(d['energy_kwh'] for d in excluded if not (d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11)),
+                      excluded_fast_kwh=sum(d['energy_kwh'] for d in excluded if d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11))
         self._charge_totals_cache[key] = result
         return dict(result)
 
-    def set_charge_payment(self, device, payment_id, ids, expected_version, actual):
+    def set_charge_excluded(self, device, payment_id, ids, expected_version, excluded):
+        if type(excluded) is not bool:
+            raise ValueError('Invalid exclusion')
+        return self.set_charge_payment(device, payment_id, ids, expected_version, None, excluded)
+
+    def set_charge_payment(self, device, payment_id, ids, expected_version, actual, excluded=None):
         if (not isinstance(ids, list) or not ids or len(ids) > 500
                 or any(not isinstance(key, str) for key in ids) or len(set(ids)) != len(ids)
                 or type(expected_version) is not int or expected_version < 0
+                or (excluded is not None and type(excluded) is not bool)
                 or (actual is not None and (type(actual) is not int or not 0 <= actual <= 999999999))):
             raise ValueError('Invalid payment')
         now = datetime.now(timezone.utc).isoformat()
@@ -172,7 +192,13 @@ class ChargeCosts:
             group = next((e['data'] for e in self._charge_groups(db, device) if e['event_id'] == payment_id), None)
             if group is None or sorted(group['source_event_ids']) != sorted(ids) or group['payment_version'] != expected_version:
                 raise PaymentConflict('Charge changed; reload before saving')
-            if actual is None and not expected_version:
+            if excluded is not None:
+                actual = group['actual_cost_krw']
+                for key in ids:
+                    db.execute('''INSERT INTO charge_exclusions VALUES (?,?,?,?)
+                        ON CONFLICT(device,event_id) DO UPDATE SET excluded=excluded.excluded, updated=excluded.updated''',
+                        (device, key, int(excluded), now))
+            if excluded is None and actual is None and not expected_version:
                 raise PaymentConflict('No saved payment')
             db.execute('''INSERT INTO charge_payments VALUES (?,?,?,?,?,?)
                 ON CONFLICT(device,id) DO UPDATE SET actual=excluded.actual,

@@ -40,6 +40,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
      writes.push(msg);await new Promise(r=>setTimeout(r,80));
      if(rejectWrite)throw {code:'save_failed'};
      const d=rows.find(e=>e.data.payment_id===msg.payment_id).data;
+     if(msg.type==='carrot_ha/charge_record/exclude'){d.excluded=msg.excluded;d.payment_version++;return {payment_version:d.payment_version};}
      d.actual_cost_krw=msg.type.endsWith('/delete')?null:msg.actual_cost_krw;
      d.effective_cost_krw=d.actual_cost_krw??d.estimated_cost_krw;d.payment_version++;
      d.cost_source=d.actual_cost_krw==null?'estimated':'actual';
@@ -76,6 +77,14 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.waitForFunction(lang=>card.shadowRoot.querySelector('[data-charge-payment="0"]').textContent.includes(lang==='ko'?'직접 입력':'Enter amount'),lang);
    assert((await pill.textContent()).includes(lang==='ko'?'직접 입력':'Enter amount'));
    assert.equal(await page.evaluate(()=>card.v.charge_cost_totals.effective_cost_krw),33600);
+   await pill.click();await page.locator('dialog .exclude').click();
+   await page.waitForFunction(()=>!document.querySelector('dialog')&&card.charges[0].data.excluded===true);
+   await page.waitForFunction(()=>!card.shadowRoot.querySelector('[data-charge-payment="0"]'));
+   await page.locator('payment-test-card [data-charge-excluded-toggle]').click();
+   await pill.click();await page.locator('dialog .exclude').click();
+   await page.waitForFunction(()=>!document.querySelector('dialog')&&card.charges[0].data.excluded===false);
+   await page.locator('payment-test-card [data-charge-excluded-toggle]').click();
+   await page.waitForFunction(()=>card.shadowRoot.querySelector('[data-charge-payment="0"]'));
    const overflow=await page.evaluate(()=>card.shadowRoot.querySelector('.charge-history').scrollWidth>card.shadowRoot.querySelector('.charge-history').clientWidth+1);assert.equal(overflow,false);
    if(width===390)await page.screenshot({path:`/private/tmp/carrot-payment-${lang}-${dark?'dark':'light'}.png`});
    assert.deepEqual(errors,[]);console.log(`PASS ${lang} ${width}px ${dark?'dark':'light'}: save/edit/zero/delete/failure/async continuity`);await page.close();

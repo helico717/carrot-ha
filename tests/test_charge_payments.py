@@ -141,5 +141,46 @@ class ChargePaymentsTest(unittest.TestCase):
         self.charge('b', start='2026-01-02T00:00:00Z', energy=20)
         self.assertEqual(self.data()['estimated_cost_krw'], 6400)
 
+    def test_reversible_exclusion_preserves_payment_raw_and_survives_resync(self):
+        original = self.charge('cloud-a', energy=0.15, duration=120)
+        data = self.data()
+        self.write(data, 50)
+        data = self.data()
+        self.archive.set_charge_excluded('car', data['payment_id'], data['source_event_ids'], data['payment_version'], True)
+        self.assertEqual(self.archive.charge_history('car'), [])
+        totals = self.archive.charge_totals('car', '2026-01')
+        self.assertEqual(totals['effective_cost_krw'], 0)
+        self.assertEqual(totals['excluded_slow_kwh'], 0.15)
+        self.assertEqual(totals['excluded_estimated_cost_krw'], 42)
+        self.assertEqual(totals['count'], 0)
+        self.assertEqual(self.archive.history('car', 'charge')[0], original)
+        self.archive = Archive(self.path)
+        self.archive.put_cloud(original)
+        self.assertEqual(self.archive.charge_history('car'), [])
+        data = self.archive.charge_history('car', include_excluded=True)[0]['data']
+        self.assertTrue(data['excluded'])
+        self.assertEqual(data['actual_cost_krw'], 50)
+        with self.assertRaises(PaymentConflict):
+            self.archive.set_charge_excluded('other', data['payment_id'], data['source_event_ids'], data['payment_version'], False)
+        with self.assertRaises(PaymentConflict):
+            self.archive.set_charge_excluded('car', data['payment_id'], data['source_event_ids'], 0, False)
+        with self.assertRaises(ValueError):
+            self.archive.set_charge_excluded('car', data['payment_id'], data['source_event_ids'], data['payment_version'], 1)
+        self.archive.set_charge_excluded('car', data['payment_id'], data['source_event_ids'], data['payment_version'], False)
+        self.assertFalse(self.data()['excluded'])
+        self.assertEqual(self.archive.charge_totals('car', '2026-01')['effective_cost_krw'], 50)
+
+    def test_excluded_group_does_not_absorb_neighbor_and_merged_scope_is_atomic(self):
+        self.charge('a')
+        self.charge('b', start='2026-01-01T01:10:00Z')
+        data = self.data()
+        self.assertEqual(len(data['source_event_ids']), 2)
+        self.archive.set_charge_excluded('car', data['payment_id'], data['source_event_ids'], 0, True)
+        self.charge('c', start='2026-01-01T02:15:00Z')
+        self.assertEqual(len(self.archive.charge_history('car')), 1)
+        self.assertEqual(self.data()['source_event_ids'], ['c'])
+        self.assertEqual(len(self.archive.charge_history('car', include_excluded=True)), 2)
+        self.assertEqual(self.archive.charge_totals('car', '2026-01')['excluded_slow_kwh'], 20)
+
 if __name__ == '__main__':
     unittest.main()

@@ -94,5 +94,19 @@ class TestChargeStats(unittest.TestCase):
         self.assertEqual(v['month_charge_cost'], 0)
         self.assertEqual(v['month_charge_kwh'], 0.0)
 
+    def test_exclusion_adjusts_display_without_mutating_collector_ledger(self):
+        runtime = {
+            'entry': type('Entry', (), {'options': {'soc_capacity_kwh': 77.0}, 'data': {'device_id': 'test'}, 'title': 'Car'}),
+            'latest': {'data': {'battery_wh': 20000, 'charge_months': {'2026-09': {'slow_kwh': 10, 'fast_kwh': 20, 'cost_krw': 9200}}}},
+            'charge_cost_totals': {'month': '2026-09', 'excluded_slow_kwh': 0.15, 'excluded_fast_kwh': 2, 'excluded_estimated_cost_krw': 682},
+        }
+        v = mod_vehicle.values(runtime)
+        self.assertEqual(v['month_slow_kwh'], 9.85)
+        self.assertEqual(v['month_fast_kwh'], 18)
+        self.assertEqual(v['month_charge_kwh'], 27.85)
+        self.assertEqual(v['month_charge_cost'], 8518)
+        self.assertEqual(runtime['latest']['data']['charge_months']['2026-09']['slow_kwh'], 10)
+        self.assertEqual(mod_vehicle.values(runtime)['month_charge_kwh'], 27.85)
+
 if __name__ == '__main__':
     unittest.main()

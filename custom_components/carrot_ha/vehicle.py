@@ -204,6 +204,14 @@ def values(runtime):
         if data.get('month_charge_kwh') is None:
             data['month_charge_kwh'] = 0.0
 
+    # Local reversible corrections leave collector ledgers and raw telemetry intact.
+    totals = runtime.get('charge_cost_totals') or {}
+    if totals.get('month') == month:
+        data['month_slow_kwh'] = round(max(0, data['month_slow_kwh'] - totals.get('excluded_slow_kwh', 0)), 2)
+        data['month_fast_kwh'] = round(max(0, data['month_fast_kwh'] - totals.get('excluded_fast_kwh', 0)), 2)
+        data['month_charge_kwh'] = round(data['month_slow_kwh'] + data['month_fast_kwh'], 2)
+        data['month_charge_cost'] = max(0, data['month_charge_cost'] - totals.get('excluded_estimated_cost_krw', 0))
+
     # Only matched trip distance / net battery depletion is driving efficiency.
     distance = data.get('month_energy_distance_km')
     energy = data.get('month_drive_energy_kwh')

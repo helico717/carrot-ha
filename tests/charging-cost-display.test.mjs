@@ -20,7 +20,7 @@ assert.ok(
   'KO dashboard must place energy at Line 2 with <strong> style and "kWh" casing'
 );
 assert.ok(
-  koContent.includes('<span class="charge-sub">추정 단가 ${n(unitPrice,0)}원/kWh</span>'),
+  koContent.includes('<span class="charge-sub">${ed.actual_cost_krw!=null?\'단가\':\'추정 단가\'} ${n(unitPrice,0)}원/kWh</span>'),
   'KO dashboard must place unit price at Line 3 with "원/kWh" (exact casing)'
 );
 
@@ -44,13 +44,13 @@ assert.ok(
   'EN dashboard must place energy at Line 2 with <strong> style and "kWh" casing'
 );
 assert.ok(
-  enContent.includes('<span class="charge-sub">Est. rate ₩${n(unitPrice,0)}/kWh</span>'),
+  enContent.includes('<span class="charge-sub">${ed.actual_cost_krw!=null?\'Rate\':\'Est. rate\'} ₩${n(unitPrice,0)}/kWh</span>'),
   'EN dashboard must place unit price at Line 3 with "₩.../kWh" (exact casing)'
 );
 
 // 3. Debug Dashboard Verification
 assert.ok(
-  debugContent.includes("isEnglish ? `₩${n(cost, 0)} <small>(est.)</small>` : `${n(cost, 0)}원 <small>(추정)</small>`"),
+  debugContent.includes("isEnglish ? `₩${n(cost, 0)} <small>${ed.actual_cost_krw != null ? '(actual)' : '(est.)'}</small>` : `${n(cost, 0)}원 <small>${ed.actual_cost_krw != null ? '(실제)' : '(추정)'}</small>`"),
   'Debug dashboard must format Line 1 cost with localization'
 );
 assert.ok(

@@ -45,10 +45,24 @@ class ChargePaymentAPITest(ChargePaymentsTest, unittest.IsolatedAsyncioTestCase)
         await ns['_write'](hass, connection, dict(msg,expected_version=1), None)
         self.assertEqual(replies[-1][0], 'ok')
         self.assertIsNone(self.data()['actual_cost_krw'])
+        data = self.data()
+        exclusion_msg = dict(msg, expected_version=data['payment_version'])
+        connection.user.is_admin = False
+        await ns['_write'](hass, connection, exclusion_msg, True, exclusion=True)
+        self.assertEqual(replies[-1][1][1], 'unauthorized')
+        self.assertEqual(len(self.archive.charge_history('car')), 1)
+        connection.user.is_admin = True
+        await ns['_write'](hass, connection, exclusion_msg, True, exclusion=True)
+        self.assertEqual(replies[-1][0], 'ok')
+        self.assertEqual(self.archive.charge_history('car'), [])
+        excluded = self.archive.charge_history('car', include_excluded=True)[0]['data']
+        await ns['_write'](hass, connection, dict(msg,expected_version=excluded['payment_version']), False, exclusion=True)
+        self.assertEqual(replies[-1][0], 'ok')
+        self.assertEqual(len(self.archive.charge_history('car')), 1)
         # A successful transaction is acknowledged even if a subsequent cache read fails.
         async def failed_refresh(*args):
             raise OSError('read failed')
         ns['refresh_runtime_costs'] = failed_refresh
-        await ns['_write'](hass, connection, dict(msg,expected_version=2), 500)
+        await ns['_write'](hass, connection, dict(msg,expected_version=self.data()['payment_version']), 500)
         self.assertEqual(replies[-1][0], 'ok')
         self.assertEqual(self.data()['actual_cost_krw'], 500)

@@ -2570,12 +2570,14 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
                 const chargeEnd = ed.ended_at || (ed.started_at && ed.duration_s ? new Date(new Date(ed.started_at).getTime() + (ed.duration_s * 1000)).toISOString() : null);
                 const timeRangeStr = chargeEnd ? `${timeOnly(ed.started_at || e.observed_at)} ~ ${timeOnly(chargeEnd)}` : timeOnly(ed.started_at || e.observed_at);
-                const unitPrice = ed.unit_price_krw != null
+                const unitPrice = ed.actual_cost_krw != null
+                  ? (ed.energy_kwh > 0 ? Math.round(ed.actual_cost_krw / ed.energy_kwh) : null)
+                  : ed.unit_price_krw != null
                   ? Math.round(ed.unit_price_krw)
                   : (ed.cost_krw != null && ed.energy_kwh > 0
                       ? Math.round(ed.cost_krw / ed.energy_kwh)
                       : (fast ? 320 : 280));
-                const cost = ed.cost_krw != null ? Math.round(ed.cost_krw) : Math.round((ed.energy_kwh || 0) * unitPrice);
+                const cost = ed.effective_cost_krw ?? (ed.cost_krw != null ? Math.round(ed.cost_krw) : Math.round((ed.energy_kwh || 0) * unitPrice));
 
                 return `
                   <div class="row charge-row">
@@ -2592,7 +2594,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
                       </div>
                     </div>
                     <div class="charge-val">
-                      <strong>${isEnglish ? `₩${n(cost, 0)} <small>(est.)</small>` : `${n(cost, 0)}원 <small>(추정)</small>`}</strong>
+                      <strong>${isEnglish ? `₩${n(cost, 0)} <small>${ed.actual_cost_krw != null ? '(actual)' : '(est.)'}</small>` : `${n(cost, 0)}원 <small>${ed.actual_cost_krw != null ? '(실제)' : '(추정)'}</small>`}</strong>
                       <strong title="${ed.merged ? (ed.merge_parts || []).map(p => `${n(p.energy_kwh, 1)} kWh`).join(' + ') : ''}">${n(ed.energy_kwh, 2)} <small>kWh</small></strong>
                       <span class="charge-sub">${isEnglish ? `₩${n(unitPrice, 0)}/kWh` : `${n(unitPrice, 0)}원/kWh`}</span>
                     </div>

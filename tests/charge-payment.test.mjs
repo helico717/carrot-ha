@@ -33,3 +33,19 @@ for(const lang of ['ko','en']){
     assert(html.indexOf('data-charge-payment')<html.indexOf('<strong>'));
   });
 }
+
+for(const lang of ['ko','en']) {
+  const Card=(await import(`../custom_components/carrot_ha/frontend/carrot-dashboard-${lang}.js`)).default;
+  test(`${lang}: actual payments override preset unit rate including zero and zero energy`,()=>{
+    for(const [amount,energy,expected] of [[10686,36.7,291],[13455,44.95,299],[6212,19.8,314],[0,10,0],[100,0,'—'],[null,10,320]]) {
+      const card=new Card();card._hass={config:{time_zone:'Asia/Seoul'}};
+      const start=new Date().toISOString();
+      card.charges=[{data:{started_at:start,ended_at:start,duration_s:3600,energy_kwh:energy,payment_id:'pay',actual_cost_krw:amount,effective_cost_krw:amount??3200,unit_price_krw:320,cost_krw:3200}}];
+      card.chargeDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      const html=card.chargeHistory();
+      const label=lang==='ko'?(amount==null?'추정 단가':'단가'):(amount==null?'Est. rate':'Rate');
+      assert(html.includes(lang==='ko'?`${label} ${expected}원/kWh`:`${label} ₩${expected}/kWh`));
+      if(amount!=null)assert(!html.includes(lang==='ko'?'추정 단가':'Est. rate'));
+    }
+  });
+}
