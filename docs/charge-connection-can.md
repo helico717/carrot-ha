@@ -31,3 +31,11 @@ HA는 HACS beta.3 설치 및 재시작. Comma는 게시된 carrot-wip-model_sele
 ## 검증
 
 새 decoder/영속성 테스트 3개, HA indication/evidence 테스트 2개 통과. HA 전체 Python 234개(2 skip), dashboard 지정 회귀 10개 통과. Comma 전체 69개에서 카메라·터미널 기존 오류 4개 별도 확인 대상. 실차 수신·신호 의미는 업데이트 후 검증 필요.
+
+### 발행 확인 — 2026-10-04 15:53 KST
+
+- HA main 및 v0.8.12-beta.3: 209ad96ed84197813790b2756fce0e5360309a80.
+- Release: https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.3 (pre-release=true).
+- HACS Release Actions 성공: https://github.com/helico717/carrot-ha/actions/runs/37183984702 . API published_at=2026-10-04T06:50:36Z (15:50:36 KST).
+- Comma 원격: fe7f59539121abb6400b1823cdf7d271856aac2b. 원격 자동 동기화 e170586f 위로 이번 변경만 재적용했고 force push 없이 게시. 재적용 후 충전 관련 12개 테스트 통과.
+- Worker incremental 검사/benchmark 통과. Worker/D1 변경·배포 없음. 실차 설치/수신 검증 및 운영 압축 실행은 수행하지 않음.
