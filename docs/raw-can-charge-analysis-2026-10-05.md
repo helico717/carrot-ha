@@ -92,3 +92,20 @@ HA 화면 반응 시간을 측정한 시험은 아니다. 원시 CAN 경계와 �
 
 재생 스크립트와 결과는 임시 로컬 `replay_beta7.py`, `replay_beta7.json`에 있다.
 실차에서 새 코드 설치 후 확인은 별도이며, AC 요청 모드 4의 실측 검증도 아직 남아 있다.
+
+## 발행 및 검증 기록
+
+- HA `v0.8.12-beta.7`, 실행 코드 커밋 `8e94175126a31ebb37c1be22d1f823ab1c8a85e4`.
+  [릴리즈](https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.7)와
+  [Actions 37218831786](https://github.com/helico717/carrot-ha/actions/runs/37218831786)의 성공,
+  공개 pre-release 상태 및 태그 manifest 버전 일치를 확인했다.
+- Comma 브랜치 `carrot-wip-model_selector-ha` 커밋
+  `670d3e7fd36517779c1683c6bfbe38843436596d`의 원격 반영을 확인했다.
+- HA Python 287건 통과(의존성 관련 4건 제외), 실제 HTTP CAN 수신 8건 통과.
+  대시보드 live/lazy/view-state 10건, 결제·SOC 9건, 의존성 버전·카메라 7건 통과.
+  Chromium 한·영/390·1200px/밝음·어둠 8조합에서 보완 표시, 결제, 삭제, 비동기 읽기 위치 유지 확인.
+  Worker incremental sync와 benchmark도 통과했고 Worker/D1 변경·배포는 없었다.
+- Comma 전체 81건 중 이전 카메라·터미널 오류 4건이 남았다(2건은 시스템 Python 3.9의
+  asyncio.timeout 부재). 충전·수집 21건과 파라미터 polling 4건은 통과했다.
+  이는 로컬 검사 결과이며 새 코드의 실차 성능 또는 24시간 운영 검증은 아니다.
+- 사용자가 HA 업데이트·재시작 및 Comma clean Git Pull·재부팅을 수행해야 실제 적용된다.
