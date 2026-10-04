@@ -13,6 +13,8 @@
 
 - [beta.8 배터리 CAN 엔터티](battery-can-monitoring-beta8.md): 6개 엔터티의 의미·수신시각·오류/만료 처리와 검증 결과.
 
+- [AC30분/DC10분 실차 기록 양식](field-tests/ac-dc-session-2026-10-05.md): 수신 준비 점검, 목표SOC 변경, 전력·계기판 대조 및 입력칸.
+
 ## 후속 에이전트가 지킬 분석 절차
 
 1. HA 엔트리와 수집 범위를 확인하고 원본은 보존한다. CAN 파일은 archive SQLite와 별개다.
