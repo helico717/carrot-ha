@@ -39,3 +39,9 @@ HA는 HACS beta.3 설치 및 재시작. Comma는 게시된 carrot-wip-model_sele
 - HACS Release Actions 성공: https://github.com/helico717/carrot-ha/actions/runs/37183984702 . API published_at=2026-10-04T06:50:36Z (15:50:36 KST).
 - Comma 원격: fe7f59539121abb6400b1823cdf7d271856aac2b. 원격 자동 동기화 e170586f 위로 이번 변경만 재적용했고 force push 없이 게시. 재적용 후 충전 관련 12개 테스트 통과.
 - Worker incremental 검사/benchmark 통과. Worker/D1 변경·배포 없음. 실차 설치/수신 검증 및 운영 압축 실행은 수행하지 않음.
+
+### HA 원격 읽기 전용 확인 — 2026-10-04 16:10 KST
+
+설치 버전 0.8.12-beta.3. 활성 archive bytes=415420416(약 415.4 MB / 396.2 MiB), page_count=101421, page_size=4096, freelist_count=2301(약 9.42 MB). state 25741행/본문 357331238 bytes, trip 158행/10676501 bytes, charge 43행/16494 bytes. compressed_rows=0. compression-enabled/status/변환 전 백업/WAL/SHM 모두 없음. PRAGMA quick_check=ok. 집계 및 검사 약 5.08초(원격 시스템 실행시간, API 지연 아님).
+
+결론: 압축 기능은 설치됐지만 운영 변환은 아직 실행되지 않았으므로 운영 압축 절감률/변환 후 동작은 미검증. 이번 점검에서 DB/설치 코드/서비스는 변경하지 않았다. AGENTS.md에 SSH 경로와 읽기 전용 검사 및 압축 효과 검증 절차를 추가했다.

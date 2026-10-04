@@ -418,3 +418,36 @@ Evidence and rollout details: `docs/dashboard-loading-audit-2026-10-01.md`.
   수용한 것이었다. 수집기 무효값 제외 및 HA 방어 처리를 반영하고 `v0.8.10` 발행.
   로컬 전체 Comma 검사에 남은 카메라·터미널 4건은 기존 테스트 문제이며
   실제 기기 장애가 확인된 것은 아니다.
+
+## HA 원격 SSH 진단 가이드 — 2026-10-04
+
+### 접속 경로와 범위
+
+- 이 Mac에서 확인된 HA SSH 주소: `hassio@192.168.0.140`, 포트 22.
+- 기존 Mac 키: `~/.ssh/id_ed25519`. Advanced SSH & Web Terminal 앱의 authorized_keys에 이 Mac 공개키가 등록되어 있다. 개인키/비밀번호/HA 토큰을 출력하거나 문서·커밋에 넣지 않는다.
+- 집 LAN 또는 사용자가 이미 구성한 VPN에서 주소가 연결돼야 한다. 연결 실패 시 주소/네트워크/인증을 구분하고 임의로 SSH 설정·키·방화벽을 변경하지 않는다.
+- 기본 연결 확인:
+  ```bash
+  ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=10 -i ~/.ssh/id_ed25519 hassio@192.168.0.140 'echo SSH_OK; date -Iseconds'
+  ```
+- sandbox에서 `Operation not permitted`이면 같은 읽기 전용 명령을 네트워크 승인 경로로 실행한다. 이를 서버 인증 실패로 오인하지 않는다. 승인 거절 시 거절 이유를 보고하고 우회하지 않는다.
+- 이 경로는 **HA 서버 진단용**이다. Comma SSH 접근 또는 `/data/openpilot` 파일 수정의 허가가 아니다. HA 설치/재시작, 운영 DB 변경, 압축/복원/삭제, rsync·직접 파일 배포를 진단 요청만으로 실행하지 않는다. HA 업데이트는 기본 HACS 릴리즈 경로다.
+
+### 위치와 읽기 전용 DB 검사
+
+- 설치 코드: `/config/custom_components/carrot_ha/`; 버전은 manifest.json에서 확인.
+- archive: `/config/carrot_ha/<entry_id>.sqlite3`. 2026-10-04 활성 큰 DB는 `01M23RJD5A9H29TRSYCXV4HJ80.sqlite3`; 작은 예전 DB도 있으므로 파일 목록과 엔트리 매핑을 확인하고 이 ID를 영구 고정값으로 가정하지 않는다.
+- 원격 Python3/sqlite3 사용 가능. Python은 `sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)` 및 `PRAGMA query_only=ON`으로 접속한다. 운영 파일에 VACUUM/UPDATE/DELETE/DDL을 실행하지 않는다.
+- 최근 상태는 kind='state'에 대해 observed DESC LIMIT으로 조회한다. 측정시각은 data.field_measured_at를 우선 확인한다. updated/observed 시각만으로 차량 CAN 신호가 신선하다고 판단하지 않는다.
+- 이벤트 body는 손실 없는 압축 wrapper일 수 있다. `json.loads(body)['data']`는 SQL용 projection일 수 있어 전체 원본과 동일하지 않다. 전체 원문 검증은 설치된 `archive_codec.py`의 loads/unpack을 사용한다(해당 파일만 importlib로 로드 가능). 일반 sqlite3에는 carrot_unpack SQL 함수가 자동 등록되지 않는다.
+- 토큰이 들어 있는 config entry 파일이나 전체 위치/GPS 원문을 출력하지 않는다. 필요한 상태값/집계만 출력한다. 400MB급 전체 스캔은 동시에 반복 실행하지 않고 제한된 진단에서 수행한다.
+
+### DB 압축의 실효성 검증
+
+- beta.2 이상 설치만으로 압축은 실행되지 않는다. `<db>.compression-enabled` 존재 여부, `<db>.compression-status.json`의 phase/operation/compressed_rows/database_bytes/error를 먼저 확인한다.
+- `<db>.before-compression.sqlite3`는 변환 전 백업이다. `.partial`은 미완료 산출물이므로 유효 백업으로 취급하지 않는다.
+- 검증 항목: DB 실제 bytes, WAL/백업을 포함한 총 디스크 사용량, page_count/page_size/freelist_count, kind별 행 수/본문 bytes, `_carrot_archive_v1` wrapper 행 수, SQLite quick_check 또는 필요 시 integrity_check.
+- 압축 전후 효과는 같은 기록집합의 원문 bytes와 저장 bytes를 비교한다. 압축 후 새 기록 추가/보관기간 purge/변경 가능한 cloud state를 구분한다. 단순 파일 크기 차이만으로 압축률이나 데이터 무손실을 확정하지 않는다.
+- 백업과 변환 후 DB에 공통으로 남은 불변 이벤트를 codec으로 복원해 원문/hash와 비교한다. 새로 추가되거나 정상 보존기간에 따라 삭제된 행을 손실로 오인하지 않는다. API/그래프/전비/충전 내역도 별도 검증한다.
+- 백업을 유지하면 운영 DB가 줄어도 합산 디스크 사용량은 늘 수 있다. 검증 목적으로 백업을 자동 삭제하지 않는다.
+- 압축을 아직 실행하지 않았다면 ‘기능 설치됨, 실제 운영 절감 미검증’으로 보고한다. 압축 실행은 운영 DB 변환이므로 사용자 요청 범위를 확인하고, 실행 전 백업·여유 공간과 서비스 entry_id를 검증한다. 원격 SSH에서 수동 SQL 변환 대신 통합의 compress_archive/restore_archive 서비스를 사용한다.
