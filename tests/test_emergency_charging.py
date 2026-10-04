@@ -30,7 +30,12 @@ class MockDateTime(datetime):
         return cls.current_time
 
 mod_vehicle.datetime = MockDateTime
-values = mod_vehicle.values
+def values(runtime):
+    data = runtime['latest']['data']
+    if 'charging' in data:
+        data['charge_can_bms_request_bus1'] = 6 if data['charging'] is True else 1 if data['charging'] is False else 7
+        data.setdefault('field_measured_at', {})['charge_can_bms_request_bus1'] = data.get('measured_at') or runtime['latest'].get('observed_at')
+    return mod_vehicle.values(runtime)
 
 class TestEmergencyCharging(unittest.TestCase):
     def setUp(self):

@@ -26,7 +26,12 @@ spec_vehicle.loader.exec_module(mod_vehicle)
 
 estimate_charging_times = mod_battery.estimate_charging_times
 ID4_CHARGING_CURVE_KW = mod_battery.ID4_CHARGING_CURVE_KW
-values = mod_vehicle.values
+def values(runtime):
+    data = runtime['latest']['data']
+    if 'charging' in data:
+        data['charge_can_bms_request_bus1'] = 6 if data['charging'] is True else 1 if data['charging'] is False else 7
+        data.setdefault('field_measured_at', {})['charge_can_bms_request_bus1'] = data.get('measured_at') or runtime['latest'].get('observed_at')
+    return mod_vehicle.values(runtime)
 
 class MockDateTime(datetime):
     current_time = datetime(2026, 9, 22, 10, 0, 0, tzinfo=timezone.utc)

@@ -182,5 +182,20 @@ class ChargePaymentsTest(unittest.TestCase):
         self.assertEqual(len(self.archive.charge_history('car', include_excluded=True)), 2)
         self.assertEqual(self.archive.charge_totals('car', '2026-01')['excluded_slow_kwh'], 20)
 
+    def test_can_mode_controls_tariff_and_keeps_distinct_sessions(self):
+        self.charge('a', energy=22, duration=3600, source='can_request', can_mode=4)
+        self.assertEqual(self.data()['estimated_cost_krw'], 6160)
+        self.charge('b', start='2026-01-01T01:05:00Z', energy=1, duration=3600,
+                    source='can_request', can_mode=6, confirmed_duration_s=3300,
+                    unknown_duration_s=300, gap_corrected=True, corrected_energy_kwh=0.2,
+                    signal_gaps=[{'started_at':'2026-01-01T01:10:00Z','ended_at':'2026-01-01T01:15:00Z'}])
+        records=self.archive.charge_history('car')
+        self.assertEqual(len(records),2)
+        dc=next(e['data'] for e in records if e['data']['can_mode']==6)
+        self.assertEqual(dc['estimated_cost_krw'],320)
+        self.assertEqual(dc['unknown_duration_s'],300)
+        self.assertEqual(dc['corrected_energy_kwh'],0.2)
+        self.assertEqual(len(dc['signal_gaps']),1)
+
 if __name__ == '__main__':
     unittest.main()

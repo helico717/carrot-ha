@@ -54,6 +54,10 @@ def values(runtime):
     if 'driving' in data:data['onroad']=data['driving']
     if data.get('onroad') is not None: data['onroad'] = bool(data['onroad'])
 
+    from .charging_mode import charging_mode
+    charge_signal = charging_mode(data, datetime.now(timezone.utc))
+    data.update(charging=charge_signal['charging'], charge_mode=charge_signal['mode'],
+                charge_mode_evidence=charge_signal, charge_state_source='can_request')
     data['doors_locked'] = combined_lock_state(data)
     power_w = charging_power(data, runtime, datetime.now(timezone.utc))
 
@@ -103,10 +107,12 @@ def values(runtime):
             runtime['charge_session_start_wh'] = session_start_wh
             runtime['charge_session_fast'] = False
         session_kwh = max(0.0, round((battery_wh - session_start_wh) / 1000.0, 2))
-        if isinstance(power_kw, (int, float)) and power_kw > 11:
-            runtime['charge_session_fast'] = True
+        runtime['charge_session_fast'] = data.get('charge_mode') == 'dc_charging'
         is_fast_charge = bool(runtime.get('charge_session_fast', False))
         unit_price = 320 if is_fast_charge else 280
+        active = data.get('charge_active_session') or {}
+        if active.get('source') == 'can_request':
+            session_kwh = active.get('energy_kwh', session_kwh)
         data['session_charge_kwh'] = session_kwh
         data['session_charge_cost'] = int(round(session_kwh * unit_price))
         data['session_charge_price'] = unit_price

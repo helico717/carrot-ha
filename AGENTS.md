@@ -461,3 +461,9 @@ with the relevant entry ID. Verify real `.json.gz` arrival and frame timestamps
 before claiming capture is running. Use the existing HA SSH access guide to read
 `/config/carrot_ha/can-analysis/<entry_id>/`; do not patch Comma source remotely.
 Physical CPU/load and stream completeness require device evidence.
+
+### CAN 분석 자료 색인
+
+충전 또는 다른 CAN 데이터의 분석·수정 전 `docs/can-analysis-index.md`와 해당 날짜의
+분석 보고서를 읽는다. 새 실측은 날짜별 보고서로 추가하고 색인을 갱신한다.
+요청 모드의 일치를 커넥터 연결·실제 전류 또는 모든 UDS 정의의 검증으로 확대하지 않는다.

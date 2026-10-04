@@ -2,6 +2,7 @@
 import gzip
 import hashlib
 import hmac
+import heapq
 import json
 import os
 import re
@@ -14,8 +15,56 @@ from homeassistant.components.http import HomeAssistantView
 
 MAX_BODY = 4 * 1024 * 1024
 MAX_WIRE = 512 * 1024
-MAX_DISK = 20 * 1024 * 1024 * 1024
+MAX_DISK = 20_000_000_000
+METADATA_RESERVE = 1_000_000
+_BUDGETS = {}
+_BUDGET_LOCK = threading.RLock()
 IDENTITY = re.compile(r'^[0-9a-f]{32}-[0-9]{10}$')
+
+
+class CaptureBudget:
+    """One shared cap across vehicle directories, without scans on every upload."""
+    def __init__(self, parent):
+        self.parent = Path(parent)
+        self.heap = []
+        self.paths = {}
+        self.rotated = 0
+        self.totals = {}
+        for path in self.parent.glob('*/*.json.gz'):
+            stat = path.stat()
+            self.paths[str(path)] = stat.st_size
+            key = str(path.parent)
+            size, count = self.totals.get(key, (0, 0))
+            self.totals[key] = (size + stat.st_size, count + 1)
+            heapq.heappush(self.heap, (stat.st_mtime, str(path)))
+        self.size = sum(self.paths.values())
+
+    def room(self, incoming):
+        limit = MAX_DISK - METADATA_RESERVE
+        if incoming > limit:
+            raise ValueError('Batch exceeds total storage cap')
+        while self.size + incoming > limit and self.heap:
+            _, path = heapq.heappop(self.heap)
+            size = self.paths.pop(path, None)
+            if size is not None:
+                Path(path).unlink(missing_ok=True)
+                self.size -= size
+                key = str(Path(path).parent)
+                used, count = self.totals[key]
+                self.totals[key] = (used-size, count-1)
+                self.rotated += 1
+
+    def add(self, path, size):
+        key = str(path)
+        self.paths[key] = size
+        self.size += size
+        root = str(path.parent)
+        used, count = self.totals.get(root, (0, 0))
+        self.totals[root] = (used+size, count+1)
+        heapq.heappush(self.heap, (time.time(), key))
+
+    def usage(self, root):
+        return self.totals.get(str(root), (0, 0))
 
 
 class CaptureFiles:
@@ -26,24 +75,41 @@ class CaptureFiles:
         try:
             self.policy = json.loads((self.root / 'capture.json').read_text())
         except (OSError, ValueError):
-            self.policy = {'until': 0}
-        self.size = sum(p.stat().st_size for p in self.root.glob('*.json.gz'))
-        self.count = len(list(self.root.glob('*.json.gz')))
-        self.last = None
+            self.policy = {'schema': 2, 'continuous': False, 'until': 0}
+        with _BUDGET_LOCK:
+            self.budget = _BUDGETS.setdefault(str(self.root.parent), None)
+            if self.budget is None:
+                self.budget = _BUDGETS[str(self.root.parent)] = CaptureBudget(self.root.parent)
+            self.budget.room(0)
+        if self.policy.get('schema') != 2:
+            self.policy = {'schema': 2, 'continuous': bool(self.policy.get('until', 0)), 'until': None}
+            self._save_policy()
+        try:
+            self.last = json.loads((self.root / 'status.json').read_text()).get('last_batch')
+        except (OSError, ValueError, AttributeError):
+            self.last = None
 
-    def start(self, hours=12, max_gb=20):
-        if type(hours) not in (int, float) or not 0 < hours <= 24:
+    @property
+    def size(self):
+        return self.budget.usage(self.root)[0]
+
+    @property
+    def count(self):
+        return self.budget.usage(self.root)[1]
+
+    def start(self, hours=None, max_gb=20):
+        if hours is not None and (type(hours) not in (int, float) or not 0 < hours <= 24):
             raise ValueError('Capture duration must be 0–24 hours')
-        if type(max_gb) not in (int, float) or not 1 <= max_gb <= 500:
-            raise ValueError('Storage limit must be 1–500 GiB')
+        if type(max_gb) not in (int, float) or not 1 <= max_gb <= 20:
+            raise ValueError('Storage limit must be 1–20 GB')
         with self.lock:
-            self.policy = {'until': time.time() + hours * 3600, 'limit_bytes': int(max_gb * 1024**3)}
+            self.policy = {'schema': 2, 'continuous': hours is None, 'until': None if hours is None else time.time() + hours * 3600}
             self._save_policy()
             return self.status()
 
     def stop(self):
         with self.lock:
-            self.policy = {'until': 0}
+            self.policy = {'schema': 2, 'continuous': False, 'until': 0}
             self._save_policy()
             return self.status()
 
@@ -53,10 +119,13 @@ class CaptureFiles:
         temp.replace(self.root / 'capture.json')
 
     def status(self):
-        with self.lock:
-            return dict(enabled=time.time() < self.policy.get('until', 0) and self.size < self.policy.get('limit_bytes', MAX_DISK),
-                        until=self.policy.get('until', 0), bytes=self.size, batches=self.count,
-                        last_batch=self.last, limit_bytes=self.policy.get('limit_bytes', MAX_DISK), directory=str(self.root))
+        with self.lock, _BUDGET_LOCK:
+            size, count = self.budget.usage(self.root)
+            return dict(enabled=bool(self.policy.get('continuous') or time.time() < (self.policy.get('until') or 0)),
+                        continuous=bool(self.policy.get('continuous')), until=self.policy.get('until'),
+                        bytes=size, batches=count, total_bytes=self.budget.size,
+                        last_batch=self.last, rotated_batches=self.budget.rotated,
+                        limit_bytes=MAX_DISK, retention='oldest_received_first', directory=str(self.root))
 
     def store(self, key, compressed, device):
         if not IDENTITY.fullmatch(key):
@@ -70,6 +139,8 @@ class CaptureFiles:
         if len(raw) > MAX_BODY:
             raise ValueError('Decoded batch too large')
         data = json.loads(raw)
+        if len(json.dumps(data.get('context', {})).encode()) > 16384:
+            raise ValueError('Capture context too large')
         if data.get('schema') != 1 or data.get('device') != device or data.get('batch_id') != key:
             raise ValueError('Batch identity mismatch')
         frames = data.get('frames')
@@ -83,7 +154,7 @@ class CaptureFiles:
                     or frame[0] < 0 or not 0 <= frame[1] <= 0x1fffffff or not 0 <= frame[2] <= 255
                     or not isinstance(frame[3], str) or not re.fullmatch(r'(?:[0-9a-f]{2}){0,64}', frame[3])):
                 raise ValueError('Invalid CAN frame')
-        with self.lock:
+        with self.lock, _BUDGET_LOCK:
             path = self.root / (key + '.json.gz')
             if path.exists():
                 if hashlib.sha256(path.read_bytes()).digest() != hashlib.sha256(compressed).digest():
@@ -91,16 +162,14 @@ class CaptureFiles:
                 return {'ok': True, 'batch_id': key, 'duplicate': True}
             if not self.status()['enabled']:
                 raise PermissionError('Capture inactive or storage limit reached')
-            if self.size + len(compressed) > self.policy.get('limit_bytes', MAX_DISK):
-                raise PermissionError('Capture storage limit reached')
+            self.budget.room(len(compressed))
             temp = path.with_suffix('.tmp')
             with temp.open('wb') as stream:
                 stream.write(compressed)
                 stream.flush()
                 os.fsync(stream.fileno())
             temp.replace(path)
-            self.size += len(compressed)
-            self.count += 1
+            self.budget.add(path, len(compressed))
             self.last = dict(batch_id=key, received_at=time.time(), frames=len(frames),
                              dropped_frames=data.get('dropped_frames', 0), context=data.get('context', {}))
             status_temp = self.root / 'status.json.tmp'
@@ -163,11 +232,13 @@ def register(hass):
         if not runtime['entry'].options.get('terminal_enabled'):
             raise ValueError('Configure the existing remote terminal HA URL and credentials first')
         if call.service == 'start_can_capture':
-            await hass.async_add_executor_job(runtime['can_capture'].start, call.data.get('hours', 12), call.data.get('max_gb', 20))
+            await hass.async_add_executor_job(runtime['can_capture'].start, call.data.get('hours'), call.data.get('max_gb', 20))
         else:
             await hass.async_add_executor_job(runtime['can_capture'].stop)
+        from homeassistant.helpers.dispatcher import async_dispatcher_send
+        async_dispatcher_send(hass, 'carrot_ha' + call.data['entry_id'])
 
     hass.services.async_register('carrot_ha', 'start_can_capture', handle,
-        schema=vol.Schema({vol.Required('entry_id'): str, vol.Optional('hours', default=12): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=24)), vol.Optional('max_gb', default=20): vol.All(vol.Coerce(float), vol.Range(min=1, max=500))}))
+        schema=vol.Schema({vol.Required('entry_id'): str, vol.Optional('hours'): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=24)), vol.Optional('max_gb', default=20): vol.All(vol.Coerce(float), vol.Range(min=1, max=20))}))
     hass.services.async_register('carrot_ha', 'stop_can_capture', handle,
         schema=vol.Schema({vol.Required('entry_id'): str}))

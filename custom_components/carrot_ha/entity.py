@@ -1,6 +1,6 @@
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .vehicle import values
-from .telemetry import OPTIONAL_FIELDS
+from .telemetry import REFRESH_FIELDS
 from .entity_migration import ESTIMATED_OBJECT_IDS, comma_device_info
 
 class VehicleEntity:
@@ -23,7 +23,7 @@ class VehicleEntity:
     def data(self): return values(self.runtime)
     async def async_added_to_hass(self):
         self.async_on_remove(async_dispatcher_connect(self.hass,'carrot_ha'+self.entry.entry_id,self.async_write_ha_state))
-        if self.key in OPTIONAL_FIELDS:
+        if self.key in REFRESH_FIELDS:
             from datetime import timedelta
             from homeassistant.helpers.event import async_track_time_interval
             from homeassistant.core import callback

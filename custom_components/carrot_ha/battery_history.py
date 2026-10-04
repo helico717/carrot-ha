@@ -95,7 +95,19 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                 a=datetime.fromisoformat(v['started_at'].replace('Z','+00:00')).timestamp()
                 b=datetime.fromisoformat(v['ended_at'].replace('Z','+00:00')).timestamp()
                 a=max(a,start);b=min(b,now.timestamp())
-                if b>a:intervals[kind].append((a,b))
+                parts = [(a,b)] if b>a else []
+                if kind == 'charge' and v.get('source') == 'can_request':
+                    for gap in v.get('signal_gaps') or []:
+                        ga=datetime.fromisoformat(gap['started_at'].replace('Z','+00:00')).timestamp()
+                        gb=datetime.fromisoformat(gap['ended_at'].replace('Z','+00:00')).timestamp()
+                        next_parts=[]
+                        for pa,pb in parts:
+                            if gb<=pa or ga>=pb:next_parts.append((pa,pb))
+                            else:
+                                if pa<ga:next_parts.append((pa,min(ga,pb)))
+                                if gb<pb:next_parts.append((max(gb,pa),pb))
+                        parts=next_parts
+                intervals[kind].extend(parts)
             except (KeyError,ValueError,TypeError):continue
     for kind,parts in intervals.items():
         merged=[]

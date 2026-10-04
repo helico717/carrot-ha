@@ -122,7 +122,7 @@ async def async_setup_entry(hass, entry):
             await terminal_relay.close()
         entry.async_on_unload(hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop_terminal_relay))
     try:
-        await hass.config_entries.async_forward_entry_setups(entry, ['sensor','binary_sensor','device_tracker'])
+        await hass.config_entries.async_forward_entry_setups(entry, ['sensor','binary_sensor','device_tracker','switch'])
     except Exception:
         if relay := runtime.get('camera_relay'):
             await relay.close()
@@ -179,7 +179,7 @@ async def _options_updated(hass, entry):
     async_dispatcher_send(hass, DOMAIN + entry.entry_id)
 
 async def async_unload_entry(hass, entry):
-    if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker']):
+    if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
         if relay := hass.data[DOMAIN][entry.entry_id].get('camera_relay'):
             await relay.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('terminal_relay'):

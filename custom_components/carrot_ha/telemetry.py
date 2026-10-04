@@ -30,7 +30,8 @@ CHARGE_CAN_SIGNALS = {
     'manager_request': ('HVK_01', 'HVK_HVLM_Sollmodus'),
 }
 CHARGE_CAN_KEYS = {f'charge_can_{name}_bus{bus}' for name in CHARGE_CAN_SIGNALS for bus in (0, 1)}
-OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | {'charge_connection_evidence', 'charge_plug_indication'}
+OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS
+REFRESH_FIELDS = OPTIONAL_FIELDS | {'charge_mode', 'charging', 'can_capture_storage', 'can_capture_last_received', 'can_capture_enabled'}
 FRESHNESS_SECONDS = 180
 
 

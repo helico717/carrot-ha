@@ -1,4 +1,4 @@
-# Temporary raw CAN analysis files
+# Raw CAN analysis files
 
 This feature subscribes to Comma's existing `can` stream; it sends no diagnostic
 requests or other vehicle CAN messages. All received buses and payload bytes are
@@ -11,15 +11,19 @@ using the existing remote-terminal discovery and credential. HA writes them to
 nor Cloudflare D1 stores these CAN batches. Comma's temporary retry queue lives
 outside the Git checkout and deletes acknowledged batches.
 
-After installing the updated HA integration and Git-managed Comma daemon, call
-`carrot_ha.start_can_capture` with `entry_id`, `hours` (default 12; maximum 24),
-and `max_gb` (default 20 GiB; configurable 1–500). Configure the existing terminal
-HA HTTPS URL and credentials first. Capture is initially disabled. Starting it
-persists the deadline across HA restarts. `carrot_ha.stop_can_capture` stops new
-batches and preserves files. Discovery is polling; activation can take 30 seconds
-plus transport time. Each batch normally covers about three seconds.
+After installing both updates, the HA switch **원시 CAN 기록 수집** starts or
+stops logging. `carrot_ha.start_can_capture` also supports `entry_id` and optional
+`hours` (maximum 24). Omitting `hours` enables continuous capture across restarts.
+An earlier armed capture policy migrates to continuous capture; an explicitly
+stopped policy stays stopped. Configure remote-terminal discovery and its HA
+HTTPS URL and credentials first. Activation uses polling and can take 30 seconds
+plus transport time; each batch normally covers about three seconds.
 
-The HA storage ceiling stops new storage without deleting existing logs. The
+All HA entries share a **20,000,000,000-byte (20 GB)** raw-file budget, with a
+small metadata reserve. New uploads rotate the oldest received gzip files when
+needed. The storage and latest receipt diagnostic sensors show occupancy and
+arrival information. Stopping capture retains files. Retention depends on actual
+traffic; this ceiling is not a promise to retain every trip indefinitely. The
 Comma retry queue is bounded at 128 MiB to protect the device during prolonged
 network outages. Queue exhaustion records dropped frame counts. Files cannot
 prove reception of messages that the harness or upstream messaging stream never
@@ -30,9 +34,9 @@ against driving and parking to reject false matches.
 
 ## Troubleshooting
 
-Read `capture.json` for the deadline and storage policy. `status.json` records
-the last accepted batch, total bytes, frame count and collector context. The
-status HTTP endpoint recomputes whether the current deadline is active. Comma
+Read `capture.json` for continuous/timed activation and storage policy. `status.json` records
+the last accepted batch, frame count and collector context. The status HTTP
+endpoint reports activation and the shared raw-file budget. Comma
 `/data/id4-collector/can-capture-spool/status.json` reports queued bytes, delivered
 batches, observed drop counts and errors (use the configured DATA_DIR if different).
 
@@ -65,7 +69,7 @@ receives a real batch; code publication alone is not evidence of live logging.
 - Disabled logging does not open a CAN socket. Active receive work is bounded per
   iteration. The capture thread uses Linux per-thread nice 10; existing telemetry
   and control process priorities are unchanged. Transient network outages retain
-  a previously authorized capture until its deadline; authorization rejection
+  a previously authorized capture while continuous capture or its deadline remains active; authorization rejection
   stops receiving. Physical device performance and file arrival remain pending.
 
 ## Physical HA reception verified — 2026-10-04 20:28 KST

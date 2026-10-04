@@ -26,6 +26,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     const now=new Date();now.setHours(4,0,0,0);
     window.rows=Array.from({length:12},(_,i)=>({event_id:`payment-${i}`,kind:'charge',data:{
      started_at:now.toISOString(),ended_at:new Date(now.getTime()+3600000).toISOString(),duration_s:3600,
+     source:"can_request",can_mode:4,confirmed_duration_s:3300,unknown_duration_s:300,gap_corrected:true,corrected_energy_kwh:0.2,
      energy_kwh:10,estimated_cost_krw:2800,effective_cost_krw:2800,actual_cost_krw:null,cost_krw:2800,
      payment_id:`payment-${i}`,source_event_ids:[`source-${i}`],payment_version:0,cost_source:'estimated'}}));
     window.totals={effective_cost_krw:33600,actual_cost_krw:0,estimated_cost_krw:33600,cost_source:'estimated'};
@@ -51,6 +52,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     card.charges=structuredClone(rows);card.themeMode=dark?'dark':'light';card.applyTheme();document.querySelector('#card').append(card);card.render();
    },{lang,dark});
    const pill=page.locator('payment-test-card [data-charge-payment="0"]');
+   const text=await page.evaluate(()=>card.shadowRoot.textContent);assert(text.includes(lang==='ko'?'신호 공백':'Signal gap'));assert(text.includes('0.2'));
    const overlap=await page.evaluate(()=>{const meta=card.shadowRoot.querySelector('.charge-meta').getBoundingClientRect(),price=card.shadowRoot.querySelector('.charge-val').getBoundingClientRect();return meta.right>price.left;});assert.equal(overlap,false);
    assert.equal(await page.evaluate(()=>card.getAttribute('data-theme')),dark?'dark':'light');
    await pill.click();const input=page.locator('dialog input');await input.fill('12,345');

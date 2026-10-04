@@ -69,3 +69,9 @@ class ChargeGraphCorrectionTests(ChargePaymentsTest):
         self.archive = type(self.archive)(self.path)
         self.assertFalse(self.archive.put_cloud(original))
         self.assertEqual(self.archive.charge_totals('car', '2026-01')['excluded_slow_kwh'], 0.15)
+
+    def test_can_signal_gap_is_not_counted_as_confirmed_charge_time(self):
+        self.charge('a', energy=1, duration=600, source='can_request', can_mode=6,
+                    confirmed_duration_s=300, unknown_duration_s=300,
+                    signal_gaps=[{'started_at':'2026-01-01T00:02:00Z','ended_at':'2026-01-01T00:07:00Z'}])
+        self.assertEqual(self.graph()['charge_s'],300)

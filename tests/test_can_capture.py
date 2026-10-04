@@ -88,3 +88,22 @@ class HttpCaptureTests(unittest.IsolatedAsyncioTestCase):
   async with self.http.post(self.url+'/api/carrot_ha/v1/can-capture/id4',data=wire,headers=headers) as r:self.assertEqual(r.status,409)
 
 if __name__=='__main__':unittest.main()
+
+class CaptureRetentionTests(unittest.TestCase):
+ def test_continuous_migration_and_global_rotation(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);a=root/'a';a.mkdir();(a/'capture.json').write_text(json.dumps({'until':1}))
+   first=ha['CaptureFiles'](a);second=ha['CaptureFiles'](root/'b');second.start()
+   self.assertTrue(first.status()['continuous'])
+   frame=[[1,1,0,'00']]
+   w1=c.encode_batch('id4','a'*32+'-0000000001',frame,{})
+   w2=c.encode_batch('id4','b'*32+'-0000000001',frame,{})
+   old_limit=ha['MAX_DISK'];old_reserve=ha['METADATA_RESERVE']
+   ha['MAX_DISK']=max(len(w1),len(w2))+1;ha['METADATA_RESERVE']=0
+   try:
+    first.store('a'*32+'-0000000001',w1,'id4')
+    second.store('b'*32+'-0000000001',w2,'id4')
+    self.assertEqual(first.count,0);self.assertEqual(second.count,1)
+    self.assertLessEqual(second.status()['total_bytes'],ha['MAX_DISK'])
+    self.assertTrue(first.status()['enabled'])
+   finally:ha['MAX_DISK']=old_limit;ha['METADATA_RESERVE']=old_reserve

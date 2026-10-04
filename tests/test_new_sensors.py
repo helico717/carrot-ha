@@ -213,6 +213,10 @@ class TestNewSensors(unittest.TestCase):
 
     def test_charging_session_sensor(self):
         from custom_components.carrot_ha.sensors_v3 import ChargingSessionSensor
+        from custom_components.carrot_ha import entity as entity_module
+        old_clock = entity_module.values.__globals__['datetime']
+        entity_module.values.__globals__['datetime'] = datetime
+        self.addCleanup(entity_module.values.__globals__.__setitem__, 'datetime', old_clock)
         entry = type('Entry', (), {'options': {'soc_capacity_kwh': 77.0}, 'data': {'device_id': 'test-id'}, 'title': 'Test Car', 'entry_id': 'test_entry'})()
         sensor = ChargingSessionSensor(entry)
         sensor.hass = types.SimpleNamespace()
@@ -223,6 +227,8 @@ class TestNewSensors(unittest.TestCase):
                     'latest': {
                         'data': {
                             'charging': True,
+                            'charge_can_bms_request_bus1': 6,
+                            'field_measured_at': {'charge_can_bms_request_bus1': datetime.now(timezone.utc).isoformat()},
                             'soc_percent': 65.0,
                             'session_start_soc': 25.0,
                             'session_charge_kwh': 18.2,
@@ -250,8 +256,8 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(attrs['added_soc'], 40.0)
 
         # Test disconnected
-        sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {'charging': False}
-        self.assertEqual(sensor.native_value, 'disconnected')
+        sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {'charging': False, 'charge_can_bms_request_bus1': 1, 'field_measured_at': {'charge_can_bms_request_bus1': datetime.now(timezone.utc).isoformat()}}
+        self.assertEqual(sensor.native_value, 'idle')
         self.assertEqual(sensor.icon, 'mdi:power-plug-off')
 
         # Test emergency charging
@@ -259,6 +265,8 @@ class TestNewSensors(unittest.TestCase):
         sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {
             'charging': True,
             'charge_power_w': 1000,
+            'charge_can_bms_request_bus1': 4,
+            'field_measured_at': {'charge_can_bms_request_bus1': now_iso},
             'measured_at': now_iso,
             'stale': False,
         }

@@ -69,7 +69,9 @@ async def async_setup_entry(hass,entry,async_add_entities):
     entities.extend([
         LastTripSensor(entry),
         ChargingSessionSensor(entry),
-        ChargeConnectionEvidenceSensor(entry),
+        ChargingModeSensor(entry),
+        CanCaptureStorageSensor(entry),
+        CanCaptureReceiptSensor(entry),
         TodayDrivingSensor(entry),
     ])
     async_add_entities(entities)
@@ -189,7 +191,7 @@ class ChargingSessionSensor(VehicleEntity, SensorEntity):
             return 'emergency'
         if bool(self.data.get('charging')):
             return 'charging'
-        return 'disconnected'
+        return 'unknown' if self.data.get('charging') is None else 'idle'
 
     @property
     def icon(self):
@@ -246,24 +248,60 @@ class TodayDrivingSensor(VehicleEntity, SensorEntity):
 
 
 
-class ChargeConnectionEvidenceSensor(VehicleEntity, SensorEntity):
+class ChargingModeSensor(VehicleEntity, SensorEntity):
     """Recorder-visible passive candidates, pending physical validation."""
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry):
-        self.configure(entry, 'charge_connection_evidence', '충전 연결 CAN 진단', 'mdi:power-plug')
+        self.configure(entry, 'charge_mode', '차량 충전 모드', 'mdi:ev-station')
 
     @property
     def native_value(self):
-        from .telemetry import CHARGE_CAN_KEYS
-        data = self.data
-        return 'unverified' if any(data.get(key) is not None for key in CHARGE_CAN_KEYS) else None
+        labels = {'hv_off':'충전 아님', 'hv_on':'충전 아님',
+                  'ac_preparing':'AC 충전 준비', 'ac_charging':'AC 완속 충전',
+                  'dc_charging':'DC 급속 충전', 'initializing':'초기화 중', 'unknown':'알 수 없음'}
+        return labels.get(self.data.get('charge_mode'), '알 수 없음')
 
     @property
     def extra_state_attributes(self):
         from .telemetry import charge_connection_evidence
         raw = self.runtime.get('latest', {}).get('data', {})
-        return {'validated': False, 'connection_status': 'unknown',
-                'evidence': charge_connection_evidence(raw, self.data),
-                'sampling': 'existing bounded CAN sampling; not an edge event log',
-                'freshness_limit_s': 180}
+        return {**self.data.get('charge_mode_evidence', {}),
+                'evidence': charge_connection_evidence(raw, self.data)}
+
+class CanCaptureStorageSensor(VehicleEntity, SensorEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_native_unit_of_measurement = 'GB'
+
+    def __init__(self, entry):
+        self.configure(entry, 'can_capture_storage', '원시 CAN 로그 저장 용량', 'mdi:harddisk')
+
+    @property
+    def native_value(self):
+        return round(self.runtime['can_capture'].status()['total_bytes'] / 1_000_000_000, 3)
+
+    @property
+    def extra_state_attributes(self):
+        status = self.runtime['can_capture'].status()
+        return {key: status[key] for key in ('bytes', 'batches', 'total_bytes', 'limit_bytes', 'rotated_batches', 'retention')}
+
+class CanCaptureReceiptSensor(VehicleEntity, SensorEntity):
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = 'timestamp'
+
+    def __init__(self, entry):
+        self.configure(entry, 'can_capture_last_received', '원시 CAN 최근 수신', 'mdi:clock-check-outline')
+
+    @property
+    def native_value(self):
+        from datetime import timezone
+        last = self.runtime['can_capture'].status().get('last_batch')
+        return datetime.fromtimestamp(last['received_at'], timezone.utc) if last else None
+
+    @property
+    def extra_state_attributes(self):
+        status = self.runtime['can_capture'].status()
+        last = status.get('last_batch') or {}
+        return {'enabled': status['enabled'], 'frames': last.get('frames'),
+                'reported_dropped_frames': last.get('dropped_frames'),
+                'batch_id': last.get('batch_id')}

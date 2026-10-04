@@ -7,6 +7,13 @@ from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
 
+def is_fast_charge(data):
+    if data.get('can_mode') in (4, 6):
+        return data['can_mode'] == 6
+    duration = data.get('duration_s') or 0
+    return bool(duration and data.get('energy_kwh', 0) / (duration / 3600) > 11)
+
+
 class PaymentConflict(ValueError):
     """The displayed charge or payment changed since it was read."""
 
@@ -64,7 +71,7 @@ class ChargeCosts:
             for key in ids:
                 row=db.execute('SELECT day,body FROM charge_summaries WHERE device=? AND id=?',(device,key)).fetchone()
                 data=json.loads(row[1])
-                correction={k:data[k] for k in ('started_at','ended_at','energy_kwh','duration_s','cost_krw') if k in data}
+                correction={k:data[k] for k in ('started_at','ended_at','energy_kwh','duration_s','cost_krw','can_mode') if k in data}
                 correction['day']=row[0]
                 db.execute('INSERT INTO charge_deletions VALUES (?,?,?,?)',
                     (device,key,json.dumps(correction),datetime.now(timezone.utc).isoformat()))
@@ -92,7 +99,7 @@ class ChargeCosts:
                 return
         except (KeyError, ValueError, TypeError, OverflowError):
             return  # Incomplete legacy records are not invented as completed charges.
-        fast = bool(duration and energy / (duration / 3600) > 11)
+        fast = is_fast_charge(data)
         cost = data.get('cost_krw')
         unit = data.get('unit_price_krw')
         if type(unit) not in (int, float) or not math.isfinite(unit) or unit < 0:
@@ -101,7 +108,8 @@ class ChargeCosts:
             cost = energy * unit
         summary = {key: data[key] for key in (
             'duration_s', 'energy_kwh', 'start_soc_percent', 'end_soc_percent',
-            'soc_charged_percent', 'soc_retroactive_estimated', 'partial') if key in data}
+            'soc_charged_percent', 'soc_retroactive_estimated', 'partial', 'source', 'can_mode',
+            'confirmed_duration_s', 'unknown_duration_s', 'gap_corrected', 'gap_count', 'corrected_energy_kwh', 'signal_gaps') if key in data}
         summary.update(started_at=start.isoformat(), ended_at=end.isoformat(),
                        cost_krw=round(cost), unit_price_krw=unit, accounting_timezone=self.charge_timezone)
         day = start.astimezone(ZoneInfo(self.charge_timezone)).date().isoformat()
@@ -127,7 +135,7 @@ class ChargeCosts:
             if key in parts:
                 frozen.setdefault(parts[key], []).append(item)
                 previous_automatic = False
-            elif previous_automatic and automatic and -60 <= (stamp(item['data']['started_at']) - max(stamp(m['data']['ended_at']) for m in automatic[-1])).total_seconds() <= 900:
+            elif previous_automatic and automatic and item['data'].get('source') != 'can_request' and automatic[-1][-1]['data'].get('source') != 'can_request' and -60 <= (stamp(item['data']['started_at']) - max(stamp(m['data']['ended_at']) for m in automatic[-1])).total_seconds() <= 900:
                 automatic[-1].append(item)
             else:
                 automatic.append([item])
@@ -206,8 +214,8 @@ class ChargeCosts:
                     cost_source='mixed' if 0 < count < len(items) else ('actual' if count else 'estimated'))
         result.update(excluded_count=len(excluded),
                       excluded_estimated_cost_krw=sum(d['estimated_cost_krw'] for d in excluded)+sum(d['cost_krw'] for d in deleted),
-                      excluded_slow_kwh=sum(d['energy_kwh'] for d in excluded+deleted if not (d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11)),
-                      excluded_fast_kwh=sum(d['energy_kwh'] for d in excluded+deleted if d.get('duration_s') and d['energy_kwh'] / (d['duration_s']/3600) > 11))
+                      excluded_slow_kwh=sum(d['energy_kwh'] for d in excluded+deleted if not is_fast_charge(d)),
+                      excluded_fast_kwh=sum(d['energy_kwh'] for d in excluded+deleted if is_fast_charge(d)))
         self._charge_totals_cache[key] = result
         return dict(result)
 
