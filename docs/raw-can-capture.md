@@ -67,3 +67,25 @@ receives a real batch; code publication alone is not evidence of live logging.
   and control process priorities are unchanged. Transient network outages retain
   a previously authorized capture until its deadline; authorization rejection
   stops receiving. Physical device performance and file arrival remain pending.
+
+## Physical HA reception verified — 2026-10-04 20:28 KST
+
+After the user updated/rebooted HA and Comma and switched ignition on, HA reported
+installed beta.6 and both capture services loaded. The prepared policy activated
+capture without a further service call. Files increased from 25 to 34 between
+checks. All 34 gzip files decoded successfully with matching schema, device and
+batch identities: 536,012 frames over 99.5 seconds, 4,972,463 compressed bytes.
+The latest file was 3.8 seconds old. Collector context recorded parked gear,
+zero wheel speed, charging false, battery 48,700 Wh and the existing CAN candidate
+values with measurement timestamps. Reported capture queue drops were zero;
+this does not prove that the upstream CAN transport lost no messages. Bus source
+codes include flagged values as well as 0/1/2; do not interpret every code as a
+physical bus. The collection deadline is 2026-10-05 08:22:15 KST. Logs are
+separate files under the entry's can-analysis directory, and were inspected over
+HA SSH. Vehicle CAN transmission was not added. Physical CPU/control latency
+was not measured in this check; actual driving and charging decoding remain
+future analysis, rather than requirements to declare file capture working.
+
+Published HA release: v0.8.12-beta.6, commit fd89975959a26978cf4757fb69bc72c1cf5c5e49.
+Release Actions run 37198420749 succeeded. Comma branch published/verified commit:
+9c4f15803c6d895fe75907864cb51806c64745dc. Worker/D1 unchanged.
