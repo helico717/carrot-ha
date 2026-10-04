@@ -93,3 +93,12 @@ python3 scripts/restore_archive_json.py current.sqlite3 restored.sqlite3
 - Worker incremental_sync와 benchmark 성공. unchanged revision은 1 indexed query/81 bytes 유지.
 - Comma param_polling: 4 tests 성공. Comma 코드는 변경하지 않음.
 - Python 구문 컴파일 및 git diff --check 성공.
+
+### 실제 발행 확인 — 2026-10-04
+
+- 기능 커밋: `68d6a28c` (main push 및 원격 새 태그 확인).
+- 태그/manifest: `v0.8.12-beta.2` / `0.8.12-beta.2`.
+- GitHub Release: https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.2
+- 한국 시간 15:39:45 게시, `prerelease=true`, `draft=false`, 지정 릴리즈 노트 존재 확인.
+- Release Actions: https://github.com/helico717/carrot-ha/actions/runs/37183447459 — completed / success.
+- 운영 DB 활성화는 아직 실행하지 않았으며 기존 DB의 내용/파일을 변경하지 않았다. 사용자의 HACS 베타 업데이트와 HA 재시작 후, 에이전트가 실제 설치 버전과 baseline을 확인하여 활성화·사후 검증을 수행한다.
