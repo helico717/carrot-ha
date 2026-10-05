@@ -70,3 +70,8 @@ frontend-version cache key에 build metadata로 추가한다. manifest/HACS 버�
 동일 manifest 버전에서 보조파일 변경시 cache key변경·동일내용일때 안정성을 회귀검사한다.
 오늘 AC/DC 분석 보고서와 본 적용 기록은 이미Git에 저장되어 있다. 사용자 실차 메모 원문은 커밋하지 않는다.
 Comma 변경과 Worker/D1 배포 없음. 기존beta.9를 설치한 사용자는 HACS다시다운로드·HA재시작이 필요하다.
+
+동일 beta.9 수정 발행 확인: 태그 커밋 `92880152d2401dd6f4ee63aec487a8342c9620ee`,
+[Actions 37276095961](https://github.com/helico717/carrot-ha/actions/runs/37276095961) completed/success.
+기존Release ID403428880을 유지하고 수정 노트가 반영됨을 확인했다. 새버전·새Release는 만들지 않았다.
+HA293건(4skip) 실패0, 관련JS19건 및Chrome8조합 검증통과. 다운로드 ZIP의 manifest는beta.9로 유지한다.
