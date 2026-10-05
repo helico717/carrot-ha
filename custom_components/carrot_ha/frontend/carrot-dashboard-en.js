@@ -291,7 +291,7 @@ class CarrotDashboard extends HTMLElement {
 @container(max-width:500px){.charge-row{flex-wrap:wrap;padding:14px}.charge-meta{flex:1 0 140px;gap:8px}.charge-icon-wrap{width:32px;height:32px}.charge-val{max-width:100%;margin-left:auto}}
 .charge-payment-pill{align-self:flex-end;border:1px solid var(--line);border-radius:999px;background:rgba(128,128,128,.16);color:var(--muted);padding:4px 10px;font:inherit;font-size:11px;cursor:pointer;margin-bottom:3px}.charge-payment-pill:hover{background:rgba(128,128,128,.28)}
 .charge-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px}.charge-actions .charge-payment-pill{margin-bottom:0}.charge-actions .charge-menu{order:2;margin:0}.charge-menu summary{font-size:18px;line-height:24px;padding:0 6px}.charge-menu button{top:0;right:100%;margin-right:4px}
-@media(hover:hover) and (pointer:fine){.charge-val{display:grid;grid-template-columns:auto auto;align-items:center;column-gap:10px;row-gap:2px}.charge-actions{grid-column:2;grid-row:1}.charge-val>strong:first-of-type{grid-column:1;grid-row:1}.charge-val>strong:nth-of-type(2),.charge-val>.charge-sub{grid-column:1 / -1}.charge-row{padding-top:12px;padding-bottom:12px}.charge-val>.charge-sub{margin-top:0}}
+@media(hover:hover) and (pointer:fine){.charge-actions{align-self:flex-end}.charge-row{padding-top:12px;padding-bottom:12px}.charge-val>.charge-sub{margin-top:0}}
 .charge-layout{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(360px,1fr);gap:18px;align-items:start;width:100%}
 .charge-layout .battery-history{margin-bottom:0;width:100%}
 .charge-sidebar{display:flex;flex-direction:column;gap:16px;min-width:0;width:100%}

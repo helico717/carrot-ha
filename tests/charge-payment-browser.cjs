@@ -1,6 +1,8 @@
 // NODE_PATH=<bundled node_modules> node tests/charge-payment-browser.cjs
 const {chromium}=require('playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const screenshotDir=path.join(require('node:os').tmpdir(),'carrot-charge-layout');
+fs.mkdirSync(screenshotDir,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
@@ -56,14 +58,15 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const overlap=await page.evaluate(()=>{const meta=card.shadowRoot.querySelector('.charge-meta').getBoundingClientRect(),price=card.shadowRoot.querySelector('.charge-val').getBoundingClientRect();return meta.right>price.left;});assert.equal(overlap,false);
    assert.equal(await page.evaluate(()=>card.getAttribute('data-theme')),dark?'dark':'light');
    if(width===1200){
-    const dimensions=await page.evaluate(()=>{const row=card.shadowRoot.querySelector('[data-charge-record]'),actions=row.querySelector('.charge-actions').getBoundingClientRect(),cost=row.querySelector('.charge-val>strong').getBoundingClientRect();return {height:row.getBoundingClientRect().height,actionsTop:actions.top,costTop:cost.top};});
-    assert(Math.abs(dimensions.actionsTop-dimensions.costTop)<8,JSON.stringify(dimensions));
+    const dimensions=await page.evaluate(()=>{const row=card.shadowRoot.querySelector('[data-charge-record]'),actions=row.querySelector('.charge-actions').getBoundingClientRect(),cost=row.querySelector('.charge-val>strong').getBoundingClientRect(),pill=row.querySelector('.charge-payment-pill').getBoundingClientRect(),menu=row.querySelector('.charge-menu summary').getBoundingClientRect();return {height:row.getBoundingClientRect().height,actionsBottom:actions.bottom,costTop:cost.top,pillCenter:(pill.top+pill.bottom)/2,menuCenter:(menu.top+menu.bottom)/2};});
+    assert(dimensions.actionsBottom<=dimensions.costTop,JSON.stringify(dimensions));
+    assert(Math.abs(dimensions.pillCenter-dimensions.menuCenter)<3,JSON.stringify(dimensions));
     assert(dimensions.height<=120,JSON.stringify(dimensions));
     console.log('compact row',lang,dark?'dark':'light',dimensions.height);
-    await page.locator('payment-test-card [data-charge-record="0"]').screenshot({path:`/private/tmp/carrot-compact-${lang}-${dark?'dark':'light'}.png`});
+    await page.locator('payment-test-card [data-charge-record="0"]').screenshot({path:path.join(screenshotDir,`carrot-compact-${lang}-${dark?'dark':'light'}.png`)});
    }
    await pill.click();const input=page.locator('dialog input');await input.fill('12,345');
-   if(width===390)await page.screenshot({path:`/private/tmp/carrot-payment-editor-${lang}-${dark?'dark':'light'}.png`});
+   if(width===390)await page.screenshot({path:path.join(screenshotDir,`carrot-payment-editor-${lang}-${dark?'dark':'light'}.png`)});
    await input.evaluate(el=>el.setSelectionRange(2,4));
    const before=await page.evaluate(()=>{const host=document.querySelector('#host');const list=card.shadowRoot.querySelector('.charge-history .scroll');list.scrollTop=40;window.oldPanel=card.shadowRoot.querySelector('ha-card');window.oldStyle=card.shadowRoot.querySelector('style');return {scroll:host.scrollTop,list:list.scrollTop,day:card.chargeDay};});
    await page.evaluate(async()=>{await card.load(true);await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);});
@@ -104,7 +107,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
      await page.mouse.move(bounds.x+30,bounds.y+bounds.height/2,{steps:6});await page.mouse.up();
    }
    await page.waitForFunction(()=>{const el=card.shadowRoot.querySelector('[data-charge-record="0"]>.charge-meta');return Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41)===-84;});
-   if(width===390)await page.screenshot({path:`/private/tmp/carrot-swipe-delete-${lang}-${dark?'dark':'light'}.png`});
+   if(width===390)await page.screenshot({path:path.join(screenshotDir,`carrot-swipe-delete-${lang}-${dark?'dark':'light'}.png`)});
    await page.locator('payment-test-card [data-charge-delete="0"]').click();
    assert((await page.locator('dialog .warning').textContent()).includes(lang==='ko'?'복원이 불가':'cannot be restored'));
    await page.locator('dialog .cancel').click();
@@ -115,7 +118,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    assert.equal(await page.evaluate(()=>rows.some(e=>e.data.payment_id==='payment-0')),false);
    assert.equal(await page.evaluate(()=>writes.filter(e=>e.type==='carrot_ha/charge_record/delete').length),1);
    const overflow=await page.evaluate(()=>card.shadowRoot.querySelector('.charge-history').scrollWidth>card.shadowRoot.querySelector('.charge-history').clientWidth+1);assert.equal(overflow,false);
-   if(width===390)await page.screenshot({path:`/private/tmp/carrot-payment-${lang}-${dark?'dark':'light'}.png`});
+   if(width===390)await page.screenshot({path:path.join(screenshotDir,`carrot-payment-${lang}-${dark?'dark':'light'}.png`)});
    assert.deepEqual(errors,[]);console.log(`PASS ${lang} ${width}px ${dark?'dark':'light'}: save/edit/zero/delete/failure/async continuity`);await page.close();
   }
  }finally{await browser.close();}

@@ -84,3 +84,15 @@ bootstrap 검사식은 suffix에두번째+를 허용하지 않아 runtime import
 백엔드 hash구분자를-로 바꾸고, 설치된 코드의 실제 생성값을 그대로 bootstrap에 전달해
 runtime URL의v까지 보존되는지 새JS회귀검사로 확인했다. 관련JS11건과Python캐시검사 통과.
 manifestbeta.9와 기존Release를 유지한다. 원격기기코드·Worker/D1 변경 없음.
+## 동일 beta.9 재수정: 금액 위 조작부 (2026-10-05)
+
+사용자 요청에 따라 데스크톱의 수정/직접 입력과 ⋮ 메뉴를 금액 윗줄에 나란히 배치한다.
+금액까지 첫 줄에 놓던 데스크톱 grid만 제거하고 메뉴의 전용 여백 및 모바일 swipe를 유지했다.
+원격 `33fea8a`의 동일 버전 캐시 bootstrap 수정을 보존했다. manifest는 `0.8.12-beta.9` 그대로다.
+Chrome 한글/영문·밝은/어두운·390/1200px 8조합에서 버튼/메뉴 수직 중심 일치,
+금액 위 배치, 행 높이(한글 105.1875px, 영문 116px), 결제 수정/0원/삭제/실패,
+기록 삭제/취소 및 비동기 스크롤·입력 상태 유지 통과. 관련 JS 19건 및 HA live/history 12건 통과.
+기존 camera-360 VM 검사는 import.meta 구문 오류, Worker migration 검사는 Windows CRLF에 따른
+legacy fixture 치환 실패(duplicate measurements_json)로 실패했다. 두 검사의 파일은 변경하지 않았다.
+bootstrap JS 검사는 python3 실행 권한 오류로 이 환경에서 실행되지 않았다.
+Comma 코드와 Worker/D1 변경·배포 없음. 기존 beta.9 설치자는 HACS 다시 다운로드 후 HA 재시작한다.
