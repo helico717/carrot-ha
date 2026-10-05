@@ -1,6 +1,6 @@
 # beta.9 실제 CAN 충전 적용 및 삭제 UI
 
-근거: [AC/DC 실차 대조](raw-can-ac-dc-validation-2026-10-05.md).
+근거: [AC/DC 실차 대조](https://github.com/helico717/meb-can-research/blob/main/docs/raw-can-ac-dc-validation-2026-10-05.md) (비공개 연구 저장소).
 
 ## 적용 범위
 

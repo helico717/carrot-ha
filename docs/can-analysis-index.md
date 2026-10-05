@@ -1,40 +1,16 @@
-# CAN 분석 기록과 후속 작업 안내
+# CAN 분석 자료 이전 안내
 
-## 먼저 읽을 자료
+2026-10-05부터 분석 도구·보고서·대장·실차 기록 양식은 개인 비공개
+[meb-can-research](https://github.com/helico717/meb-can-research)에 보관합니다.
 
-- [수집 구조와 실제 수신 검증](raw-can-capture.md): HA gzip 파일의 위치, 압축 형식, 시계 기준 및 수집 한계.
-- [2026-10-04 귀가·DC 충전 분석](raw-can-charge-analysis-2026-10-05.md): 79,494,733 프레임의 분석 범위,
-  HVK_01의 DC 요청 모드 실측, 원시 예시 및 실제 모드·플러그 후보의 한계.
-- [같은 귀가 로그의 추가 모니터링 후보](raw-can-monitoring-analysis-2026-10-05.md):
-  구동·회생 전력, 공조 요청, DC-DC 온도, HV 활성, BMS Ah 값 및 전류·전압 해석의 한계.
+- [연구 지침](https://github.com/helico717/meb-can-research/blob/main/AGENTS.md)
+- [분석 색인](https://github.com/helico717/meb-can-research/blob/main/docs/can-analysis-index.md)
+- [이전 출처·검증 기록](https://github.com/helico717/meb-can-research/blob/main/docs/migration-2026-10-05.md)
 
-- [전체 원시 CAN·기존 엔터티 재검수](raw-can-full-audit-2026-10-05.md): 모든 ID/정의 신호 대장,
-  BMS 실제모드·전류·전압·SOC·팩 온도 후보, 무효 코드 및 수신/전송 개선 검토.
+접근에는 소유자 또는 허용된 협업자·GitHub 앱 권한이 필요합니다.
+HA 수집 코드·스위치·센서 및 제품 적용 기록은 carrot-ha에 유지합니다.
+[수집 구조](raw-can-capture.md)는 기존 경로를 사용하며 원격 원시 파일은 그대로 보존합니다.
+Comma 실행 코드는 openpilot의 Git 관리 데몬입니다.
 
-- [beta.8 배터리 CAN 엔터티](battery-can-monitoring-beta8.md): 6개 엔터티의 의미·수신시각·오류/만료 처리와 검증 결과.
-
-- [AC30분/DC10분 실차 기록 양식](field-tests/ac-dc-session-2026-10-05.md): 수신 준비 점검, 목표SOC 변경, 전력·계기판 대조 및 입력칸.
-
-- [AC/DC 실차 대조 분석](raw-can-ac-dc-validation-2026-10-05.md): 실제 모드·전류 낮추기 검증, HA 충전 속도 차이, 목표 SOC 탐색 결과.
-
-- [beta.9 실제 충전 상태·전력 적용](actual-charging-can-beta9.md): 엔터티 교체, AC/DC 표시 정밀도, 삭제 메뉴, 검증·이전값 호환.
-
-## 후속 에이전트가 지킬 분석 절차
-
-1. HA 엔트리와 수집 범위를 확인하고 원본은 보존한다. CAN 파일은 archive SQLite와 별개다.
-2. 큰 자료는 원본을 변경하지 않고 로컬 분석 공간에 복사할 수 있다. 진행 중인 다른 복사 작업이
-   있는지 사용자 지시를 확인하고, 복사 시작·완료 및 파일 위치를 즉시 보고한다.
-3. 각 gzip의 스키마, 배치 ID, 프레임 수, reported dropped_frames와 시계 anchor를 검사한다.
-4. 프레임을 시간으로 정렬한다. TAR 멤버 순서나 UUID 파일명 순서를 시간 순서로 가정하지 않는다.
-5. bus source의 플래그가 있는 128/130/192/194 등을 별도의 물리 버스로 단정하지 않는다.
-6. 실제 사용자 동작·충전기 시각과 수집기 판단 시각을 구분한다. 기존 에너지 추정을 정답으로
-   라벨링하지 않는다. 후보 선별 후 해당 신호의 전체 프레임으로 전이·예외·공백을 검증한다.
-7. DBC 신호의 start bit, width, endian, scaling, enum과 정확한 원시 예시를 함께 남긴다.
-   CRC/카운터/초기화/무효값/요청/표시 신호와 실제 측정값을 구분한다.
-8. 한 신호의 실측 일치를 다른 모든 DBC/UDS 정의의 검증으로 확대하지 않는다.
-   특히 HVK_BMS_Sollmodus는 요청 모드이며 커넥터 연결의 증명이 아니다.
-9. 보고서에는 데이터 범위, 방법, 일치·반례, 불확실성, 추가 검증 항목과 실행 코드 변경 여부를 쓴다.
-   이후 분석은 날짜별 새 보고서를 추가하고 이 색인을 갱신한다.
-
-실차 CAN 송신·UDS 질의는 별도 작업이다. 수신 로그 분석을 위해 도입하지 않는다.
-Comma 실행 코드는 Git으로만 배포하며 직접 SSH/SCP로 소스 파일을 변경하지 않는다.
+새 연구 결과는 연구 저장소에 커밋합니다. 검증된 신호의 제품 반영은 각 제품 저장소에서
+진행합니다. 기존 연구 자료는 과거 Git 이력과 기존 릴리즈에 보존돼 있습니다.

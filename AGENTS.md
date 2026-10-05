@@ -464,6 +464,11 @@ Physical CPU/load and stream completeness require device evidence.
 
 ### CAN 분석 자료 색인
 
-충전 또는 다른 CAN 데이터의 분석·수정 전 `docs/can-analysis-index.md`와 해당 날짜의
-분석 보고서를 읽는다. 새 실측은 날짜별 보고서로 추가하고 색인을 갱신한다.
+CAN 연구의 기준 저장소는 비공개 `helico717/meb-can-research`이다.
+충전 또는 다른 CAN 데이터의 분석·수정 전 `docs/can-analysis-index.md`의 이전 안내를
+따라 연구 저장소의 AGENTS.md·색인·해당 날짜 분석 보고서를 읽는다.
+새 분석 도구·실측 보고서·대장·실차 양식은 연구 저장소에 추가하고 색인을 갱신한다.
+HA 수신 어댑터와 제품 적용·릴리즈 기록은 이 저장소에, Comma 실행 코드는 openpilot에 유지한다.
+연구 저장소는 HACS/Comma 실행 의존성이 아니며, 접근은 사용자 Git 인증 또는 GitHub 앱의
+저장소 허용 범위에 따른다. 원시 로그·개인 메모·인증정보는 연구 저장소에도 커밋하지 않는다.
 요청 모드의 일치를 커넥터 연결·실제 전류 또는 모든 UDS 정의의 검증으로 확대하지 않는다.

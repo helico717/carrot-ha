@@ -46,7 +46,7 @@ CAN 수신 당시 차량이 보고한 팩 내부 측정 지점의 최저·최고
 - dashboard live/lazy/view와 Worker incremental 11개 검사, sync benchmark 통과.
 - 실기 설치 후 엔터티 수신·Recorder의 실제 장기 기록은 아직 확인하지 않았다.
 
-분석 근거: [전체 CAN 재검수](raw-can-full-audit-2026-10-05.md).
+분석 근거: [전체 CAN 재검수](https://github.com/helico717/meb-can-research/blob/main/docs/raw-can-full-audit-2026-10-05.md) (비공개 연구 저장소).
 
 ## 배포 커밋
 
