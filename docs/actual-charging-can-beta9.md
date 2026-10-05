@@ -96,3 +96,10 @@ Chrome 한글/영문·밝은/어두운·390/1200px 8조합에서 버튼/메뉴 �
 legacy fixture 치환 실패(duplicate measurements_json)로 실패했다. 두 검사의 파일은 변경하지 않았다.
 bootstrap JS 검사는 python3 실행 권한 오류로 이 환경에서 실행되지 않았다.
 Comma 코드와 Worker/D1 변경·배포 없음. 기존 beta.9 설치자는 HACS 다시 다운로드 후 HA 재시작한다.
+
+17:16 KST 재발행 검증: 수정 커밋 `57b693c3ff4e07f04a2ab10abcf4c1e7334dbdaf`가
+main과 기존 `v0.8.12-beta.9` 태그에 반영됐다. 기존 Release ID `403428880` 유지,
+prerelease=true/draft=false 및 수정 노트 확인.
+[Actions 37282556011](https://github.com/helico717/carrot-ha/actions/runs/37282556011) completed/success.
+실제 태그 ZIP의 manifest `0.8.12-beta.9`와 한글/영문 수정 CSS 확인.
+추가 HA 프론트엔드 캐시 1건과 Comma param polling 4건 통과.
