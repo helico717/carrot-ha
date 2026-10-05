@@ -45,3 +45,16 @@ CAN 송신/UDS·수신주기·업로드주기·raw20GB·Worker/D1 변경 없음.
   source변경 후 그래프·요금·삭제 관련 HA 테스트도 통과.
 
 배포 후 실제 장치 CPU·반응·화면 기록은 아직 별도 실측하지 않았다.
+
+## 발행 확인
+
+- HA 코드/태그: `b9dfffaa88f0ad494498257d9aa0e4ff5fc08575`, `v0.8.12-beta.9`.
+- [GitHub Release](https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.9):
+  prerelease=true,draft=false, 태그 manifest=0.8.12-beta.9 확인.
+- [Actions 37273042735](https://github.com/helico717/carrot-ha/actions/runs/37273042735): completed/success, 코드SHA 일치.
+- Comma 원격 `5411ffb51e18200b1c55cb9cb3da7834c5ef6447` 일치 확인.
+  최초푸시 중 자동동기화가 먼저원격을 갱신했으며 비중첩 upstream변경을 보존해 rebase한 뒤
+  daemon86건 검사를 재실행하고 정상 fast-forward 푸시했다. 강제푸시/소스폐기 없음.
+- 새 JS2건과 필수표시/삭제/live/lazy/view-state 및 수정된분류 회귀검사22건 통과.
+- 사용자작업: Comma GitPull·재부팅, HACS beta.9 설치·HA재시작, 필요시 외부카드/자동화의
+  추정 전력 참조를 새 엔터티로 변경. 에이전트는 실제 기기 업데이트·재부팅을 실행하지 않았다.
