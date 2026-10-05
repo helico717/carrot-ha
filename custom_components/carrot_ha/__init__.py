@@ -323,7 +323,7 @@ def _read_frontend_version():
     for asset in sorted((root / 'frontend').glob('*.js')):
         digest.update(asset.name.encode())
         digest.update(asset.read_bytes())
-    return f'{version}+{digest.hexdigest()[:12]}'
+    return f'{version}-{digest.hexdigest()[:12]}'
 
 
 class FrontendVersionView(HomeAssistantView):

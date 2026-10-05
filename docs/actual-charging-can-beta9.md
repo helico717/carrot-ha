@@ -75,3 +75,12 @@ Comma 변경과 Worker/D1 배포 없음. 기존beta.9를 설치한 사용자는 
 [Actions 37276095961](https://github.com/helico717/carrot-ha/actions/runs/37276095961) completed/success.
 기존Release ID403428880을 유지하고 수정 노트가 반영됨을 확인했다. 새버전·새Release는 만들지 않았다.
 HA293건(4skip) 실패0, 관련JS19건 및Chrome8조합 검증통과. 다운로드 ZIP의 manifest는beta.9로 유지한다.
+
+## 동일 beta.9 재설치 구성 오류 수정
+
+HA의 실제 공개 endpoint 응답 `0.8.12-beta.9+067b9bcd0ad4`를 확인했다.
+bootstrap 검사식은 suffix에두번째+를 허용하지 않아 runtime import 전에 예외가 발생했다.
+캐시 key변경·안정성만 확인한 앞선 Python검사는 소비자인 실제 JS 검사와의 호환성을 다루지 못했다.
+백엔드 hash구분자를-로 바꾸고, 설치된 코드의 실제 생성값을 그대로 bootstrap에 전달해
+runtime URL의v까지 보존되는지 새JS회귀검사로 확인했다. 관련JS11건과Python캐시검사 통과.
+manifestbeta.9와 기존Release를 유지한다. 원격기기코드·Worker/D1 변경 없음.

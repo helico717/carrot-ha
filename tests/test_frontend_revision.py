@@ -17,5 +17,5 @@ class FrontendRevisionTests(unittest.TestCase):
             self.assertEqual(read(),before)
             asset.write_text('export const value=2;');after=read()
             self.assertNotEqual(after,before)
-            self.assertTrue(before.startswith('0.8.12-beta.9+'))
-            self.assertTrue(after.startswith('0.8.12-beta.9+'))
+            self.assertTrue(before.startswith('0.8.12-beta.9-'))
+            self.assertTrue(after.startswith('0.8.12-beta.9-'))
