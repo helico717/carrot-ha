@@ -58,3 +58,15 @@ CAN 송신/UDS·수신주기·업로드주기·raw20GB·Worker/D1 변경 없음.
 - 새 JS2건과 필수표시/삭제/live/lazy/view-state 및 수정된분류 회귀검사22건 통과.
 - 사용자작업: Comma GitPull·재부팅, HACS beta.9 설치·HA재시작, 필요시 외부카드/자동화의
   추정 전력 참조를 새 엔터티로 변경. 에이전트는 실제 기기 업데이트·재부팅을 실행하지 않았다.
+
+## 동일 beta.9 수정: 데스크톱 행 높이
+
+사용자 요청으로 새 버전 없이 beta.9를 수정한다. 메뉴 details에 일반 details의18px 상단여백이 상속되고,
+금액·수정·메뉴가 세로로 쌓여 행이 커졌다. 제어부와 금액을 동일 첫 행에 정렬하고 전용 여백을0으로 지정했다.
+같은 fixture의 데스크톱 행166.1875→116px(약30% 감소), 조작부/금액 수직 정렬·행높이≤120px를 Chrome으로 검증한다.
+모바일 swipe 및 데스크톱 menu/delete/payment/cancel/error/async continuity8조합도 유지한다.
+동일 릴리즈 재다운로드 시 캐시 충돌을 방지하기 위해 executor에서 top-level JS 내용 해시를 계산해
+frontend-version cache key에 build metadata로 추가한다. manifest/HACS 버전은0.8.12-beta.9로 유지한다.
+동일 manifest 버전에서 보조파일 변경시 cache key변경·동일내용일때 안정성을 회귀검사한다.
+오늘 AC/DC 분석 보고서와 본 적용 기록은 이미Git에 저장되어 있다. 사용자 실차 메모 원문은 커밋하지 않는다.
+Comma 변경과 Worker/D1 배포 없음. 기존beta.9를 설치한 사용자는 HACS다시다운로드·HA재시작이 필요하다.

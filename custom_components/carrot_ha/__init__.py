@@ -316,7 +316,14 @@ class DashboardView(HomeAssistantView):
 def _read_frontend_version():
     """Read the installed manifest in HA's executor, never in the event loop."""
     from pathlib import Path
-    return json.loads((Path(__file__).parent / 'manifest.json').read_text(encoding='utf-8'))['version']
+    import hashlib
+    root = Path(__file__).parent
+    version = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))['version']
+    digest = hashlib.sha256()
+    for asset in sorted((root / 'frontend').glob('*.js')):
+        digest.update(asset.name.encode())
+        digest.update(asset.read_bytes())
+    return f'{version}+{digest.hexdigest()[:12]}'
 
 
 class FrontendVersionView(HomeAssistantView):

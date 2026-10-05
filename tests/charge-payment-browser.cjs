@@ -55,6 +55,13 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const text=await page.evaluate(()=>card.shadowRoot.textContent);assert(text.includes(lang==='ko'?'신호 공백':'Signal gap'));assert(text.includes('0.2'));
    const overlap=await page.evaluate(()=>{const meta=card.shadowRoot.querySelector('.charge-meta').getBoundingClientRect(),price=card.shadowRoot.querySelector('.charge-val').getBoundingClientRect();return meta.right>price.left;});assert.equal(overlap,false);
    assert.equal(await page.evaluate(()=>card.getAttribute('data-theme')),dark?'dark':'light');
+   if(width===1200){
+    const dimensions=await page.evaluate(()=>{const row=card.shadowRoot.querySelector('[data-charge-record]'),actions=row.querySelector('.charge-actions').getBoundingClientRect(),cost=row.querySelector('.charge-val>strong').getBoundingClientRect();return {height:row.getBoundingClientRect().height,actionsTop:actions.top,costTop:cost.top};});
+    assert(Math.abs(dimensions.actionsTop-dimensions.costTop)<8,JSON.stringify(dimensions));
+    assert(dimensions.height<=120,JSON.stringify(dimensions));
+    console.log('compact row',lang,dark?'dark':'light',dimensions.height);
+    await page.locator('payment-test-card [data-charge-record="0"]').screenshot({path:`/private/tmp/carrot-compact-${lang}-${dark?'dark':'light'}.png`});
+   }
    await pill.click();const input=page.locator('dialog input');await input.fill('12,345');
    if(width===390)await page.screenshot({path:`/private/tmp/carrot-payment-editor-${lang}-${dark?'dark':'light'}.png`});
    await input.evaluate(el=>el.setSelectionRange(2,4));
