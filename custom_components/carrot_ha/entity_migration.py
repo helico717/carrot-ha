@@ -3,7 +3,7 @@ import logging
 
 DOMAIN = 'carrot_ha'
 REMOVED_SENSORS = {
-    'charge_connection_evidence', 'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
+    'charge_power_w', 'charge_connection_evidence', 'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
     'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
 }
 DIAGNOSTIC_KEYS = {
@@ -23,7 +23,6 @@ ESTIMATED_OBJECT_IDS = {
     'time_to_100_s': 'estimated_time_to_100_s',
     'eta_80': 'estimated_eta_80',
     'eta_100': 'estimated_eta_100',
-    'charging': 'estimated_charging',
     'emergency_charging': 'estimated_emergency_charging',
 }
 

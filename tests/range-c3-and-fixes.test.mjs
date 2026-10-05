@@ -39,21 +39,21 @@ assert.ok(
   'Debug dashboard must set range-sub-c3 text to #ffffff !important'
 );
 
-// 2. Verify Fast Charging threshold is strictly > 11 kW
+// 2. Production classification follows actual AC/DC mode, including low-power DC.
 assert.ok(
-  /powerKw\s*>\s*11/.test(koContent) || /power_kw\s*>\s*11/.test(koContent),
-  'Korean dashboard must use > 11 for fast charging'
+  koContent.includes("const isFast=v.charge_mode==='dc_charging'"),
+  'Korean dashboard must use actual DC mode for fast charging'
 );
 assert.ok(
-  /powerKw\s*>\s*11/.test(enContent) || /power_kw\s*>\s*11/.test(enContent),
-  'English dashboard must use > 11 for fast charging'
+  enContent.includes("const isFast=v.charge_mode==='dc_charging'"),
+  'English dashboard must use actual DC mode for fast charging'
 );
 assert.ok(
   debugContent.includes('powerKw > 11'),
   'Debug dashboard must use powerKw > 11 for fast charging'
 );
 assert.ok(
-  vehicleContent.includes('power_kw > 11'),
+  vehicleContent.includes("data.get('charge_mode') == 'dc_charging'"),
   'vehicle.py must use power_kw > 11 for fast charging'
 );
 

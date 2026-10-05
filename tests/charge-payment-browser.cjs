@@ -84,15 +84,19 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    if(width===390){
      const session=await page.context().newCDPSession(page);
      const point=x=>({x,y:bounds.y+bounds.height/2});
-     await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point(bounds.x+25)]});
-     for(let dx=45;dx<=125;dx+=20)await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[point(bounds.x+dx)]});
+     await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[point(bounds.x+150)]});
+     for(let dx=130;dx>=30;dx-=20)await session.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[point(bounds.x+dx)]});
      await session.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
      await session.detach();
    }else{
-     await page.mouse.move(bounds.x+25,bounds.y+bounds.height/2);await page.mouse.down();
-     await page.mouse.move(bounds.x+125,bounds.y+bounds.height/2,{steps:6});await page.mouse.up();
+     await page.locator('payment-test-card [data-charge-record="0"] summary').click();
+     await page.locator('payment-test-card [data-charge-menu-delete="0"]').click();
+     assert(await page.locator('dialog').isVisible());
+     await page.locator('dialog .cancel').click();
+     await page.mouse.move(bounds.x+150,bounds.y+bounds.height/2);await page.mouse.down();
+     await page.mouse.move(bounds.x+30,bounds.y+bounds.height/2,{steps:6});await page.mouse.up();
    }
-   await page.waitForFunction(()=>{const el=card.shadowRoot.querySelector('[data-charge-record="0"]>.charge-meta');return Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41)===84;});
+   await page.waitForFunction(()=>{const el=card.shadowRoot.querySelector('[data-charge-record="0"]>.charge-meta');return Math.round(new DOMMatrixReadOnly(getComputedStyle(el).transform).m41)===-84;});
    if(width===390)await page.screenshot({path:`/private/tmp/carrot-swipe-delete-${lang}-${dark?'dark':'light'}.png`});
    await page.locator('payment-test-card [data-charge-delete="0"]').click();
    assert((await page.locator('dialog .warning').textContent()).includes(lang==='ko'?'복원이 불가':'cannot be restored'));

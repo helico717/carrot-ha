@@ -96,7 +96,7 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                 b=datetime.fromisoformat(v['ended_at'].replace('Z','+00:00')).timestamp()
                 a=max(a,start);b=min(b,now.timestamp())
                 parts = [(a,b)] if b>a else []
-                if kind == 'charge' and v.get('source') == 'can_request':
+                if kind == 'charge' and v.get('source') in ('can_request', 'can_actual'):
                     for gap in v.get('signal_gaps') or []:
                         ga=datetime.fromisoformat(gap['started_at'].replace('Z','+00:00')).timestamp()
                         gb=datetime.fromisoformat(gap['ended_at'].replace('Z','+00:00')).timestamp()

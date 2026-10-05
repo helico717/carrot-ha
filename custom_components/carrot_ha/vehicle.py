@@ -57,7 +57,7 @@ def values(runtime):
     from .charging_mode import charging_mode
     charge_signal = charging_mode(data, datetime.now(timezone.utc))
     data.update(charging=charge_signal['charging'], charge_mode=charge_signal['mode'],
-                charge_mode_evidence=charge_signal, charge_state_source='can_request')
+                charge_mode_evidence=charge_signal, charge_state_source='can_actual' if charge_signal['source_kind']=='actual' else 'can_request')
     data['doors_locked'] = combined_lock_state(data)
     power_w = charging_power(data, runtime, datetime.now(timezone.utc))
 
@@ -111,7 +111,7 @@ def values(runtime):
         is_fast_charge = bool(runtime.get('charge_session_fast', False))
         unit_price = 320 if is_fast_charge else 280
         active = data.get('charge_active_session') or {}
-        if active.get('source') == 'can_request':
+        if active.get('source') in ('can_request', 'can_actual'):
             session_kwh = active.get('energy_kwh', session_kwh)
         data['session_charge_kwh'] = session_kwh
         data['session_charge_cost'] = int(round(session_kwh * unit_price))

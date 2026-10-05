@@ -22,7 +22,7 @@ FIELDS = {
  'odometer_km':('총 주행거리','km','mdi:counter','distance',0),
  'outside_temp_c':('외기 온도','°C','mdi:thermometer','temperature',1),
  'aux_voltage':('12V 배터리 전압','V','mdi:car-battery','voltage',2),
- 'charge_power_w':('충전 전력 (추정)','kW','mdi:ev-station','power',1),
+ 'actual_charge_power_w':('충전 전력','kW','mdi:ev-station','power',1),
  'time_to_80_s':('80% 충전 남은시간 (추정)','s','mdi:timer-sand','duration',0),
  'eta_80':('80% 충전 완료시각 (추정)',None,'mdi:clock-end','timestamp',None),
  'time_to_100_s':('100% 충전 남은시간 (추정)','s','mdi:timer-sand','duration',0),
@@ -102,9 +102,9 @@ class VehicleSensor(VehicleEntity,SensorEntity):
             if not value:
                 return None
             return GEAR_DISPLAY.get(str(value).lower(), str(value).upper())
-        if self.key=='charge_power_w':
+        if self.key=='actual_charge_power_w':
             if isinstance(value,(int,float)):
-                return round(value/1000.0, 1)
+                return round(value/1000.0, 0 if self.data.get('charge_mode') == 'dc_charging' else 1)
             kw=self.data.get('charge_power_kw')
             if isinstance(kw,(int,float)):
                 return round(kw, 1)
@@ -116,14 +116,22 @@ class VehicleSensor(VehicleEntity,SensorEntity):
             return int(round(value))
         return value
     @property
+    def suggested_display_precision(self):
+        if self.key == 'actual_charge_power_w':
+            return 0 if self.data.get('charge_mode') == 'dc_charging' else 1
+        return getattr(self, '_attr_suggested_display_precision', None)
+
+    @property
     def extra_state_attributes(self):
         attrs=super().extra_state_attributes
         attrs.update(battery_monitor_attributes(self.key, self.data))
-        if self.key == 'charge_power_w':
+        if self.key == 'actual_charge_power_w':
             attrs.update(raw_power_w=self.data.get('charge_power_raw_w'),
-                         source=self.data.get('charge_power_source'),
+                         source=self.data.get('charge_power_source'), can_id='0xCF', measurement_basis='battery_voltage_times_current',
                          hold_age_s=self.data.get('charge_power_hold_age_s'),
                          hold_limit_s=self.data.get('charge_power_hold_limit_s'))
+        elif self.key == 'hv_voltage':
+            attrs.update(source='can_actual', can_id='0xCF', measurement_basis='battery_terminal_voltage')
         elif self.key in ('time_to_80_s','time_to_100_s','eta_80','eta_100'):
             attrs.update(source=self.data.get('charging_eta_source'),
                          hold_age_s=self.data.get('charging_eta_hold_age_s'), hold_limit_s=180)
@@ -252,7 +260,7 @@ class TodayDrivingSensor(VehicleEntity, SensorEntity):
 
 
 class ChargingModeSensor(VehicleEntity, SensorEntity):
-    """Recorder-visible passive candidates, pending physical validation."""
+    """Recorder-visible BMS actual mode, with request compatibility."""
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, entry):
@@ -262,7 +270,7 @@ class ChargingModeSensor(VehicleEntity, SensorEntity):
     def native_value(self):
         labels = {'hv_off':'충전 아님', 'hv_on':'충전 아님',
                   'ac_preparing':'AC 충전 준비', 'ac_charging':'AC 완속 충전',
-                  'dc_charging':'DC 급속 충전', 'initializing':'초기화 중', 'unknown':'알 수 없음'}
+                  'dc_charging':'DC 급속 충전', 'external_charging':'외부 충전 모드', 'error':'BMS 오류', 'initializing':'초기화 중', 'unknown':'알 수 없음'}
         return labels.get(self.data.get('charge_mode'), '알 수 없음')
 
     @property

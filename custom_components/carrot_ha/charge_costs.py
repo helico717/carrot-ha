@@ -135,7 +135,7 @@ class ChargeCosts:
             if key in parts:
                 frozen.setdefault(parts[key], []).append(item)
                 previous_automatic = False
-            elif previous_automatic and automatic and item['data'].get('source') != 'can_request' and automatic[-1][-1]['data'].get('source') != 'can_request' and -60 <= (stamp(item['data']['started_at']) - max(stamp(m['data']['ended_at']) for m in automatic[-1])).total_seconds() <= 900:
+            elif previous_automatic and automatic and item['data'].get('source') not in ('can_request', 'can_actual') and automatic[-1][-1]['data'].get('source') not in ('can_request', 'can_actual') and -60 <= (stamp(item['data']['started_at']) - max(stamp(m['data']['ended_at']) for m in automatic[-1])).total_seconds() <= 900:
                 automatic[-1].append(item)
             else:
                 automatic.append([item])

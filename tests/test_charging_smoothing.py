@@ -31,6 +31,11 @@ def values(runtime):
     if 'charging' in data:
         data['charge_can_bms_request_bus1'] = 6 if data['charging'] is True else 1 if data['charging'] is False else 7
         data.setdefault('field_measured_at', {})['charge_can_bms_request_bus1'] = data.get('measured_at') or runtime['latest'].get('observed_at')
+    stamp = data.get('measured_at') or runtime['latest'].get('observed_at')
+    data.update(bms_actual_mode_bus1=data.get('charge_can_bms_request_bus1', 7),
+                bms_power_w_bus1=data.get('charge_power_w'), bms_voltage_v_bus1=350)
+    for key in ('bms_actual_mode_bus1', 'bms_power_w_bus1', 'bms_voltage_v_bus1'):
+        data.setdefault('field_measured_at', {})[key] = stamp
     return mod_vehicle.values(runtime)
 
 class MockDateTime(datetime):
@@ -174,8 +179,8 @@ class TestChargingRegression(unittest.TestCase):
             runtime['latest']['data'].update(
                 measured_at=MockDateTime.current_time.isoformat(), charge_power_w=0)
             result = values(runtime)
-            self.assertEqual(result['charge_power_w'], 1500)
-            self.assertEqual(result['charge_power_source'], 'held_last_positive')
+            self.assertEqual(result['charge_power_w'], 0)
+            self.assertEqual(result['charge_power_source'], 'can_actual')
             if elapsed < 180:
                 self.assertEqual(result['eta_80'], first['eta_80'])
                 self.assertEqual(result['eta_100'], first['eta_100'])

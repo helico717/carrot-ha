@@ -285,12 +285,14 @@ class TestNewSensors(unittest.TestCase):
         now_iso = datetime.now(timezone.utc).isoformat()
         sensor.hass.data['carrot_ha']['test_entry']['latest']['data'] = {
             'charging': True,
-            'charge_power_w': 1000,
+            'charge_power_w': 1000, 'bms_actual_mode_bus1':6, 'bms_power_w_bus1':1000, 'bms_voltage_v_bus1':350,
             'charge_can_bms_request_bus1': 4,
             'field_measured_at': {'charge_can_bms_request_bus1': now_iso},
             'measured_at': now_iso,
             'stale': False,
         }
+        d=sensor.hass.data['carrot_ha']['test_entry']['latest']['data']
+        d['field_measured_at'].update({k:d['measured_at'] for k in ('bms_actual_mode_bus1','bms_power_w_bus1','bms_voltage_v_bus1')})
         sensor.hass.data['carrot_ha']['test_entry']['low_power_charging_since'] = datetime.now(timezone.utc) - timedelta(seconds=400)
         self.assertEqual(sensor.native_value, 'emergency')
         self.assertEqual(sensor.icon, 'mdi:power-plug-off')
@@ -320,6 +322,19 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(attrs['today_distance_km'], 45.2)
         self.assertEqual(attrs['today_energy_kwh'], 7.8)
         self.assertEqual(attrs['today_efficiency_kpl'], 5.8)
+
+class ActualPowerEntityTests(unittest.TestCase):
+    def test_new_identity_precision_and_no_estimated_entity(self):
+        from custom_components.carrot_ha.sensors_v3 import FIELDS, VehicleSensor
+        from unittest.mock import patch, PropertyMock
+        self.assertNotIn('charge_power_w', FIELDS)
+        entry=types.SimpleNamespace(data={'device_id':'car'},options={},title='ID.4')
+        sensor=VehicleSensor(entry,'actual_charge_power_w',*FIELDS['actual_charge_power_w'])
+        self.assertEqual(sensor._attr_unique_id,'car_actual_charge_power_w')
+        for mode,power,expected,precision in [('ac_charging',6480,6.5,1),('dc_charging',71480,71,0)]:
+            with patch.object(VehicleSensor,'data',new_callable=PropertyMock,return_value={'actual_charge_power_w':power,'charge_mode':mode}):
+                self.assertEqual(sensor.native_value,expected)
+                self.assertEqual(sensor.suggested_display_precision,precision)
 
 if __name__ == '__main__':
     unittest.main()

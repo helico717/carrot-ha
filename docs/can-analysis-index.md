@@ -17,6 +17,8 @@
 
 - [AC/DC 실차 대조 분석](raw-can-ac-dc-validation-2026-10-05.md): 실제 모드·전류 낮추기 검증, HA 충전 속도 차이, 목표 SOC 탐색 결과.
 
+- [beta.9 실제 충전 상태·전력 적용](actual-charging-can-beta9.md): 엔터티 교체, AC/DC 표시 정밀도, 삭제 메뉴, 검증·이전값 호환.
+
 ## 후속 에이전트가 지킬 분석 절차
 
 1. HA 엔트리와 수집 범위를 확인하고 원본은 보존한다. CAN 파일은 archive SQLite와 별개다.

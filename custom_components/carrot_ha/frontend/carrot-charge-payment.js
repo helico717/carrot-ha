@@ -85,18 +85,20 @@ function bindChargeDeletion(card,en) {
   card.shadowRoot.querySelectorAll('[data-charge-record]').forEach(row=>{
     const button=row.querySelector('[data-charge-delete]');
     const reveal=()=>{row.classList.add('charge-swipe-open');button.hidden=false;};
-    row.setAttribute('aria-label',en?'Swipe right or use the context menu to delete this charge':'오른쪽으로 밀거나 우클릭하여 충전 기록 삭제');
+    row.setAttribute('aria-label',en?'Swipe left or use the menu to delete this charge':'왼쪽으로 밀거나 메뉴에서 충전 기록 삭제');
     let origin=null;
-    row.onpointerdown=e=>{if(e.target.closest('button'))return;origin={x:e.clientX,y:e.clientY};row.setPointerCapture(e.pointerId);};
+    row.onpointerdown=e=>{if(e.target.closest('button, summary, .charge-menu'))return;origin={x:e.clientX,y:e.clientY};row.setPointerCapture(e.pointerId);};
     row.onpointerup=e=>{
       if(!origin)return;
       const dx=e.clientX-origin.x,dy=e.clientY-origin.y;origin=null;
-      if(dx>60&&dx>Math.abs(dy)*1.5)reveal();
-      else if(dx < -40){row.classList.remove('charge-swipe-open');button.hidden=true;}
+      if(dx < -60 && -dx>Math.abs(dy)*1.5)reveal();
+      else if(dx > 40){row.classList.remove('charge-swipe-open');button.hidden=true;}
     };
     row.onpointercancel=()=>{origin=null;};
     row.oncontextmenu=e=>{e.preventDefault();reveal();button.focus({preventScroll:true});};
     row.onkeydown=e=>{if(e.key==='Delete'){e.preventDefault();reveal();button.focus({preventScroll:true});}};
+    const menuButton=row.querySelector('[data-charge-menu-delete]');
+    if(menuButton)menuButton.onclick=()=>{row.querySelector('.charge-menu').open=false;confirmChargeDeletion(card,card.charges[Number(menuButton.dataset.chargeMenuDelete)],en);};
     button.onclick=()=>confirmChargeDeletion(card,card.charges[Number(button.dataset.chargeDelete)],en);
   });
 }

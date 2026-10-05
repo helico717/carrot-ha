@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, 'custom_components/carrot_ha/' + name + '.py')
+    spec = importlib.util.spec_from_file_location('custom_components.carrot_ha.'+name, 'custom_components/carrot_ha/' + name + '.py')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -18,56 +18,30 @@ class PowerTest(unittest.TestCase):
     def setUp(self):
         self.runtime = {}
         self.start = datetime.now(timezone.utc)
-
-    def sample(self, seconds, watts, **kw):
-        now = self.start + timedelta(seconds=seconds)
-        data = dict(charging=True, charge_power_w=watts, measured_at=now.isoformat())
-        data.update(kw)
-        power(data, self.runtime, now)
+    def sample(self, watts, mode=4, age=0, **changes):
+        stamp = (self.start-timedelta(seconds=age)).isoformat()
+        data = dict(bms_actual_mode_bus1=mode, bms_power_w_bus1=watts, bms_voltage_v_bus1=350,
+                    field_measured_at={k:stamp for k in ('bms_actual_mode_bus1','bms_power_w_bus1','bms_voltage_v_bus1')})
+        data.update(changes)
+        power(data,self.runtime,self.start)
         return data
-
-    def test_fast_start_and_taper_are_immediate(self):
-        for sec, watts in [(0, 150000), (60, 90000), (120, 50000), (180, 6000)]:
-            self.assertEqual(self.sample(sec, watts)['charge_power_w'], watts)
-
-    def test_low_power_zero_hold_and_expiry(self):
-        self.sample(0, 1500)
-        self.assertEqual(self.sample(60, 0)['charge_power_w'], 1500)
-        self.assertEqual(self.sample(180, 0)['charge_power_w'], 1500)
-        self.assertEqual(self.sample(240, 0)['charge_power_w'], 0)
-        self.assertEqual(self.sample(300, 0)['charge_power_w'], 0)
-        self.assertEqual(self.sample(360, 2000)['charge_power_w'], 2000)
-
-    def test_fast_hold_shorter(self):
-        self.sample(0, 100000)
-        self.assertEqual(self.sample(60, 0)['charge_power_w'], 100000)
-        self.assertEqual(self.sample(120, 0)['charge_power_w'], 0)
-
-    def test_reset_conditions_and_restart(self):
-        for change in ({'charging': False}, {'charging': None}, {'onroad': True}, {'stale': True}):
-            self.runtime.clear()
-            self.sample(0, 1500)
-            self.sample(60, 0, **change)
-            self.assertEqual(self.sample(120, 0)['charge_power_w'], 0)
-        self.runtime.clear()
-        self.assertEqual(self.sample(0, 0)['charge_power_w'], 0)
-
-    def test_gap_missing_and_out_of_order(self):
-        self.sample(0, 1500)
-        self.assertEqual(self.sample(181, 0)['charge_power_w'], 0)
-        self.sample(240, 1500)
-        self.assertIsNone(self.sample(250, None)['charge_power_w'])
-        self.assertEqual(self.sample(260, 0)['charge_power_w'], 0)
-        self.sample(300, 1500)
-        self.assertEqual(self.sample(290, 0)['charge_power_w'], 0)
-
-    def test_repeated_reads_do_not_extend_hold(self):
-        self.sample(0, 1500)
-        stamp = (self.start + timedelta(seconds=60)).isoformat()
-        self.sample(60, 0)
-        self.assertEqual(self.sample(239, 0, measured_at=stamp)['charge_power_w'], 1500)
-        self.assertEqual(self.sample(240, 0, measured_at=stamp)['charge_power_w'], 0)
-        self.assertIsNone(self.sample(241, 0, measured_at=stamp)['charge_power_w'])
+    def test_low_power_does_not_depend_on_energy_quantization(self):
+        self.assertEqual(self.sample(1450)['actual_charge_power_w'],1450)
+    def test_actual_zero_is_immediate_without_hold(self):
+        self.sample(6500)
+        self.assertEqual(self.sample(0)['charge_power_w'],0)
+        self.assertNotIn('power_hold',self.runtime)
+    def test_missing_init_stale_and_future_are_unknown(self):
+        for args in ({'watts':None},{'watts':6500,'mode':7},{'watts':6500,'age':91},{'watts':6500,'age':-1}):
+            self.assertIsNone(self.sample(**args)['charge_power_w'])
+    def test_request_only_does_not_restore_estimated_power(self):
+        data={'charge_power_w':6500,'charge_can_bms_request_bus1':4,'field_measured_at':{'charge_can_bms_request_bus1':self.start.isoformat()}}
+        self.assertIsNone(power(data,self.runtime,self.start))
+    def test_same_frame_required_and_noncharging_is_zero(self):
+        self.assertEqual(self.sample(-200,mode=1)['charge_power_w'],0)
+        self.assertIsNone(self.sample(6500,field_measured_at={'bms_actual_mode_bus1':self.start.isoformat()})['charge_power_w'])
+    def test_driving_cannot_be_charging(self):
+        self.assertEqual(self.sample(20000,driving=True)['charge_power_w'],0)
 
 
 class LockTest(unittest.TestCase):
