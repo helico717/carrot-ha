@@ -1,4 +1,4 @@
-import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-compact-1';
+import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-chart-fix-1';
 import {preserveView} from './carrot-view-state.js';
 // HA-local EV journal. No remote polling, browser token or localStorage records.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -67,7 +67,7 @@ export class VehicleJournal extends HTMLElement {
             <article class="panel wide hero" id="heroCard">
               <h1 id="headline">기록을 불러오고 있어요.</h1>
               <div class="stats" id="briefStats"></div>
-              <div style="margin-top: 4px;">
+              <div class="hero-btn-wrap" style="margin-top: auto;">
                 <button id="gotoCompare" style="font-size:13px; padding:7px 14px; min-height:34px;">절약 계산 살펴보기 →</button>
               </div>
             </article>

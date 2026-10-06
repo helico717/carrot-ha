@@ -1,5 +1,26 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 지출 비교 바 차트 비율 복원 및 상단 카드 높이 균형 최적화
+
+- 커밋 제목: `vehicle-journal: restore bar chart scale to 175px and balance hero card proportions`.
+- 변경·이유:
+  1. 지출 비교 카드(#targetCard)의 SVG 바 차트 높이를 80px에서 175px로 복원:
+     - 80px로 축소 시 320x185 viewBox가 0.44배로 축소되어 막대 및 금액 라벨("162,688원", "74,566원", "▼ 절약")이 비정상적으로 작아 보이던 축소 왜곡 현상 완전 해결.
+     - 175px 높이에서 차트 폰트, 막대 두께(54px), 추이 연결선 및 뱃지가 원래의 선명하고 또렷한 크기로 복원됨.
+  2. 영웅 카드(#heroCard)와 비교 카드 간 높이 균형 완성:
+     - 영웅 카드의 헤드라인과 통계 지표, 버튼 간격을 세련되게 배치하고 `padding: 26px 28px 22px 28px` 적용.
+     - 양쪽 카드가 약 350px 높이로 자연스럽고 균형 잡힌 비율을 이루며, 버튼 아래의 광활한 여백 없이 꽉 찬 완성도 높은 레이아웃 유지.
+  3. 캐시 버스팅 갱신:
+     - `carrot-journal-panel.js` 및 `carrot-vehicle-journal.js` 모듈 버전을 `?v=journal-20261007-chart-fix-1`로 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `custom_components/carrot_ha/frontend/carrot-journal-panel.js`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포:
+  - Headless Chrome 데스크톱(1280px) 렌더링 검증 완료.
+  - HA 실서버(`192.168.0.140`)에 SSH 직접 배포 및 3개 파일 SHA-256 일치 확인 완료.
+
 ## 2026-10-07 — 사진 수정의 main 및 HA 반영 확인
 
 - 커밋 제목: vehicle-journal: record verified photo compression and cancellation deployment.
