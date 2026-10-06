@@ -4,6 +4,23 @@ from homeassistant.components import websocket_api
 from .store import Conflict
 
 
+def fuel_sensor_supported(sensor, platform):
+    unit=sensor.attributes.get('unit_of_measurement')
+    return unit in ('원/L','KRW/L','원/ℓ') or (unit=='원' and platform=='gas_station_korea')
+
+
+def discover_fuel_sensors(hass):
+    from homeassistant.helpers import entity_registry as er
+    registry=er.async_get(hass)
+    found={}
+    for fuel,entity_id in {'gasoline':'sensor.average_gasoline','diesel':'sensor.average_diesel','premium':'sensor.average_premium_gasoline'}.items():
+        entity=registry.async_get(entity_id)
+        sensor=hass.states.get(entity_id)
+        if entity and entity.platform=='gas_station_korea' and sensor and fuel_sensor_supported(sensor,entity.platform):
+            found[fuel]=entity_id
+    return found
+
+
 def runtime(hass, connection, msg):
     if not connection.user or not connection.user.is_admin:
         connection.send_error(msg['id'],'unauthorized','관리자 계정으로 확인해 주세요.')
@@ -50,6 +67,7 @@ async def query(hass,connection,msg):
             live=values(r)
             result['latest']={key:live.get(key) for key in ('soc_percent','range_km','range_estimated','driving','onroad','charging','doors_locked','odometer_km','outside_temp_c','last_received','measured_at')}
             result['sync_error']=r.get('journal_error')
+            result['fuel_sensors']=discover_fuel_sensors(hass)
             # Current fuel sensor values stay within HA; no external request.
             comparison=result.get('comparison')
             if comparison:
@@ -57,7 +75,9 @@ async def query(hass,connection,msg):
                 from .store import number
                 entities=json.loads(comparison['sensor_entities_json'])
                 sensor=hass.states.get(entities.get(comparison['fuel'],''))
-                if sensor and sensor.attributes.get('unit_of_measurement') in ('원/L','KRW/L','원/ℓ'):
+                from homeassistant.helpers import entity_registry as er
+                entity=er.async_get(hass).async_get(sensor.entity_id) if sensor else None
+                if sensor and fuel_sensor_supported(sensor,entity.platform if entity else None):
                     try:
                         price=number(float(sensor.state))
                         if price and price>0:result['fuel_price']={'price':price,'entity_id':sensor.entity_id,'observed_at':sensor.last_updated.isoformat()}
