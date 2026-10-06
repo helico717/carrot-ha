@@ -97,6 +97,8 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
         runtime, cursor, notifications = await self.run_sync(fail=True)
         self.assertEqual(runtime['latest']['observed_at'], '2026-09-24T11:00:00Z')
         self.assertEqual(runtime['cloud_status'], 'HTTP_500')
+        self.assertEqual(runtime['state_status'], 'ok')
+        self.assertIsNotNone(runtime['state_checked_at'])
         self.assertEqual(cursor, 1)
         self.assertFalse(runtime['syncing'])
         self.assertEqual(len(notifications), 2)

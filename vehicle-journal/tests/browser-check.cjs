@@ -25,10 +25,10 @@ const path=require('path');
  if(await root.locator('#records img').count())throw Error('memo HTML executed');
  await root.locator('#tab1').click();await root.locator('#metric').selectOption('drive_energy_kwh');
  if(!(await root.locator('#chart path').getAttribute('d')))throw Error('chart did not update');
- await root.locator('#add').click();await root.locator('#kind').selectOption('trip');
- await root.locator('input[name="date"]').fill('2026-09-02');await root.locator('input[name="distance_km"]').fill('123');
+ await root.locator('#add').click();
+ await root.locator('input[name="date"]').fill('2026-09-02');await root.locator('#actualKrw').fill('123');
  await root.locator('#save').click();
- if((await page.evaluate(()=>window.saved[0]?.payload.distance_km))!==123)throw Error('manual record not saved');
+ if((await page.evaluate(()=>window.saved[0]?.payload.actual_krw))!==123)throw Error('manual record not saved');
  await root.locator('#tab0').click();
  await page.evaluate(async()=>{
   const card=document.querySelector('carrot-vehicle-journal'),original=card._hass.callWS;

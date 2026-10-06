@@ -106,6 +106,10 @@ async def sync(hass, runtime):
             feed = await get('/api/json')
             fallback_trips = feed.get('trips')
         await save({'state': feed.get('state')})
+        # Device connectivity follows the independently completed state read,
+        # even when subsequent archive work fails and must retry its cursor.
+        runtime['state_status'] = 'ok'
+        runtime['state_checked_at'] = datetime.now(timezone.utc).isoformat()
         if fallback_trips and isinstance(fallback_trips, list):
             await save({'trips': fallback_trips})
         # Recent trips must not wait behind an offline telemetry backlog.

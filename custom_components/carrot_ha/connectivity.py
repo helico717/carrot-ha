@@ -19,9 +19,13 @@ def connection_status(runtime, now=None):
     last = (runtime.get('latest') or {}).get('observed_at')
     age = _age(last, now)
     sync_age = _age(runtime.get('cloud_last_sync'), now)
+    state_ages = [_age(runtime.get(key), now) for key, status in
+                  (('state_checked_at', 'state_status'), ('live_checked_at', 'live_status'))
+                  if runtime.get(status) == 'ok']
+    state_fresh = any(value is not None and value <= SYNC_FRESH_SECONDS for value in state_ages)
     result = {'online': None, 'last_telemetry_at': last, 'telemetry_age_seconds': age,
               'offline_after_seconds': OFFLINE_AFTER_SECONDS, 'reason': 'cloud_unavailable'}
-    if runtime.get('cloud_status') not in ('ok', 'syncing') or sync_age is None or sync_age > SYNC_FRESH_SECONDS:
+    if not state_fresh and (runtime.get('cloud_status') not in ('ok', 'syncing') or sync_age is None or sync_age > SYNC_FRESH_SECONDS):
         return result
     if age is None:
         result['reason'] = 'missing_or_invalid_device_timestamp'

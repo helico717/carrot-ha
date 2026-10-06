@@ -46,11 +46,10 @@ async def async_setup(hass, config):
     hass.http.register_view(PhotoUpload(hass))
     hass.http.register_view(PhotoDownload(hass))
     from homeassistant.components.panel_custom import async_register_panel
-    manifest_version = await hass.async_add_executor_job(lambda: json.loads((Path(__file__).parent / 'manifest.json').read_text())['version'])
     await async_register_panel(hass, frontend_url_path='carrot-journal',
         webcomponent_name='carrot-journal-panel', sidebar_title='차계부',
         sidebar_icon='mdi:car-electric', require_admin=True,
-        module_url=f'/carrot_ha_static/carrot-journal-panel.js?v={manifest_version}')
+        module_url=f'/carrot_ha_static/carrot-journal-panel.js?v={version}')
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -492,4 +491,3 @@ class ParamStatusView(HomeAssistantView):
                 return web.json_response(data, status=resp.status)
         except Exception as err:
             return web.json_response({'ok': False, 'error': str(err)}, status=502)
-

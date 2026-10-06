@@ -31,9 +31,15 @@ def parse_feed(feed, device_id):
         route = trip.get('route', trip.get('route_json', []))
         if isinstance(route, str):
             route = json.loads(route)
+        # Keep the complete route once. Repeating it in diagnostic metadata can
+        # push an otherwise valid trip over the bounded envelope size.
+        raw_trip = {key: value for key, value in trip.items() if key != 'route'}
+        raw_route = raw_trip.get('route_json')
+        if raw_route is not None and (json.loads(raw_route) if isinstance(raw_route, str) else raw_route) == route:
+            raw_trip.pop('route_json')
         data = {'started_at': trip.get('started_at'), 'ended_at': trip['ended_at'],
                 'duration_s': trip.get('duration_s'), 'distance_m': trip.get('distance_m'),
-                'route': route, 'partial':trip.get('partial'), 'cloud_raw_trip': trip,
+                'route': route, 'partial':trip.get('partial'), 'cloud_raw_trip': raw_trip,
                 'trip_measurements':trip.get('trip_measurements'),
                 'distance_source':trip.get('distance_source'), 'distance_quality':trip.get('distance_quality')}
         fix_session_start(data)

@@ -15,6 +15,7 @@ async def setup(hass, entry, runtime):
         entry.entry_id,entry.data['device_id'],hass.config.time_zone)
     runtime['journal']=journal
     runtime['archive'].journal_guard=lambda: sync(runtime['archive'],journal,True)
+    from homeassistant.core import callback
     from homeassistant.helpers.event import async_track_time_interval
 
     async def run():
@@ -25,6 +26,7 @@ async def setup(hass, entry, runtime):
             runtime['journal_error']='차계부 동기화를 다시 시도하고 있어요.'
             _LOGGER.exception('Local vehicle journal synchronization failed')
 
+    @callback
     def schedule(_=None):
         if not runtime.get('journal_task') or runtime['journal_task'].done():
             runtime['journal_task']=hass.async_create_background_task(run(),'carrot local journal sync')

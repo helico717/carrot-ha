@@ -1,3 +1,27 @@
+## 2026-10-06 — 패널 캐시 갱신과 백그라운드 동기화 스레드 수정
+
+- 커밋 제목: vehicle-journal: refresh panel modules and schedule sync on HA loop.
+- 승인된 충전량·전비·평균 충전요금 지표, 도넛 라벨, 수기 지출 전용 모달 및
+  금액 콤마 서식을 그대로 유지했다. HA 설치본과 최신 Git UI 파일 해시 일치를
+  확인했으며 기존 Chrome 실화면에서 원장과 승인된 지표 표시를 확인했다.
+- 패널 URL은 manifest 고정값 대신 기존 전체 frontend 내용 해시를 사용한다.
+  카드 dependency는 revision이 있는 정적 import를 사용하여 top-level await를
+  도입하지 않고 패널과 카드 각각의 모듈 URL을 갱신한다.
+- HA 실제 traceback에서 60초 timer의 schedule이 executor thread로 넘어가
+  background task 생성이 실패하는 것을 확인했다. HA callback 표시로 event
+  loop에서 실행하도록 수정했고 실행 중 작업 중복 방지 회귀 검증을 추가했다.
+- browser-check의 수기 저장 테스트를 최신 승인된 지출 전용 폼에 맞췄다.
+- 관련 파일: __init__.py, frontend/carrot-journal-panel.js,
+  vehicle_journal/runtime.py, tests/browser-check.cjs, tests/test_runtime_schedule.py.
+- 검증: 차계부 Python 14 tests, schema 9 tests 및 Chromium tabs/chart/manual
+  expense/escaping/desktop/mobile/패널 정의 전 hass 전달 검증 통과. HA Python
+  299 tests 통과(3 skip). 기존 Python3에는 Pillow가 없어 사진 2 tests가 실패했지만
+  번들 Python 환경으로 전체 차계부 tests 통과했다.
+- 배포: 커밋 후 main 푸시 및 HA 기존 코드 백업·선택 파일 직접 반영·해시 확인 예정.
+  Python 변경 적용은 사용자가 HA를 재시작한다. DB·사진·설정은 배포 대상이 아니다.
+- 한계: iOS의 이전 세션/캐시 원인은 아직 실화면으로 확인되지 않았다. 새 모듈
+  URL 등록은 HA 재시작 후 적용된다. 운영 재시작 후 주행 복구와 timer 재검증이 필요하다.
+
 # 차계부 변경 이력
 
 ## 2026-10-06 — 패널 로더 정적 임포트 전환 및 초기 로딩 보장
