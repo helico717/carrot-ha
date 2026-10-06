@@ -472,3 +472,12 @@ HA 수신 어댑터와 제품 적용·릴리즈 기록은 이 저장소에, Comm
 연구 저장소는 HACS/Comma 실행 의존성이 아니며, 접근은 사용자 Git 인증 또는 GitHub 앱의
 저장소 허용 범위에 따른다. 원시 로그·개인 메모·인증정보는 연구 저장소에도 커밋하지 않는다.
 요청 모드의 일치를 커넥터 연결·실제 전류 또는 모든 UDS 정의의 검증으로 확대하지 않는다.
+
+## HA 전용 차계부 — 2026-10-06
+
+차계부 작업 전에 [vehicle-journal/AGENTS.md](vehicle-journal/AGENTS.md)를 읽는다.
+차계부 설계·지침·참고 자료·변경 이력은 `vehicle-journal/`, 향후 실행 코드는
+`custom_components/carrot_ha/vehicle_journal/`에 둔다. 기존 통합 연결부에도 해당
+지침을 적용한다. 커밋 접두사는 `vehicle-journal:`이다. 장기 저장·집계·수동 기록·
+조회는 HA 로컬에서 처리하고 차계부용 Cloudflare 요청·변경을 추가하지 않는다.
+준비 문서와 미연결 SQL만 변경한 단계에는 버전 상승·HACS 릴리즈·Worker 배포를 하지 않는다.

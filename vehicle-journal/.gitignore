@@ -1,0 +1,9 @@
+# Runtime/private files must never enter the design/reference tree.
+*.sqlite3*
+*.db
+*.db-*
+__pycache__/
+*.pyc
+attachments/
+exports/
+private/
