@@ -51,6 +51,15 @@ const path=require('path');
   await root.locator('#tab1').click();await root.locator('#tab0').click();
   if(width===360)await page.screenshot({path:'.preview/journal/mobile.png',fullPage:true});
  }
+ // HA may populate a panel before its async module finishes defining it.
+ await page.evaluate(()=>{
+  const panel=document.createElement('carrot-journal-panel');
+  panel.hass=document.querySelector('carrot-vehicle-journal')._hass;
+  document.getElementById('mount').append(panel);
+ });
+ const panelModule=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-journal-panel.js','utf8');
+ await page.addScriptTag({content:panelModule.slice(panelModule.indexOf('class CarrotJournalPanel'))});
+ await page.locator('carrot-journal-panel').locator('#headline').filter({hasText:'km'}).waitFor();
  if(errors.length)throw Error(errors.join('\n'));
  await browser.close();console.log('Journal browser checks: tabs, chart, manual save, escaping, desktop/mobile layout OK');
 })().catch(e=>{console.error(e);process.exit(1)});
