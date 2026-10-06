@@ -1,5 +1,18 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 문서 언어 전수 확인과 혼입 표현 정리
+
+- 커밋 제목: `vehicle-journal: normalize reference text and document language policy`.
+- 숨김 폴더를 포함한 저장소 문서 93개를 문자별로 검사했다. 현재 작성 문서에는
+  일본어 문장이 남아 있지 않으며, 참고 ev-zero-base.html의 한자 혼입 두 곳을 발견했다.
+- 한자를 한국어로 치환하던 두 표현을 처음부터 한국어로 쓰도록 정리했다.
+  참고 원문 해시는 유지하고 현재 파일 해시와 원문 보관 커밋을 별도 기록했다.
+- 루트·차계부 AGENTS.md에 한국어/영어 문서 작성 및 커밋 전 혼입 확인 규칙을 추가했다.
+- 관련 파일: references/prototypes/ev-zero-base.html, references/README.md,
+  루트·차계부 AGENTS.md 및 이 CHANGELOG.md. 의도적인 제품 중국어 번역은 변경하지 않았다.
+- 검증: 문서 전체 문자 검사·HTML 내 JS 구문·diff/공백·파일 해시 확인.
+  문서·참고 파일만 커밋·푸시한다. HA 코드 반영·재시작·새 릴리즈는 필요 없다.
+
 ## 2026-10-06 — 전체 변경의 누적 changelog 기록 의무화
 
 - 커밋 제목: `vehicle-journal: require complete changelogs for commits and releases`.
