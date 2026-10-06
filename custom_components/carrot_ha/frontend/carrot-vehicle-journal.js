@@ -3,7 +3,7 @@ import {preserveView} from './carrot-view-state.js';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{maximumFractionDigits:digits}):'—';
 const money=value=>Number.isFinite(value)?numeric(value,0)+'원':'미확인';
-const categories={maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',other:'기타'};
+const categories={charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',other:'기타'};
 const uuid=()=>{if(crypto.randomUUID)return crypto.randomUUID();const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;};
 const kindNames={trip:'주행',charge:'충전',expense:'지출'};
 const styles=`
@@ -40,7 +40,7 @@ export class VehicleJournal extends HTMLElement {
     <dialog id="recordDialog" aria-labelledby="dialogTitle"><form id="recordForm"><div class="row spaced"><h2 id="dialogTitle">놓친 기록을 남겨요.</h2><button id="close" type="button" aria-label="닫기">닫기</button></div><div class="fields">
     <input type="hidden" name="kind" id="kind" value="expense">
     <label>기록 날짜<input name="date" type="date" required></label>
-    <label id="categoryField">비용 분류<select name="category">${Object.entries(categories).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></label>
+    <label id="categoryField">비용 분류<select name="category">${Object.entries(categories).filter(([k])=>k!=='charging').map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></label>
     <label id="subcategoryField">세부 작업<input name="subcategory" placeholder="타이어 · 와이퍼 · 워셔액 등" maxlength="100"></label>
     <label id="distanceField" hidden>주행거리 · km<input name="distance_km" type="number" min="0" step="0.001"></label><label id="energyField" hidden>주행 소비 · kWh (선택)<input name="drive_energy_kwh" type="number" min="0" step="0.001"></label>
     <label id="chargeField" hidden>배터리 충전량 · kWh<input name="battery_charge_kwh" type="number" min="0" step="0.001"></label><label id="modeField" hidden>충전 종류<select name="charge_mode"><option value="unknown">미확인</option><option value="slow">완속</option><option value="fast">급속</option></select></label>
