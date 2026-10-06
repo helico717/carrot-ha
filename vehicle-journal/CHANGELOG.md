@@ -1,5 +1,15 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — v0.8.14-beta.1 실제 발행 확인
+
+- 커밋 제목: vehicle-journal: record verified beta release and HA deployment.
+- 태그 v0.8.14-beta.1은 447a165b6e3742eb42564299b49c944a730cc304를 가리키며 manifest 0.8.14-beta.1과 일치한다. 기존 태그는 이동하지 않았다.
+- GitHub Release pre-release=true 및 누적 본문을 확인했다: https://github.com/helico717/carrot-ha/releases/tag/v0.8.14-beta.1
+- HACS Release Actions completed/success: https://github.com/helico717/carrot-ha/actions/runs/37483882735
+- 최종 화면 파일 3개를 HA에 직접 반영하고 해시 일치를 확인했다. 백업: deployment-backups/447a165b6e3742eb42564299b49c944a730cc304. DB·사진·설정은 변경하지 않았다.
+- 운영 설치 manifest는 기존 0.8.13이며 직접 배포한 실행 수정본이다. HACS의 새 베타에는 동일한 수정본이 포함된다. iOS 실사용·장기간 관측은 아직 미확인으로 정식 릴리즈는 발행하지 않았다.
+
+
 ## 2026-10-07 — 전체 디자인 실기 적용·베타 노트 확정
 
 - 커밋 제목: vehicle-journal: finalize approved dashboard beta verification.
