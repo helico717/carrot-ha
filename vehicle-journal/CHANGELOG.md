@@ -1,6 +1,24 @@
+# 차계부 변경 이력
+
+## 2026-10-06 — v0.8.14-beta.1 배포 준비
+
+- 커밋 제목: vehicle-journal: prepare cumulative 0.8.14 beta notes.
+- manifest `0.8.14-beta.1` 및 태그별 누적 릴리즈 노트를 준비했다. 기준은
+  pre-release `v0.8.13` (`c8ad4aa`)이고 수정 실행 코드는 `4489ba0`이다.
+  `v0.8.13..4489ba0`의 20개 커밋과 파일 diff를 대조하여 승인 UI, 유가 센서,
+  loader/동기화, 문서·prototype·자산 보관과 이미지 원복 이력을 포함했다.
+- SSH 개발본의 승인된 UI를 베타 소스에 포함하여 이 베타 다운로드가 이전
+  화면을 되돌리지 않도록 했다. 다른 로컬 삭제 파일은 커밋에 포함하지 않았다.
+- 직접 반영된 파일은 기존 manifest `0.8.13` 상태다. HACS 재다운로드가 이번
+  SSH 검증의 필수 단계는 아니다. Python 재시작·실기 복구·iOS 확인은 대기 중이다.
+- 이 준비 커밋은 버전/노트/기록 변경만 포함하며 Worker·D1·Comma는 유지한다.
+  pre-release 발행 및 Actions 결과는 확인 후 별도 기록한다. 정식 발행은
+  실사용 검증 후이며 기존 태그를 이동하지 않는다.
+
 ## 2026-10-06 — 패널 캐시 갱신과 백그라운드 동기화 스레드 수정
 
-- 커밋 제목: vehicle-journal: refresh panel modules and schedule sync on HA loop.
+- 원격 커밋: `4489ba0` — vehicle-journal: repair long-trip ingestion, panel cache and HA loop scheduling.
+  로컬 검증 커밋 두 개의 내용과 원격 tree 해시가 동일함을 확인했다.
 - 승인된 충전량·전비·평균 충전요금 지표, 도넛 라벨, 수기 지출 전용 모달 및
   금액 콤마 서식을 그대로 유지했다. HA 설치본과 최신 Git UI 파일 해시 일치를
   확인했으며 기존 Chrome 실화면에서 원장과 승인된 지표 표시를 확인했다.
@@ -17,12 +35,12 @@
   expense/escaping/desktop/mobile/패널 정의 전 hass 전달 검증 통과. HA Python
   299 tests 통과(3 skip). 기존 Python3에는 Pillow가 없어 사진 2 tests가 실패했지만
   번들 Python 환경으로 전체 차계부 tests 통과했다.
-- 배포: 커밋 후 main 푸시 및 HA 기존 코드 백업·선택 파일 직접 반영·해시 확인 예정.
+- 배포: `4489ba0` main 반영 완료. HA 기존 코드 백업 후 선택 6개 파일 직접 반영 및
+  SHA-256 일치 확인 완료. 백업: `/config/carrot_ha/deployment-backups/4489ba05620cbff77cfcc8d4921401e4395c5546/`.
   Python 변경 적용은 사용자가 HA를 재시작한다. DB·사진·설정은 배포 대상이 아니다.
 - 한계: iOS의 이전 세션/캐시 원인은 아직 실화면으로 확인되지 않았다. 새 모듈
   URL 등록은 HA 재시작 후 적용된다. 운영 재시작 후 주행 복구와 timer 재검증이 필요하다.
 
-# 차계부 변경 이력
 
 ## 2026-10-06 — 패널 로더 정적 임포트 전환 및 초기 로딩 보장
 
