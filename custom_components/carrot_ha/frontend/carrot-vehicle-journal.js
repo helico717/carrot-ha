@@ -58,7 +58,7 @@ export class VehicleJournal extends HTMLElement {
               </div>
 
               <div class="chart-container" id="chartBox">
-                <div class="chart-tooltip" id="chartTooltip">
+                <div class="chart-tooltip" id="chartTooltip" aria-hidden="true">
                   <span class="tooltip-dot" id="tooltipDot"></span>
                   <strong id="tooltipCat">충전비</strong>: <span id="tooltipAmount">0원</span> (<span id="tooltipPct">0%</span>)
                 </div>

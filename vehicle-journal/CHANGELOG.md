@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 전체 디자인 실기 적용·베타 노트 확정
+
+- 커밋 제목: vehicle-journal: finalize approved dashboard beta verification.
+- 전체 디자인 원격 커밋 0b12115를 HA에 직접 배포하고 3개 파일 SHA-256 일치를 확인했다. 백업은 deployment-backups/0b1211576466b90ee8a24692ad090c3611c9e22e다.
+- Chrome 새로고침 후 기간 선택·3단 hero·이전 기간 지출 비교·분류 범례·도넛·지출 목록과 실제 HA 기록 표시를 확인했다. 최초 SPA 이동에는 기존 모듈이 남았고 전체 새로고침으로 최신 모듈을 확인했다.
+- 기존 입력 스타일이 원본의 차량/기간 selector를 전체 폭으로 만드는 것을 보정했고 분류 버튼 기본 스타일과 숨겨진 prototype tooltip 접근성을 정리했다.
+- 누적 베타 노트에 전체 디자인과 실제 주행 복구 결과를 반영했다. iOS 실사용은 아직 미확인이다. Worker/D1/Comma 변경은 없다.
+
+
 ## 2026-10-06 — 승인된 spending prototype 전체 반영
 
 - 커밋 제목: vehicle-journal: apply approved spending prototype to live HA records.
