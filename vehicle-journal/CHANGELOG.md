@@ -1,5 +1,15 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 차량 이미지 추가 전 원본 복원
+
+- 커밋 제목: `vehicle-journal: restore original review without vehicle image`.
+- 사용자 요청으로 review_journal_spending.html을 이미지 추가 직전 백업과 동일하게 복원했다.
+  이미지·오버레이·관련 반응형 수정이 제거되고 원래 제목·설명·통계 구성이 돌아왔다.
+- 이전 이미지 자산과 오버레이 검사 파일은 작업 이력으로 유지한다. 오버레이 검사는
+  이미지가 없는 현재 원본에 적용하지 않는다.
+- 검증: 백업과 파일 일치, HTML 내 JS 구문 검사, 모바일·데스크톱 렌더링·이미지 없음 확인.
+- 배포: 검토 HTML 및 변경 기록만 main 커밋·푸시. HA·Cloudflare·릴리즈 변경 없음.
+
 ## 2026-10-06 — 차량 우측 하단 고정과 겹침 중간값 조정
 
 - 커밋 제목: `vehicle-journal: anchor hero vehicle at bottom right`.
