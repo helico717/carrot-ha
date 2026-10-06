@@ -40,6 +40,17 @@ async def async_setup(hass, config):
     async_register_charge_ws(hass)
     from .can_capture import register as register_can_capture
     register_can_capture(hass)
+    from .vehicle_journal.api import register as register_journal
+    register_journal(hass)
+    from .vehicle_journal.photos import PhotoUpload, PhotoDownload
+    hass.http.register_view(PhotoUpload(hass))
+    hass.http.register_view(PhotoDownload(hass))
+    from homeassistant.components.panel_custom import async_register_panel
+    manifest_version = await hass.async_add_executor_job(lambda: json.loads((Path(__file__).parent / 'manifest.json').read_text())['version'])
+    await async_register_panel(hass, frontend_url_path='carrot-journal',
+        webcomponent_name='carrot-journal-panel', sidebar_title='차계부',
+        sidebar_icon='mdi:car-electric', require_admin=True,
+        module_url=f'/carrot_ha_static/carrot-journal-panel.js?v={manifest_version}')
 
     async def async_handle_purge(call):
         for runtime in hass.data.get(DOMAIN, {}).values():
@@ -93,6 +104,16 @@ async def async_setup_entry(hass, entry):
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
     await refresh_runtime_costs(hass, runtime)
+    from .vehicle_journal.runtime import setup as setup_journal
+    try:
+        await setup_journal(hass, entry, runtime)
+    except Exception:
+        # A journal error must not prevent existing vehicle entities/latest state.
+        runtime['journal_error'] = '차계부 DB를 열지 못했어요. 기존 차량 데이터는 계속 수집해요.'
+        _LOGGER.exception('Vehicle journal initialization failed')
+        def defer_archive_purge():
+            raise RuntimeError('Journal unavailable; archive retention deferred')
+        archive.journal_guard = defer_archive_purge
     runtime['camera_options'] = (entry.options.get('camera_enabled', False), entry.options.get('camera_token', ''))
     if runtime['camera_options'][0] and len(runtime['camera_options'][1]) >= 32:
         from .camera_relay import CameraRelay
@@ -184,6 +205,10 @@ async def async_unload_entry(hass, entry):
             await relay.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('terminal_relay'):
             await relay.close()
+        journal_task = hass.data[DOMAIN][entry.entry_id].get('journal_task')
+        if journal_task and not journal_task.done():
+            journal_task.cancel()
+            await asyncio.gather(journal_task, return_exceptions=True)
         task = hass.data[DOMAIN][entry.entry_id].get('cloud_task')
         if task and not task.done():
             task.cancel()

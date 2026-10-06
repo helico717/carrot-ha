@@ -1,9 +1,9 @@
 # HA 전용 차계부 기반
 
-**상태: 2026-10-06 설계 준비·HA 빈 DB 생성 완료, 수집·이관·API·화면 미구현.**
+**상태: 2026-10-06 v0.8.13 첫 구현·실제 HA 기록 이관·읽기 전용 미리보기 검증.**
 HA의 기존 기록을 활용해 자동 주행·충전과 수동 정비·비용·누락 보완을 장기 보존한다.
 Cloudflare·Comma 변경 없이 일별 요약과 간결한 원장을 HA에 저장한다.
-이번 폴더는 지침·문서·초기 SQL·미선정 디자인 참고 자료를 모은 작업 기준이다.
+이번 폴더는 지침·문서·초기 SQL·디자인 참고 자료를 모은 작업 기준이다.
 
 ## 읽는 순서
 
@@ -18,8 +18,11 @@ Cloudflare·Comma 변경 없이 일별 요약과 간결한 원장을 HA에 저�
 실행하면 안 된다. 운영 위치는 HA 설정 디렉터리 기준
 `carrot_ha/vehicle_journal/<entry_id>.sqlite3`, 사진은
 `carrot_ha/vehicle_journal/<entry_id>/attachments/`로 계획한다.
-사용자 추가 요청으로 활성 HA entry의 빈 DB(스키마 1, 차량 1개, 기록 0건)를
-생성하고 integrity/FK를 검증했다. 실제 HA API·수집·이관·백업 코드는 아직 연결하지 않았다.
+사용자 추가 요청으로 빈 DB 생성 이후 실제 HA 과거 기록을 이관하고 integrity/FK를
+검증했다. 자동 수집·수동 기록·사진·조회 코드와 후보 1번 기반 카드를 구현했다.
+운영 실행 연결은 HACS 업데이트·HA 재시작 후 확인해야 한다.
+[설치·사용 안내](usage.md), [대시보드 YAML](dashboard.yaml)을 참고한다.
+주차 SOC·과거 유가·자동/수동 링크·필드 보정·export API는 후속 범위다.
 
 독립 검증: 저장소 루트에서 `python3 vehicle-journal/schema/validate_schema.py`.
 이 명령은 실제 HA에 접속하지 않고 임시 DB에서 제약조건과 재실행을 검사한다.

@@ -1,4 +1,10 @@
-# 후속 구현 계획과 로컬 인터페이스
+# 구현 상태와 후속 로컬 인터페이스
+
+v0.8.13은 이 계획의 첫 수직 구현이다. query(일별·합계·페이지 원장), entries,
+record/save, record/status, comparison/save 및 인증 사진 upload/download를 구현했다.
+초기 접근은 관리자만 허용한다. 나머지 아래 예정 API는 아직 미등록이다.
+주차 SOC·당시 유가·link/correction/export·backup API는 후속 작업이다.
+후보 1번 기반 카드와 설치 안내는 usage.md를 참고한다.
 
 ## 단계와 완료 조건
 

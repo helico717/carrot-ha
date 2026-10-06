@@ -38,3 +38,17 @@ openpilot `ha/tests/test_param_polling.py`와 관련 auth/charge/trip/camera int
 
 운영 수집·백업·latency 검증은 실제 배포 이후 별도다. 합성 schema 검증을 실제
 일별 집계·데이터 복원·운영 수집의 성공으로 표현하지 않는다.
+
+## v0.8.13 실제 수행 결과
+
+- Journal 합성 검증 12건: 이관 replay·retention 유지·실패 guard·결제 0원/삭제,
+  수동 CAS/복원/유효성, DST 배분, schema packaging, 사진 EXIF/중복/한도, 관리자 권한.
+- 초기 SQL 9건, 기존 storage purge·monthly energy·charge payments/API·trip repair/
+  boundaries·archive compression/performance·frontend revision 검증 통과.
+- freshness 필수 Node 3파일(10개 test)과 cloud live/incremental/history cache Python,
+  Worker incremental/benchmark, Comma param_polling(4개) 통과.
+- 독립 Chromium: 탭·차트 지표·수동 저장·memo escaping, 1280/850/520/360/320px,
+  오래된 월 응답 거부, async 갱신 후 2개 animation frame의 scroll/style 보존 확인.
+- HA source read-only 이관과 target integrity/FK 검증, 기존 자료로 로컬 화면 확인.
+  HA에 새 실행 코드가 설치된 상태의 실제 저장·60초 자동 반영·full backup 복원은
+  HACS 업데이트 및 사용자 재시작 후 확인할 항목이다.

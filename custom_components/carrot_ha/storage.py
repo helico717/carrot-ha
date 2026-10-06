@@ -20,6 +20,7 @@ from .charge_costs import ChargeCosts
 
 class Archive(ChargeCosts):
     def __init__(self, path, charge_timezone="Asia/Seoul"):
+        self.journal_guard = None
         self.charge_timezone = charge_timezone
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.path = str(path)
@@ -37,6 +38,17 @@ class Archive(ChargeCosts):
             db.execute("CREATE INDEX IF NOT EXISTS events_started ON events(device,kind,julianday(COALESCE(json_extract(body,'$.data.started_at'),observed)) DESC)")
 
             self.init_charge_costs(db)
+            db.execute('CREATE TABLE IF NOT EXISTS journal_outbox (device TEXT PRIMARY KEY, generation INTEGER NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0)')
+            db.execute('INSERT OR IGNORE INTO journal_outbox(device,generation) SELECT DISTINCT device,1 FROM events')
+            # Device-specific queue triggers avoid scanning all history per mutation.
+            for table in ('events','trip_derivations','trip_energy','charge_summaries',
+                          'charge_payments','charge_payment_parts','charge_exclusions','charge_deletions'):
+                for operation, row in (('INSERT','NEW'),('UPDATE','NEW'),('DELETE','OLD')):
+                    db.execute(f"""CREATE TRIGGER IF NOT EXISTS journal_{table}_{operation.lower()}
+                        AFTER {operation} ON {table} BEGIN
+                        INSERT INTO journal_outbox(device,generation) VALUES ({row}.device,1)
+                        ON CONFLICT(device) DO UPDATE SET generation=generation+1;
+                        END""")
 
     @contextmanager
     def connect(self):
@@ -490,7 +502,15 @@ class Archive(ChargeCosts):
             for month in {datetime.fromisoformat(r[0]).astimezone(tz).strftime('%Y-%m') for r in dates}:
                 self.driving_energy_summary(device, month, tz, 0)
         counts = {'purged_state': 0, 'purged_trip': 0, 'purged_charge': 0, 'slimmed_trip': 0}
+        if self.journal_guard is not None:
+            # Abort retention if durable journal replication cannot complete.
+            self.journal_guard()
         with self.connect() as db:
+            if self.journal_guard is not None:
+                db.execute('BEGIN IMMEDIATE')
+                pending = db.execute('SELECT COUNT(*) FROM journal_outbox WHERE generation>acknowledged').fetchone()[0]
+                if pending:
+                    return dict(counts, journal_deferred=True)
             cur = db.execute(
                 "DELETE FROM events WHERE kind='state' AND julianday('now') - julianday(observed) > ?",
                 (state_days,)

@@ -1,0 +1,10 @@
+# Add resource /carrot_ha_static/carrot-vehicle-journal.js?v=0.8.13 as a JavaScript module.
+# After HACS update + HA restart. No external server or token is required.
+title: 차계부
+views:
+  - title: 내 차의 생활
+    path: journal
+    type: panel
+    cards:
+      - type: custom:carrot-vehicle-journal
+        # Optional: entry_id: YOUR_CARROT_HA_ENTRY_ID

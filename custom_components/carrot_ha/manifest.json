@@ -1,17 +1,21 @@
 {
   "domain": "carrot_ha",
   "name": "Carrot HA",
-  "version": "0.8.12",
+  "version": "0.8.13",
   "config_flow": true,
   "dependencies": [
     "http",
     "stream",
-    "websocket_api"
+    "websocket_api",
+    "frontend",
+    "panel_custom"
   ],
   "codeowners": [
     "@helico717"
   ],
-  "requirements": [],
+  "requirements": [
+    "Pillow>=10.0.0"
+  ],
   "iot_class": "cloud_polling",
   "documentation": "https://github.com/helico717/carrot-ha",
   "issue_tracker": "https://github.com/helico717/carrot-ha/issues"

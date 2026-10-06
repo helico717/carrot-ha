@@ -1,5 +1,9 @@
 # SQLite DB 설계 v1
 
+구현 상태: v0.8.13은 원장·일별 배분/집계·수동 CRUD·사진·현재 유가 비교를 사용한다.
+parking·record_links·corrections·fuel_observations는 스키마 준비 상태이며 runtime
+처리는 아직 없다. 이 문서의 전체 데이터 계약과 최초 릴리즈 구현 범위를 구분한다.
+
 ## 저장·연결 계약
 
 HA 설정 경로 `carrot_ha/vehicle_journal/<entry_id>.sqlite3`에 entry별 DB를 둔다.
