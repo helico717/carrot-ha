@@ -1,5 +1,15 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 승인된 spending prototype 전체 반영
+
+- 커밋 제목: vehicle-journal: apply approved spending prototype to live HA records.
+- review_journal_spending.html 원본은 보존했다. 3단 hero, 일/월/연도 선택, 이전 기간 스택 비교와 분류 선택, 고정 분류 색상, 지출 전용 최근 기록, 모바일 레이아웃과 수기 지출 4개 분류를 적용했다. 샘플 수치와 장치 프레임은 제외했다.
+- 기존 HA 로컬 query만 사용하며 이전 조회 실패가 현재 기록을 차단하지 않는다. Worker·D1·Comma 변경은 없다.
+- 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, carrot-journal-panel.js, tests/browser-check.cjs.
+- Chromium 저장·escaping·오래된 응답 거부·스크롤/스타일 유지·320/360/520/850px·윤년 범위·분류 토글 검증 통과. 실기 화면과 iOS 검증은 대기 중이다.
+- HA 재시작 이후 장거리 주행 동기화와 원장 복구를 확인했다. 전체 디자인 실기 확인 전 베타 발행은 보류한다.
+
+
 ## 2026-10-06 — v0.8.14-beta.1 배포 준비
 
 - 커밋 제목: vehicle-journal: prepare cumulative 0.8.14 beta notes.
