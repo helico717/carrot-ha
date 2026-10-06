@@ -1,5 +1,23 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 차량 이미지 규격화와 오버레이 재수정
+
+- 커밋 제목: `vehicle-journal: fit complete vehicle art and verify hero overlays`.
+- 이전 `20f9e5b`의 차량 뒷부분 잘림·설명 대비·과도한 여백 문제를 해결했다.
+  음수 right와 100% 초과 확대를 없애고 고정 비율 영역에서 차량 전체를 contain으로 표시한다.
+- 원본 사진을 built-in image_gen으로 배경 제거한 새 1536×1024 RGBA 이미지를 추가했다.
+  기존 컷아웃에 있던 유리창 투명 구멍 대신 유리·실내 표현을 보존한 파생 이미지를 사용한다.
+  원본·기존 이미지는 유지한다. 작은 설명은 가벼운 대비 처리를 적용해 차체 가장자리와 겹친다.
+- 좁은 뷰포트에 프레임 폭을 맞추고, 320px 연도별 지표는 두 열로 표시해 금액과
+  전비 단위가 글자 중간에서 끊기거나 인접 지표를 침범하지 않도록 했다.
+- 관련 파일: review_journal_spending.html, vehicle-journal/assets/id4-hero.png,
+  assets/README.md, tests/review-hero.cjs 및 이 변경 기록.
+- 검증: 320~1920px·세 화면 모드·일/월/연도 21개 조합의 이미지 경계·텍스트 경계,
+  실제 차체 알파와 설명의 겹침·단위 한 줄 유지·JS 오류 검사 통과. 모바일 월간,
+  320px 연간, 좁은 데스크톱 및 넓은 데스크톱 스크린샷을 육안 검토했다.
+- 배포: 검토용 로컬 HTML과 자산만 커밋·푸시. 운영 HA·DB·API·manifest·태그·
+  pre-release·정식 릴리즈는 변경하지 않는다. 이미지 생성 프롬프트와 배치 원칙을 문서화했다.
+
 ## 2026-10-06 — 검토 HTML의 차량·설명 오버레이
 
 - 커밋 제목: `vehicle-journal: compose vehicle and overlay copy in review hero`.
