@@ -508,16 +508,15 @@
     }
     /* The full vehicle stays inside one bounded artboard at every card width. */
     #heroCard { container-type: inline-size; }
-    .hero-scene { position: relative; isolation: isolate; }
+    .hero-scene { position: relative; isolation: isolate; padding-bottom: calc(47cqi - 16px); }
     #heroHeadline { position: relative; z-index: 2; max-width: 100%; }
-    .hero-artboard { position: relative; width: 92%; margin-left: auto; aspect-ratio: 1.8;
-      margin-top: calc(-12cqi - 10px); isolation: isolate; z-index: 3; }
+    .hero-artboard { position: absolute; right: 0; bottom: 0; width: 86%; aspect-ratio: 1.5;
+      isolation: isolate; z-index: 3; }
     .hero-vehicle { display: block; width: 100%; height: 100%; object-fit: contain;
       pointer-events: none; filter: drop-shadow(0 10px 10px #0005); }
     #heroCard > .stats { position: relative; margin-top: 12px;
       border-top: 1px solid #ffffff18; padding-top: 18px; }
     .stage-mobile #heroHeadline, .stage-max #heroHeadline { font-size: clamp(20px, 8cqi, 30px); }
-    .stage-mobile .hero-artboard, .stage-max .hero-artboard { aspect-ratio: 1.55; margin-top: calc(-14cqi - 7px); }
     @container (max-width: 350px) {
       #heroHeadline { font-size: clamp(20px, 8cqi, 28px) !important; }
       }

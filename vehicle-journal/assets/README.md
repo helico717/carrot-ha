@@ -27,7 +27,8 @@ Keep entire vehicle, all tires, bumper and mirrors, centered on the same
 
 배치는 review_journal_spending.html의 `.hero-artboard`에서 `object-fit: contain`으로
 규격화한다. 이미지를 100%보다 크게 확대하거나 음수 right로 밀어 차체를 자르지 않는다.
-문장과 이미지는 같은 `.hero-scene`에 있고 제목은 좌측 상단, 차량 영역은 92% 폭으로 우측 정렬한다.
+문장과 이미지는 같은 `.hero-scene`에 있고 제목은 좌측 상단, 차량 영역은 86% 폭으로 같은 장면의 right: 0 / bottom: 0에 고정한다.
+제목 아래의 예약 공간으로 장면 높이를 확보하며 음수 margin으로 차량을 끌어올리지 않는다.
 큰 헤드라인의 마지막 줄 아래쪽과 차량 지붕이 겹친다. 작은 설명은 삭제했다.
 320px 카드의 지표는 두 열로 바꾸고 숫자·단위의 글자 중간 줄바꿈을 막는다.
 

@@ -25,6 +25,8 @@ const http=require('node:http');
     const result=await page.locator('#heroCard').evaluate(card=>{
      const box=card.getBoundingClientRect(),image=card.querySelector('.hero-vehicle'),img=image.getBoundingClientRect();
      const smallNote=!!card.querySelector('#heroNote');
+     const scene=card.querySelector('.hero-scene').getBoundingClientRect(),art=card.querySelector('.hero-artboard').getBoundingClientRect();
+     const anchored=Math.abs(art.right-scene.right)<1&&Math.abs(art.bottom-scene.bottom)<1;
      const headline=card.querySelector('#heroHeadline .h-phrase:last-child'),noteBox=headline.getBoundingClientRect();
      const ranges=[];
      for(const el of card.querySelectorAll('#heroHeadline .h-phrase, .stat strong')){
@@ -49,9 +51,9 @@ const http=require('node:http');
       if(ix>=0&&iy>=0&&ix<canvas.width&&iy<canvas.height&&alpha[(iy*canvas.width+ix)*4+3]>180)overlap++;
      }
      return {outside,brokenMetrics,imageInside:img.left>=box.left&&img.right<=box.right&&img.top>=box.top&&img.bottom<=box.bottom,
-      horizontalOverflow:card.scrollWidth>card.clientWidth,overlap,smallNote};
+      horizontalOverflow:card.scrollWidth>card.clientWidth,overlap,smallNote,anchored};
     });
-    if(result.outside||result.brokenMetrics||!result.imageInside||result.horizontalOverflow||result.overlap<4||result.smallNote)throw Error(JSON.stringify({mode,width,period,...result}));
+    if(result.outside||result.brokenMetrics||!result.imageInside||result.horizontalOverflow||result.overlap<4||result.smallNote||!result.anchored)throw Error(JSON.stringify({mode,width,period,...result}));
     if(period==='month'||(width===320&&period==='year'))await page.locator('#heroCard').screenshot({path:`.preview/journal/hero/${mode}-${width}-${period}.png`});
     checked++;
    }

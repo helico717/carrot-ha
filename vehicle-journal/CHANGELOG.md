@@ -1,5 +1,20 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 차량 우측 하단 고정과 겹침 중간값 조정
+
+- 커밋 제목: `vehicle-journal: anchor hero vehicle at bottom right`.
+- 이전 배치는 일반 문서 흐름에서 음수 margin으로 겹침을 만들어 중앙에 걸쳐 보였다.
+  차량을 상단 hero-scene의 right: 0 / bottom: 0에 고정하고 폭을 86%로 줄였다.
+  제목은 좌측 상단, 통계는 장면 아래에 유지한다. 전체 카드의 통계·버튼 영역을
+  차량으로 덮는 구성은 아니며 차량은 카드 상단 시각 영역의 우측 하단에 놓인다.
+- 장면에 반응형 예약 공간을 확보해 제목 길이가 달라도 차량의 우측·하단 기준을 유지한다.
+  겹침은 직전보다 줄여 마지막 줄 아래쪽만 가리도록 조정했다.
+- 관련 파일: review_journal_spending.html, assets/README.md, tests/review-hero.cjs,
+  CHANGELOG.md. 새 이미지 생성이나 이미지 자산 변경은 없다.
+- 검증: 21개 화면·기간 조합에서 경계·겹침·JS 오류 및 장면 우측 하단 정렬 검사.
+  모바일 402px·데스크톱 1280px 월간 스크린샷 육안 확인.
+- 배포: 검토 파일만 main 커밋·푸시. 운영 HA·Cloudflare·릴리즈 변경 없음.
+
 ## 2026-10-06 — 좌측 제목·우측 차량 구도와 이미지 제작 기준
 
 - 커밋 제목: `vehicle-journal: align vehicle right and deepen headline overlap`.
