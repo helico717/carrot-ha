@@ -8,7 +8,7 @@
   2. `CarrotJournalPanel.connectedCallback()` 및 `set hass()`에서 `this.card.load()`를 명시적으로 호출하여 DOM 연결 및 `hass` 주입 시점에 항상 데이터 조회가 안정적으로 트리거되도록 보장.
   3. `carrot-vehicle-journal.js`의 `build()` 및 `load()` 내 DOM 참조(`actualKrw`, `recordForm`, `month` 등)에 null 안전 가드를 추가하여 초기화 중단 방지.
 - 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-panel.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/CHANGELOG.md`.
-- 검증: `node --check` 통과 및 모의 DOM 라이프사이클 테스트 통과. HA SSH 직접 배포 및 SHA-256 검증.
+- 검증: `node --check` 통과 및 모의 DOM 라이프사이클 테스트 통과. HA SSH 직접 배포 및 SHA-256 일치 확인 (`carrot-vehicle-journal.js`: `2234105ecf9dec53c0dedaf3c69991ba60aa00325f385dadab808a3c0c2e1111`, `carrot-journal-panel.js`: `9eaa9fe4b734260c7eaed218f2de4203496dab89a38222f0991c7d725d847891`). 백업: `/config/carrot_ha/deployment-backups/3d87c3f/`.
 
 ## 2026-10-06 — HA 차계부 카드 UI/UX 최적화 반영 및 HA 직접 배포
 
