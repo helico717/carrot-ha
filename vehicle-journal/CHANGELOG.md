@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 사진 수정의 main 및 HA 반영 확인
+
+- 커밋 제목: vehicle-journal: record verified photo compression and cancellation deployment.
+- 사진 기능 커밋 7212fe3ca4389017b2b6a715d65554102eaf6068은 동시 대시보드 커밋 19bac1435d7720efe53eee5e7e05de7788919e64의 부모이며 원격 main에 포함된 것을 확인했다. 현재 진행 중인 디자인 수정도 함께 유지된다.
+- HA 설치 카드 SHA-256 d81226f75f8b38169b423f23a87e8a2cf36c5ebbc4de54f64d416f51ed58d3fc 및 패널 9503738a2e6aa98b570988323c0c225ca5a17851e4a39ff8fd93fb2661622279가 최신 소스와 일치한다. 사진당 20MiB 입력·브라우저 자동 압축·개별/전체 선택 취소가 설치 소스에 포함됨을 확인했다.
+- Chrome 사진 압축 및 선택 취소·입력 유지·기록 수정 검증 통과. 실제 사용자의 영수증·iOS 저장 검증은 대기 중이다. 화면 강력 새로고침이 필요하며 HA 재시작·새 릴리즈·HACS 재다운로드는 수행하지 않았다.
+
+
 ## 2026-10-07 — 차계부 UI 전면 개편 및 상단 카드 하단 여백 제거 (컴팩트 레이아웃)
 
 - 커밋 제목: `vehicle-journal: compact dashboard layout, eliminate hero bottom void, and refine period/tab copy`.
