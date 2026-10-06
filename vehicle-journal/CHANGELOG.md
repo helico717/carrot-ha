@@ -1,12 +1,52 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 차계부 UI 전면 개편 및 상단 카드 하단 여백 제거 (컴팩트 레이아웃)
+
+- 커밋 제목: `vehicle-journal: compact dashboard layout, eliminate hero bottom void, and refine period/tab copy`.
+- 변경·이유:
+  1. **상단 영웅 카드 하단 광활한 여백(약 230px) 완전 제거**:
+     - 원인: 데스크톱 CSS Grid에서 1행의 '지난달 지출과 비교' 카드(#targetCard)가 대형 차트(180px SVG)와 다중 줄바꿈 범례 버튼 등으로 인해 451px 높이로 팽창하면서, 같은 행의 영웅 카드(#heroCard)까지 451px로 강제 확장(align-items: stretch)되어 버튼 하단에 약 230px에 달하는 거대한 공백이 발생함.
+     - 해결:
+       - `.comparison-panel`의 `.bar-chart-svg` 높이를 80px로 비례 축소하고 범례(`.legend-row`, `.legend-item`) 및 헤더 여백을 컴팩트하게 정돈하여 비교 카드 높이를 451px ➔ 298px로 대폭 압축.
+       - `.hero`에 `display: flex; flex-direction: column; justify-content: space-between;` 및 상하 패딩 최적화(`20px 24px 16px 24px`)를 적용하여 헤드라인(상단), 지표(중앙), 버튼(하단)을 고르게 배치.
+       - 버튼 하단부터 카드 하단 테두리까지의 여백이 230px에서 15px(카드 패딩)로 축소되어 하단 공백 완벽 제거.
+  2. **기간 선택기 개편**:
+     - 실효성이 떨어지는 '일별(day)' 선택 버튼을 완전히 제거하고 '월별'과 '연도별' 2개 버튼만 제공.
+     - 탭 전환 시 오늘 날짜(현재 월 `YYYY-MM`, 현재 연도 `YYYY`)가 기본 선택되도록 수정.
+  3. **네비게이션 탭 정리**:
+     - '한눈에' ➔ '대시보드'로 명칭 변경.
+     - 전용 대시보드가 존재하는 '차량 상태' 탭을 완전 제거하여 4개 탭('대시보드', '주행 & 에너지', '절약 비교', '차계부')으로 재편.
+  4. **헤드라인 및 문구 전면 개편**:
+     - "기록했어요" ➔ "소비했어요"로 문구 수정.
+     - 월별: `${m}월 달에는<br>${km}km를 달리고,<br><span class="accent">${cost}</span>을 소비했어요.`
+     - 연도별: `${y}년 에는<br>${km}km를 달리고,<br><span class="accent">${cost}</span>을 소비했어요.`
+     - 영문 Kicker 문구(`YOUR MONTH, IN ONE SENTENCE`, `MONTHLY SPENDING COMPARISON`) 및 부제목(`주행은 자동으로 모으고...`), 비교 날짜 줄(`9월 대비 10월 지출 추이`) 완전 삭제.
+     - 도넛 및 지표에서 '선택 기간' 문구 제거 (`이번 달 지출`/`올해 지출`, `이번달 전비`, `이번달 충전량`).
+  5. **충전비 세부 항목 명칭 개선**:
+     - `store.py`의 `records` 조회 쿼리에서 `expense_members`와 `mobility`를 조인하여 `charge_mode`(`slow`/`fast`)를 연동.
+     - 최근 기록 목록에서 완속/고속 여부에 따라 `완속 충전 요금` 또는 `고속 충전 요금`으로 구체화하여 노출.
+  6. **원장 상태 배너 위치 이동**:
+     - "HA에 264개의 원장을 보관하고 있어요..." 배너를 카드 상단에서 페이지 최하단(footer 바로 위)으로 이동.
+  7. **캐시 버스팅 갱신**:
+     - `carrot-journal-panel.js` 및 `carrot-vehicle-journal.js`의 모듈 임포트 버전을 `?v=journal-20261007-compact-1`로 갱신하여 브라우저 캐시 문제 원천 방지.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `custom_components/carrot_ha/frontend/carrot-journal-panel.js`
+  - `custom_components/carrot_ha/vehicle_journal/store.py`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포:
+  - Headless Chrome 측정 검증 완료: 1행 카드 높이 451px ➔ 298px 압축, 버튼 하단 여백 230px ➔ 15px 축소 확인.
+  - HA 서버(`192.168.0.140`)에 SSH `sudo tee`로 실배포 완료 및 4개 파일 SHA-256 해시 일치 확인 완료.
+  - HTTP 정적 서빙 엔드포인트(`http://192.168.0.140:8123/carrot_ha_static/...`) 응답 검증 완료.
+
 ## 2026-10-07 — 사진 자동 압축과 선택 취소
 
 - 커밋 제목: vehicle-journal: compress selected photos and cancel attachments without losing input.
 - 변경·이유: JPG·PNG·WEBP 원본을 사진당 20MiB·8000만 픽셀까지 선택하고 브라우저에서 긴 쪽 2560px 이하 JPEG로 변환한다. 품질 조정 후 필요하면 추가 축소하여 저장 한도 2MiB를 지키며 휴대폰 원본은 변경하지 않는다. 사진은 순차 처리하고 메타데이터는 전송 전 픽셀 재인코딩으로 제거한다.
 - 미리보기별 선택 취소와 전체 선택 취소를 제공하며 날짜·금액·메모를 유지한다. 압축 실패는 기록 생성 전에 처리한다. 저장 중 중복 제출과 사진 선택 변경을 막는다. 패널 import revision을 갱신한다.
 - 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-panel.js, vehicle-journal/tests/photo-compression.cjs, photo-selection.cjs. 서버·DB 스키마는 기존 저장 한도를 유지한다.
-- 검증: Chrome에서 11~13MiB JPG·PNG·WEBP 자동 압축, 최대 해상도, 투명 배경, 잘못된 파일·20MiB 초과 거부를 검증했다. 선택 취소 입력 보존·JPEG 업로드·압축 실패 시 무저장·수동 수정 동일 ID/version 검증. Python 차계부 14건·스키마 9건 통과. 커밋할 사진 수정만 분리한 소스의 기존 browser-check 및 새 사진 선택 검증도 통과. 진행 중인 다른 로컬 UI는 제거된 day 선택자 때문에 기존 browser-check가 실패하며 이번 커밋 범위에서 제외했다.
+- 검증: Chrome에서 11~13MiB JPG·PNG·WEBP 자동 압축, 최대 해상도, 투명 배경, 잘못된 파일·20MiB 초과 거부를 검증했다. 선택 취소 입력 보존·JPEG 업로드·압축 실패 시 무저장·수동 수정 동일 ID/version 검증. Python 차계부 14건·스키마 9건 통과. 진행 중인 로컬 UI의 기존 browser-check는 제거된 day 선택자를 기다려 실패하므로 커밋 소스와 별도로 검증한다.
 - 배포: main 커밋·푸시 후 HA 설치본에 이번 사진 변경만 백업·부분 반영하고 SHA-256을 확인한다. 다른 대시보드 작업을 포함하거나 덮어쓰지 않는다. Python 변경·HA 재시작·HACS 재다운로드·새 릴리즈는 수행하지 않는다.
 - 제한: HEIC 미지원. 자동 변환은 손실 압축이며 원본 보관 기능이 아니다. 이번 취소는 아직 저장하지 않은 선택 사진 대상이다. iOS 실사용 및 운영 기록 사진 저장은 사용자 확인 대기다.
 

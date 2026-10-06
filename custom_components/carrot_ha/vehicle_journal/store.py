@@ -261,7 +261,8 @@ class Journal:
                 (self.vehicle,self.time_zone,start,end))]
             rows=db.execute('''SELECT r.id,r.kind,r.origin,r.status,r.version,r.quality_json,r.extra_json,
                 m.started_at,m.ended_at,m.distance_km,m.drive_energy_kwh,m.battery_charge_kwh,m.billed_charge_kwh,
-                m.charge_mode,m.memo AS mobility_memo,e.accounting_date,e.category,e.subcategory,
+                COALESCE(m.charge_mode,(SELECT m2.charge_mode FROM expense_members em JOIN mobility m2 ON m2.vehicle_id=em.vehicle_id AND m2.record_id=em.charge_id WHERE em.vehicle_id=r.vehicle_id AND em.expense_id=r.id LIMIT 1)) AS charge_mode,
+                m.memo AS mobility_memo,e.accounting_date,e.category,e.subcategory,
                 e.actual_krw,e.estimated_krw,e.memo AS expense_memo,e.payment_owner,e.payment_id,e.payment_version
                 FROM records r LEFT JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id
                 LEFT JOIN expenses e ON e.vehicle_id=r.vehicle_id AND e.record_id=r.id

@@ -497,13 +497,13 @@
     .hero {
       position: relative;
       border-radius: 28px;
-      padding: 30px;
+      padding: 24px 28px 18px 28px;
       background: linear-gradient(130deg, #183b37 0%, var(--j-surface) 100%);
       border: 1px solid var(--j-border);
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     }
     .stage-mobile .hero, .stage-max .hero {
-      padding: 22px 18px 24px;
+      padding: 18px 16px 14px;
       border-radius: 22px;
     }
     .kicker {
@@ -542,12 +542,12 @@
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 14px;
-      margin: 20px 0 16px;
+      margin: 16px 0 10px;
     }
     .stage-mobile .stats, .stage-max .stats {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
-      margin: 16px 0 14px;
+      margin: 12px 0 8px;
     }
     .stat {
       min-width: 0;
@@ -1045,6 +1045,8 @@
       transform: translateX(-50%) translateY(0);
       opacity: 1;
     }
+      .status { margin: 24px 0 10px; padding: 12px 16px; font-size: 12.5px; color: var(--j-sub); background: var(--j-surface); border: 1px solid var(--j-border); border-radius: 12px; text-align: center; }
+    .footer { font-size: 12px; color: var(--j-sub); text-align: center; margin-bottom: 16px; }
   </style>
 </head>
 <body>
@@ -1130,7 +1132,6 @@
             
             <!-- 일별 / 월별 / 연도별 선택기 -->
             <div class="period-segmented" role="group" aria-label="집계 기간 선택">
-              <button class="period-tab-btn" id="btnPeriodDay" onclick="setPeriod('day')">일별</button>
               <button class="period-tab-btn active" id="btnPeriodMonth" onclick="setPeriod('month')">월별</button>
               <button class="period-tab-btn" id="btnPeriodYear" onclick="setPeriod('year')">연도별</button>
             </div>
@@ -1139,11 +1140,10 @@
 
         <!-- 5대 탭 목록 (완전 작동 전환) -->
         <nav class="tabs" role="tablist">
-          <button role="tab" id="tab0" aria-selected="true" onclick="selectTab(0)">한눈에</button>
-          <button role="tab" id="tab1" aria-selected="false" onclick="selectTab(1)">주행&에너지</button>
+          <button role="tab" id="tab0" aria-selected="true" onclick="selectTab(0)">대시보드</button>
+          <button role="tab" id="tab1" aria-selected="false" onclick="selectTab(1)">주행 & 에너지</button>
           <button role="tab" id="tab2" aria-selected="false" onclick="selectTab(2)">절약 비교</button>
           <button role="tab" id="tab3" aria-selected="false" onclick="selectTab(3)">차계부</button>
-          <button role="tab" id="tab4" aria-selected="false" onclick="selectTab(4)">차량 상태</button>
         </nav>
 
         <!-- [탭 0: 한눈에] 컨텐츠 그리드 -->
@@ -1152,12 +1152,10 @@
 
             <!-- 1. 영웅 카드 (클린 3단 큼직한 타이포그래피 문장형) -->
             <article class="panel wide hero" id="heroCard">
-              <div class="kicker" id="heroKicker">YOUR MONTH, IN ONE SENTENCE</div>
-              <h1 id="heroHeadline">
+                            <h1 id="heroHeadline">
                 <!-- 동적 3줄 헤드라인 -->
               </h1>
-              <p class="muted note" id="heroNote">주행은 자동으로 모으고, 놓친 기록은 직접 남겨요.</p>
-              <div class="stats">
+                            <div class="stats">
                 <div class="stat">
                   <small id="statLabel1">이번달 충전량</small>
                   <strong id="heroStat1">262.8<span class="stat-unit">kWh</span></strong>
@@ -1180,14 +1178,12 @@
             <article class="panel narrow comparison-panel is-more" id="targetCard">
               <div class="card-header-row">
                 <div>
-                  <div class="kicker" id="compareKicker" style="margin-bottom:3px;">MONTHLY SPENDING COMPARISON</div>
                   <h2 id="cardTitle">지난달 지출과 비교</h2>
                 </div>
                 <span id="trendPill" class="trend-badge more">▲ 35.2%</span>
               </div>
 
               <div class="spend-headline">
-                <div class="spend-context" id="compareContext">9월 대비 10월 지출 추이</div>
                 <div class="spend-statement" id="spendStatement">
                   <span id="statementCompareBase">지난달</span>에 비해 <span class="domain-tag" id="statementDomain">전체 지출</span>에서<br>
                   <span class="amount-highlight" id="statementAmount">17,800원</span>을
@@ -1325,21 +1321,8 @@
           </article>
         </section>
 
-        <!-- [탭 4: 차량 상태] -->
-        <section class="tab-view" id="view4">
-          <article class="panel">
-            <h2>마지막으로 확인한 차량 상태예요.</h2>
-            <div class="stats" style="margin:20px 0;">
-              <div class="stat"><small>배터리 SOC</small><strong class="accent">78%</strong></div>
-              <div class="stat"><small>주행가능거리</small><strong>342 km</strong></div>
-              <div class="stat"><small>차량 상태</small><strong style="color:#60a5fa;">주차 중</strong></div>
-              <div class="stat"><small>도어 잠금</small><strong>잠겨 있어요</strong></div>
-              <div class="stat"><small>계기판 누적거리</small><strong>42,850 km</strong></div>
-              <div class="stat"><small>외기 온도</small><strong>19.5 °C</strong></div>
-            </div>
-            <p class="muted note">마지막 수신: 2026-10-06 17:18 · 실시간 카드와 동일한 HA 최신 센서 연동</p>
-          </article>
-        </section>
+        <p class="status" id="message">HA에 264개의 원장을 보관하고 있어요. 기존 기록을 연결했어요.</p>
+        <p class="footer" id="footer">집계 시간대 Asia/Seoul · HA 로컬 DB에 보관해요. 누락 데이터는 0으로 채우지 않아요.</p>
 
       </main>
 
@@ -1473,7 +1456,7 @@
         dateValue: '2026-10',
         hero: {
           kicker: 'YOUR MONTH, IN ONE SENTENCE',
-          headline: '이번 달 1,420km를 달리고,<br><span class="accent">68,400원</span>을 기록했어요.',
+          headline: '10월 달에는<br>1,420km를 달리고,<br><span class="accent">68,400원</span>을 소비했어요.',
           cost: '68,400원',
           chargedEnergy: '262.8 kWh',
           efficiency: '5.4 km/kWh',
@@ -1508,7 +1491,7 @@
         recent: [
           { title: '자동 세차 및 실내 청소', cat: 'washing', date: '10-04', amount: '17,000원', sub: '직접 기록', origin: 'manual' },
           { title: '트렁크 미끄럼방지 패드', cat: 'tuning', date: '10-03', amount: '6,400원', sub: '온라인 구매', origin: 'manual' },
-          { title: '아파트 완속 충전', cat: 'charging', date: '10-02', amount: '5,420원', sub: '24.2 kWh (자동 원장)', origin: 'auto' }
+          { title: '완속 충전 요금', cat: 'charging', date: '10-02', amount: '5,420원', sub: '24.2 kWh (자동 원장)', origin: 'auto' }
         ]
       },
       year: {
@@ -1516,7 +1499,7 @@
         dateValue: '2026',
         hero: {
           kicker: 'YOUR YEAR, IN ONE SENTENCE',
-          headline: '올해 15,620km를 달리고,<br><span class="accent">784,000원</span>을 기록했어요.',
+          headline: '2026년 에는<br>15,620km를 달리고,<br><span class="accent">784,000원</span>을 소비했어요.',
           cost: '784,000원',
           chargedEnergy: '2,940 kWh',
           efficiency: '5.3 km/kWh',
@@ -1552,7 +1535,7 @@
         recent: [
           { title: '에어컨 필터 교체', cat: 'maintenance', date: '08-15', amount: '35,000원', sub: '정비 / 소모품비', origin: 'manual' },
           { title: '앞유리 와이퍼 교체', cat: 'maintenance', date: '06-20', amount: '42,000원', sub: '정비 / 소모품비', origin: 'manual' },
-          { title: '고속도로 급속 충전', cat: 'charging', date: '05-05', amount: '22,400원', sub: '강릉 여행 급속 충전', origin: 'auto' }
+          { title: '고속 충전 요금', cat: 'charging', date: '05-05', amount: '22,400원', sub: '강릉 여행 급속 충전', origin: 'auto' }
         ]
       }
     };
@@ -1574,8 +1557,7 @@
       currentPeriod = p;
       hoveredCategory = null;
 
-      document.getElementById('btnPeriodDay').classList.toggle('active', p === 'day');
-      document.getElementById('btnPeriodMonth').classList.toggle('active', p === 'month');
+            document.getElementById('btnPeriodMonth').classList.toggle('active', p === 'month');
       document.getElementById('btnPeriodYear').classList.toggle('active', p === 'year');
 
       const container = document.getElementById('datePickerContainer');
@@ -1625,7 +1607,7 @@
 
     // 5대 탭 전환 핸들러
     function selectTab(idx) {
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         const btn = document.getElementById('tab' + i);
         const view = document.getElementById('view' + i);
         if (btn) btn.setAttribute('aria-selected', i === idx ? 'true' : 'false');
@@ -1636,13 +1618,10 @@
     }
 
     function getFormattedHeadline(p) {
-      // [사용자 요청] 어절 단위 3줄 줄바꿈: 큼직한 글씨로 시원하고 가독성 높은 구성
-      if (p === 'day') {
-        return `<span class="h-phrase">오늘</span><br><span class="h-phrase">58.4km를 달리고,</span><br><span class="h-phrase"><span class="accent">4,200원</span>을 기록했어요.</span>`;
-      } else if (p === 'month') {
-        return `<span class="h-phrase">이번 달</span><br><span class="h-phrase">1,420km를 달리고,</span><br><span class="h-phrase"><span class="accent">68,400원</span>을 기록했어요.</span>`;
+      if (p === 'year') {
+        return `<span class="h-phrase">2026년 에는</span><br><span class="h-phrase">15,620km를 달리고,</span><br><span class="h-phrase"><span class="accent">784,000원</span>을 소비했어요.</span>`;
       } else {
-        return `<span class="h-phrase">올해</span><br><span class="h-phrase">15,620km를 달리고,</span><br><span class="h-phrase"><span class="accent">784,000원</span>을 기록했어요.</span>`;
+        return `<span class="h-phrase">10월 달에는</span><br><span class="h-phrase">1,420km를 달리고,</span><br><span class="h-phrase"><span class="accent">68,400원</span>을 소비했어요.</span>`;
       }
     }
 
@@ -1716,10 +1695,8 @@
       const ds = periodDatasets[currentPeriod];
 
       // 1. 영웅 카드 갱신 (클린 대형 타이포그래피 & 3대 지표)
-      document.getElementById('heroKicker').textContent = ds.hero.kicker;
-      document.getElementById('heroHeadline').innerHTML = getFormattedHeadline(currentPeriod);
-      document.getElementById('heroNote').textContent = ds.hero.note;
-      renderHeroStats(currentPeriod);
+            document.getElementById('heroHeadline').innerHTML = getFormattedHeadline(currentPeriod);
+            renderHeroStats(currentPeriod);
 
       // 2. 비교 카드 갱신
       renderComparisonCard();
@@ -1741,10 +1718,8 @@
       const pct = prevTotal > 0 ? ((diff / prevTotal) * 100) : (currTotal > 0 ? 100 : 0);
 
       const targetCard = document.getElementById('targetCard');
-      document.getElementById('compareKicker').textContent = comp.kicker;
-      document.getElementById('cardTitle').textContent = comp.title;
-      document.getElementById('compareContext').textContent = comp.context;
-      document.getElementById('statementCompareBase').textContent = comp.baseLabel;
+            document.getElementById('cardTitle').textContent = comp.title;
+            document.getElementById('statementCompareBase').textContent = comp.baseLabel;
 
       const statementDomain = document.getElementById('statementDomain');
       const statementAmount = document.getElementById('statementAmount');

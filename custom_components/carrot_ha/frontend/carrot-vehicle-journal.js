@@ -1,4 +1,4 @@
-import {journalDesign} from './carrot-journal-design.js?v=journal-20261006-3';
+import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-compact-1';
 import {preserveView} from './carrot-view-state.js';
 // HA-local EV journal. No remote polling, browser token or localStorage records.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -58,35 +58,30 @@ export class VehicleJournal extends HTMLElement {
   build(){
     this.ready=true;
     this.shadowRoot.innerHTML=`<style>${styles}${journalDesign}</style><div class="shell">
-    <header class="mast"><div class="mast-left"><div class="brand">CARROT HA · EV JOURNAL</div><div class="title-controls-row"><h2>내 차의 생활</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['day','일별'],['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
-    <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
-    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['한눈에','주행 & 에너지','절약 비교','차계부','차량 상태'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
+    <header class="mast"><div class="mast-left"><div class="brand">CARROT HA · EV JOURNAL</div><div class="title-controls-row"><h2>내 차의 생활</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
+    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','주행 & 에너지','절약 비교','차계부'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
     <section id="page0" role="tabpanel" aria-labelledby="tab0">
           <div class="grid">
 
             <!-- 1. 영웅 카드 (클린 3단 큼직한 타이포그래피 문장형) -->
             <article class="panel wide hero" id="heroCard">
-              <div class="kicker" id="heroKicker">YOUR MONTH, IN ONE SENTENCE</div>
               <h1 id="headline">기록을 불러오고 있어요.</h1>
-              <p class="muted note" id="heroNote">주행은 자동으로 모으고, 놓친 기록은 직접 남겨요.</p>
               <div class="stats" id="briefStats"></div>
-<div style="margin-top: 8px;">
-                <button id="gotoCompare" style="font-size:13px; padding:8px 14px; min-height:36px;">절약 계산 살펴보기 →</button>
+              <div style="margin-top: 4px;">
+                <button id="gotoCompare" style="font-size:13px; padding:7px 14px; min-height:34px;">절약 계산 살펴보기 →</button>
               </div>
             </article>
 
-            <!-- 2. 스택형 전월/전일/전년 대비 지출 비교 카드 -->
+            <!-- 2. 스택형 전월/전년 대비 지출 비교 카드 -->
             <article class="panel narrow comparison-panel is-more" id="targetCard">
               <div class="card-header-row">
                 <div>
-                  <div class="kicker" id="compareKicker" style="margin-bottom:3px;">MONTHLY SPENDING COMPARISON</div>
                   <h2 id="cardTitle">지난달 지출과 비교</h2>
                 </div>
                 <span id="trendPill" class="trend-badge">비교 중</span>
               </div>
 
               <div class="spend-headline">
-                <div class="spend-context" id="compareContext"></div>
                 <div class="spend-statement" id="spendStatement"></div>
               </div>
 
@@ -151,7 +146,7 @@ export class VehicleJournal extends HTMLElement {
     <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><article class="panel"><h2>달리고 충전한 흐름이에요.</h2><div class="chart-controls"><select id="metric" aria-label="추이 지표"><option value="distance_km">주행거리 · km</option><option value="drive_energy_kwh">주행 소비 · kWh</option><option value="battery_charge_kwh">충전량 · kWh</option><option value="charge_effective_krw">충전비 · 원</option><option value="efficiency">전비 · km/kWh</option><option value="drive_soc_used_pp">주행 사용 SOC · %p</option></select><select id="period" aria-label="집계 단위"><option value="day">1일 단위</option><option value="week">1주 단위</option><option value="month">1개월 단위</option></select></div><svg id="chart" class="chart" role="img" aria-label="날짜별 추이"></svg><div class="stats" id="energyStats"></div><p class="note" id="qualityNote"></p></article></section>
     <section id="page2" role="tabpanel" aria-labelledby="tab2" hidden><div class="grid"><article class="panel wide hero"><h2>같은 거리를 다른 차로 달렸다면요.</h2><div class="compare-value" id="saving">유가 센서를 먼저 연결해 주세요.</div><div id="compareDetail"></div><p class="note">선택 기간의 충전비와 현재 유가 기준 예상 유류비만 비교해요. 전체 차량 유지비 절감은 아니에요.</p></article><article class="panel narrow"><h2>비교 기준을 정해요.</h2><form id="compareForm"><div class="fields"><label class="fullfield">비교 유종<select id="fuel"><option value="gasoline">휘발유</option><option value="diesel">경유</option><option value="premium">고급유</option></select></label><label class="fullfield">비교 연비 · km/L<input id="economy" type="number" min="1" max="50" step="0.1" value="12" required></label><label class="fullfield">HA 유가 센서<input id="fuelEntity" placeholder="sensor.fuel_price" required></label></div><button class="primary" type="submit">HA에 비교 기준 저장</button><p class="note" id="compareMessage" role="status"></p></form></article></div></section>
     <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="row spaced"><h2>차에 남긴 기록이에요.</h2><button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button></div><p class="note">자동 주행·충전·결제와 직접 남긴 기록을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="table-wrap"><table class="table"><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th>거리·충전·금액</th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
-    <section id="page4" role="tabpanel" aria-labelledby="tab4" hidden><article class="panel"><h2>마지막으로 확인한 차량 상태예요.</h2><div class="stats" id="stateStats"></div><p class="note" id="stateNote"></p></article></section>
+    <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
     <p class="footer" id="footer">차계부는 HA 로컬 DB에 보관해요. 누락 데이터는 0으로 채우지 않아요.</p>
     <dialog id="recordDialog" aria-labelledby="dialogTitle"><form id="recordForm"><div class="row spaced"><h2 id="dialogTitle">놓친 기록을 남겨요.</h2><button id="close" class="modal-close-btn" type="button" aria-label="닫기">닫기</button></div><div class="fields">
     <input type="hidden" name="kind" id="kind" value="expense">
@@ -170,7 +165,7 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]'))button.onclick=()=>this.setScope(button.dataset.scope);
     this.$('legendRow').onclick=event=>{const button=event.target.closest('[data-cat]');if(button){this.comparisonCategory=this.comparisonCategory===button.dataset.cat?null:button.dataset.cat;this.renderSpendingComparison();}};
-    for(let i=0;i<5;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
+    for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
     for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.openRecord();
     if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
     if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(2);
@@ -188,7 +183,7 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
     if(this.$('chart')){this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));}
   }
-  selectTab(index){this.tab=index;for(let i=0;i<5;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
+  selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
   call(type,params={}){return this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}
   async load(force=false){
     if(!this._hass?.callWS||!this.isConnected)return;
@@ -218,21 +213,20 @@ export class VehicleJournal extends HTMLElement {
     finally{this.loading=false;if(this.reloadPending){this.reloadPending=false;this.load(true);}}
   }
   setScope(scope){
-    if(!['day','month','year'].includes(scope)||scope===this.scope)return;
-    const value=this.$('month').value,today=new Date().toLocaleDateString('sv-SE'),date=value.length===4?value+'-01-01':value.length===7?(value===today.slice(0,7)?today:value+'-01'):value;
+    if(!['month','year'].includes(scope)||scope===this.scope)return;
+    const today=new Date().toLocaleDateString('sv-SE');
     this.scope=scope;this.offset=0;
-    const input=this.$('month');input.type=scope==='day'?'date':scope==='month'?'month':'number';
-    if(scope==='year'){input.min='1900';input.max='2100';input.value=date.slice(0,4);}else{input.removeAttribute('min');input.removeAttribute('max');input.value=scope==='day'?date:date.slice(0,7);}
+    const input=this.$('month');input.type=scope==='year'?'number':'month';
+    if(scope==='year'){input.min='1900';input.max='2100';input.value=today.slice(0,4);}else{input.removeAttribute('min');input.removeAttribute('max');input.value=today.slice(0,7);}
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]')){const active=button.dataset.scope===scope;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
     this.load(true);
   }
   range(){
     const value=this.$('month')?.value;
-    if(!value||!({day:/^\d{4}-\d{2}-\d{2}$/,month:/^\d{4}-\d{2}$/,year:/^\d{4}$/}[this.scope]).test(value))return null;
-    const [year,month=1,day=1]=value.split('-').map(Number),date=new Date(Date.UTC(year,month-1,day));
-    if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return null;
+    if(!value||!({month:/^\d{4}-\d{2}$/,year:/^\d{4}$/}[this.scope]).test(value))return null;
+    const [year,month=1]=value.split('-').map(Number),date=new Date(Date.UTC(year,month-1,1));
+    if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1)return null;
     const iso=d=>d.toISOString().slice(0,10),end=new Date(date),previous=new Date(date),previousEnd=new Date(date);
-    if(this.scope==='day'){previous.setUTCDate(day-1);previousEnd.setUTCDate(day-1);}
     if(this.scope==='month'){end.setUTCMonth(month,0);previous.setUTCMonth(month-2,1);previousEnd.setUTCDate(0);}
     if(this.scope==='year'){end.setUTCMonth(11,31);previous.setUTCFullYear(year-1);previousEnd.setUTCFullYear(year-1);previousEnd.setUTCMonth(11,31);}
     return {from:iso(date),to:iso(end),previousFrom:iso(previous),previousTo:iso(previousEnd)};
@@ -247,9 +241,24 @@ export class VehicleJournal extends HTMLElement {
   }
   renderRecentExpenses(){
     const expenses=this.data.records.filter(record=>record.status==='active'&&record.kind==='expense').slice(0,4);
-    this.$('recent').innerHTML=expenses.map(record=>{const key=['charging','maintenance','washing','tuning'].includes(record.category)?record.category:'other',color=this.categoryColor(key);
-      return `<div class="recent-expense-row"><div class="recent-left"><div class="recent-title-line"><span class="cat-highlight-pill" style="color:${color};background:${color}22;border:1px solid ${color}66">${esc(categories[record.category]||'기타')}</span><span class="recent-item-title">${esc(record.subcategory||record.memo||categories[record.category]||'지출')}</span></div><small class="recent-date-sub">${esc(record.accounting_date||'미확인')} · ${record.origin==='manual'?'직접 기록':'자동 기록'}</small></div><strong class="recent-amount">${money(record.actual_krw??record.estimated_krw)}</strong></div>`;
-    }).join('')||'<p class="muted note">이 기간의 지출 기록이 없어요.</p>';
+    this.$('recent').innerHTML=expenses.map(record=>{
+      const key=['charging','maintenance','washing','tuning'].includes(record.category)?record.category:'other',color=this.categoryColor(key);
+      let title=record.subcategory||record.memo;
+      if(record.category==='charging'||record.kind==='charge'){
+        let mode=record.charge_mode;
+        if(!mode||mode==='unknown'){
+          const dateStr=(record.accounting_date||record.started_at||'').slice(0,10);
+          const match=this.data.records?.find(r=>r.kind==='charge'&&(r.started_at||'').slice(0,10)===dateStr&&r.charge_mode&&r.charge_mode!=='unknown');
+          if(match)mode=match.charge_mode;
+        }
+        if(mode==='fast')title='고속 충전 요금';
+        else if(mode==='slow')title='완속 충전 요금';
+        else title='충전 요금';
+      }else{
+        title=title||categories[record.category]||'지출';
+      }
+      return `<div class="recent-expense-row"><div class="recent-left"><div class="recent-title-line"><span class="cat-highlight-pill" style="color:${color};background:${color}22;border:1px solid ${color}66">${esc(categories[record.category]||'기타')}</span><span class="recent-item-title">${esc(title)}</span></div><small class="recent-date-sub">${esc(record.accounting_date||'미확인')} · ${record.origin==='manual'?'직접 기록':'자동 기록'}</small></div><strong class="recent-amount">${money(record.actual_krw??record.estimated_krw)}</strong></div>`;
+    }).join('')||'<p class="muted note">지출 기록이 아직 없어요.</p>';
   }
   renderSpendingComparison(){
     if(!this.data)return;
@@ -257,18 +266,20 @@ export class VehicleJournal extends HTMLElement {
     const sum=data=>Object.values(data).reduce((total,item)=>total+item.effective_krw,0);
     const oldValue=key?(previous[key]?.effective_krw||0):sum(previous),newValue=key?(current[key]?.effective_krw||0):sum(current),diff=newValue-oldValue;
     const observed=Boolean(this.data.previous?.daily?.length);
-    this.$('cardTitle').textContent={day:'이전 날 지출과 비교',month:'지난달 지출과 비교',year:'지난해 지출과 비교'}[this.scope];
-    this.$('compareKicker').textContent={day:'DAILY SPENDING COMPARISON',month:'MONTHLY SPENDING COMPARISON',year:'YEARLY SPENDING COMPARISON'}[this.scope];
-    const range=this.range();this.$('compareContext').textContent=`${range.previousFrom} ~ ${range.previousTo} 대비 ${range.from} ~ ${range.to}`;
+    const prevName=this.scope==='year'?'지난해':'지난달';
+    this.$('cardTitle').textContent=this.scope==='year'?'지난해 지출과 비교':'지난달 지출과 비교';
+    const range=this.range();
     const color=diff>0?'#ff5c5c':diff<0?'#60a5fa':'#81e6c5';
     this.$('targetCard').classList.toggle('is-more',observed&&diff>0);this.$('targetCard').classList.toggle('is-less',observed&&diff<0);
     this.$('trendPill').className='trend-badge '+(observed?(diff>0?'more':diff<0?'less':''): '');
     this.$('trendPill').textContent=observed&&oldValue>0?`${diff>0?'▲':diff<0?'▼':'—'} ${numeric(Math.abs(diff/oldValue*100))}%`:'비교율 미확인';
-    this.$('spendStatement').innerHTML=observed?`이전 기간에 비해 <span class="domain-tag" style="color:${key?this.categoryColor(key):'var(--j-accent)'}">${esc(key?categories[key]:'전체 지출')}</span>에서<br><span class="amount-highlight">${money(Math.abs(diff))}</span>을 <span style="color:${color}">${diff>0?'더 소비':diff<0?'덜 소비':'동일하게 소비'}</span>했어요.`:'이전 기간의 관측 기록이 없어 지출 차이를 계산하지 않아요.';
+    this.$('spendStatement').innerHTML=observed?`${prevName}에 비해 <span class="domain-tag" style="color:${key?this.categoryColor(key):'var(--j-accent)'}">${esc(key?categories[key]:'전체 지출')}</span>에서<br><span class="amount-highlight">${money(Math.abs(diff))}</span>을 <span style="color:${color}">${diff>0?'더 소비':diff<0?'덜 소비':'동일하게 소비'}</span>했어요.`:'이전 기간의 관측 기록이 없어 지출 차이를 계산하지 않아요.';
     for(const button of this.$('legendRow').querySelectorAll('[data-cat]')){button.classList.toggle('active',button.dataset.cat===key);button.setAttribute('aria-pressed',String(button.dataset.cat===key));}
     const amounts=data=>Object.fromEntries(Object.entries(data).map(([category,cost])=>[category,cost.effective_krw]));
-    this.$('barChartSvg').setAttribute('aria-label',observed?'이전 기간과 선택 기간의 지출 비교':'이전 기간 기록 없음 · 선택 기간 지출');
-    this.drawStackedChart(amounts(previous),amounts(current),sum(previous),sum(current),sum(current)-sum(previous),observed?range.previousFrom.slice(this.scope==='year'?0:5,this.scope==='year'?4:10):'기록 없음',range.from.slice(this.scope==='year'?0:5,this.scope==='year'?4:10));
+    this.$('barChartSvg').setAttribute('aria-label',observed?`${prevName}와 ${this.scope==='year'?'올해':'이번달'}의 지출 비교`:'이전 기간 기록 없음 · 이번달 지출');
+    const prevLabel=observed?(this.scope==='year'?range.previousFrom.slice(0,4)+'년':Number(range.previousFrom.slice(5,7))+'월'):'기록 없음';
+    const currLabel=this.scope==='year'?range.from.slice(0,4)+'년':Number(range.from.slice(5,7))+'월';
+    this.drawStackedChart(amounts(previous),amounts(current),sum(previous),sum(current),sum(current)-sum(previous),prevLabel,currLabel);
   }
   drawStackedChart(prevData, currData, prevTotal, currTotal, diff, prevLabel, currLabel) {
       const svg=this.$('barChartSvg'),hoveredCategory=this.comparisonCategory;
@@ -398,13 +409,17 @@ export class VehicleJournal extends HTMLElement {
     const d=this.data,t=d.totals,latest=d.latest||{};
     this.$('footer').textContent=`집계 시간대 ${d.timezone} · HA 로컬 DB에 보관해요. 누락 데이터는 0으로 채우지 않아요.`;
     this.$('message').classList.remove('error');this.$('message').textContent=d.sync_error||`HA에 ${numeric(d.record_count,0)}개의 원장을 보관하고 있어요. ${d.status.phase==='complete'?'기존 기록을 연결했어요.':'기존 기록을 가져오고 있어요.'}`;
-    const periodLabel={day:'선택한 날',month:'선택한 달',year:'선택한 해'}[this.scope];
-    this.$('heroKicker').textContent={day:'YOUR DAY, IN ONE SENTENCE',month:'YOUR MONTH, IN ONE SENTENCE',year:'YOUR YEAR, IN ONE SENTENCE'}[this.scope];
-    this.$('headline').innerHTML=`<span class="h-phrase">${periodLabel}</span><br><span class="h-phrase">${numeric(t.distance_km)}km를 달리고,</span><br><span class="h-phrase"><span class="accent">${money(t.total_cost_krw)}</span>을 기록했어요.</span>`;
+    const monthVal=this.$('month')?.value||new Date().toLocaleDateString('sv-SE').slice(0,7);
+    const monthNum=Number(monthVal.slice(5,7));
+    const yearNum=monthVal.slice(0,4);
+    const todayStr=new Date().toLocaleDateString('sv-SE');
+    const isThisMonth=monthVal===todayStr.slice(0,7);
+    const isThisYear=yearNum===todayStr.slice(0,4);
+    const periodHeadline=this.scope==='year'?`${yearNum}년 에는`:`${monthNum}월 달에는`;
+    this.$('headline').innerHTML=`<span class="h-phrase">${periodHeadline}</span><br><span class="h-phrase">${numeric(t.distance_km)}km를 달리고,</span><br><span class="h-phrase"><span class="accent">${money(t.total_cost_krw)}</span>을 소비했어요.</span>`;
 
-    const isThisMonth=this.$('month').value===new Date().toLocaleDateString('sv-SE').slice(0,7);
-    const effLabel=this.scope==='day'?'선택일 전비':this.scope==='year'?'선택 연도 전비':isThisMonth?'이번달 전비':'선택 월 전비';
-    const chargeLabel=this.scope==='day'?'선택일 충전량':this.scope==='year'?'선택 연도 충전량':isThisMonth?'이번달 충전량':'선택 월 충전량';
+    const effLabel=this.scope==='year'?(isThisYear?'올해 전비':`${yearNum}년 전비`):(isThisMonth?'이번달 전비':`${monthNum}월 전비`);
+    const chargeLabel=this.scope==='year'?(isThisYear?'올해 충전량':`${yearNum}년 충전량`):(isThisMonth?'이번달 충전량':`${monthNum}월 충전량`);
 
     const chargeKwhStr=(Number.isFinite(t.battery_charge_kwh)&&t.battery_charge_kwh>0)
       ?`${numeric(t.battery_charge_kwh)}<span class="stat-unit">kWh</span>`
@@ -423,14 +438,17 @@ export class VehicleJournal extends HTMLElement {
       this.stat(effLabel,effStr)+
       this.stat('kWh 당 평균 충전요금',avgRate);
 
-    const state=this.stat('배터리 SOC',numeric(latest.soc_percent)+'%')+this.stat('주행가능거리',numeric(latest.range_km??latest.estimated_range_km)+' km')+this.stat('차량 상태',latest.driving||latest.onroad?'주행 중':latest.charging?'충전 중':'마지막 수신 상태');
-    this.$('stateStats').innerHTML=state+this.stat('도어 잠금',latest.doors_locked===true?'잠겨 있어요':latest.doors_locked===false?'열려 있어요':'미확인')+this.stat('계기판 누적거리',numeric(latest.odometer_km)+' km')+this.stat('외기 온도',numeric(latest.outside_temp_c)+' °C');
-    this.$('stateNote').textContent=`마지막 수신 ${latest.last_received||latest.measured_at||'미확인'} · 실시간 카드와 같은 HA 최신 기록을 사용해요. 수신 공백 동안 값은 새 측정이 아니에요.`;
+    if(this.$('stateStats')){
+      const state=this.stat('배터리 SOC',numeric(latest.soc_percent)+'%')+this.stat('주행가능거리',numeric(latest.range_km??latest.estimated_range_km)+' km')+this.stat('차량 상태',latest.driving||latest.onroad?'주행 중':latest.charging?'충전 중':'마지막 수신 상태');
+      this.$('stateStats').innerHTML=state+this.stat('도어 잠금',latest.doors_locked===true?'잠겨 있어요':latest.doors_locked===false?'열려 있어요':'미확인')+this.stat('계기판 누적거리',numeric(latest.odometer_km)+' km')+this.stat('외기 온도',numeric(latest.outside_temp_c)+' °C');
+      if(this.$('stateNote'))this.$('stateNote').textContent=`마지막 수신 ${latest.last_received||latest.measured_at||'미확인'} · 실시간 카드와 같은 HA 최신 기록을 사용해요. 수신 공백 동안 값은 새 측정이 아니에요.`;
+    }
     const amounts=Object.entries(this.costCategories(t)).filter(([,v])=>v.effective_krw>0);
     const colors=amounts.map(([key])=>this.categoryColor(key));
     this.$('costs').innerHTML=amounts.map(([k,v],i)=>`<div class="list-row"><span style="display:inline-flex;align-items:center"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:${colors[i]}"></span>${esc(categories[k]||k)}</span><strong style="font-variant-numeric:tabular-nums">${money(v.effective_krw)}</strong></div>`).join('')||'<p class="note">이 기간의 지출 기록이 아직 없어요.</p>';
     const total=amounts.reduce((sum,[,v])=>sum+v.effective_krw,0);let offset=0;
-    this.$('donut').innerHTML=`<title>선택 기간 지출 ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="20"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="20" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="78" text-anchor="middle" fill="var(--j-sub)" font-size="12">선택 기간 지출</text><text x="80" y="98" text-anchor="middle" fill="var(--j-ink)" font-size="15">${money(total)}</text>`;
+    const donutLabel=this.scope==='year'?(isThisYear?'올해 지출':`${yearNum}년 지출`):(isThisMonth?'이번 달 지출':`${monthNum}월 지출`);
+    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="20"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="20" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="78" text-anchor="middle" fill="var(--j-sub)" font-size="12">${donutLabel}</text><text x="80" y="98" text-anchor="middle" fill="var(--j-ink)" font-size="15">${money(total)}</text>`;
     this.renderRecentExpenses();
     this.renderSpendingComparison();
     this.$('energyStats').innerHTML=this.stat('충전량',numeric(t.battery_charge_kwh)+' kWh')+this.stat('완속 / 급속',`${numeric(t.slow_count,0)} / ${numeric(t.fast_count,0)}회`,`미확인 ${numeric(t.unknown_count,0)}회`)+this.stat('주행 소비 SOC',numeric(t.drive_soc_used_pp)+' %p','주차 소비·하루 전체 소비는 미확인');
