@@ -476,6 +476,10 @@ HA 수신 어댑터와 제품 적용·릴리즈 기록은 이 저장소에, Comm
 ## HA 전용 차계부 — 2026-10-06
 
 차계부 작업 전에 [vehicle-journal/AGENTS.md](vehicle-journal/AGENTS.md)를 읽는다.
+차계부의 모든 커밋은 기능·버그·UI·테스트·문서·배포 정책을 포함한 모든 변경을
+`vehicle-journal/CHANGELOG.md`에 함께 기록한다. pre-release와 정식 릴리즈 노트는
+해당 커밋 범위의 전체 변경을 포함하며, 정식 노트에는 직전 정식 릴리즈 이후의 중간
+베타 변경도 누적해 기록한다. git log·diff와 대조해 누락을 확인한다.
 Antigravity 등 개발 에이전트는 [차계부 배포·인계 절차](vehicle-journal/deployment.md)도
 읽는다. 디버깅 중에는 커밋·푸시와 승인된 HA SSH 직접 반영을 사용하며, 버그 수정 완료
 후 pre-release, 사용자 실사용 검증 후 정식 릴리즈를 발행한다. 이 사용자 지정 정책은
