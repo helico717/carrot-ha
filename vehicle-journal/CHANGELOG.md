@@ -1,5 +1,17 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 검토 HTML의 차량·설명 오버레이
+
+- 커밋 제목: `vehicle-journal: compose vehicle and overlay copy in review hero`.
+- 사용자 지정 review_journal_spending.html의 요약 카드를 하나의 상대 좌표 영역으로
+  구성하고 기존 투명 ID.4 이미지와 작은 설명을 겹쳐 배치했다. 설명은 차량 앞면
+  가장자리 위에 표시하고 주요 수치와 하단 지표는 읽기 쉽게 유지했다.
+- 모바일·큰 모바일·데스크톱 모드별 크기·위치와 좁은 카드 컨테이너 규칙을 추가했다.
+- 관련 파일: review_journal_spending.html, 기존 vehicle_id4_transparent.png, 이 변경 기록.
+- 검증: 세 화면 모드 이미지 로드·JS 실행·카드 렌더링을 확인했다. 차량 가장자리는
+  카드 내부에서 잘라 표현한다. 원본 HTML 백업은 /private/tmp에 보관했다.
+- 검토용 로컬 HTML만 수정했다. 운영 HA·manifest·태그·릴리즈는 변경하지 않는다.
+
 ## 2026-10-06 — 문서 언어 전수 확인과 혼입 표현 정리
 
 - 커밋 제목: `vehicle-journal: normalize reference text and document language policy`.

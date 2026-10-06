@@ -1,0 +1,2183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>차계부 대시보드 검토용 프로토타입 · 디버그 완전 작동 대시보드</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --j-bg: #0b1014;
+      --j-surface: #161e25;
+      --j-raised: #202c36;
+      --j-border: #2a3945;
+      --j-ink: #f1f6fa;
+      --j-sub: #a8bdca;
+      --j-accent: #81e6c5;
+      --j-blue: #7bb6ff;
+      --j-red: #ff5c5c;
+      --j-red-bg: rgba(255, 92, 92, 0.15);
+      --j-blue-bg: rgba(123, 182, 255, 0.15);
+
+      /* 카테고리 고유 색상 팔레트 (5대 핵심 분류 확정) */
+      --cat-charging: #81e6c5;     /* 충전비: Carrot 민트 그린 */
+      --cat-maintenance: #f59e0b;  /* 정비/소모품비: 앰버 오렌지 */
+      --cat-washing: #60a5fa;      /* 세차비: 산뜻한 스카이 블루 */
+      --cat-tuning: #c084fc;       /* 튜닝: 스타일리시 퍼플 */
+      --cat-other: #94a3b8;        /* 기타: 뉴트럴 슬레이트 그레이 */
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #06090c;
+      color: var(--j-ink);
+      font: 15px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      word-break: keep-all; /* 모바일 한글 어절 단위 자연스러운 줄바꿈 */
+      overflow-wrap: break-word;
+    }
+
+    button, input, select, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      background: var(--j-raised);
+      border: 1px solid var(--j-border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      min-height: 40px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    button:hover { filter: brightness(1.15); }
+    button:active { transform: scale(0.98); }
+
+    /* 검토용 상단 컨트롤 바 */
+    .review-banner {
+      background: #0f171e;
+      border-bottom: 2px solid #243545;
+      padding: 12px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .review-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .review-tag {
+      background: #2563eb;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .review-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* 디바이스 뷰포트 토글 */
+    .device-switcher, .test-switcher {
+      display: inline-flex;
+      background: #16222c;
+      border: 1px solid var(--j-border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .device-btn, .test-btn {
+      background: transparent;
+      border: 0;
+      color: var(--j-sub);
+      font-size: 12px;
+      padding: 4px 10px;
+      min-height: 28px;
+      border-radius: 7px;
+    }
+    .device-btn.active, .test-btn.active {
+      background: var(--j-raised);
+      color: var(--j-ink);
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* 뷰포트 래퍼 */
+    .viewport-stage {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px 12px;
+      transition: all 0.3s ease;
+    }
+
+    /* 아이폰 16 프로 (402 × 874) 디바이스 프레임 */
+    .stage-mobile .iphone-frame {
+      width: 402px;
+      min-width: 402px;
+      max-width: 402px;
+      height: 874px;
+    }
+    /* 아이폰 16 프로 맥스 & 갤럭시 S24 울트라 (430 × 932) */
+    .stage-max .iphone-frame {
+      width: 430px;
+      min-width: 430px;
+      max-width: 430px;
+      height: 932px;
+      background: var(--j-bg);
+      border: 12px solid #1f2730;
+      border-radius: 56px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.85), 0 0 0 1px #3a4a59;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+      scrollbar-width: thin;
+      scrollbar-color: #2a3945 transparent;
+    }
+    .stage-max .iphone-frame::-webkit-scrollbar { width: 4px; }
+    .stage-max .iphone-frame::-webkit-scrollbar-thumb { background: #2a3945; border-radius: 4px; }
+    .dummy-placeholder {
+      background: var(--j-bg);
+      border: 12px solid #1f2730;
+      border-radius: 54px;
+      box-shadow: 0 30px 70px rgba(0, 0, 0, 0.85), 0 0 0 1px #3a4a59;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+      scrollbar-width: thin;
+      scrollbar-color: #2a3945 transparent;
+    }
+    .stage-mobile .iphone-frame::-webkit-scrollbar {
+      width: 4px;
+    }
+    .stage-mobile .iphone-frame::-webkit-scrollbar-thumb {
+      background: #2a3945;
+      border-radius: 4px;
+    }
+
+    /* 아이폰 16 프로 상단 다이나믹 아일랜드 및 상태표시줄 */
+    .iphone-status-bar {
+      display: none;
+      height: 52px;
+      background: rgba(11, 16, 20, 0.95);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 500;
+      padding: 14px 26px 0;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #f1f6fa;
+      border-top-left-radius: 42px;
+      border-top-right-radius: 42px;
+    }
+    .stage-mobile .iphone-status-bar, .stage-max .iphone-status-bar {
+      display: flex;
+    }
+    .dynamic-island {
+      width: 125px;
+      height: 35px;
+      background: #000;
+      border-radius: 20px;
+      position: absolute;
+      top: 11px;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 0 0.5px rgba(255,255,255,0.08);
+    }
+
+    /* 아이폰 하단 홈 인디케이터 바 */
+    .iphone-home-bar {
+      display: none;
+      width: 140px;
+      height: 4.5px;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 4px;
+      position: sticky;
+      bottom: 8px;
+      left: 50%;
+      margin: 14px auto 6px;
+      z-index: 500;
+    }
+    .stage-mobile .iphone-home-bar, .stage-max .iphone-home-bar {
+      display: block;
+    }
+
+    /* 데스크톱 일반 래퍼 */
+    .stage-desktop .iphone-frame {
+      width: 100%;
+      max-width: 1280px;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      height: auto;
+      overflow: visible;
+    }
+
+    /* 차계부 본체 레이아웃 */
+    .shell {
+      background: var(--j-bg);
+      border-radius: 24px;
+      padding: 30px;
+      min-width: 0;
+      width: 100%;
+    }
+    .stage-mobile .shell, .stage-max .shell {
+      padding: 16px 16px 32px;
+      border-radius: 0;
+    }
+
+    /* 상단 마스트헤드 및 기간 단위 선택기(일/월/년) */
+    .mast {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .mast-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .brand {
+      color: var(--j-sub);
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: 600;
+    }
+    .title-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title-controls-row h2 {
+      font-size: 24px;
+      margin: 0;
+      white-space: nowrap;
+      letter-spacing: -0.5px;
+    }
+    .select-pill, .date-pill {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 10px;
+      padding: 7px 11px;
+      font-size: 13px;
+      color: var(--j-ink);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .select-pill:hover, .date-pill:hover,
+    .select-pill:focus, .date-pill:focus {
+      border-color: var(--j-accent);
+    }
+
+    /* 우측 버튼 및 기간 선택기 그룹 */
+    .mast-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* 일별/월별/연도별 선택기 */
+    .period-segmented {
+      display: inline-flex;
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 12px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .period-tab-btn {
+      background: transparent;
+      border: 0;
+      color: var(--j-sub);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      min-height: 36px;
+      border-radius: 9px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .period-tab-btn:hover {
+      color: var(--j-ink);
+    }
+    .period-tab-btn.active {
+      background: var(--j-raised);
+      color: var(--j-ink);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-weight: 750;
+    }
+
+    /* + 기록 남기기 버튼 (통일된 당근 민트 액센트) */
+    .btn-record-primary {
+      background: var(--j-accent);
+      color: #07221b;
+      border: 0;
+      font-size: 14.5px;
+      font-weight: 750;
+      padding: 10px 20px;
+      min-height: 42px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.25);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .btn-record-primary:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 6px 18px rgba(129, 230, 197, 0.38);
+      transform: translateY(-1px);
+    }
+    .btn-record-primary:active {
+      transform: translateY(1px);
+    }
+
+    /* [사용자 요청] 최근 기록 카드의 + 기록 버튼: 상단과 동일한 스타일 유지 */
+    .btn-recent-record {
+      background: var(--j-accent);
+      color: #07221b;
+      border: 0;
+      font-size: 12.5px;
+      font-weight: 750;
+      padding: 6px 13px;
+      min-height: 32px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(129, 230, 197, 0.28);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .btn-recent-record:hover {
+      filter: brightness(1.12);
+      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.45);
+      transform: translateY(-1px);
+    }
+
+    /* 아이폰 16 프로 (402px) 마스트헤드 레이아웃 */
+    .stage-mobile .mast, .stage-max .mast {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .stage-mobile .title-controls-row, .stage-max .title-controls-row {
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .stage-mobile .title-controls-row h2, .stage-max .title-controls-row h2 {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .stage-mobile .select-pill, .stage-max .select-pill, 
+    .stage-mobile .date-pill, .stage-max .date-pill {
+      font-size: 12px;
+      padding: 6px 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .stage-mobile .mast-right, .stage-max .mast-right {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+    .stage-mobile .period-segmented, .stage-max .period-segmented {
+      width: 100%;
+      display: flex;
+    }
+    .stage-mobile .period-tab-btn, .stage-max .period-tab-btn {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 12.5px;
+      text-align: center;
+    }
+    .stage-mobile .btn-record-primary, .stage-max .btn-record-primary {
+      width: 100%;
+      min-height: 44px;
+      font-size: 14.5px;
+      border-radius: 12px;
+    }
+
+    /* 탭 네비게이션 */
+    .tabs {
+      display: flex;
+      background: var(--j-surface);
+      padding: 5px;
+      gap: 4px;
+      border-radius: 14px;
+      margin: 16px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs button {
+      flex: 1;
+      background: transparent;
+      color: var(--j-sub);
+      border: 0;
+      white-space: nowrap;
+      min-height: 38px;
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+    .tabs button[aria-selected="true"] {
+      background: var(--j-raised);
+      color: var(--j-ink);
+      font-weight: 700;
+    }
+
+    /* 그리드 시스템 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .panel {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 22px;
+      padding: 22px;
+      min-width: 0;
+      position: relative;
+    }
+    .wide { grid-column: span 8; }
+    .narrow { grid-column: span 4; }
+    .half { grid-column: span 6; }
+    .full { grid-column: span 12; }
+
+    /* 모바일 환경 그리드 강제 1열 */
+    .stage-mobile .grid, .stage-max .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .stage-mobile .panel, .stage-max .panel {
+      padding: 18px 16px;
+      border-radius: 20px;
+    }
+
+    /* [영웅 카드: 큼직하고 웅장한 타이포그래피 (3줄 어절 줄바꿈) + 클린 그라디언트] */
+    .hero {
+      position: relative;
+      border-radius: 28px;
+      padding: 30px;
+      background: linear-gradient(130deg, #183b37 0%, var(--j-surface) 100%);
+      border: 1px solid var(--j-border);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+    .stage-mobile .hero, .stage-max .hero {
+      padding: 22px 18px 24px;
+      border-radius: 22px;
+    }
+    /* One scene keeps the vehicle and its overlay copy in the same coordinate space. */
+    #heroCard { overflow: hidden; container-type: inline-size; }
+    .hero-scene { position: relative; isolation: isolate; min-height: 370px; }
+    #heroHeadline { position: relative; z-index: 2; max-width: 78%; }
+    .hero-vehicle { position: absolute; z-index: 1; width: 72%; height: auto;
+      right: -45px; bottom: -38px; pointer-events: none;
+      filter: drop-shadow(0 18px 16px #0008); }
+    #heroNote { position: absolute; z-index: 3; left: 60px; bottom: 48px;
+      max-width: 50%; margin: 0; font-size: 12px; line-height: 1.7;
+      color: #e3efed; text-shadow: 0 1px 4px #081513, 0 0 14px #081513; }
+    #heroCard > .stats { position: relative; z-index: 4; margin-top: 24px;
+      border-top: 1px solid #ffffff18; padding-top: 18px; }
+    .stage-mobile .hero-scene, .stage-max .hero-scene { min-height: 330px; }
+    .stage-mobile #heroHeadline, .stage-max #heroHeadline { max-width: 100%; font-size: 30px; }
+    .stage-mobile .hero-vehicle, .stage-max .hero-vehicle { width: 116%; right: -48px; bottom: -28px; }
+    .stage-mobile #heroNote, .stage-max #heroNote { left: 0; bottom: 104px; max-width: 52%; font-size: 11px; }
+    @container (max-width: 350px) {
+      .hero-scene { min-height: 310px !important; }
+      #heroHeadline { font-size: 27px !important; }
+      #heroNote { bottom: 96px !important; }
+    }
+    .kicker {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--j-sub);
+      margin-bottom: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(34px, 4vw, 44px);
+      line-height: 1.25;
+      letter-spacing: -1px;
+      margin: 0;
+      font-weight: 850;
+      color: #ffffff;
+      word-break: keep-all;
+    }
+    .stage-mobile h1, .stage-max h1 {
+      font-size: 34px;
+      line-height: 1.26;
+      letter-spacing: -0.8px;
+      font-weight: 850;
+      word-break: keep-all;
+    }
+    .h-phrase {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    h2 { font-size: 18.5px; margin: 0; }
+    .accent { color: var(--j-accent); }
+    .muted { color: var(--j-sub); }
+    .note { font-size: 12.5px; margin-top: 12px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 20px 0 16px;
+    }
+    .stage-mobile .stats, .stage-max .stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: 16px 0 14px;
+    }
+    .stat small { display: block; color: var(--j-sub); font-size: 11.5px; }
+    .stat strong {
+      display: block;
+      font-size: 21px;
+      font-variant-numeric: tabular-nums;
+      margin: 2px 0;
+    }
+    .stage-mobile .stat strong, .stage-max .stat strong {
+      font-size: 19px;
+    }
+
+    /* 전월/전일/전년 대비 지출 비교 카드 */
+    .comparison-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.3s ease;
+    }
+    .comparison-panel.is-more {
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+    .comparison-panel.is-less {
+      border-color: rgba(96, 165, 250, 0.4);
+    }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .spend-headline {
+      margin-top: 2px;
+      margin-bottom: 12px;
+      min-height: 50px;
+    }
+    .spend-context {
+      font-size: 12px;
+      color: var(--j-sub);
+      margin-bottom: 3px;
+    }
+    .spend-statement {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.45;
+      letter-spacing: -0.4px;
+      color: var(--j-ink);
+      word-break: keep-all;
+    }
+    .stage-mobile .spend-statement, .stage-max .spend-statement {
+      font-size: 15px;
+    }
+    .domain-tag {
+      display: inline-block;
+      color: var(--j-accent);
+      font-weight: 700;
+    }
+    .amount-highlight {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-text-more {
+      color: #ff5c5c;
+      font-weight: 700;
+      background: var(--j-red-bg);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+    .trend-text-less {
+      color: #7bb6ff;
+      font-weight: 700;
+      background: var(--j-blue-bg);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+
+    .trend-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.2px;
+      line-height: 1.3;
+    }
+    .trend-badge.more {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ff7878;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .trend-badge.less {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+
+    /* 바 그래프 컨테이너 & 툴팁 */
+    .chart-container {
+      position: relative;
+      background: rgba(11, 16, 20, 0.6);
+      border: 1px solid rgba(42, 57, 69, 0.7);
+      border-radius: 16px;
+      padding: 12px 12px 10px;
+      margin-top: auto;
+    }
+    .bar-chart-svg {
+      width: 100%;
+      height: 180px;
+      display: block;
+      overflow: visible;
+    }
+
+    .bar-segment {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bar-segment:hover {
+      filter: brightness(1.28);
+    }
+    .is-hovering .bar-segment {
+      opacity: 0.35;
+    }
+    .is-hovering .bar-segment.highlighted {
+      opacity: 1;
+      filter: brightness(1.25);
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      background: rgba(22, 30, 37, 0.98);
+      border: 1px solid #3b5062;
+      border-radius: 10px;
+      padding: 6px 11px;
+      font-size: 12px;
+      color: var(--j-ink);
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 20;
+      white-space: nowrap;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      opacity: 0;
+      transform: translate(-50%, -100%);
+    }
+    .chart-tooltip.visible {
+      opacity: 1;
+    }
+    .tooltip-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      justify-content: center;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(42, 57, 69, 0.5);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4.5px;
+      font-size: 11.5px;
+      color: var(--j-sub);
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .legend-item:hover, .legend-item.active {
+      color: var(--j-ink);
+      background: var(--j-raised);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 어디에 썼을까요? 카드 크기 고정 & 상하 중앙 정렬  */
+    /* ======================================================== */
+    .donut-panel {
+      height: 250px; /* 불필요한 하단 여백이 남지 않도록 고정 */
+      display: flex;
+      flex-direction: column;
+    }
+    .stage-mobile .donut-panel, .stage-max .donut-panel {
+      height: auto;
+      min-height: 205px;
+    }
+    .cost-layout {
+      flex: 1;
+      display: flex;
+      align-items: center; /* 파이차트와 카테고리 목록 상하 수평축 일치 */
+      gap: 22px;
+      margin-top: 6px;
+      min-height: 0;
+    }
+    .donut {
+      width: 140px;
+      height: 140px;
+      flex-shrink: 0;
+    }
+    .stage-mobile .donut, .stage-max .donut {
+      width: 120px;
+      height: 120px;
+    }
+    .cost-list {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center; /* 1개든 2~3개든 파이차트 정중앙 수평선과 일치 */
+      height: 100%;
+    }
+    .cost-list .list-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--j-border);
+      font-size: 13px;
+    }
+    .cost-list .list-row:last-child {
+      border-bottom: 0; /* 단일 항목이거나 마지막 항목일 때 어색한 밑줄 제거 */
+    }
+    .cost-list .list-row small {
+      display: block;
+      color: var(--j-sub);
+      font-size: 11.5px;
+      margin-top: 2px;
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 최근 기록이에요 카드 (지출 전용 & 색상 하이라이트) */
+    /* ======================================================== */
+    .recent-panel {
+      height: 250px; /* 어디에 썼을까요 카드와 높이 통일 */
+      display: flex;
+      flex-direction: column;
+    }
+    .stage-mobile .recent-panel, .stage-max .recent-panel {
+      height: auto;
+      min-height: 205px;
+    }
+    .recent-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .recent-list-wrap {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+      scrollbar-width: thin;
+      scrollbar-color: #2a3945 transparent;
+    }
+    .recent-list-wrap::-webkit-scrollbar {
+      width: 4px;
+    }
+    .recent-list-wrap::-webkit-scrollbar-thumb {
+      background: #2a3945;
+      border-radius: 4px;
+    }
+    .recent-expense-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--j-border);
+      font-size: 13px;
+    }
+    .recent-expense-row:last-child {
+      border-bottom: 0;
+    }
+    .recent-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .recent-title-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    /* 카테고리별 색상 하이라이트 뱃지 */
+    .cat-highlight-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: -0.2px;
+      line-height: 1.2;
+    }
+    .recent-item-title {
+      color: var(--j-ink);
+      font-weight: 600;
+    }
+    .recent-date-sub {
+      color: var(--j-sub);
+      font-size: 11.5px;
+    }
+    .recent-amount {
+      font-size: 14.5px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--j-ink);
+      white-space: nowrap;
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */
+    /* ======================================================== */
+    dialog#recordDialog {
+      color: var(--j-ink);
+      background: #141c23;
+      border: 1px solid #334454;
+      border-radius: 24px;
+      width: min(580px, calc(100% - 24px));
+      padding: 24px 26px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      z-index: 2000;
+    }
+    dialog#recordDialog::backdrop {
+      background: rgba(4, 8, 12, 0.75);
+      backdrop-filter: blur(8px);
+    }
+    .modal-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--j-border);
+    }
+    .modal-close-btn {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      color: var(--j-sub);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      min-height: 32px;
+      border-radius: 8px;
+    }
+    .modal-close-btn:hover {
+      color: var(--j-ink);
+      border-color: #486074;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    .stage-mobile .form-grid, .stage-max .form-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12.5px;
+      color: var(--j-sub);
+    }
+    .form-field.full {
+      grid-column: 1 / -1;
+    }
+    .form-field input, .form-field select, .form-field textarea {
+      background: #0d1318;
+      border: 1px solid var(--j-border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      color: var(--j-ink);
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+      border-color: var(--j-accent);
+    }
+    .file-input-box {
+      border: 1px dashed var(--j-border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #0b1014;
+      font-size: 12px;
+      color: var(--j-sub);
+    }
+    .modal-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--j-border);
+    }
+
+    /* 기타 보조 탭 뷰 (주행&에너지, 절약비교, 차계부, 차량상태) */
+    .tab-view {
+      display: none;
+    }
+    .tab-view.active {
+      display: block;
+    }
+
+    /* 토스트 알림 */
+    .toast-notice {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #183b37;
+      border: 1px solid var(--j-accent);
+      color: var(--j-ink);
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      z-index: 3000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .toast-notice.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 검토용 상단 툴바 -->
+  <aside class="review-banner">
+    <div class="review-title">
+      <span class="review-tag">디버그 인터랙티브 대시보드</span>
+      <strong>모든 버튼·모달·탭·지출 필터링 완전 작동</strong>
+    </div>
+
+    <div class="review-controls">
+      <!-- 카테고리 1개 vs 3개 즉시 테스트 스위처 (사용자 사진 상황 즉각 재현) -->
+      <div class="test-switcher" title="어디에 썼을까요 카테고리 개수별 정렬 검토">
+        <button class="test-btn active" id="btnTestMulti" onclick="toggleCategoryTest('multi')">
+          3개 지출 (분산)
+        </button>
+        <button class="test-btn" id="btnTestSingle" onclick="toggleCategoryTest('single')">
+          1개만 (충전비 단독)
+        </button>
+      </div>
+
+      <!-- 디바이스 화면 모드 전환 (아이폰 16 프로 / 프로 맥스·갤럭시 / 데스크톱) -->
+      <div class="device-switcher">
+        <button class="device-btn active" id="btnDeviceMobile" onclick="setDeviceMode('mobile')">
+          📱 16 프로 (402px)
+        </button>
+        <button class="device-btn" id="btnDeviceMax" onclick="setDeviceMode('max')">
+          📱 프로 맥스 / 갤럭시 (430px)
+        </button>
+        <button class="device-btn" id="btnDeviceDesktop" onclick="setDeviceMode('desktop')">
+          🖥️ 데스크톱 (PC)
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 메인 뷰포트 스테이지 -->
+  <div class="viewport-stage stage-mobile" id="viewportStage">
+
+    <!-- 아이폰 16 프로 디바이스 프레임 (402 × 874) -->
+    <div class="iphone-frame" id="iphoneFrame">
+      
+      <!-- 다이나믹 아일랜드 & 상단 상태표시줄 -->
+      <div class="iphone-status-bar">
+        <span>09:41</span>
+        <div class="dynamic-island"></div>
+        <span style="font-size:12px;">5G 100% 🔋</span>
+      </div>
+
+      <!-- 차계부 메인 본체 -->
+      <main class="shell">
+        
+        <!-- 상단 마스트헤드 -->
+        <header class="mast">
+          <div class="mast-left">
+            <div class="brand">CARROT HA · EV JOURNAL</div>
+            <div class="title-controls-row">
+              <h2>내 차의 생활</h2>
+              <select class="select-pill" id="vehicleSelect" aria-label="차량 선택">
+                <option>폭스바겐 ID.4 Pro</option>
+              </select>
+              <div id="datePickerContainer">
+                <input class="date-pill" id="dateInput" type="month" value="2026-10" aria-label="기록 기간">
+              </div>
+            </div>
+          </div>
+
+          <div class="mast-right">
+            <!-- 메인 + 기록 남기기 버튼 -->
+            <button class="btn-record-primary" id="btnRecord" onclick="openRecordModal()">
+              <span style="font-size:17px; line-height:1;">＋</span> 기록 남기기
+            </button>
+            
+            <!-- 일별 / 월별 / 연도별 선택기 -->
+            <div class="period-segmented" role="group" aria-label="집계 기간 선택">
+              <button class="period-tab-btn" id="btnPeriodDay" onclick="setPeriod('day')">일별</button>
+              <button class="period-tab-btn active" id="btnPeriodMonth" onclick="setPeriod('month')">월별</button>
+              <button class="period-tab-btn" id="btnPeriodYear" onclick="setPeriod('year')">연도별</button>
+            </div>
+          </div>
+        </header>
+
+        <!-- 5대 탭 목록 (완전 작동 전환) -->
+        <nav class="tabs" role="tablist">
+          <button role="tab" id="tab0" aria-selected="true" onclick="selectTab(0)">한눈에</button>
+          <button role="tab" id="tab1" aria-selected="false" onclick="selectTab(1)">주행&에너지</button>
+          <button role="tab" id="tab2" aria-selected="false" onclick="selectTab(2)">절약 비교</button>
+          <button role="tab" id="tab3" aria-selected="false" onclick="selectTab(3)">차계부</button>
+          <button role="tab" id="tab4" aria-selected="false" onclick="selectTab(4)">차량 상태</button>
+        </nav>
+
+        <!-- [탭 0: 한눈에] 컨텐츠 그리드 -->
+        <section class="tab-view active" id="view0">
+          <div class="grid">
+
+            <!-- 1. 영웅 카드 (클린 3단 큼직한 타이포그래피 문장형) -->
+            <article class="panel wide hero" id="heroCard">
+              <div class="kicker" id="heroKicker">YOUR MONTH, IN ONE SENTENCE</div>
+              <div class="hero-scene">
+              <h1 id="heroHeadline">
+                <!-- 동적 3줄 헤드라인 -->
+              </h1>
+              <p class="muted note" id="heroNote">주행은 자동으로 모으고, 놓친 기록은 직접 남겨요.</p>
+              <img class="hero-vehicle" src="vehicle_id4_transparent.png" alt="폭스바겐 ID.4" width="1024" height="640">
+              </div>
+              <div class="stats">
+                <div class="stat">
+                  <small id="statLabel1">차량 총 지출</small>
+                  <strong id="heroTotalCost">68,400원</strong>
+                </div>
+                <div class="stat">
+                  <small id="statLabel2">확인된 전비</small>
+                  <strong id="heroEfficiency">5.4 km/kWh</strong>
+                </div>
+                <div class="stat">
+                  <small id="statLabel3">1km당 충전비</small>
+                  <strong id="heroCostPerKm">48.2원</strong>
+                </div>
+              </div>
+              <div style="margin-top: 8px;">
+                <button style="font-size:13px; padding:8px 14px; min-height:36px;" onclick="selectTab(2)">절약 계산 살펴보기 →</button>
+              </div>
+            </article>
+
+            <!-- 2. 스택형 전월/전일/전년 대비 지출 비교 카드 -->
+            <article class="panel narrow comparison-panel is-more" id="targetCard">
+              <div class="card-header-row">
+                <div>
+                  <div class="kicker" id="compareKicker" style="margin-bottom:3px;">MONTHLY SPENDING COMPARISON</div>
+                  <h2 id="cardTitle">지난달 지출과 비교</h2>
+                </div>
+                <span id="trendPill" class="trend-badge more">▲ 35.2%</span>
+              </div>
+
+              <div class="spend-headline">
+                <div class="spend-context" id="compareContext">9월 대비 10월 지출 추이</div>
+                <div class="spend-statement" id="spendStatement">
+                  <span id="statementCompareBase">지난달</span>에 비해 <span class="domain-tag" id="statementDomain">전체 지출</span>에서<br>
+                  <span class="amount-highlight" id="statementAmount">17,800원</span>을
+                  <span class="trend-text-more" id="statementAction">더 소비</span>하고 있어요.
+                </div>
+              </div>
+
+              <div class="chart-container" id="chartBox">
+                <div class="chart-tooltip" id="chartTooltip">
+                  <span class="tooltip-dot" id="tooltipDot"></span>
+                  <strong id="tooltipCat">충전비</strong>: <span id="tooltipAmount">0원</span> (<span id="tooltipPct">0%</span>)
+                </div>
+
+                <svg class="bar-chart-svg" id="barChartSvg" viewBox="0 0 320 185">
+                  <!-- 동적 SVG 바 렌더링 -->
+                </svg>
+
+                <div class="legend-row" id="legendRow">
+                  <div class="legend-item" data-cat="charging" onclick="onLegendTap('charging')">
+                    <span class="legend-dot" style="background:var(--cat-charging);"></span>충전비
+                  </div>
+                  <div class="legend-item" data-cat="maintenance" onclick="onLegendTap('maintenance')">
+                    <span class="legend-dot" style="background:var(--cat-maintenance);"></span>정비/소모품
+                  </div>
+                  <div class="legend-item" data-cat="washing" onclick="onLegendTap('washing')">
+                    <span class="legend-dot" style="background:var(--cat-washing);"></span>세차
+                  </div>
+                  <div class="legend-item" data-cat="tuning" onclick="onLegendTap('tuning')">
+                    <span class="legend-dot" style="background:var(--cat-tuning);"></span>튜닝
+                  </div>
+                  <div class="legend-item" data-cat="other" onclick="onLegendTap('other')">
+                    <span class="legend-dot" style="background:var(--cat-other);"></span>기타
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <!-- 3. [사용자 요청 반영] 어디에 썼을까요? (고정 높이 & 상하 중앙 정렬) -->
+            <article class="panel half donut-panel" id="donutPanel">
+              <h2 id="donutTitle">어디에 썼을까요?</h2>
+              <div class="cost-layout">
+                <svg class="donut" id="donutSvg" viewBox="0 0 160 160" role="img" aria-label="차량 지출 분류">
+                  <!-- 동적 도넛 SVG 렌더링 -->
+                </svg>
+                <div class="cost-list" id="donutList">
+                  <!-- 동적 카테고리 목록 (1개든 3개든 중앙 정렬) -->
+                </div>
+              </div>
+            </article>
+
+            <!-- 4. [사용자 요청 반영] 최근 기록이에요 (지출만 표시 & 카테고리별 색상 하이라이트 & +기록 버튼 스타일 일치) -->
+            <article class="panel half recent-panel" id="recentPanel">
+              <div class="recent-panel-header">
+                <h2 id="recentTitle">최근 기록이에요.</h2>
+                <button class="btn-recent-record" id="btnRecentAdd" onclick="openRecordModal()">
+                  <span style="font-size:15px;line-height:1;">＋</span> 기록
+                </button>
+              </div>
+              <div class="recent-list-wrap" id="recentList">
+                <!-- 동적 최근 지출 내역 렌더링 -->
+              </div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- [탭 1: 주행 & 에너지] -->
+        <section class="tab-view" id="view1">
+          <article class="panel">
+            <h2>달리고 충전한 흐름이에요.</h2>
+            <div style="display:flex; gap:10px; margin: 15px 0; flex-wrap:wrap;">
+              <select class="select-pill" id="energyMetricSelect" onchange="renderEnergyTabChart()">
+                <option value="distance">주행거리 · km</option>
+                <option value="cost">충전비 · 원</option>
+                <option value="eff">전비 · km/kWh</option>
+              </select>
+            </div>
+            <div style="background:rgba(11,16,20,0.6); border:1px solid #2a3945; border-radius:16px; padding:16px; height:200px; display:flex; align-items:flex-end; gap:8px;" id="energyChartBars">
+              <!-- 주행 에너지 차트 바 -->
+            </div>
+            <div class="stats" style="margin-top:18px;">
+              <div class="stat"><small>총 충전량</small><strong id="energyChargeTotal">242.8 kWh</strong></div>
+              <div class="stat"><small>완속 / 급속</small><strong>9회 / 2회</strong></div>
+              <div class="stat"><small>주행 에너지 커버리지</small><strong>98.5%</strong></div>
+            </div>
+          </article>
+        </section>
+
+        <!-- [탭 2: 절약 비교] -->
+        <section class="tab-view" id="view2">
+          <div class="grid">
+            <article class="panel wide hero">
+              <h2>같은 거리를 다른 차로 달렸다면요.</h2>
+              <div style="font-size:32px; font-weight:800; color:var(--j-accent); margin:15px 0;">128,400원을 아꼈어요.</div>
+              <p class="muted">내 전기차 45,000원 · 비교 휘발유 차량 173,400원</p>
+              <small class="muted" style="display:block; margin-top:8px;">전국 평균 유가 1,640원/L (연비 13.5 km/L) 기준 추산</small>
+            </article>
+            <article class="panel narrow">
+              <h2>비교 기준 설정</h2>
+              <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+                <label style="font-size:12.5px; color:var(--j-sub);">비교 유종
+                  <select class="select-pill" style="width:100%; margin-top:4px;"><option>휘발유</option><option>경유</option></select>
+                </label>
+                <label style="font-size:12.5px; color:var(--j-sub);">비교 연비
+                  <input class="select-pill" type="number" value="13.5" style="width:100%; margin-top:4px;">
+                </label>
+                <button class="btn-record-primary" style="margin-top:6px; min-height:36px; font-size:13px;" onclick="showToast('비교 기준이 저장되었습니다.')">기준 저장</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- [탭 3: 차계부 전체 원장] -->
+        <section class="tab-view" id="view3">
+          <article class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+              <h2>차에 남긴 모든 기록이에요.</h2>
+              <button class="btn-recent-record" onclick="openRecordModal()">＋ 누락 기록 추가</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--j-border); text-align:left; color:var(--j-sub);">
+                    <th style="padding:8px 4px;">날짜</th>
+                    <th style="padding:8px 4px;">분류</th>
+                    <th style="padding:8px 4px;">세부 내용</th>
+                    <th style="padding:8px 4px; text-align:right;">금액 / 거리</th>
+                  </tr>
+                </thead>
+                <tbody id="fullLedgerBody">
+                  <!-- 동적 원장 렌더링 -->
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <!-- [탭 4: 차량 상태] -->
+        <section class="tab-view" id="view4">
+          <article class="panel">
+            <h2>마지막으로 확인한 차량 상태예요.</h2>
+            <div class="stats" style="margin:20px 0;">
+              <div class="stat"><small>배터리 SOC</small><strong class="accent">78%</strong></div>
+              <div class="stat"><small>주행가능거리</small><strong>342 km</strong></div>
+              <div class="stat"><small>차량 상태</small><strong style="color:#60a5fa;">주차 중</strong></div>
+              <div class="stat"><small>도어 잠금</small><strong>잠겨 있어요</strong></div>
+              <div class="stat"><small>계기판 누적거리</small><strong>42,850 km</strong></div>
+              <div class="stat"><small>외기 온도</small><strong>19.5 °C</strong></div>
+            </div>
+            <p class="muted note">마지막 수신: 2026-10-06 17:18 · 실시간 카드와 동일한 HA 최신 센서 연동</p>
+          </article>
+        </section>
+
+      </main>
+
+      <!-- 홈 인디케이터 바 -->
+      <div class="iphone-home-bar"></div>
+
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그 (실제 동작 구현)  -->
+  <!-- ======================================================== -->
+  <dialog id="recordDialog" aria-labelledby="dialogTitle">
+    <form id="recordForm" onsubmit="handleRecordSubmit(event)">
+      <div class="modal-header-row">
+        <h2 id="dialogTitle" style="font-size:20px; font-weight:750;">놓친 기록을 남겨요.</h2>
+        <button class="modal-close-btn" type="button" onclick="closeRecordModal()">닫기</button>
+      </div>
+
+      <div class="form-grid">
+        <!-- 1. 기록 종류 -->
+        <div class="form-field">
+          <label for="recordKind">기록 종류</label>
+          <select id="recordKind" name="kind" onchange="onRecordKindChange()">
+            <option value="expense" selected>정비 / 지출</option>
+            <option value="charge">누락 충전</option>
+            <option value="trip">누락 주행</option>
+          </select>
+        </div>
+
+        <!-- 2. 기록 날짜 -->
+        <div class="form-field">
+          <label for="recordDate">기록 날짜</label>
+          <input type="date" id="recordDate" name="date" value="2026-10-06" required>
+        </div>
+
+        <!-- 3. 비용 분류: [사용자 요청] 5대 핵심 카테고리만 엄선 (보험, 세금, 주차, 통행료 제외) -->
+        <div class="form-field" id="fieldCategory">
+          <label for="recordCategory">비용 분류</label>
+          <select id="recordCategory" name="category">
+            <option value="charging" selected>충전비</option>
+            <option value="maintenance">정비 / 소모품비</option>
+            <option value="washing">세차비</option>
+            <option value="tuning">튜닝</option>
+            <option value="other">기타</option>
+          </select>
+        </div>
+
+        <!-- 4. 세부 작업 -->
+        <div class="form-field" id="fieldSubcategory">
+          <label for="recordSubcategory">세부 작업</label>
+          <input type="text" id="recordSubcategory" name="subcategory" placeholder="타이어 · 와이퍼 · 워셔액 등" maxlength="100">
+        </div>
+
+        <!-- 5. 실제 금액 (원) -->
+        <div class="form-field" id="fieldAmount">
+          <label for="recordAmount">실제 금액 · 원</label>
+          <input type="number" id="recordAmount" name="amount" placeholder="50000" min="0" step="100">
+        </div>
+
+        <!-- 충전 전용 필드 -->
+        <div class="form-field" id="fieldChargeKwh" style="display:none;">
+          <label for="chargeKwh">충전량 · kWh</label>
+          <input type="number" id="chargeKwh" name="charge_kwh" placeholder="24.5" min="0" step="0.1">
+        </div>
+
+        <div class="form-field" id="fieldChargeMode" style="display:none;">
+          <label for="chargeMode">충전 종류</label>
+          <select id="chargeMode" name="charge_mode">
+            <option value="slow">완속 충전</option>
+            <option value="fast">급속 충전</option>
+          </select>
+        </div>
+
+        <!-- 주행 전용 필드 -->
+        <div class="form-field" id="fieldTripKm" style="display:none;">
+          <label for="tripKm">주행거리 · km</label>
+          <input type="number" id="tripKm" name="distance_km" placeholder="42.5" min="0" step="0.1">
+        </div>
+
+        <!-- 6. 메모 -->
+        <div class="form-field full">
+          <label for="recordMemo">메모</label>
+          <textarea id="recordMemo" name="memo" rows="3" placeholder="지출이나 작업 관련 특이사항을 적어주세요."></textarea>
+        </div>
+
+        <!-- 7. 사진 첨부 -->
+        <div class="form-field full">
+          <label>사진 · JPG / PNG / WEBP</label>
+          <div class="file-input-box">
+            <input type="file" id="recordPhotos" accept="image/jpeg,image/png,image/webp" multiple>
+            <small style="display:block; margin-top:4px;">사진당 2MiB 이하, 최대 5장까지 가능해요.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <p class="muted note" style="margin:0; font-size:12px;">
+          모르는 소비량·시각은 비워 두셔도 돼요. 저장을 누르면 대시보드 지출 통계와 최근 목록에 즉시 반영됩니다.
+        </p>
+        <button class="btn-record-primary" type="submit" style="width:100%; min-height:44px;">
+          HA에 기록 저장
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 피드백 토스트 -->
+  <div class="toast-notice" id="toastNotice">기록이 성공적으로 저장되었습니다!</div>
+
+  <script>
+    // 5대 카테고리 정의 및 고유 색상 매핑
+    const CATEGORIES = {
+      charging:    { label: '충전비',        color: 'var(--cat-charging)',    rawColor: '#81e6c5', bg: 'rgba(129, 230, 197, 0.15)', border: 'rgba(129, 230, 197, 0.4)' },
+      maintenance: { label: '정비/소모품비', color: 'var(--cat-maintenance)', rawColor: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)',  border: 'rgba(245, 158, 11, 0.4)' },
+      washing:     { label: '세차비',        color: 'var(--cat-washing)',     rawColor: '#60a5fa', bg: 'rgba(96, 165, 250, 0.15)',  border: 'rgba(96, 165, 250, 0.4)' },
+      tuning:      { label: '튜닝',          color: 'var(--cat-tuning)',      rawColor: '#c084fc', bg: 'rgba(192, 132, 252, 0.15)', border: 'rgba(192, 132, 252, 0.4)' },
+      other:       { label: '기타',          color: 'var(--cat-other)',       rawColor: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)' }
+    };
+
+    // [데모 데이터셋] 일별(day), 월별(month), 연도별(year) 완전 연동 데이터
+    const periodDatasets = {
+      day: {
+        dateType: 'date',
+        dateValue: '2026-10-06',
+        hero: {
+          kicker: 'YOUR DAY, IN ONE SENTENCE',
+          headline: '오늘 58.4km를 달리고,<br><span class="accent">4,200원</span>을 기록했어요.',
+          cost: '4,200원',
+          efficiency: '5.8 km/kWh',
+          costPerKm: '71.9원',
+          note: '오늘 관측된 이동과 충전 기록 기준'
+        },
+        comparison: {
+          kicker: 'DAILY SPENDING COMPARISON',
+          title: '어제 지출과 비교',
+          context: '어제(10/5) 대비 오늘(10/6) 지출 추이',
+          baseLabel: '어제',
+          prevName: '어제 (10/5)',
+          currName: '오늘 (10/6)',
+          prev: { charging: 7400, maintenance: 0, washing: 0, tuning: 0, other: 0 },
+          curr: { charging: 4200, maintenance: 0, washing: 0, tuning: 0, other: 0 }
+        },
+        donut: {
+          total: '4,200원',
+          centerLabel: '오늘 지출',
+          categories: [
+            { cat: 'charging', label: '충전비', amount: '4,200원', color: 'var(--cat-charging)', rawColor: '#81e6c5', sub: '아파트 완속 (21.4 kWh)' }
+          ],
+          circles: [
+            { length: 365, offset: 0, color: '#81e6c5' }
+          ]
+        },
+        // [사용자 요청] 최근 기록: 주행 제외하고 지출 내역만 필터링 + 카테고리 색상 하이라이트
+        recent: [
+          { title: '아파트 완속 충전', cat: 'charging', date: '오늘 07:20', amount: '4,200원', sub: '21.4 kWh 충전', origin: 'auto' }
+        ]
+      },
+      month: {
+        dateType: 'month',
+        dateValue: '2026-10',
+        hero: {
+          kicker: 'YOUR MONTH, IN ONE SENTENCE',
+          headline: '이번 달 1,420km를 달리고,<br><span class="accent">68,400원</span>을 기록했어요.',
+          cost: '68,400원',
+          efficiency: '5.4 km/kWh',
+          costPerKm: '48.2원',
+          note: '주행은 자동으로 모으고, 놓친 기록은 직접 남겨요.'
+        },
+        comparison: {
+          kicker: 'MONTHLY SPENDING COMPARISON',
+          title: '지난달 지출과 비교',
+          context: '9월 대비 10월 지출 추이',
+          baseLabel: '지난달',
+          prevName: '지난달 (9월)',
+          currName: '이번달 (10월)',
+          prev: { charging: 35000, maintenance: 0, washing: 10000, tuning: 0, other: 5600 },
+          curr: { charging: 45000, maintenance: 0, washing: 17000, tuning: 6400, other: 0 }
+        },
+        donut: {
+          total: '68,400원',
+          centerLabel: '이번 달 지출',
+          categories: [
+            { cat: 'charging', label: '충전비', amount: '45,000원', color: 'var(--cat-charging)', rawColor: '#81e6c5', sub: 'HA 자동 집계' },
+            { cat: 'washing', label: '세차비', amount: '17,000원', color: 'var(--cat-washing)', rawColor: '#60a5fa', sub: '직접 기록' },
+            { cat: 'tuning', label: '튜닝', amount: '6,400원', color: 'var(--cat-tuning)', rawColor: '#c084fc', sub: '트렁크 미끄럼방지 패드' }
+          ],
+          circles: [
+            { length: 240, offset: 0, color: '#81e6c5' },
+            { length: 90, offset: -240, color: '#60a5fa' },
+            { length: 35, offset: -330, color: '#c084fc' }
+          ]
+        },
+        // [사용자 요청] 최근 기록: 주행 제외하고 지출 내역만 필터링 + 카테고리 색상 하이라이트
+        recent: [
+          { title: '자동 세차 및 실내 청소', cat: 'washing', date: '10-04', amount: '17,000원', sub: '직접 기록', origin: 'manual' },
+          { title: '트렁크 미끄럼방지 패드', cat: 'tuning', date: '10-03', amount: '6,400원', sub: '온라인 구매', origin: 'manual' },
+          { title: '아파트 완속 충전', cat: 'charging', date: '10-02', amount: '5,420원', sub: '24.2 kWh (자동 원장)', origin: 'auto' }
+        ]
+      },
+      year: {
+        dateType: 'select',
+        dateValue: '2026',
+        hero: {
+          kicker: 'YOUR YEAR, IN ONE SENTENCE',
+          headline: '올해 15,620km를 달리고,<br><span class="accent">784,000원</span>을 기록했어요.',
+          cost: '784,000원',
+          efficiency: '5.3 km/kWh',
+          costPerKm: '50.2원',
+          note: '2026년 연간 누적 주행 및 관리비 합산'
+        },
+        comparison: {
+          kicker: 'YEARLY SPENDING COMPARISON',
+          title: '작년 지출과 비교',
+          context: '2025년 대비 2026년 연간 지출 추이',
+          baseLabel: '작년',
+          prevName: '작년 (2025년)',
+          currName: '올해 (2026년)',
+          prev: { charging: 540000, maintenance: 180000, washing: 90000, tuning: 45000, other: 35000 },
+          curr: { charging: 490000, maintenance: 95000, washing: 135000, tuning: 64000, other: 0 }
+        },
+        donut: {
+          total: '784,000원',
+          centerLabel: '연간 지출',
+          categories: [
+            { cat: 'charging', label: '충전비', amount: '490,000원', color: 'var(--cat-charging)', rawColor: '#81e6c5', sub: '누적 3,120 kWh' },
+            { cat: 'washing', label: '세차비', amount: '135,000원', color: 'var(--cat-washing)', rawColor: '#60a5fa', sub: '총 9회 세차' },
+            { cat: 'maintenance', label: '정비/소모품', amount: '95,000원', color: 'var(--cat-maintenance)', rawColor: '#f59e0b', sub: '와이퍼·에어컨 필터' },
+            { cat: 'tuning', label: '튜닝', amount: '64,000원', color: 'var(--cat-tuning)', rawColor: '#c084fc', sub: '악세서리 및 코딩' }
+          ],
+          circles: [
+            { length: 228, offset: 0, color: '#81e6c5' },
+            { length: 63, offset: -228, color: '#60a5fa' },
+            { length: 44, offset: -291, color: '#f59e0b' },
+            { length: 30, offset: -335, color: '#c084fc' }
+          ]
+        },
+        recent: [
+          { title: '에어컨 필터 교체', cat: 'maintenance', date: '08-15', amount: '35,000원', sub: '정비 / 소모품비', origin: 'manual' },
+          { title: '앞유리 와이퍼 교체', cat: 'maintenance', date: '06-20', amount: '42,000원', sub: '정비 / 소모품비', origin: 'manual' },
+          { title: '고속도로 급속 충전', cat: 'charging', date: '05-05', amount: '22,400원', sub: '강릉 여행 급속 충전', origin: 'auto' }
+        ]
+      }
+    };
+
+    let currentPeriod = 'month'; // 'day' | 'month' | 'year'
+    let hoveredCategory = null;
+    let singleCategoryMode = false; // 검토용 1개 vs 3개 토글 플래그
+
+    function won(num) {
+      return (Number(num) || 0).toLocaleString('ko-KR') + '원';
+    }
+
+    function sum(obj) {
+      return Object.values(obj).reduce((a, b) => a + b, 0);
+    }
+
+    // 기간 전환 핸들러
+    function setPeriod(p) {
+      currentPeriod = p;
+      hoveredCategory = null;
+
+      document.getElementById('btnPeriodDay').classList.toggle('active', p === 'day');
+      document.getElementById('btnPeriodMonth').classList.toggle('active', p === 'month');
+      document.getElementById('btnPeriodYear').classList.toggle('active', p === 'year');
+
+      const container = document.getElementById('datePickerContainer');
+      const ds = periodDatasets[p];
+      if (ds.dateType === 'date') {
+        container.innerHTML = `<input class="date-pill" id="dateInput" type="date" value="${ds.dateValue}" aria-label="기록 일자">`;
+      } else if (ds.dateType === 'month') {
+        container.innerHTML = `<input class="date-pill" id="dateInput" type="month" value="${ds.dateValue}" aria-label="기록 월">`;
+      } else {
+        container.innerHTML = `
+          <select class="select-pill" id="dateInput" aria-label="기록 연도">
+            <option value="2026" selected>2026년</option>
+            <option value="2025">2025년</option>
+          </select>`;
+      }
+
+      renderAllDashboardCards();
+    }
+
+    // 디바이스 모드 전환
+    function setDeviceMode(mode) {
+      const stage = document.getElementById('viewportStage');
+      const btnMobile = document.getElementById('btnDeviceMobile');
+      const btnMax = document.getElementById('btnDeviceMax');
+      const btnDesktop = document.getElementById('btnDeviceDesktop');
+
+      btnMobile.classList.toggle('active', mode === 'mobile');
+      btnMax.classList.toggle('active', mode === 'max');
+      btnDesktop.classList.toggle('active', mode === 'desktop');
+
+      if (mode === 'mobile') {
+        stage.className = 'viewport-stage stage-mobile';
+      } else if (mode === 'max') {
+        stage.className = 'viewport-stage stage-max';
+      } else {
+        stage.className = 'viewport-stage stage-desktop';
+      }
+    }
+
+    // [검토용 기능] 카테고리 1개(충전비만) vs 3개(분산) 즉시 토글
+    function toggleCategoryTest(mode) {
+      singleCategoryMode = (mode === 'single');
+      document.getElementById('btnTestSingle').classList.toggle('active', singleCategoryMode);
+      document.getElementById('btnTestMulti').classList.toggle('active', !singleCategoryMode);
+      renderDonutCard();
+    }
+
+    // 5대 탭 전환 핸들러
+    function selectTab(idx) {
+      for (let i = 0; i < 5; i++) {
+        const btn = document.getElementById('tab' + i);
+        const view = document.getElementById('view' + i);
+        if (btn) btn.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+        if (view) view.classList.toggle('active', i === idx);
+      }
+      if (idx === 1) renderEnergyTabChart();
+      if (idx === 3) renderFullLedgerTable();
+    }
+
+    function getFormattedHeadline(p) {
+      // [사용자 요청] 어절 단위 3줄 줄바꿈: 큼직한 글씨로 시원하고 가독성 높은 구성
+      if (p === 'day') {
+        return `<span class="h-phrase">오늘</span><br><span class="h-phrase">58.4km를 달리고,</span><br><span class="h-phrase"><span class="accent">4,200원</span>을 기록했어요.</span>`;
+      } else if (p === 'month') {
+        return `<span class="h-phrase">이번 달</span><br><span class="h-phrase">1,420km를 달리고,</span><br><span class="h-phrase"><span class="accent">68,400원</span>을 기록했어요.</span>`;
+      } else {
+        return `<span class="h-phrase">올해</span><br><span class="h-phrase">15,620km를 달리고,</span><br><span class="h-phrase"><span class="accent">784,000원</span>을 기록했어요.</span>`;
+      }
+    }
+
+    // 전체 대시보드 렌더링
+    function renderAllDashboardCards() {
+      const ds = periodDatasets[currentPeriod];
+
+      // 1. 영웅 카드 갱신 (클린 대형 타이포그래피)
+      document.getElementById('heroKicker').textContent = ds.hero.kicker;
+      document.getElementById('heroHeadline').innerHTML = getFormattedHeadline(currentPeriod);
+      document.getElementById('heroNote').textContent = ds.hero.note;
+      document.getElementById('heroTotalCost').textContent = ds.hero.cost;
+      document.getElementById('heroEfficiency').textContent = ds.hero.efficiency;
+      document.getElementById('heroCostPerKm').textContent = ds.hero.costPerKm;
+
+      // 2. 비교 카드 갱신
+      renderComparisonCard();
+
+      // 3. 어디에 썼을까요 (도넛 카드 갱신)
+      renderDonutCard();
+
+      // 4. 최근 기록이에요 (지출 전용 갱신)
+      renderRecentCard();
+    }
+
+    // 2번: 비교 카드 렌더링
+    function renderComparisonCard() {
+      const ds = periodDatasets[currentPeriod];
+      const comp = ds.comparison;
+      const prevTotal = sum(comp.prev);
+      const currTotal = sum(comp.curr);
+      const diff = currTotal - prevTotal;
+      const pct = prevTotal > 0 ? ((diff / prevTotal) * 100) : (currTotal > 0 ? 100 : 0);
+
+      const targetCard = document.getElementById('targetCard');
+      document.getElementById('compareKicker').textContent = comp.kicker;
+      document.getElementById('cardTitle').textContent = comp.title;
+      document.getElementById('compareContext').textContent = comp.context;
+      document.getElementById('statementCompareBase').textContent = comp.baseLabel;
+
+      const statementDomain = document.getElementById('statementDomain');
+      const statementAmount = document.getElementById('statementAmount');
+      const statementAction = document.getElementById('statementAction');
+      const trendPill = document.getElementById('trendPill');
+
+      if (!hoveredCategory) {
+        statementDomain.textContent = '전체 지출';
+        statementDomain.style.color = 'var(--j-accent)';
+
+        if (diff > 0) {
+          targetCard.className = 'panel narrow comparison-panel is-more';
+          statementAmount.textContent = won(diff);
+          statementAction.className = 'trend-text-more';
+          statementAction.textContent = '더 소비';
+          trendPill.className = 'trend-badge more';
+          trendPill.textContent = `▲ ${Math.abs(pct).toFixed(1)}%`;
+        } else if (diff < 0) {
+          targetCard.className = 'panel narrow comparison-panel is-less';
+          statementAmount.textContent = won(Math.abs(diff));
+          statementAction.className = 'trend-text-less';
+          statementAction.textContent = '덜 소비';
+          trendPill.className = 'trend-badge less';
+          trendPill.textContent = `▼ ${Math.abs(pct).toFixed(1)}%`;
+        } else {
+          targetCard.className = 'panel narrow comparison-panel';
+          statementAmount.textContent = '0원 차이로';
+          statementAction.className = '';
+          statementAction.style.color = 'var(--j-accent)';
+          statementAction.textContent = '동일하게 소비';
+          trendPill.className = 'trend-badge';
+          trendPill.style.background = 'rgba(129, 230, 197, 0.15)';
+          trendPill.style.color = 'var(--j-accent)';
+          trendPill.textContent = '0.0%';
+        }
+      } else {
+        const catInfo = CATEGORIES[hoveredCategory];
+        const pVal = comp.prev[hoveredCategory] || 0;
+        const cVal = comp.curr[hoveredCategory] || 0;
+        const cDiff = cVal - pVal;
+
+        statementDomain.textContent = catInfo.label;
+        statementDomain.style.color = catInfo.rawColor;
+
+        if (cDiff > 0) {
+          statementAmount.textContent = won(cDiff);
+          statementAction.className = 'trend-text-more';
+          statementAction.textContent = '더 소비';
+        } else if (cDiff < 0) {
+          statementAmount.textContent = won(Math.abs(cDiff));
+          statementAction.className = 'trend-text-less';
+          statementAction.textContent = '덜 소비';
+        } else {
+          statementAmount.textContent = '0원 차이로';
+          statementAction.className = '';
+          statementAction.style.color = 'var(--j-sub)';
+          statementAction.textContent = '동일하게 소비';
+        }
+      }
+
+      drawStackedChart(comp.prev, comp.curr, prevTotal, currTotal, diff, comp.prevName, comp.currName);
+    }
+
+    function drawStackedChart(prevData, currData, prevTotal, currTotal, diff, prevLabel, currLabel) {
+      const svg = document.getElementById('barChartSvg');
+      const bottomY = 145;
+      const topLimitY = 38;
+      const maxDrawHeight = bottomY - topLimitY; // 107px
+
+      const maxVal = Math.max(prevTotal, currTotal, 1000) * 1.18;
+      const hPrev = Math.max(8, (prevTotal / maxVal) * maxDrawHeight);
+      const hCurr = Math.max(8, (currTotal / maxVal) * maxDrawHeight);
+      const yPrev = bottomY - hPrev;
+      const yCurr = bottomY - hCurr;
+
+      const xPrev = 82;
+      const xCurr = 238;
+      const barW = 54;
+
+      const isMore = diff > 0;
+      const isLess = diff < 0;
+      const trendColor = isMore ? '#ff5c5c' : isLess ? '#60a5fa' : '#81e6c5';
+
+      function generateSegments(dataObj, totalVal, barX, barHeight, monthKey) {
+        let segs = [];
+        let currY = bottomY;
+        const catKeys = Object.keys(CATEGORIES);
+
+        for (const cat of catKeys) {
+          const val = dataObj[cat] || 0;
+          if (val <= 0) continue;
+
+          const segH = Math.max(2, (val / totalVal) * barHeight);
+          const segY = currY - segH;
+
+          segs.push({
+            cat,
+            val,
+            pct: ((val / totalVal) * 100).toFixed(1),
+            x: barX - barW / 2,
+            y: segY,
+            width: barW,
+            height: segH,
+            color: CATEGORIES[cat].rawColor,
+            label: CATEGORIES[cat].label,
+            monthKey
+          });
+
+          currY = segY;
+        }
+        return segs;
+      }
+
+      const prevSegs = generateSegments(prevData, prevTotal, xPrev, hPrev, prevLabel);
+      const currSegs = generateSegments(currData, currTotal, xCurr, hCurr, currLabel);
+
+      const midX = (xPrev + xCurr) / 2;
+      const midY = (yPrev + yCurr) / 2;
+
+      svg.innerHTML = `
+        <defs>
+          <clipPath id="clipPrev">
+            <rect x="${xPrev - barW/2}" y="${yPrev}" width="${barW}" height="${hPrev}" rx="8" />
+          </clipPath>
+          <clipPath id="clipCurr">
+            <rect x="${xCurr - barW/2}" y="${yCurr}" width="${barW}" height="${hCurr}" rx="8" />
+          </clipPath>
+          <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${trendColor}" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="${trendColor}" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+
+        <line x1="30" y1="${bottomY}" x2="290" y2="${bottomY}" stroke="var(--j-border)" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="${xPrev},${yPrev} ${xCurr},${yCurr} ${xCurr},${bottomY} ${xPrev},${bottomY}" fill="url(#trendAreaGrad)"/>
+
+        <!-- 이전 기간 스택 바 -->
+        <g clip-path="url(#clipPrev)">
+          ${prevSegs.map(s => `
+            <rect class="bar-segment ${hoveredCategory === s.cat ? 'highlighted' : ''}"
+                  data-cat="${s.cat}" data-val="${s.val}" data-pct="${s.pct}" data-label="${s.label}" data-month="${prevLabel}"
+                  x="${s.x}" y="${s.y}" width="${s.width}" height="${s.height}" fill="${s.color}"
+                  onmouseenter="onSegmentHover(event, '${s.cat}', ${s.val}, ${s.pct}, '${s.label}', '${prevLabel}')"
+                  onmouseleave="onSegmentLeave()"
+                  onclick="onSegmentClick(event, '${s.cat}', ${s.val}, ${s.pct}, '${s.label}', '${prevLabel}')">
+            </rect>
+          `).join('')}
+        </g>
+        <rect x="${xPrev - barW/2}" y="${yPrev}" width="${barW}" height="${hPrev}" rx="8"
+              fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.2" pointer-events="none"/>
+
+        <!-- 현재 기간 스택 바 -->
+        <g clip-path="url(#clipCurr)">
+          ${currSegs.map(s => `
+            <rect class="bar-segment ${hoveredCategory === s.cat ? 'highlighted' : ''}"
+                  data-cat="${s.cat}" data-val="${s.val}" data-pct="${s.pct}" data-label="${s.label}" data-month="${currLabel}"
+                  x="${s.x}" y="${s.y}" width="${s.width}" height="${s.height}" fill="${s.color}"
+                  onmouseenter="onSegmentHover(event, '${s.cat}', ${s.val}, ${s.pct}, '${s.label}', '${currLabel}')"
+                  onmouseleave="onSegmentLeave()"
+                  onclick="onSegmentClick(event, '${s.cat}', ${s.val}, ${s.pct}, '${s.label}', '${currLabel}')">
+            </rect>
+          `).join('')}
+        </g>
+        <rect x="${xCurr - barW/2}" y="${yCurr}" width="${barW}" height="${hCurr}" rx="8"
+              fill="none" stroke="${trendColor}" stroke-width="1.5" pointer-events="none"/>
+
+        <!-- 추이 연결선 & 마커 -->
+        <line x1="${xPrev}" y1="${yPrev}" x2="${xCurr}" y2="${yCurr}" stroke="${trendColor}" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="${xPrev}" cy="${yPrev}" r="5" fill="#f1f6fa" stroke="#32485c" stroke-width="2.5"/>
+        <circle cx="${xCurr}" cy="${yCurr}" r="6" fill="#fff" stroke="${trendColor}" stroke-width="3"/>
+
+        <!-- 상단 금액 -->
+        <text x="${xPrev}" y="${yPrev - 11}" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600">${won(prevTotal)}</text>
+        <text x="${xCurr}" y="${yCurr - 11}" text-anchor="middle" fill="${trendColor}" font-size="14.5" font-weight="750">${won(currTotal)}</text>
+
+        <!-- 연결선 뱃지 -->
+        <g transform="translate(${midX}, ${midY - 14})">
+          <rect x="-32" y="-11" width="64" height="22" rx="11" fill="#161e25" stroke="${trendColor}" stroke-width="1.2"/>
+          <text x="0" y="4" text-anchor="middle" fill="${trendColor}" font-size="11" font-weight="700">
+            ${isMore ? '▲ 증가' : isLess ? '▼ 절약' : '— 유지'}
+          </text>
+        </g>
+
+        <!-- X축 라벨 -->
+        <text x="${xPrev}" y="${bottomY + 22}" text-anchor="middle" fill="var(--j-sub)" font-size="12" font-weight="500">${prevLabel}</text>
+        <text x="${xCurr}" y="${bottomY + 22}" text-anchor="middle" fill="var(--j-ink)" font-size="12.5" font-weight="700">${currLabel}</text>
+      `;
+    }
+
+    // 3번: 어디에 썼을까요? (도넛 차트 렌더링 - 상하 중앙 정렬 완벽 적용)
+    function renderDonutCard() {
+      let d = periodDatasets[currentPeriod].donut;
+      
+      // 단일 카테고리 테스트 모드 시 강제 충전비 1건만 세팅
+      if (singleCategoryMode) {
+        d = {
+          total: '63,499원',
+          centerLabel: '이번 달 지출',
+          categories: [
+            { cat: 'charging', label: '충전비', amount: '63,499원', color: 'var(--cat-charging)', rawColor: '#81e6c5', sub: '실제 금액 포함' }
+          ],
+          circles: [
+            { length: 365, offset: 0, color: '#81e6c5' }
+          ]
+        };
+      }
+
+      const svg = document.getElementById('donutSvg');
+      const list = document.getElementById('donutList');
+
+      let circlesHtml = `
+        <circle cx="80" cy="80" r="58" fill="none" stroke="var(--j-raised)" stroke-width="18"/>
+      `;
+      d.circles.forEach(c => {
+        circlesHtml += `
+          <circle cx="80" cy="80" r="58" fill="none" stroke="${c.color}" stroke-width="18"
+                  stroke-dasharray="${c.length} ${365 - c.length}" stroke-dashoffset="${c.offset}" transform="rotate(-90 80 80)"/>
+        `;
+      });
+      circlesHtml += `
+        <text x="80" y="77" text-anchor="middle" fill="var(--j-sub)" font-size="11.5">${d.centerLabel}</text>
+        <text x="80" y="97" text-anchor="middle" fill="var(--j-ink)" font-size="14" font-weight="750">${d.total}</text>
+      `;
+      svg.innerHTML = circlesHtml;
+
+      // [핵심] 1개든 3개든 list 내부가 flex justify-content: center로 파이차트 정중앙 수평선에 일치
+      list.innerHTML = d.categories.map(c => `
+        <div class="list-row">
+          <span>
+            <span class="legend-dot" style="display:inline-block; margin-right:6px; background:${c.color};"></span>${c.label}
+            <small>${c.sub}</small>
+          </span>
+          <strong style="font-variant-numeric:tabular-nums; font-size:13.5px;">${c.amount}</strong>
+        </div>
+      `).join('');
+    }
+
+    // 4번: 최근 기록이에요 (지출 내역만 필터링 + 카테고리 색상 하이라이트)
+    function renderRecentCard() {
+      const rec = periodDatasets[currentPeriod].recent;
+      const list = document.getElementById('recentList');
+
+      if (!rec || rec.length === 0) {
+        list.innerHTML = `<p class="muted note" style="padding:10px 0;">이번 기간의 지출 내역이 없어요.</p>`;
+        return;
+      }
+
+      list.innerHTML = rec.map(r => {
+        const catInfo = CATEGORIES[r.cat] || CATEGORIES.other;
+        return `
+          <div class="recent-expense-row">
+            <div class="recent-left">
+              <div class="recent-title-line">
+                <span class="cat-highlight-pill" style="background:${catInfo.bg}; color:${catInfo.rawColor}; border:1px solid ${catInfo.border};">
+                  <span class="legend-dot" style="background:${catInfo.rawColor}; width:6px; height:6px;"></span>
+                  ${catInfo.label}
+                </span>
+                <span class="recent-item-title">${r.title}</span>
+              </div>
+              <small class="recent-date-sub">${r.date} · ${r.sub || (r.origin === 'manual' ? '직접 기록' : '자동 원장')}</small>
+            </div>
+            <strong class="recent-amount">${r.amount}</strong>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 주행&에너지 탭 바 차트 렌더링
+    function renderEnergyTabChart() {
+      const metric = document.getElementById('energyMetricSelect').value;
+      const container = document.getElementById('energyChartBars');
+      const heights = metric === 'distance' ? [35, 60, 42, 85, 20, 70, 95] : metric === 'cost' ? [20, 50, 0, 75, 0, 45, 90] : [70, 65, 80, 75, 85, 78, 82];
+      const days = ['10/1', '10/2', '10/3', '10/4', '10/5', '10/6', '10/7'];
+      container.innerHTML = heights.map((h, i) => `
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;">
+          <div style="width:100%; max-width:28px; height:${h}%; background:var(--j-accent); border-radius:6px 6px 0 0; opacity:0.85;"></div>
+          <span style="font-size:11px; color:var(--j-sub); margin-top:6px;">${days[i]}</span>
+        </div>
+      `).join('');
+    }
+
+    // 전체 원장 테이블 렌더링
+    function renderFullLedgerTable() {
+      const tbody = document.getElementById('fullLedgerBody');
+      const allRows = [
+        { date: '2026-10-06', cat: 'charging', title: '아파트 완속 충전', amount: '4,200원' },
+        { date: '2026-10-04', cat: 'washing', title: '자동 세차 및 실내 청소', amount: '17,000원' },
+        { date: '2026-10-03', cat: 'tuning', title: '트렁크 미끄럼방지 패드', amount: '6,400원' },
+        { date: '2026-10-02', cat: 'charging', title: '아파트 완속 충전 (24.2 kWh)', amount: '5,420원' },
+        { date: '2026-08-15', cat: 'maintenance', title: '에어컨 필터 정기 교체', amount: '35,000원' }
+      ];
+      tbody.innerHTML = allRows.map(r => {
+        const c = CATEGORIES[r.cat] || CATEGORIES.other;
+        return `
+          <tr style="border-bottom:1px solid var(--j-border);">
+            <td style="padding:10px 4px; color:var(--j-sub);">${r.date}</td>
+            <td style="padding:10px 4px;">
+              <span class="cat-highlight-pill" style="background:${c.bg}; color:${c.rawColor}; border:1px solid ${c.border};">
+                ${c.label}
+              </span>
+            </td>
+            <td style="padding:10px 4px; font-weight:600;">${r.title}</td>
+            <td style="padding:10px 4px; text-align:right; font-weight:700;">${r.amount}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ========================================================
+    // 모달 다이얼로그 제어 & 기록 추가 실제 작동 로직
+    // ========================================================
+    function openRecordModal() {
+      const dialog = document.getElementById('recordDialog');
+      dialog.showModal();
+    }
+
+    function closeRecordModal() {
+      const dialog = document.getElementById('recordDialog');
+      dialog.close();
+    }
+
+    // 모달 배경 클릭 시 닫기
+    document.getElementById('recordDialog').addEventListener('click', (e) => {
+      const dialog = document.getElementById('recordDialog');
+      const rect = dialog.getBoundingClientRect();
+      const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+                          rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
+      if (!isInDialog) {
+        dialog.close();
+      }
+    });
+
+    // 기록 종류 변경 시 폼 필드 동적 노출/숨김
+    function onRecordKindChange() {
+      const kind = document.getElementById('recordKind').value;
+      const fieldCat = document.getElementById('fieldCategory');
+      const fieldSub = document.getElementById('fieldSubcategory');
+      const fieldAmt = document.getElementById('fieldAmount');
+      const fieldChargeKwh = document.getElementById('fieldChargeKwh');
+      const fieldChargeMode = document.getElementById('fieldChargeMode');
+      const fieldTripKm = document.getElementById('fieldTripKm');
+
+      if (kind === 'expense') {
+        fieldCat.style.display = 'flex';
+        fieldSub.style.display = 'flex';
+        fieldAmt.style.display = 'flex';
+        fieldChargeKwh.style.display = 'none';
+        fieldChargeMode.style.display = 'none';
+        fieldTripKm.style.display = 'none';
+      } else if (kind === 'charge') {
+        fieldCat.style.display = 'none';
+        fieldSub.style.display = 'none';
+        fieldAmt.style.display = 'flex';
+        fieldChargeKwh.style.display = 'flex';
+        fieldChargeMode.style.display = 'flex';
+        fieldTripKm.style.display = 'none';
+      } else if (kind === 'trip') {
+        fieldCat.style.display = 'none';
+        fieldSub.style.display = 'none';
+        fieldAmt.style.display = 'none';
+        fieldChargeKwh.style.display = 'none';
+        fieldChargeMode.style.display = 'none';
+        fieldTripKm.style.display = 'flex';
+      }
+    }
+
+    // 기록 저장 제출 이벤트 (실제 상태 반영)
+    function handleRecordSubmit(e) {
+      e.preventDefault();
+      const form = document.getElementById('recordForm');
+      const kind = form.kind.value;
+      const date = form.date.value;
+      const cat = (kind === 'charge') ? 'charging' : (form.category ? form.category.value : 'other');
+      const sub = form.subcategory.value || (kind === 'charge' ? '누락 충전 기록' : CATEGORIES[cat]?.label || '지출');
+      const amount = Number(form.amount.value) || 0;
+      const memo = form.memo.value;
+
+      if (kind === 'expense' || kind === 'charge') {
+        // 현재 기간의 최근 기록에 신규 추가
+        const ds = periodDatasets[currentPeriod];
+        const newRecord = {
+          title: sub,
+          cat: cat,
+          date: date.slice(5),
+          amount: won(amount),
+          sub: memo || '방금 직접 기록',
+          origin: 'manual'
+        };
+        ds.recent.unshift(newRecord);
+
+        // 비교 데이터셋 현재 금액 가산
+        if (ds.comparison && ds.comparison.curr) {
+          ds.comparison.curr[cat] = (ds.comparison.curr[cat] || 0) + amount;
+        }
+
+        renderAllDashboardCards();
+        showToast(`'${sub}' 지출 기록(${won(amount)})이 저장되었습니다!`);
+      } else {
+        showToast('누락 주행 기록이 저장되었습니다.');
+      }
+
+      form.reset();
+      document.getElementById('recordDate').value = '2026-10-06';
+      onRecordKindChange();
+      closeRecordModal();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastNotice');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2600);
+    }
+
+    // 호버 툴팁 및 인터랙션 핸들러
+    function onSegmentHover(evt, catKey, val, pct, label, periodName) {
+      hoveredCategory = catKey;
+      document.getElementById('chartBox').classList.add('is-hovering');
+
+      const tooltip = document.getElementById('chartTooltip');
+      const dot = document.getElementById('tooltipDot');
+      const catText = document.getElementById('tooltipCat');
+      const amtText = document.getElementById('tooltipAmount');
+      const pctText = document.getElementById('tooltipPct');
+
+      dot.style.background = CATEGORIES[catKey].rawColor;
+      catText.textContent = `${periodName} ${label}`;
+      amtText.textContent = won(val);
+      pctText.textContent = `${pct}%`;
+
+      const rect = evt.target.getBoundingClientRect();
+      const parentRect = document.getElementById('chartBox').getBoundingClientRect();
+      const posX = rect.left + rect.width / 2 - parentRect.left;
+      const posY = rect.top - parentRect.top - 8;
+
+      tooltip.style.left = `${posX}px`;
+      tooltip.style.top = `${posY}px`;
+      tooltip.classList.add('visible');
+
+      document.querySelectorAll('.legend-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.cat === catKey);
+      });
+
+      renderComparisonCard();
+    }
+
+    function onSegmentClick(evt, catKey, val, pct, label, periodName) {
+      evt.stopPropagation();
+      if (hoveredCategory === catKey) {
+        onSegmentLeave();
+      } else {
+        onSegmentHover(evt, catKey, val, pct, label, periodName);
+      }
+    }
+
+    function onSegmentLeave() {
+      hoveredCategory = null;
+      document.getElementById('chartBox').classList.remove('is-hovering');
+      document.getElementById('chartTooltip').classList.remove('visible');
+      document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+      renderComparisonCard();
+    }
+
+    function onLegendTap(catKey) {
+      if (hoveredCategory === catKey) {
+        onSegmentLeave();
+      } else {
+        hoveredCategory = catKey;
+        document.getElementById('chartBox').classList.add('is-hovering');
+        document.querySelectorAll('.legend-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.cat === catKey);
+        });
+        renderComparisonCard();
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#chartBox')) {
+        onSegmentLeave();
+      }
+    });
+
+    // 초기 실행
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('mode') === 'desktop') {
+      setDeviceMode('desktop');
+    } else if (urlParams.get('mode') === 'max') {
+      setDeviceMode('max');
+    }
+    renderAllDashboardCards();
+  </script>
+</body>
+</html>
