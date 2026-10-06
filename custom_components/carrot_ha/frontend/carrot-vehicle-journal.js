@@ -49,26 +49,27 @@ export class VehicleJournal extends HTMLElement {
     <label id="startField" hidden>시작 시각 (선택)<input name="started_at" type="datetime-local"></label><label id="endField" hidden>종료 시각 (선택)<input name="ended_at" type="datetime-local"></label>
     <label id="socStartField" hidden>시작 SOC · % (선택)<input name="soc_start_percent" type="number" min="0" max="100" step="0.1"></label><label id="socEndField" hidden>종료 SOC · % (선택)<input name="soc_end_percent" type="number" min="0" max="100" step="0.1"></label><label id="odometerField" hidden>계기판 누적거리 · km (선택)<input name="odometer_km" type="number" min="0" step="0.1"></label><label class="fullfield">메모<textarea name="memo" maxlength="4000" rows="3"></textarea></label><label class="fullfield">사진 · JPG / PNG / WEBP<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>사진당 2MiB 이하, 최대 5장이에요.</small><div class="preview" id="photoPreview"></div></label></div>
     <p class="note">모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.</p><p class="error" id="recordError" role="alert"></p><div class="row" style="margin-top:16px"><button id="save" class="primary" type="submit">HA에 기록 저장</button></div></form></dialog></div>`;
-    this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
-    this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
-    this.$('month').onchange=()=>{this.offset=0;this.load(true);};
-    for(let i=0;i<5;i++)this.$('tab'+i).onclick=()=>this.selectTab(i);
-    for(const id of ['add','addRecent','addLedger'])this.$(id).onclick=()=>this.openRecord();
-    this.$('close').onclick=()=>this.$('recordDialog').close();
-    this.$('gotoCompare').onclick=()=>this.selectTab(2);
-    this.$('recordForm').onsubmit=event=>this.saveRecord(event);
-    this.$('actualKrw').oninput=e=>{const raw=e.target.value.replace(/[^\d]/g,'');e.target.value=raw?Number(raw).toLocaleString('ko-KR'):'';};
-    this.$('metric').onchange=()=>{this.metric=this.$('metric').value;this.drawChart();};
-    this.$('period').onchange=()=>{this.period=this.$('period').value;this.drawChart();};
-    this.$('previous').onclick=()=>{this.offset=Math.max(0,this.offset-100);this.load(true);};
-    this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
-    this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data.records.find(r=>r.id===button.dataset.record);if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
-    this.$('compareForm').onsubmit=async event=>{event.preventDefault();try{await this.call('comparison/save',{fuel:this.$('fuel').value,economy_km_l:Number(this.$('economy').value),entity_id:this.$('fuelEntity').value});this.$('compareMessage').textContent='비교 기준을 저장했어요.';await this.load(true);}catch(e){this.$('compareMessage').textContent=e.message||'저장하지 못했어요.';}};
-    this.$('photos').onchange=()=>{this.$('photoPreview').replaceChildren();for(const file of this.$('photos').files){const img=document.createElement('img');const url=URL.createObjectURL(file);img.src=url;img.alt='사진 미리보기';img.onload=()=>URL.revokeObjectURL(url);this.$('photoPreview').append(img);}};
-    this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
-    this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));
+    if(this.$('month'))this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
+    if(this.$('entry'))this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
+    if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
+    for(let i=0;i<5;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
+    for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.openRecord();
+    if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
+    if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(2);
+    if(this.$('recordForm'))this.$('recordForm').onsubmit=event=>this.saveRecord(event);
+    const actualInput=this.$('actualKrw');
+    if(actualInput)actualInput.oninput=e=>{const raw=e.target.value.replace(/[^\d]/g,'');e.target.value=raw?Number(raw).toLocaleString('ko-KR'):'';};
+    if(this.$('metric'))this.$('metric').onchange=()=>{this.metric=this.$('metric').value;this.drawChart();};
+    if(this.$('period'))this.$('period').onchange=()=>{this.period=this.$('period').value;this.drawChart();};
+    if(this.$('previous'))this.$('previous').onclick=()=>{this.offset=Math.max(0,this.offset-100);this.load(true);};
+    if(this.$('next'))this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
+    if(this.$('records'))this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
+    if(this.$('compareForm'))this.$('compareForm').onsubmit=async event=>{event.preventDefault();try{await this.call('comparison/save',{fuel:this.$('fuel').value,economy_km_l:Number(this.$('economy').value),entity_id:this.$('fuelEntity').value});this.$('compareMessage').textContent='비교 기준을 저장했어요.';await this.load(true);}catch(e){this.$('compareMessage').textContent=e.message||'저장하지 못했어요.';}};
+    if(this.$('photos'))this.$('photos').onchange=()=>{this.$('photoPreview').replaceChildren();for(const file of this.$('photos').files){const img=document.createElement('img');const url=URL.createObjectURL(file);img.src=url;img.alt='사진 미리보기';img.onload=()=>URL.revokeObjectURL(url);this.$('photoPreview').append(img);}};
+    if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
+    if(this.$('chart')){this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));}
   }
-  selectTab(index){this.tab=index;for(let i=0;i<5;i++){this.$('page'+i).hidden=i!==index;this.$('tab'+i).setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
+  selectTab(index){this.tab=index;for(let i=0;i<5;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
   call(type,params={}){return this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}
   async load(force=false){
     if(!this._hass?.callWS||!this.isConnected)return;
@@ -76,15 +77,25 @@ export class VehicleJournal extends HTMLElement {
     if(!force&&this.data)return;
     this.loading=true;const generation=++this.request;
     try{
-      if(!this.entries.length){this.entries=await this._hass.callWS({type:'carrot_ha/journal/entries'});this.$('entry').innerHTML=this.entries.map(e=>`<option value="${esc(e.entry_id)}">${esc(e.title)}</option>`).join('');this.entry=this.entry||this.entries[0]?.entry_id;this.$('entry').value=this.entry||'';}
+      if(!this.entries.length){
+        this.entries=await this._hass.callWS({type:'carrot_ha/journal/entries'});
+        if(this.$('entry'))this.$('entry').innerHTML=this.entries.map(e=>`<option value="${esc(e.entry_id)}">${esc(e.title)}</option>`).join('');
+        this.entry=this.entry||this.entries[0]?.entry_id;
+        if(this.$('entry'))this.$('entry').value=this.entry||'';
+      }
       if(!this.entry)throw new Error('HA에서 차계부 통합을 아직 찾지 못했어요. 업데이트와 재시작을 확인해 주세요.');
-      const month=this.$('month').value;if(!/^\d{4}-\d{2}$/.test(month))throw new Error('기록 월을 골라 주세요.');
+      const month=this.$('month')?.value;if(!month||!/^\d{4}-\d{2}$/.test(month))throw new Error('기록 월을 골라 주세요.');
       const [year,m]=month.split('-').map(Number);const end=month+'-'+new Date(year,m,0).getDate();
       const selectedEntry=this.entry,selectedOffset=this.offset;
       const data=await this.call('query',{from:month+'-01',to:end,offset:selectedOffset});
-      if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month').value!==month)return;
+      if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month')?.value!==month)return;
       this.data=data;preserveView(this,()=>this.renderData());
-    }catch(error){this.$('message').textContent=error.message||'HA 차계부에 연결하지 못했어요.';this.$('message').classList.add('error');}
+    }catch(error){
+      if(this.$('message')){
+        this.$('message').textContent=error.message||'HA 차계부에 연결하지 못했어요.';
+        this.$('message').classList.add('error');
+      }
+    }
     finally{this.loading=false;if(this.reloadPending){this.reloadPending=false;this.load(true);}}
   }
   stat(label,value,note=''){return `<div class="stat"><small>${esc(label)}</small><strong>${value}</strong>${note?`<small>${esc(note)}</small>`:''}</div>`;}
