@@ -1,7 +1,10 @@
 """Interpret fresh passive HVK_01 requests; never infer connector state."""
 from datetime import datetime, timezone
 
-FRESHNESS_SECONDS = 90
+# A 60s publication plus 60s HA poll can arrive after the old 90s limit.
+# Keep the CAN measurement timestamp; receipt never renews this lease.
+FRESHNESS_SECONDS = 180
+DELAY_AFTER_SECONDS = 90
 MODES = {0: 'hv_off', 1: 'hv_on', 3: 'ac_preparing', 4: 'ac_charging', 6: 'dc_charging', 7: 'initializing'}
 
 
@@ -39,6 +42,8 @@ def request_charging_mode(data, now=None):
         return result
     mode = MODES.get(code, 'unknown')
     result.update(mode=mode, code=code, bus=bus, measured_at=at.isoformat(),
+                  measurement_age_s=(now-at).total_seconds(),
+                  delayed=(now-at).total_seconds() > DELAY_AFTER_SECONDS,
                   charging=True if code in (4, 6) else False if code in (0, 1, 3) else None,
                   validation='dc_observed_2026_10_04' if code == 6 else 'dbc_definition')
     if data.get('driving') is True or data.get('onroad') is True:
@@ -80,6 +85,8 @@ def charging_mode(data, now=None):
         result['validation'] = 'bus_conflict'
         return result
     result.update(mode=ACTUAL_MODES.get(code, 'unknown'), code=code, bus=bus,
+                  measurement_age_s=(now-at).total_seconds(),
+                  delayed=(now-at).total_seconds() > DELAY_AFTER_SECONDS,
                   measured_at=at.isoformat(), charging=True if code in (4, 6) else False if code in (0, 1) else None,
                   validation='ac_dc_observed_2026_10_05' if code in (4, 6) else 'definition')
     if result['driving']:

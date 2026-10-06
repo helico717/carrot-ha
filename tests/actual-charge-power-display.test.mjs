@@ -10,6 +10,8 @@ for(const lang of ['ko','en']){
    assert(html.includes(`${display} kW`));
    assert(html.includes(`charge-power-tag ${fast?'fast':'slow'}`));
   }
+  const delayed=card.overview({charging:true,driving:false,charge_mode:'ac_charging',charge_power_kw:9.4,charge_mode_evidence:{delayed:true,measurement_age_s:95}});
+  assert(delayed.includes(lang==='ko'?'갱신 지연 (95s)':'Update delayed (95s)'));
   const html=card.overview({charging:true,driving:false,charge_mode:'ac_charging',charge_power_kw:null});
   assert(!html.includes('charge-power-tag'));
  });

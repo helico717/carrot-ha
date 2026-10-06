@@ -1182,6 +1182,7 @@ class CarrotDashboard extends HTMLElement {
       : Math.round(sessionKwh * sessionUnitPrice);
     const sessionCostSub = `+${n(sessionKwh, 1)} kWh (추정)`;
 
+    if(v.charge_mode_evidence?.delayed) etaCardSubText += ` · 갱신 지연 (${Math.round(v.charge_mode_evidence.measurement_age_s ?? 0)}s)`;
     if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · 마지막 추정 유지 (${v.charging_eta_hold_age_s ?? 0}s)`;
     const quickMetrics = charging
       ? `${renderLockMetric(isLocked, true, openDoors)}` +
@@ -1271,6 +1272,7 @@ class CarrotDashboard extends HTMLElement {
         </span>`;
     }
 
+    if(v.charge_mode_evidence?.delayed) etaCardSubText += ` · 갱신 지연 (${Math.round(v.charge_mode_evidence.measurement_age_s ?? 0)}s)`;
     if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · 마지막 추정 유지 (${v.charging_eta_hold_age_s ?? 0}s)`;
     return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>외기 <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span>${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at, tz)}</small></span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }

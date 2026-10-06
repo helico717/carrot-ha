@@ -32,8 +32,15 @@ class PowerTest(unittest.TestCase):
         self.assertEqual(self.sample(0)['charge_power_w'],0)
         self.assertNotIn('power_hold',self.runtime)
     def test_missing_init_stale_and_future_are_unknown(self):
-        for args in ({'watts':None},{'watts':6500,'mode':7},{'watts':6500,'age':91},{'watts':6500,'age':-1}):
+        for args in ({'watts':None},{'watts':6500,'mode':7},{'watts':6500,'age':181},{'watts':6500,'age':-1}):
             self.assertIsNone(self.sample(**args)['charge_power_w'])
+    def test_delayed_display_is_not_calculation_input(self):
+        data = self.sample(9400, age=95)
+        self.assertEqual(data['actual_charge_power_w'], 9400)
+        self.assertEqual(data['charge_power_source'], 'can_actual_delayed')
+        self.assertIsNone(data['charge_power_raw_w'])
+        self.assertEqual(self.sample(0, mode=1)['actual_charge_power_w'], 0)
+
     def test_request_only_does_not_restore_estimated_power(self):
         data={'charge_power_w':6500,'charge_can_bms_request_bus1':4,'field_measured_at':{'charge_can_bms_request_bus1':self.start.isoformat()}}
         self.assertIsNone(power(data,self.runtime,self.start))

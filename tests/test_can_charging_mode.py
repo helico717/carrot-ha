@@ -14,7 +14,7 @@ class ChargingModeTests(unittest.TestCase):
     self.assertEqual((result['mode'],result['charging']),(mode,active))
  def test_stale_and_missing_never_infer_from_energy(self):
   self.assertIsNone(m.charging_mode({'battery_wh':50000},1791120601)['charging'])
-  self.assertIsNone(m.charging_mode(self.sample(6),1791120700)['charging'])
+  self.assertIsNone(m.charging_mode(self.sample(6),1791120781)['charging'])
  def test_init_and_driving(self):
   d=self.sample(6);d['driving']=True
   self.assertFalse(m.charging_mode(d,1791120601)['charging'])
@@ -41,4 +41,4 @@ class ActualModeTests(unittest.TestCase):
    self.assertEqual((signal['mode'],signal['charging']),(mode,active));self.assertEqual(signal['source_kind'],'actual')
  def test_stale_actual_does_not_fall_back_to_newer_request(self):
   d=self.sample(4);d['field_measured_at']['charge_can_bms_request_bus1']='2026-10-04T13:32:00+00:00'
-  self.assertIsNone(m.charging_mode(d,1791120721)['charging'])
+  self.assertIsNone(m.charging_mode(d,1791120781)['charging'])

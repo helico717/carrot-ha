@@ -1182,6 +1182,7 @@ class CarrotDashboard extends HTMLElement {
       : Math.round(sessionKwh * sessionUnitPrice);
     const sessionCostSub = `+${n(sessionKwh, 1)} kWh (est.)`;
 
+    if(v.charge_mode_evidence?.delayed) etaCardSubText += ` · Update delayed (${Math.round(v.charge_mode_evidence.measurement_age_s ?? 0)}s)`;
     if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · Last estimate held (${v.charging_eta_hold_age_s ?? 0}s)`;
     const quickMetrics = charging
       ? `${renderLockMetric(isLocked, true, openDoors)}` +

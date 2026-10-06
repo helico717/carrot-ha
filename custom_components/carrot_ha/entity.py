@@ -34,4 +34,11 @@ class VehicleEntity:
     @property
     def extra_state_attributes(self):
         data=self.data
-        return {'measured_at':data.get('measured_at'),'stale':data.get('stale'),'field_measured_at':(data.get('field_measured_at') or {}).get(self.key)}
+        attrs = {'measured_at':data.get('measured_at'),'stale':data.get('stale'),'field_measured_at':(data.get('field_measured_at') or {}).get(self.key)}
+        if self.key in {'charging', 'charge_mode', 'actual_charge_power_w', 'hv_voltage', 'charging_session', 'time_to_80_s', 'time_to_100_s', 'eta_80', 'eta_100'}:
+            evidence = data.get('charge_mode_evidence') or {}
+            attrs.update(charge_measured_at=evidence.get('measured_at'),
+                         measurement_age_s=evidence.get('measurement_age_s'),
+                         delayed=evidence.get('delayed', False),
+                         freshness_limit_s=evidence.get('freshness_limit_s'))
+        return attrs

@@ -168,6 +168,25 @@ class TestChargingRegression(unittest.TestCase):
                 'measured_at': self.base_time.isoformat(), 'stale': False}},
             'summary': {}}
 
+    def test_real_logbook_gap_preserves_charging_and_eta_without_training(self):
+        runtime = self.runtime(wh=39000)
+        first = values(runtime)
+        model = dict(runtime['charging_smooth_state'])
+        for elapsed in (75, 95, 135, 170):
+            MockDateTime.current_time = self.base_time + timedelta(seconds=elapsed)
+            result = values(runtime)
+            self.assertTrue(result['charging'])
+            self.assertEqual(result['charge_mode'], 'dc_charging')
+            self.assertEqual(result['actual_charge_power_w'], 27987)
+            self.assertEqual(result['eta_80'], first['eta_80'])
+            self.assertEqual(result['eta_100'], first['eta_100'])
+            self.assertEqual(runtime['charging_smooth_state'], model)
+            self.assertEqual(result['charge_mode_evidence']['delayed'], elapsed > 90)
+        MockDateTime.current_time = self.base_time + timedelta(seconds=181)
+        expired = values(runtime)
+        for key in ('charging', 'actual_charge_power_w', 'time_to_80_s', 'time_to_100_s', 'eta_80', 'eta_100'):
+            self.assertIsNone(expired[key], key)
+
     def test_display_hold_does_not_train_eta(self):
         runtime = self.runtime(wh=39000)
         runtime['latest']['data']['charge_power_w'] = 1500

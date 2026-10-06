@@ -152,7 +152,10 @@ def values(runtime):
     )
     # Missing/quantized zero power is a display interruption, not training data.
     # A model rejection with otherwise valid power is an anomaly, never held.
-    runtime['charging_smooth_state'] = charging_est['smooth_state']
+    # A delayed snapshot is display-only: do not reset or retrain the model
+    # merely because its power has been withheld from calculation inputs.
+    runtime['charging_smooth_state'] = (previous_model if active_estimate and charge_signal.get('delayed')
+                                       else charging_est['smooth_state'])
     valid_result = charging_est['eta_100'] is not None
     if valid_result and active_estimate:
         if held is None or measured_time.timestamp() > held['measured']:
