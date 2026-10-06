@@ -1,5 +1,23 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — HA 차계부 카드 UI/UX 최적화 반영 및 HA 직접 배포
+
+- 커밋 제목: `vehicle-journal: apply approved hero metrics, clean donut labels, and simplified record modal to HA card`.
+- 사용자 요청에 따라 검토 프로토타입(`review_journal_spending.html`)에서 승인된 3대 핵심 개선사항을 실제 HA 카드(`custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`)에 그대로 반영:
+  1. **영웅 카드 지표 3종 최적화**:
+     - 1번 지표: 중복 '차량 총 지출'을 대체하여 `이번달 충전량` (kWh) 적용, 데이터 부재 시 `기록 없음`.
+     - 2번 지표: `이번달 전비` (km/kWh) 적용, 데이터 부재 시 `기록 없음`. 모바일 줄바꿈 방지 (`white-space: nowrap`, 18px 모바일 / 21px 데스크톱, 단위 분리).
+     - 3번 지표: 기존 1km당 충전비 대신 `kWh 당 평균 충전요금` (원) 적용, 데이터 부재 시 `기록 없음`.
+     - 지표 상단 라벨 베이스라인 수평 정렬(`min-height: 28px`).
+  2. **도넛 카드 카테고리 라벨 정돈**:
+     - 카테고리 하단 세부 텍스트(`HA 자동 집계` 등)를 완전히 제거하고, 색상 도트 + 라벨 + 금액만 간결하게 정렬.
+  3. **기록 모달 간소화 및 금액 자동 콤마**:
+     - 수기 입력 불필요 항목인 `누락 충전`, `누락 주행` 및 `충전비`를 제외하고 `정비 / 지출` 전용 모달로 전환.
+     - `실제 금액 · 원` 입력창에 세 자릿수 단위 콤마 자동 서식(`50,000`) 적용.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/CHANGELOG.md`.
+- 검증: `node --check` 문법 검사 통과, SSH HA 직접 반영 후 SHA-256 일치 확인.
+- 배포: SSH를 통해 HA 서버(`/config/custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`)에 안전 백업 후 직접 배포.
+
 ## 2026-10-06 — 영웅 카드 지표 최적화, 도넛 라벨 정돈 및 기록 모달 간소화
 
 - 커밋 제목: `vehicle-journal: refine hero metrics, clean donut labels, and streamline record modal`.
