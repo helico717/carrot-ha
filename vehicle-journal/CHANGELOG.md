@@ -1,5 +1,16 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 사진 자동 압축과 선택 취소
+
+- 커밋 제목: vehicle-journal: compress selected photos and cancel attachments without losing input.
+- 변경·이유: JPG·PNG·WEBP 원본을 사진당 20MiB·8000만 픽셀까지 선택하고 브라우저에서 긴 쪽 2560px 이하 JPEG로 변환한다. 품질 조정 후 필요하면 추가 축소하여 저장 한도 2MiB를 지키며 휴대폰 원본은 변경하지 않는다. 사진은 순차 처리하고 메타데이터는 전송 전 픽셀 재인코딩으로 제거한다.
+- 미리보기별 선택 취소와 전체 선택 취소를 제공하며 날짜·금액·메모를 유지한다. 압축 실패는 기록 생성 전에 처리한다. 저장 중 중복 제출과 사진 선택 변경을 막는다. 패널 import revision을 갱신한다.
+- 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-panel.js, vehicle-journal/tests/photo-compression.cjs, photo-selection.cjs. 서버·DB 스키마는 기존 저장 한도를 유지한다.
+- 검증: Chrome에서 11~13MiB JPG·PNG·WEBP 자동 압축, 최대 해상도, 투명 배경, 잘못된 파일·20MiB 초과 거부를 검증했다. 선택 취소 입력 보존·JPEG 업로드·압축 실패 시 무저장·수동 수정 동일 ID/version 검증. Python 차계부 14건·스키마 9건 통과. 커밋할 사진 수정만 분리한 소스의 기존 browser-check 및 새 사진 선택 검증도 통과. 진행 중인 다른 로컬 UI는 제거된 day 선택자 때문에 기존 browser-check가 실패하며 이번 커밋 범위에서 제외했다.
+- 배포: main 커밋·푸시 후 HA 설치본에 이번 사진 변경만 백업·부분 반영하고 SHA-256을 확인한다. 다른 대시보드 작업을 포함하거나 덮어쓰지 않는다. Python 변경·HA 재시작·HACS 재다운로드·새 릴리즈는 수행하지 않는다.
+- 제한: HEIC 미지원. 자동 변환은 손실 압축이며 원본 보관 기능이 아니다. 이번 취소는 아직 저장하지 않은 선택 사진 대상이다. iOS 실사용 및 운영 기록 사진 저장은 사용자 확인 대기다.
+
+
 ## 2026-10-07 — v0.8.14-beta.1 실제 발행 확인
 
 - 커밋 제목: vehicle-journal: record verified beta release and HA deployment.

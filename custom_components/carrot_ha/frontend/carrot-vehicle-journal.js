@@ -6,6 +6,39 @@ const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-
 const money=value=>Number.isFinite(value)?numeric(value,0)+'원':'미확인';
 const categories={charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',other:'기타'};
 const uuid=()=>{if(crypto.randomUUID)return crypto.randomUUID();const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;};
+// Normalize locally before upload; camera originals never leave this browser.
+async function prepareJournalPhoto(file){
+  const maxInput=20*1024*1024,maxStored=2*1024*1024;
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||!file.size||file.size>maxInput)
+    throw new Error('사진당 20MiB 이하 JPG·PNG·WEBP 사진을 골라 주세요.');
+  const url=URL.createObjectURL(file),image=new Image();
+  try{
+    image.src=url;await image.decode();
+    if(!image.naturalWidth||!image.naturalHeight||image.naturalWidth*image.naturalHeight>80000000)
+      throw new Error('사진 해상도가 너무 커요. 8000만 픽셀 이하 사진을 골라 주세요.');
+    const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+    if(!context)throw new Error('이 브라우저에서 사진을 압축하지 못했어요.');
+    let edge=2560;
+    while(edge>=1024){
+      const scale=Math.min(1,edge/Math.max(image.naturalWidth,image.naturalHeight));
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);
+      context.drawImage(image,0,0,canvas.width,canvas.height);
+      for(const quality of [.92,.85,.78,.70]){
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',quality));
+        if(blob&&blob.size<=maxStored){
+          return new File([blob],file.name.replace(/\.[^.]+$/,'')+'.jpg',{type:'image/jpeg'});
+        }
+      }
+      edge=Math.floor(edge*.8);
+    }
+    throw new Error('사진을 저장 크기로 압축하지 못했어요. 다른 사진을 골라 주세요.');
+  }catch(error){
+    if(error.name==='EncodingError')throw new Error('사진을 읽지 못했어요. JPG·PNG·WEBP 사진을 골라 주세요.');
+    throw error;
+  }finally{URL.revokeObjectURL(url);}
+}
 const kindNames={trip:'주행',charge:'충전',expense:'지출'};
 const styles=`
 :host{display:block;--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5;--j-blue:#7bb6ff;color:var(--j-ink);font:15px/1.65 system-ui,-apple-system,sans-serif}
@@ -20,7 +53,7 @@ export class VehicleJournal extends HTMLElement {
   getGridOptions(){return {columns:36,rows:'auto',min_columns:6};}
   static getStubConfig(){return {entry_id:''};}
   connectedCallback(){if(!this.ready)this.build();else this.resize?.observe(this.$('chart'));this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open)this.load(true);},60000);this.load();}
-  disconnectedCallback(){this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
+  disconnectedCallback(){for(const url of this.photoURLs||[])URL.revokeObjectURL(url);this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
   $(id){return this.shadowRoot.getElementById(id);}
   build(){
     this.ready=true;
@@ -130,7 +163,7 @@ export class VehicleJournal extends HTMLElement {
     <label id="billedField" hidden>청구 충전량 · kWh (선택)<input name="billed_charge_kwh" type="number" min="0" step="0.001"></label>
     <label id="amountField">실제 금액 · 원<input name="actual_krw" id="actualKrw" type="text" inputmode="numeric" placeholder="0" required></label>
     <label id="startField" hidden>시작 시각 (선택)<input name="started_at" type="datetime-local"></label><label id="endField" hidden>종료 시각 (선택)<input name="ended_at" type="datetime-local"></label>
-    <label id="socStartField" hidden>시작 SOC · % (선택)<input name="soc_start_percent" type="number" min="0" max="100" step="0.1"></label><label id="socEndField" hidden>종료 SOC · % (선택)<input name="soc_end_percent" type="number" min="0" max="100" step="0.1"></label><label id="odometerField" hidden>계기판 누적거리 · km (선택)<input name="odometer_km" type="number" min="0" step="0.1"></label><label class="fullfield">메모<textarea name="memo" maxlength="4000" rows="3"></textarea></label><label class="fullfield">사진 · JPG / PNG / WEBP<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>사진당 2MiB 이하, 최대 5장이에요.</small><div class="preview" id="photoPreview"></div></label></div>
+    <label id="socStartField" hidden>시작 SOC · % (선택)<input name="soc_start_percent" type="number" min="0" max="100" step="0.1"></label><label id="socEndField" hidden>종료 SOC · % (선택)<input name="soc_end_percent" type="number" min="0" max="100" step="0.1"></label><label id="odometerField" hidden>계기판 누적거리 · km (선택)<input name="odometer_km" type="number" min="0" step="0.1"></label><label class="fullfield">메모<textarea name="memo" maxlength="4000" rows="3"></textarea></label><label class="fullfield">사진 · JPG / PNG / WEBP<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>사진당 20MiB 이하, 최대 5장. 저장할 때 자동으로 축소·압축해요.</small><button id="clearPhotos" type="button" hidden>사진 선택 모두 취소</button><div class="preview" id="photoPreview"></div></label></div>
     <p class="note">모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.</p><p class="error" id="recordError" role="alert"></p><div class="row" style="margin-top:16px"><button id="save" class="btn-record-primary" type="submit">HA에 기록 저장</button></div></form></dialog></div>`;
     if(this.$('month'))this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
     if(this.$('entry'))this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
@@ -150,7 +183,8 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('next'))this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
     if(this.$('records'))this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
     if(this.$('compareForm'))this.$('compareForm').onsubmit=async event=>{event.preventDefault();try{await this.call('comparison/save',{fuel:this.$('fuel').value,economy_km_l:Number(this.$('economy').value),entity_id:this.$('fuelEntity').value});this.$('compareMessage').textContent='비교 기준을 저장했어요.';await this.load(true);}catch(e){this.$('compareMessage').textContent=e.message||'저장하지 못했어요.';}};
-    if(this.$('photos'))this.$('photos').onchange=()=>{this.$('photoPreview').replaceChildren();for(const file of this.$('photos').files){const img=document.createElement('img');const url=URL.createObjectURL(file);img.src=url;img.alt='사진 미리보기';img.onload=()=>URL.revokeObjectURL(url);this.$('photoPreview').append(img);}};
+    if(this.$('photos'))this.$('photos').onchange=()=>{this.selectedPhotos=[...this.$('photos').files];this.renderSelectedPhotos();};
+    this.$('clearPhotos').onclick=e=>{e.preventDefault();this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();};
     if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
     if(this.$('chart')){this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));}
   }
@@ -424,8 +458,23 @@ export class VehicleJournal extends HTMLElement {
     try{for(const photo of record.attachments){const response=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments/${encodeURIComponent(photo.id)}`);if(!response.ok)throw new Error('사진을 읽지 못했어요.');const url=URL.createObjectURL(await response.blob());const img=document.createElement('img');img.src=url;img.alt=photo.name;img.onload=()=>URL.revokeObjectURL(url);this.$('photoPreview').append(img);}}catch(e){this.$('recordError').textContent=e.message;}
   }
   formFields(){const kind=this.$('kind').value||'expense';for(const id of ['categoryField','subcategoryField'])this.$(id).hidden=kind!=='expense';for(const id of ['distanceField','energyField'])this.$(id).hidden=kind!=='trip';for(const id of ['chargeField','modeField','billedField'])this.$(id).hidden=kind!=='charge';this.$('odometerField').hidden=kind!=='trip';for(const id of ['startField','endField','socStartField','socEndField'])this.$(id).hidden=kind==='expense';this.$('amountField').hidden=kind==='trip';}
+  renderSelectedPhotos(){
+    for(const url of this.photoURLs||[])URL.revokeObjectURL(url);
+    this.photoURLs=[];this.$('photoPreview').replaceChildren();
+    this.$('clearPhotos').hidden=!this.selectedPhotos?.length;
+    this.$('recordError').textContent='';
+    for(const [index,file] of (this.selectedPhotos||[]).entries()){
+      const item=document.createElement('div'),img=document.createElement('img'),name=document.createElement('small'),button=document.createElement('button');
+      item.style.cssText='display:inline-flex;flex-direction:column;gap:6px;margin:8px;max-width:140px';
+      const url=URL.createObjectURL(file);this.photoURLs.push(url);img.src=url;img.alt=file.name;
+      name.textContent=file.name;name.style.overflowWrap='anywhere';
+      button.type='button';button.textContent='선택 취소';button.setAttribute('aria-label',file.name+' 사진 선택 취소');
+      button.onclick=e=>{e.preventDefault();this.selectedPhotos.splice(index,1);this.$('photos').value='';this.renderSelectedPhotos();};
+      item.append(img,name,button);this.$('photoPreview').append(item);
+    }
+  }
   openRecord(record){
-    this.$('save').hidden=false;this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.$('recordError').textContent='';this.$('photoPreview').replaceChildren();
+    this.$('save').hidden=false;this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.selectedPhotos=[];this.renderSelectedPhotos();
     const form=this.$('recordForm');form.elements.date.value=new Date().toLocaleDateString('sv-SE');
     if(record?.input)for(const [key,value] of Object.entries(record.input))if(form.elements[key]){let text=value??'';if(value&&['started_at','ended_at'].includes(key)){const time=new Date(value);text=new Date(time.getTime()-time.getTimezoneOffset()*60000).toISOString().slice(0,16);}if(key==='actual_krw'&&value!=null){text=Number(value).toLocaleString('ko-KR');}form.elements[key].value=text;}
     this.formFields();this.$('recordDialog').showModal();
@@ -435,15 +484,21 @@ export class VehicleJournal extends HTMLElement {
     if(payload.kind==='expense'){payload.category=form.elements.category.value;payload.subcategory=form.elements.subcategory.value;}
     const rawAmt=form.elements.actual_krw?.value?.replace(/[^\d]/g,'');
     if(rawAmt)payload.actual_krw=Number(rawAmt);
-    const photos=[...this.$('photos').files];if(photos.length>5||photos.some(f=>f.size>2097152||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent='2MiB 이하 JPG·PNG·WEBP 사진을 최대 5장 골라 주세요.';return;}
-    this.$('save').disabled=true;
+    const photos=[...(this.selectedPhotos||[])];if(photos.length>5||photos.some(f=>!f.size||f.size>20*1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent='20MiB 이하 JPG·PNG·WEBP 사진을 최대 5장 골라 주세요.';return;}
+    this.$('save').disabled=true;this.$('photos').disabled=true;this.$('clearPhotos').disabled=true;for(const button of this.$('photoPreview').querySelectorAll('button'))button.disabled=true;
     try{
+      const preparedPhotos=[];
+      for(let i=0;i<photos.length;i++){
+        this.$('recordError').textContent=`사진을 압축하고 있어요 (${i+1}/${photos.length})`;
+        preparedPhotos.push(await prepareJournalPhoto(photos[i]));
+      }
+      this.$('recordError').textContent='';
       const result=await this.call('record/save',{record_id:this.pendingId,expected_version:this.editing?.version||0,payload});
       this.editing={id:result.id,version:result.version,input:payload};
-      for(const file of photos){const body=new FormData();body.append('record_id',result.id);body.append('file',file);const response=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments`,{method:'POST',body});if(!response.ok)throw new Error('기록은 저장했지만 사진을 저장하지 못했어요. 사진을 다시 골라 주세요.');}
+      for(const file of preparedPhotos){const body=new FormData();body.append('record_id',result.id);body.append('file',file);const response=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments`,{method:'POST',body});if(!response.ok)throw new Error('기록은 저장했지만 사진을 저장하지 못했어요. 사진을 다시 골라 주세요.');}
       this.$('recordDialog').close();this.offset=0;await this.load(true);
     }catch(error){this.$('recordError').textContent=error.message||'기록을 저장하지 못했어요.';}
-    finally{this.$('save').disabled=false;}
+    finally{this.$('save').disabled=false;this.$('photos').disabled=false;this.$('clearPhotos').disabled=false;for(const button of this.$('photoPreview').querySelectorAll('button'))button.disabled=false;}
   }
   async changeStatus(record,action){try{await this.call('record/status',{record_id:record.id,expected_version:record.version,status:action==='restore'?'active':'deleted'});await this.load(true);}catch(error){this.$('message').textContent=error.message||'기록을 변경하지 못했어요.';}}
 }
