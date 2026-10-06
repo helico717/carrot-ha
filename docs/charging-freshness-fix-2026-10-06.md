@@ -33,3 +33,12 @@ HA 로그북에서 10:30:01 충전 복구(측정10:28:46,75초 경과)→10:30:2
 HA296tests(4skip) 통과, 충전 집중56tests 통과, 최신/lazy/view-state/전력JS12tests통과, 전체JS64중63통과. motion-status1실패는 변경전HEAD 파일로도 재현했다. Worker incremental 테스트·benchmark 및 Comma param polling4tests통과. 런타임 Python의 개별 charging_power 테스트는 package stub 없이 실행하면 aiohttp 의존성으로 import 실패하며, 기존 charging_smoothing package stub과 함께 또는 전체 discovery에서는 통과했다.
 
 사용자 지시에 따라 자동화 수정 검증 전 발행을 보류했고, 이후 정식v0.8.12 발행을 요청받았다. 발행 결과는 실제 확인 후 아래에 기록한다. HA HACS설치·재시작은 사용자가 수행한다.
+
+## Release verification: 2026-10-06 10:59 KST
+
+- Release/tag commit: `e4cc98ead1e4084cabc063a768821697fa9a8639`.
+- [Stable v0.8.12](https://github.com/helico717/carrot-ha/releases/tag/v0.8.12): id404232702, draft=false, prerelease=false; published10:59:28 KST.
+- [HACS Release Actions](https://github.com/helico717/carrot-ha/actions/runs/37401910280): completed/success, matching tag/SHA. Tagged manifest version0.8.12 verified via GitHub API.
+- Main/new tag pushes succeeded; no existing tags overwritten. Initial fetch --tags rejected the previously moved beta.9 tag locally; origin/main was current and stable tag publication was unaffected.
+- Automation saved and read back; start/update templates render exactly two lines. Actual iPhone delivery/display and installed new HA behavior remain unverified.
+- Comma/Worker/D1 unchanged. User installs HACS0.8.12 and restartsHA.
