@@ -27,7 +27,7 @@ Keep entire vehicle, all tires, bumper and mirrors, centered on the same
 
 배치는 review_journal_spending.html의 `.hero-artboard`에서 `object-fit: contain`으로
 규격화한다. 이미지를 100%보다 크게 확대하거나 음수 right로 밀어 차체를 자르지 않는다.
-문장과 이미지는 같은 `.hero-scene`에 있고 작은 설명만 차체 가장자리와 겹친다.
+문장과 이미지는 같은 `.hero-scene`에 있고 큰 헤드라인의 마지막 줄 아래쪽과 차량 지붕이 조금 겹친다. 작은 설명은 삭제했다.
 320px 카드의 지표는 두 열로 바꾸고 숫자·단위의 글자 중간 줄바꿈을 막는다.
 
 ## 확인
@@ -37,6 +37,6 @@ NODE_PATH=<playwright 설치 경로> node vehicle-journal/tests/review-hero.cjs
 ```
 
 분리된 브라우저에서 320~1920px, 모바일·큰 모바일·데스크톱, 일·월·연도 21개 조합을
-검사한다. 이미지 전체 경계, 텍스트 경계, 실제 알파가 있는 차체와 설명의 겹침,
+검사한다. 이미지 전체 경계, 텍스트 경계, 실제 알파가 있는 차체와 큰 헤드라인의 겹침,
 지표 단위의 한 줄 유지와 인접 열 침범, JS 오류를 확인한다.
 스크린샷은 Git에서 제외된 `.preview/journal/hero/`에 저장하며 육안 검토도 필요하다.

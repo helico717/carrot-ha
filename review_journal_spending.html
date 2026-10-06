@@ -511,23 +511,16 @@
     .hero-scene { position: relative; isolation: isolate; }
     #heroHeadline { position: relative; z-index: 2; max-width: 100%; }
     .hero-artboard { position: relative; width: 100%; aspect-ratio: 1.8;
-      margin-top: -52px; isolation: isolate; }
+      margin-top: calc(-10cqi - 10px); isolation: isolate; z-index: 3; }
     .hero-vehicle { display: block; width: 100%; height: 100%; object-fit: contain;
       pointer-events: none; filter: drop-shadow(0 10px 10px #0005); }
-    #heroNote { position: absolute; z-index: 2; left: 0; top: 40%;
-      width: 46%; margin: 0; padding: 4px 12px 4px 0;
-      font-size: 12px; line-height: 1.65; color: #f1f6fa;
-      background: linear-gradient(90deg, #163532b3, #16353266 65%, #16353200);
-      text-shadow: 0 1px 3px #071317; }
     #heroCard > .stats { position: relative; margin-top: 12px;
       border-top: 1px solid #ffffff18; padding-top: 18px; }
     .stage-mobile #heroHeadline, .stage-max #heroHeadline { font-size: clamp(20px, 8cqi, 30px); }
-    .stage-mobile .hero-artboard, .stage-max .hero-artboard { aspect-ratio: 1.55; margin-top: -22px; }
-    .stage-mobile #heroNote, .stage-max #heroNote { font-size: 12px; width: 53%; top: 24%; }
+    .stage-mobile .hero-artboard, .stage-max .hero-artboard { aspect-ratio: 1.55; margin-top: calc(-12cqi - 7px); }
     @container (max-width: 350px) {
       #heroHeadline { font-size: clamp(20px, 8cqi, 28px) !important; }
-      #heroNote { font-size: 11px; }
-    }
+      }
     #heroCard .stat strong { word-break: keep-all; overflow-wrap: normal; }
     @container (max-width: 300px) {
       #heroCard > .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1138,7 +1131,6 @@
                 <!-- 동적 3줄 헤드라인 -->
               </h1>
               <div class="hero-artboard">
-              <p class="muted note" id="heroNote">주행은 자동으로 모으고, 놓친 기록은 직접 남겨요.</p>
               <img class="hero-vehicle" src="vehicle-journal/assets/id4-hero.png" alt="폭스바겐 ID.4" width="1536" height="1024">
               </div>
               </div>
@@ -1666,7 +1658,6 @@
       // 1. 영웅 카드 갱신 (클린 대형 타이포그래피)
       document.getElementById('heroKicker').textContent = ds.hero.kicker;
       document.getElementById('heroHeadline').innerHTML = getFormattedHeadline(currentPeriod);
-      document.getElementById('heroNote').textContent = ds.hero.note;
       document.getElementById('heroTotalCost').textContent = ds.hero.cost;
       document.getElementById('heroEfficiency').textContent = ds.hero.efficiency;
       document.getElementById('heroCostPerKm').textContent = ds.hero.costPerKm;

@@ -24,9 +24,10 @@ const http=require('node:http');
     await page.evaluate(p=>setPeriod(p),period);
     const result=await page.locator('#heroCard').evaluate(card=>{
      const box=card.getBoundingClientRect(),image=card.querySelector('.hero-vehicle'),img=image.getBoundingClientRect();
-     const note=card.querySelector('#heroNote'),noteBox=note.getBoundingClientRect();
+     const smallNote=!!card.querySelector('#heroNote');
+     const headline=card.querySelector('#heroHeadline .h-phrase:last-child'),noteBox=headline.getBoundingClientRect();
      const ranges=[];
-     for(const el of card.querySelectorAll('#heroHeadline .h-phrase, .stat strong, #heroNote')){
+     for(const el of card.querySelectorAll('#heroHeadline .h-phrase, .stat strong')){
       const range=document.createRange();range.selectNodeContents(el);ranges.push(...range.getClientRects());
      }
      const brokenMetrics=[...card.querySelectorAll('.stat strong')].some(el=>{
@@ -48,9 +49,9 @@ const http=require('node:http');
       if(ix>=0&&iy>=0&&ix<canvas.width&&iy<canvas.height&&alpha[(iy*canvas.width+ix)*4+3]>180)overlap++;
      }
      return {outside,brokenMetrics,imageInside:img.left>=box.left&&img.right<=box.right&&img.top>=box.top&&img.bottom<=box.bottom,
-      horizontalOverflow:card.scrollWidth>card.clientWidth,overlap,noteFont:parseFloat(getComputedStyle(note).fontSize)};
+      horizontalOverflow:card.scrollWidth>card.clientWidth,overlap,smallNote};
     });
-    if(result.outside||result.brokenMetrics||!result.imageInside||result.horizontalOverflow||result.overlap<4||result.noteFont<11)throw Error(JSON.stringify({mode,width,period,...result}));
+    if(result.outside||result.brokenMetrics||!result.imageInside||result.horizontalOverflow||result.overlap<4||result.smallNote)throw Error(JSON.stringify({mode,width,period,...result}));
     if(period==='month'||(width===320&&period==='year'))await page.locator('#heroCard').screenshot({path:`.preview/journal/hero/${mode}-${width}-${period}.png`});
     checked++;
    }

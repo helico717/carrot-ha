@@ -1,5 +1,18 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 큰 헤드라인 오버레이로 요청 정정
+
+- 커밋 제목: `vehicle-journal: overlap vehicle with large headline and remove helper copy`.
+- 이전 작업은 겹칠 대상을 작은 설명으로 잘못 이해했다. 작은 설명을 삭제하고
+  큰 헤드라인의 마지막 줄 아래쪽과 차량 지붕만 조금 겹치도록 배치했다.
+- 설명 DOM 갱신 코드와 CSS를 제거하고 모바일·데스크톱의 이미지 상단 간격을 조정했다.
+- 관련 파일: review_journal_spending.html, assets/README.md, tests/review-hero.cjs,
+  vehicle-journal/CHANGELOG.md.
+- 검증: 320~1920px·세 화면 모드·일/월/연도 21개 조합에서 큰 제목과 차량의
+  실제 알파 겹침, 작은 설명 제거, 차량·텍스트 경계, 지표 단위, JS 오류 검사 통과.
+  모바일 월간 스크린샷을 육안 확인했다.
+- 검토 HTML만 커밋·푸시한다. 운영 HA·Cloudflare·manifest·태그·릴리즈는 변경하지 않는다.
+
 ## 2026-10-06 — 차량 이미지 규격화와 오버레이 재수정
 
 - 커밋 제목: `vehicle-journal: fit complete vehicle art and verify hero overlays`.
