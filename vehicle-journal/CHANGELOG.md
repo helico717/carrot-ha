@@ -1,5 +1,15 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 패널 로더 정적 임포트 전환 및 초기 로딩 보장
+
+- 커밋 제목: `vehicle-journal: switch panel loader to static import and ensure load on connect`.
+- 변경·이유:
+  1. `carrot-journal-panel.js`에서 동적 타임스탬프 기반 `await import(cardURL.href)`를 표준 정적 임포트(`import './carrot-vehicle-journal.js';`)로 전환하여 top-level await 지연 및 모바일 웹뷰(WKWebView) 환경 등에서의 비동기 로딩 멈춤 현상을 원천 방지.
+  2. `CarrotJournalPanel.connectedCallback()` 및 `set hass()`에서 `this.card.load()`를 명시적으로 호출하여 DOM 연결 및 `hass` 주입 시점에 항상 데이터 조회가 안정적으로 트리거되도록 보장.
+  3. `carrot-vehicle-journal.js`의 `build()` 및 `load()` 내 DOM 참조(`actualKrw`, `recordForm`, `month` 등)에 null 안전 가드를 추가하여 초기화 중단 방지.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-panel.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/CHANGELOG.md`.
+- 검증: `node --check` 통과 및 모의 DOM 라이프사이클 테스트 통과. HA SSH 직접 배포 및 SHA-256 검증.
+
 ## 2026-10-06 — HA 차계부 카드 UI/UX 최적화 반영 및 HA 직접 배포
 
 - 커밋 제목: `vehicle-journal: apply approved hero metrics, clean donut labels, and simplified record modal to HA card` (`eab0a4e`).
