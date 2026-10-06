@@ -1,5 +1,39 @@
 # 차계부 변경 이력
 
+## 2026-10-06 — 좌측 제목·우측 차량 구도와 이미지 제작 기준
+
+- 커밋 제목: `vehicle-journal: align vehicle right and deepen headline overlap`.
+- 큰 제목은 좌측 상단에 유지하고 차량 영역을 카드 내용 폭의 92%로 줄여 우측 정렬했다.
+  이전보다 지붕이 제목 마지막 줄 아래쪽을 더 덮도록 간격을 조정했다.
+- 관련 파일: review_journal_spending.html, assets/README.md, CHANGELOG.md.
+- 검증: 모바일·큰 모바일·데스크톱, 320~1920px, 일/월/연도 21개 조합 통과.
+  모바일 402px와 데스크톱 1280px의 월간 카드 스크린샷에서 겹침을 육안 확인했다.
+- 배포: 로컬 검토 파일만 main에 커밋·푸시. HA·Cloudflare·버전·릴리즈 변경 없음.
+
+### 다른 차량 이미지 형식과 재사용 편집 프롬프트
+
+- 형식: 배경이 투명한 RGBA PNG, 1536×1024(3:2) 캔버스.
+- 차량은 전면이 왼쪽을 향하는 앞쪽 3/4 구도, 전체 범퍼·바퀴·미러가 잘리지 않아야 한다.
+- 차량 중심을 캔버스 중앙에 두고 가장자리에 약 4~6% 안전 여백을 둔다.
+  차량 외부 배경은 완전히 투명하게, 유리창과 실내는 원래 표현을 유지한다.
+- 흰 바닥·배경 안개·광택 테두리를 넣지 않는다. 그림자는 CSS에서 처리한다.
+- 이미지는 contain으로 표시하고 우측 정렬·텍스트 겹침은 CSS에서 조정한다.
+  차량마다 높이와 지붕 위치가 달라 교체 후 모바일·데스크톱 재검증이 필요하다.
+
+```text
+Edit the supplied vehicle photo into a dashboard cutout. Preserve the exact
+vehicle identity, paint, badges, wheels, mirrors, proportions, tinted glass
+and cabin details. Use a front three-quarter view facing left. Keep the entire
+vehicle visible, including every tire and bumper, with no cropping. Place it
+centered on a 1536x1024 RGBA PNG canvas with approximately 4-6% safe margins.
+Remove the background completely: all pixels outside the vehicle silhouette
+must be transparent (alpha zero), with clean antialiased edges. Preserve the
+original glass and cabin appearance; do not punch transparent holes through
+the windows. No white floor, smoky halo, background haze, glow, external shadow,
+text, or added objects. Do not include dashboard text in the image; overlapping
+text and right alignment will be implemented separately in CSS.
+```
+
 ## 2026-10-06 — 큰 헤드라인 오버레이로 요청 정정
 
 - 커밋 제목: `vehicle-journal: overlap vehicle with large headline and remove helper copy`.
