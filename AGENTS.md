@@ -476,6 +476,10 @@ HA 수신 어댑터와 제품 적용·릴리즈 기록은 이 저장소에, Comm
 ## HA 전용 차계부 — 2026-10-06
 
 차계부 작업 전에 [vehicle-journal/AGENTS.md](vehicle-journal/AGENTS.md)를 읽는다.
+Antigravity 등 개발 에이전트는 [차계부 배포·인계 절차](vehicle-journal/deployment.md)도
+읽는다. 디버깅 중에는 커밋·푸시와 승인된 HA SSH 직접 반영을 사용하며, 버그 수정 완료
+후 pre-release, 사용자 실사용 검증 후 정식 릴리즈를 발행한다. 이 사용자 지정 정책은
+차계부 작업에 한해 위의 매 실행 코드 변경마다 릴리즈하는 기본 정책보다 우선한다.
 차계부 설계·지침·참고 자료·변경 이력은 `vehicle-journal/`, 향후 실행 코드는
 `custom_components/carrot_ha/vehicle_journal/`에 둔다. 기존 통합 연결부에도 해당
 지침을 적용한다. 커밋 접두사는 `vehicle-journal:`이다. 장기 저장·집계·수동 기록·
