@@ -19,9 +19,11 @@ stopped policy stays stopped. Configure remote-terminal discovery and its HA
 HTTPS URL and credentials first. Activation uses polling and can take 30 seconds
 plus transport time; each batch normally covers about three seconds.
 
-All HA entries share a **20,000,000,000-byte (20 GB)** raw-file budget, with a
+All HA entries share a **10,000,000,000-byte (10 GB)** raw-file budget, with a
 small metadata reserve. New uploads rotate the oldest received gzip files when
-needed. The storage and latest receipt diagnostic sensors show occupancy and
+needed. HA startup also enforces this ceiling, so lowering the cap can remove
+oldest files on the next restart if existing usage exceeds the new budget.
+The storage and latest receipt diagnostic sensors show occupancy and
 arrival information. Stopping capture retains files. Retention depends on actual
 traffic; this ceiling is not a promise to retain every trip indefinitely. The
 Comma retry queue is bounded at 128 MiB to protect the device during prolonged

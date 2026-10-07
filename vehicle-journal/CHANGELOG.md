@@ -648,3 +648,22 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   migration Python 2개만 반영한다. 기존 설치 파일 해시와 수정 전 커밋 일치 확인.
   코드 반영/해시·백업 확인은 후속 기록으로 확정하고 사용자 재시작·69개 확인은 대기다.
   manifest/태그/새 Release/Cloudflare/Comma/운영 DB/사진/화면 코드 변경 없음.
+# 2026-10-07 — 원시 CAN 수집 공유 용량 상한 10GB
+
+- 커밋 제목: `vehicle-journal: lower HA raw CAN storage ceiling to 10 GB`.
+- 변경·이유: 사용자 요청으로 HA 원시 CAN 파일의 모든 엔트리 공유 상한을
+  20,000,000,000에서 10,000,000,000 bytes로 낮춘다. 기존 메타데이터 예약량과
+  오래된 수신 파일부터 정리하는 정책은 유지한다. 시작 API의 max_gb 기본/검증
+  상한과 서비스 설명을 10GB로 맞춘다. 원래와 같이 max_gb는 공유 상한을
+  엔트리별 별도 예산으로 바꾸지 않는다.
+- 영향: 시작 시 및 새 수신 시 새 상한을 적용한다. 기존 용량이 상한 초과라면
+  다음 사용자 HA 재시작 시 오래된 원시 로그부터 정리된다. 운영 원시 로그 총량은
+  읽기 전용 확인에서 새 상한 미만이었다. archive/차계부 DB·사진은 정리 대상이 아니다.
+- 관련 파일: custom_components/carrot_ha/{can_capture.py,services.yaml},
+  tests/test_can_capture.py, docs/raw-can-capture.md.
+- 검증: CAN 테스트 10건 중 8건 통과, aiohttp 미설치로 실제 HTTP 2건 skip.
+  새 10GB 상태/시작 검증 및 재시작 하향 상한·오래된 파일 우선 정리 검증 포함.
+  실제 운영 파일 정리·수집 중 상한 도달은 수행하지 않았다.
+- 배포: main 커밋·푸시 후 현 개발 정책으로 Python/서비스 설명 2개를 기존 해시
+  확인·백업 후 부분 반영 대상. 확정 배포 및 사용자 재시작 대기는 후속 기록한다.
+  차계부/차량 화면·Comma·Worker·D1·manifest·태그·새 Release 변경 없음.

@@ -23,7 +23,7 @@ restore_archive:
 
 start_can_capture:
   name: Start raw CAN logging
-  description: Continuously store raw CAN batches in separate gzip analysis files on HA. Rotate oldest received files within a shared 20 GB ceiling. Requires updated Comma and configured remote terminal discovery. No archive DB writes.
+  description: Continuously store raw CAN batches in separate gzip analysis files on HA. Rotate oldest received files within a shared 10 GB ceiling. Requires updated Comma and configured remote terminal discovery. No archive DB writes.
   fields:
     entry_id:
       required: true

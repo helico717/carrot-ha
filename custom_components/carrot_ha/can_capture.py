@@ -15,7 +15,7 @@ from homeassistant.components.http import HomeAssistantView
 
 MAX_BODY = 4 * 1024 * 1024
 MAX_WIRE = 512 * 1024
-MAX_DISK = 20_000_000_000
+MAX_DISK = 10_000_000_000
 METADATA_RESERVE = 1_000_000
 _BUDGETS = {}
 _BUDGET_LOCK = threading.RLock()
@@ -97,11 +97,11 @@ class CaptureFiles:
     def count(self):
         return self.budget.usage(self.root)[1]
 
-    def start(self, hours=None, max_gb=20):
+    def start(self, hours=None, max_gb=10):
         if hours is not None and (type(hours) not in (int, float) or not 0 < hours <= 24):
             raise ValueError('Capture duration must be 0–24 hours')
-        if type(max_gb) not in (int, float) or not 1 <= max_gb <= 20:
-            raise ValueError('Storage limit must be 1–20 GB')
+        if type(max_gb) not in (int, float) or not 1 <= max_gb <= 10:
+            raise ValueError('Storage limit must be 1–10 GB')
         with self.lock:
             self.policy = {'schema': 2, 'continuous': hours is None, 'until': None if hours is None else time.time() + hours * 3600}
             self._save_policy()
@@ -232,13 +232,13 @@ def register(hass):
         if not runtime['entry'].options.get('terminal_enabled'):
             raise ValueError('Configure the existing remote terminal HA URL and credentials first')
         if call.service == 'start_can_capture':
-            await hass.async_add_executor_job(runtime['can_capture'].start, call.data.get('hours'), call.data.get('max_gb', 20))
+            await hass.async_add_executor_job(runtime['can_capture'].start, call.data.get('hours'), call.data.get('max_gb', 10))
         else:
             await hass.async_add_executor_job(runtime['can_capture'].stop)
         from homeassistant.helpers.dispatcher import async_dispatcher_send
         async_dispatcher_send(hass, 'carrot_ha' + call.data['entry_id'])
 
     hass.services.async_register('carrot_ha', 'start_can_capture', handle,
-        schema=vol.Schema({vol.Required('entry_id'): str, vol.Optional('hours'): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=24)), vol.Optional('max_gb', default=20): vol.All(vol.Coerce(float), vol.Range(min=1, max=20))}))
+        schema=vol.Schema({vol.Required('entry_id'): str, vol.Optional('hours'): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=24)), vol.Optional('max_gb', default=10): vol.All(vol.Coerce(float), vol.Range(min=1, max=10))}))
     hass.services.async_register('carrot_ha', 'stop_can_capture', handle,
         schema=vol.Schema({vol.Required('entry_id'): str}))

@@ -90,6 +90,28 @@ class HttpCaptureTests(unittest.IsolatedAsyncioTestCase):
 if __name__=='__main__':unittest.main()
 
 class CaptureRetentionTests(unittest.TestCase):
+ def test_ten_gb_limit_and_start_validation(self):
+  self.assertEqual(ha['MAX_DISK'],10_000_000_000)
+  with tempfile.TemporaryDirectory() as temp:
+   store=ha['CaptureFiles'](Path(temp)/'vehicle')
+   self.assertEqual(store.start()['limit_bytes'],10_000_000_000)
+   for invalid in (11,20,float('inf'),float('nan'),True):
+    with self.assertRaises(ValueError):store.start(max_gb=invalid)
+ def test_restart_applies_lower_cap_oldest_first(self):
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp);vehicle=root/'vehicle';vehicle.mkdir()
+   older=vehicle/('a'*32+'-0000000001.json.gz');newer=vehicle/('b'*32+'-0000000001.json.gz')
+   older.write_bytes(b'a'*70);newer.write_bytes(b'b'*60)
+   import os
+   os.utime(older,(1,1));os.utime(newer,(2,2))
+   old_limit=ha['MAX_DISK'];old_reserve=ha['METADATA_RESERVE']
+   ha['MAX_DISK']=100;ha['METADATA_RESERVE']=0
+   try:
+    store=ha['CaptureFiles'](vehicle)
+    self.assertFalse(older.exists());self.assertTrue(newer.exists())
+    self.assertEqual(store.status()['total_bytes'],60)
+    self.assertEqual(store.status()['rotated_batches'],1)
+   finally:ha['MAX_DISK']=old_limit;ha['METADATA_RESERVE']=old_reserve
  def test_continuous_migration_and_global_rotation(self):
   with tempfile.TemporaryDirectory() as temp:
    root=Path(temp);a=root/'a';a.mkdir();(a/'capture.json').write_text(json.dumps({'until':1}))
