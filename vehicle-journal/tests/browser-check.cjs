@@ -88,6 +88,7 @@ const path=require('path');
  await page.screenshot({path:'.preview/journal/desktop.png',fullPage:true});
  for(const width of [850,520,360,320]){
   await page.setViewportSize({width,height:1100});
+  await root.locator('#tab1').click();
   if(width<=600){
    const columns=await page.evaluate(()=>getComputedStyle(document.querySelector('carrot-vehicle-journal').shadowRoot.querySelector('.trends-grid')).gridTemplateColumns.split(' ').length);
    if(columns!==1)throw Error('mobile trends must have one column at '+width);

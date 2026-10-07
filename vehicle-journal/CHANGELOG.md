@@ -1,5 +1,10 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 모바일 추이 열 수 테스트의 표시 상태 수정
+
+- 커밋 제목: `vehicle-journal: inspect mobile columns while trends are visible`.
+- 이유·관련 파일: `browser-check.cjs`가 숨겨진 추이 탭의 grid 폭을 검사해 520px에서 잘못 실패. 탭을 먼저 열고 실제 열 수 검사. 구현 `209359b`의 기본 계산 회귀는 통과했고 새 열 수 검사만 이 원인으로 실패했으며, 수정 후 재실행 결과와 배포를 후속 기록.
+
 ## 2026-10-07 — 비용·충전 패턴·거리당 배터리 소모 추이 추가
 
 - 커밋 제목: `vehicle-journal: add spending and charging pattern trends`.
