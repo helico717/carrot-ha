@@ -751,6 +751,17 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   차계부/차량 화면·Comma·Worker·D1·manifest·태그·새 Release 변경 없음.
 # 2026-10-07 — 추이 카드의 미정의 이전 기간 변수 수정
 
+- 배포/실화면 확정: `f597575dac65d507b8ece8017d50a0b2702ce99c` main 푸시 후
+  카드 한 파일 백업·부분 반영. 백업은 `/config/carrot_ha/deployment-backups/f597575dac65d507b8ece8017d50a0b2702ce99c/`.
+  설치·사용자 외부 주소 HTTP SHA-256 `9610587f9cb806f038249d2f787719982895f67ed826fbb0ff6269446e3588b5`
+  일치, frontend-version `0.8.13-a0781aefca83` 확인. 실제 Chrome의 기존 오류를
+  먼저 확인하고 새로고침 후 월/연도 6개 추이 카드·SVG와 비교 문구 표시를 확인했다.
+  월별 화면으로 복원했다. HA 재시작·HACS 재다운로드는 실행하지 않았다.
+- 별도 계산 제한: 기존 추이 코드는 진행 중인 월의 누적량을 월 전체 일수로 나누고,
+  이전 월 분모를 30일로 고정한다. 미관측/미래 bin은 0으로 표현한다. 이번 수정은
+  렌더링 오류 복구이며 이 비교 기준의 정확성까지 검증·수정했다고 보고하지 않는다.
+  관측 범위·누락을 분리하는 후속 보완이 필요하며 원시 DB나 집계 결과는 변경하지 않았다.
+
 - 커밋 제목: `vehicle-journal: fix undefined comparison values in trends dashboard`.
 - 원인: e057203에서 추이 화면을 개편한 뒤 이전 기간 계산의 prevDist/prevCharge/
   prevRate/prevDriveSoc/prevFastRatio 선언과 카드 생성의 past* 참조가 불일치했다.
