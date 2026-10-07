@@ -40,6 +40,8 @@ FIELDS = {
  'gps_accuracy_m':('GPS 정확도','m','mdi:crosshairs-gps','distance',1),
  'bearing_deg':('진행 방향','°','mdi:compass',None,0),
  'month_efficiency_kpl':('이번 달 주행 전비 (추정)','km/kWh','mdi:chart-line',None,2),
+ 'rolling30_efficiency_kpl':('최근 30일 평균전비 (추정)','km/kWh','mdi:chart-line',None,2),
+ 'rolling30_distance_km':('최근 30일 주행거리','km','mdi:map-marker-distance','distance',2),
  'month_charge_kwh':('이번 달 충전량 (추정)','kWh','mdi:ev-station','energy',2),
  'month_slow_kwh':('이번 달 완속 분류 충전량 (추정)','kWh','mdi:power-plug','energy',2),
  'month_fast_kwh':('이번 달 급속 분류 충전량 (추정)','kWh','mdi:flash','energy',2),
@@ -135,11 +137,12 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         elif self.key in ('time_to_80_s','time_to_100_s','eta_80','eta_100'):
             attrs.update(source=self.data.get('charging_eta_source'),
                          hold_age_s=self.data.get('charging_eta_hold_age_s'), hold_limit_s=180)
-        elif self.key == 'month_efficiency_kpl':
+        elif self.key in ('month_efficiency_kpl', 'rolling30_efficiency_kpl'):
+            period = 'rolling30' if self.key.startswith('rolling30_') else 'month'
             attrs.update(calculation='matched_trip_distance / net_battery_depletion',
-                         coverage_percent=self.data.get('month_energy_coverage_percent'),
-                         distance_km=self.data.get('month_energy_distance_km'),
-                         energy_kwh=self.data.get('month_drive_energy_kwh'),
+                         coverage_percent=self.data.get(f'{period}_energy_coverage_percent'),
+                         distance_km=self.data.get(f'{period}_energy_distance_km'),
+                         energy_kwh=self.data.get(f'{period}_drive_energy_kwh'),
                          calculation_version=2)
         elif self.key=='gear':
             attrs['raw_gear']=self.data.get('gear')
@@ -154,6 +157,19 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                     attrs['recent_efficiency_distance_km'] = self.data.get('recent_efficiency_distance_km')
         elif self.key=='soc_percent':
             attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
+        if self.key.startswith('rolling30_'):
+            attrs.update(period_days=30, period_basis='rolling_720_hours',
+                         trip_time_basis='observed_at', summary_updated_at=self.runtime.get('cloud_last_sync'),
+                         trip_count=self.data.get('rolling30_trip_count'),
+                         matched_trip_count=self.data.get('rolling30_energy_trip_count'),
+                         total_distance_km=self.data.get('rolling30_distance_km'),
+                         efficiency_kpl=self.data.get('rolling30_efficiency_kpl'),
+                         month_efficiency_kpl=self.data.get('month_efficiency_kpl'),
+                         month_distance_km=self.data.get('month_distance_km'),
+                         month_trip_count=self.data.get('month_trip_count'),
+                         month_energy_distance_km=self.data.get('month_energy_distance_km'),
+                         month_drive_energy_kwh=self.data.get('month_drive_energy_kwh'),
+                         month_energy_coverage_percent=self.data.get('month_energy_coverage_percent'))
         return attrs
 
 

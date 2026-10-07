@@ -15,6 +15,7 @@ ESTIMATED_OBJECT_IDS = {
     'range_km': 'estimated_range_km',
     'measured_capacity_kwh': 'estimated_measured_capacity_kwh',
     'month_efficiency_kpl': 'estimated_month_efficiency_kpl',
+    'rolling30_efficiency_kpl': 'estimated_rolling30_efficiency_kpl',
     'month_charge_kwh': 'estimated_month_charge_kwh',
     'month_slow_kwh': 'estimated_month_slow_kwh',
     'month_fast_kwh': 'estimated_month_fast_kwh',

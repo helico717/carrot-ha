@@ -136,6 +136,36 @@ class TestNewSensors(unittest.TestCase):
         result = values(self._make_runtime({'month_charge_kwh': 50}, {'month_distance_km': 480.5}))
         self.assertIsNone(result['month_efficiency_kpl'])
 
+    def test_rolling30_sensors_and_missing_energy(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
+        summary = {'rolling30_distance_km': 550, 'rolling30_trip_count': 12,
+                   'rolling30_energy_distance_km': 500, 'rolling30_drive_energy_kwh': 100,
+                   'rolling30_energy_coverage_percent': 90.9, 'rolling30_energy_trip_count': 9,
+                   'month_distance_km': 120, 'month_trip_count': 4,
+                   'month_energy_distance_km': 100, 'month_drive_energy_kwh': 20,
+                   'month_energy_coverage_percent': 83.3}
+        runtime = self._make_runtime({}, summary)
+        entry = runtime['entry']; entry.entry_id = 'rolling-test'
+        self.assertNotIn('rolling30_trip_count', FIELDS)
+        for key, expected in [('rolling30_efficiency_kpl', 5), ('rolling30_distance_km', 550)]:
+            sensor = VehicleSensor(entry, key, *FIELDS[key])
+            sensor.hass = types.SimpleNamespace(data={'carrot_ha': {entry.entry_id: runtime}})
+            self.assertEqual(sensor.native_value, expected)
+            self.assertEqual(sensor.extra_state_attributes['period_days'], 30)
+            self.assertEqual(sensor.extra_state_attributes['trip_count'], 12)
+            self.assertEqual(sensor.extra_state_attributes['month_efficiency_kpl'], 5)
+            self.assertEqual(sensor.extra_state_attributes['month_distance_km'], 120)
+            self.assertEqual(sensor.extra_state_attributes['month_trip_count'], 4)
+            if key == 'rolling30_efficiency_kpl':
+                self.assertEqual(sensor.suggested_object_id, 'estimated_rolling30_efficiency_kpl')
+                self.assertEqual(sensor.extra_state_attributes['coverage_percent'], 90.9)
+        summary['month_drive_energy_kwh'] = None
+        self.assertIsNone(sensor.extra_state_attributes['month_efficiency_kpl'])
+        self.assertEqual(values(runtime)['rolling30_efficiency_kpl'], 5)
+        for energy in (None, 0, 0.49, float('nan'), float('inf'), -1):
+            summary['rolling30_drive_energy_kwh'] = energy
+            self.assertIsNone(values(runtime)['rolling30_efficiency_kpl'])
+
     def test_stale_door_retains_last_value(self):
         # Door fields are no longer in OPTIONAL_FIELDS; they retain last-known values.
         now = datetime.now(timezone.utc)

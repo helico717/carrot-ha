@@ -6,7 +6,7 @@ import math
 import sqlite3
 import threading
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from .protocol import validate
 from . import archive_codec
@@ -276,16 +276,16 @@ class Archive(ChargeCosts):
             events = [trip_repair.apply(event, derived.get(event['event_id'])) for event in events]
         return events
 
-    def overview(self, device):
+    def overview(self, device, now=None):
         self._ensure_derivations(device)
         try:
             from zoneinfo import ZoneInfo
             kst = ZoneInfo('Asia/Seoul')
         except Exception:
-            from datetime import timedelta
             kst = timezone(timedelta(hours=9))
-        month = datetime.now(kst).strftime('%Y-%m')
-        today_str = datetime.now(kst).strftime('%Y-%m-%d')
+        now = now or datetime.now(timezone.utc)
+        month = now.astimezone(kst).strftime('%Y-%m')
+        today_str = now.astimezone(kst).strftime('%Y-%m-%d')
         with self.connect() as db:
             rows = db.execute("SELECT e.observed,COALESCE(json_extract(d.body,'$.distance_m'),json_extract(e.body,'$.data.distance_m')) FROM events e LEFT JOIN trip_derivations d ON e.device=d.device AND e.id=d.id WHERE e.device=? AND e.kind='trip'",(device,)).fetchall()
         def _to_kst(ts):
@@ -305,6 +305,12 @@ class Archive(ChargeCosts):
             'today_distance_km': round(sum(r[1] or 0 for r in today_trips)/1000, 2),
         }
         summary.update(self.driving_energy_summary(device, month, kst, summary['month_distance_km']))
+        since = now - timedelta(days=30)
+        rolling = [r for r in rows if since <= datetime.fromisoformat(r[0].replace('Z', '+00:00')) <= now]
+        rolling_distance = round(sum(r[1] or 0 for r in rolling)/1000, 3)
+        summary.update(rolling30_trip_count=len(rolling), rolling30_distance_km=rolling_distance)
+        summary.update(self.driving_energy_summary(
+            device, month, kst, rolling_distance, since=since, until=now, prefix='rolling30'))
         summary.update(self._recent_efficiency(device))
 
         # Query today energy consumption from trip_energy cache
@@ -374,7 +380,7 @@ class Archive(ChargeCosts):
             'recent_efficiency_distance_km': round(total_km, 1),
         }
 
-    def driving_energy_summary(self, device, month, tz, total_distance):
+    def driving_energy_summary(self, device, month, tz, total_distance, *, since=None, until=None, prefix='month'):
         """Persist matched trip energy independently of the 14-day raw state retention.
 
         Only measured Wh within a trip are used (not SOC calibration or charging).
@@ -393,7 +399,11 @@ class Archive(ChargeCosts):
         with self.connect() as db:
             rows = db.execute("SELECT id, observed, body FROM events WHERE device=? AND kind='trip'", (device,)).fetchall()
             for event_id, observed, body in rows:
-                if datetime.fromisoformat(observed).astimezone(tz).strftime('%Y-%m') != month:
+                observed_time = datetime.fromisoformat(observed.replace('Z', '+00:00'))
+                if since is not None:
+                    if not since <= observed_time <= until:
+                        continue
+                elif observed_time.astimezone(tz).strftime('%Y-%m') != month:
                     continue
                 trip = archive_codec.loads(body)['data']
                 fingerprint = json.dumps([trip.get(k) for k in ('started_at', 'ended_at', 'distance_m', 'partial')])
@@ -416,7 +426,8 @@ class Archive(ChargeCosts):
                         cached = None
                 if cached:
                     effective_km = float(trip.get('distance_m') or 0)/1000
-                    db.execute('UPDATE trip_energy SET distance_km=? WHERE device=? AND id=?',(effective_km,device,event_id))
+                    if cached[1] != effective_km:
+                        db.execute('UPDATE trip_energy SET distance_km=? WHERE device=? AND id=?',(effective_km,device,event_id))
                     cached = (cached[0], effective_km, cached[2])
                     distance += cached[1]
                     energy += cached[2]
@@ -467,10 +478,10 @@ class Archive(ChargeCosts):
                 distance += km
                 energy += used
                 count += 1
-        return {'month_energy_distance_km': round(distance, 3),
-                'month_drive_energy_kwh': round(energy, 3) if count else None,
-                'month_energy_trip_count': count,
-                'month_energy_coverage_percent': round(min(100, distance/total_distance*100), 1) if total_distance > 0 else None}
+        return {f'{prefix}_energy_distance_km': round(distance, 3),
+                f'{prefix}_drive_energy_kwh': round(energy, 3) if count else None,
+                f'{prefix}_energy_trip_count': count,
+                f'{prefix}_energy_coverage_percent': round(min(100, distance/total_distance*100), 1) if total_distance > 0 else None}
 
     def cursor(self, name, value=None):
         with self.connect() as db:

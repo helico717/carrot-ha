@@ -24,6 +24,60 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 
 서드파티 EV 대시보드 카드(예: Vehicle Card, Minimalist UI)와 편리한 Home Assistant 자동화를 지원하기 위해 추가된 고기능 복합 센서입니다.
 
+### 최근 30일 주행 엔티티
+
+기존 월간 엔티티와 별도로 현재 시각에서 720시간 전까지의 주행 이벤트를 집계합니다.
+월초에도 이전 달의 기록이 포함됩니다. 기간 경계에 걸친 주행은 `observed_at`을 기준으로
+전체 주행을 포함하거나 제외하며, 진행 중인 주행을 시간 비례로 분할하지 않습니다.
+
+| ID.4 기본 엔티티 ID | 표시 내용 |
+| --- | --- |
+| `sensor.id_4_estimated_rolling30_efficiency_kpl` | 최근 30일 평균전비 (추정), km/kWh |
+| `sensor.id_4_rolling30_distance_km` | 최근 30일 전체 기록 주행거리, km |
+
+전비는 유효한 주행의 거리 합계 / 순 배터리 소비 에너지 합계이며 소수점 둘째 자리로
+반올림합니다. 기존 월간 전비와 동일한 검증·회생제동·커버리지 기준을 사용합니다.
+유효 거리 1km 미만 또는 순 소비량 0.5kWh 미만이면 전비는 `unknown`입니다.
+주행 기록이 없으면 거리와 횟수 속성은 0이며, 값이 0인 거리 위젯은 '데이터 수집 중'으로
+표현할 수 있습니다. 에너지를 측정하지 못한 주행도 전체 거리·횟수에는 포함됩니다.
+
+전비 속성의 `distance_km`·`energy_kwh`·`coverage_percent`는 계산에 포함된 데이터이며,
+`total_distance_km`·`trip_count`는 전체 기록, `matched_trip_count`는 계산에 포함된 횟수입니다.
+두 엔티티 모두 `efficiency_kpl`(최근 30일 전비), `trip_count`, `matched_trip_count`,
+`total_distance_km` 및 이번 달의 `month_efficiency_kpl`, `month_distance_km`,
+`month_trip_count`, `month_energy_distance_km`, `month_drive_energy_kwh`,
+`month_energy_coverage_percent` 속성을 제공합니다. 이번 달 유효 에너지가 없으면
+`month_efficiency_kpl`은 null이며 최근 30일 값은 독립적으로 유지됩니다.
+주행횟수는 별도 엔티티를 만들지 않습니다. 기존 월간 엔티티는 호환성을 위해 유지합니다.
+두 엔티티 모두 `period_days=30`, `period_basis=rolling_720_hours`,
+`trip_time_basis=observed_at`, `summary_updated_at` 속성을 제공합니다.
+60초 주기의 기존 이력 동기화 후 HA 로컬 요약을 공유하며 별도 클라우드 요청은 없습니다.
+동기화 실패 중에는 이전 요약이 유지되므로 `summary_updated_at`을 함께 확인합니다.
+
+주행과 검증된 에너지 캐시는 기본 90일 보존합니다. 원시 상태·상세 경로는 기본
+14일 보존하며, 이미 검증된 에너지는 원시 상태 정리 후에도 유지됩니다. 과거에
+누락돼 보존되지 않은 에너지를 임의로 복구하지 않습니다.
+
+아이폰 위젯 템플릿 예시(엔티티 ID를 사용자 차량에 맞게 확인):
+
+상단: `최근 30일 평균전비`
+
+하단:
+```jinja
+{{ ('⚡ ' ~ ('%.1f' | format(states('sensor.id_4_estimated_rolling30_efficiency_kpl') | float(0))) ~ ' km/kWh') if states('sensor.id_4_estimated_rolling30_efficiency_kpl') not in ['unknown', 'unavailable', 'none', ''] else '데이터 수집 중' }}
+```
+
+세부정보:
+```jinja
+{{ ('🚘 ' ~ ('%.0f' | format(states('sensor.id_4_rolling30_distance_km') | float(0))) ~ 'km 주행') if states('sensor.id_4_rolling30_distance_km') not in ['unknown', 'unavailable', 'none', ''] and states('sensor.id_4_rolling30_distance_km') | float(0) > 0 else '데이터 수집 중' }}
+```
+
+차계부 화면 개발 중에는 `vehicle-journal/deployment.md`의 배포 정책을 따릅니다.
+기존 릴리즈의 HACS 재다운로드는 직접 반영한 최신 화면을 덮어쓸 수 있습니다.
+센서 개발 파일만 백업·부분 배포하고, 향후 릴리즈에는 해당 시점의 차계부 수정 커밋도
+포함해 설치본·태그·파일 해시를 확인합니다. `/config/carrot_ha/`의 DB·사진과
+HA 설정은 코드 동기화 대상에서 제외합니다.
+
 ### 1) 최근 주행 결과 센서 (`sensor.<vehicle>_last_trip`)
 가장 최근에 완료된 1회의 트립(주행) 요약 정보를 종합 제공합니다.
 

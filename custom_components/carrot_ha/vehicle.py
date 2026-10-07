@@ -222,14 +222,15 @@ def values(runtime):
         data['month_charge_cost'] = max(0, data['month_charge_cost'] - totals.get('excluded_estimated_cost_krw', 0))
 
     # Only matched trip distance / net battery depletion is driving efficiency.
-    distance = data.get('month_energy_distance_km')
-    energy = data.get('month_drive_energy_kwh')
-    data['month_efficiency_kpl'] = (
-        round(distance / energy, 2)
-        if type(distance) in (int, float) and type(energy) in (int, float)
-        and math.isfinite(distance) and math.isfinite(energy)
-        and distance >= 1 and energy >= 0.5 else None
-    )
+    for period in ('month', 'rolling30'):
+        distance = data.get(f'{period}_energy_distance_km')
+        energy = data.get(f'{period}_drive_energy_kwh')
+        data[f'{period}_efficiency_kpl'] = (
+            round(distance / energy, 2)
+            if type(distance) in (int, float) and type(energy) in (int, float)
+            and math.isfinite(distance) and math.isfinite(energy)
+            and distance >= 1 and energy >= 0.5 else None
+        )
 
     DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, conservative default for VW ID.4 in Korea
 
