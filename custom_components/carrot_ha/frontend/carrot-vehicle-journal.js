@@ -620,11 +620,11 @@ export class VehicleJournal extends HTMLElement {
 
     const metrics=[
       createMetric('efficiency','평균 전비','⚡','#81e6c5','km/kWh',currEff,pastEff,effBars),
-      createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,pastDist,distBars),
-      createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,pastCharge,chargeBars),
-      createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,pastRate,rateBars),
-      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%p',currDriveSoc,pastDriveSoc,driveSocBars),
-      createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,pastFastRatio,fastRatioBars)
+      createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
+      createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
+      createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,prevRate,rateBars),
+      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%p',currDriveSoc,prevDriveSoc,driveSocBars),
+      createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
 
     const changingItems=metrics.filter(m=>m.isChanging);

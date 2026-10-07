@@ -24,8 +24,26 @@ const path=require('path');
  const root=page.locator('carrot-vehicle-journal');
  await root.locator('#headline').filter({hasText:'42km'}).waitFor();
  if(await root.locator('#records img').count())throw Error('memo HTML executed');
- await root.locator('#tab1').click();await root.locator('#metric').selectOption('drive_energy_kwh');
- if(!(await root.locator('#chart path').getAttribute('d')))throw Error('chart did not update');
+ await root.locator('#tab1').click();
+ if(await root.locator('.trend-card').count()!==6)throw Error('six trend metrics did not render');
+ if(await root.locator('#message').getAttribute('class')==='error')throw Error('journal render error: '+await root.locator('#message').textContent());
+ // Execute every metric; syntax checks cannot detect unresolved identifiers.
+ await page.evaluate(()=>{
+  const card=document.querySelector('carrot-vehicle-journal'),original=card.data;
+  for(const scope of ['month','year']){
+   card.scope=scope;card.$('month').value=scope==='year'?'2026':'2026-10';
+   for(const previous of [null,{daily:original.daily,totals:{...original.totals,distance_km:21,battery_charge_kwh:10,efficiency_km_kwh:4,charge_effective_krw:2000,drive_soc_used_pp:5,fast_count:1,slow_count:0}}]){
+    card.data={...original,previous};card.renderTrendsDashboard();
+    if(card.shadowRoot.querySelectorAll('.trend-card').length!==6)throw Error('missing trend metrics: '+scope);
+    if(card.shadowRoot.querySelectorAll('.trend-chart-svg').length!==6)throw Error('missing trend charts: '+scope);
+    if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
+    if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
+   }
+  }
+  card.data={...original,daily:[]};card.renderTrendsDashboard();
+  if(!card.$('changingTrendsGrid').textContent.includes('데이터가 아직 없어요'))throw Error('missing empty trend state');
+  card.scope='month';card.$('month').value='2026-10';card.data=original;card.renderTrendsDashboard();
+ });
  await root.locator('#add').click();
  await root.locator('input[name="date"]').fill('2026-09-02');await root.locator('#actualKrw').fill('123');
  await root.locator('#save').click();

@@ -749,3 +749,26 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 배포: main 커밋·푸시 후 현 개발 정책으로 Python/서비스 설명 2개를 기존 해시
   확인·백업 후 부분 반영 대상. 확정 배포 및 사용자 재시작 대기는 후속 기록한다.
   차계부/차량 화면·Comma·Worker·D1·manifest·태그·새 Release 변경 없음.
+# 2026-10-07 — 추이 카드의 미정의 이전 기간 변수 수정
+
+- 커밋 제목: `vehicle-journal: fix undefined comparison values in trends dashboard`.
+- 원인: e057203에서 추이 화면을 개편한 뒤 이전 기간 계산의 prevDist/prevCharge/
+  prevRate/prevDriveSoc/prevFastRatio 선언과 카드 생성의 past* 참조가 불일치했다.
+  d5aad74의 legacy energyStats 제거 및 d4ca68b의 null 요소 보호는 이 별도 오류를
+  해결하지 못했다. 운영 파일에서도 동일한 참조 5개와 화면 `pastDist is not defined`
+  오류를 확인했다. DB 누락이 아니라 첫 카드 생성 시 ReferenceError로 렌더링 중단이다.
+- 수정: 5개 참조를 선언된 prev* 이름으로 맞춰 모든 추이 카드 렌더링을 복구한다.
+  기간 계산·API·집계 정의·기록은 변경하지 않는다.
+- 회귀: 이전 browser-check의 삭제된 metric/chart 선택자를 현재 6개 trend-card/SVG
+  검증으로 교체한다. 월/연도·이전 기간 존재/없음·빈 데이터·NaN/undefined·비교 카드,
+  기존 탭·수기 저장·HTML escaping·비동기 기간 전환·scroll/style·모바일 검증 통과.
+  loader-update의 실제 모듈 로딩/입력 보호/뷰 복원 검증도 통과했다. node 구문 검사 통과.
+- 지침: node --check만으로 미정의 변수 실행 오류를 잡지 못하므로 실제 Chromium
+  렌더 및 화면 error 표시를 검사하도록 AGENTS와 .agents 규칙에 동일하게 추가했다.
+- 관련 파일: frontend/carrot-vehicle-journal.js (custom_components/carrot_ha/ 아래),
+  vehicle-journal/tests/browser-check.cjs, vehicle-journal/AGENTS.md,
+  .agents/rules/vehicle-journal.md, vehicle-journal/CHANGELOG.md.
+- 배포: 검증 후 main 커밋·푸시 및 카드 JS 한 파일의 백업·부분 반영 대상.
+  운영 설치 hash가 수정 전 커밋과 일치함을 확인하고, 서버/HTTP/실제 브라우저 적용
+  결과는 후속 기록한다. 현재 개발 정책에 따라 새 릴리즈 없음. Python/DB/사진/
+  Cloudflare/Comma 변경 없음.
