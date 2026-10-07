@@ -625,7 +625,7 @@ export class VehicleJournal extends HTMLElement {
       createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
       createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
       createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,prevRate,rateBars),
-      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%p',currDriveSoc,prevDriveSoc,driveSocBars),
+      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
       createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
 
@@ -667,8 +667,8 @@ export class VehicleJournal extends HTMLElement {
       const splitXPct=((n-4)/n)*100;
 
       baselineLinesSvg=`
-        <line x1="0%" y1="${pastYPct.toFixed(1)}%" x2="${(splitXPct-1.5).toFixed(1)}%" y2="${pastYPct.toFixed(1)}%" stroke="#718698" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="${(splitXPct+1.5).toFixed(1)}%" y1="${currYPct.toFixed(1)}%" x2="100%" y2="${currYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="0%" y1="${pastYPct.toFixed(1)}%" x2="${(splitXPct-1.5).toFixed(1)}%" y2="${pastYPct.toFixed(1)}%" stroke="#718698" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="${(splitXPct+1.5).toFixed(1)}%" y1="${currYPct.toFixed(1)}%" x2="100%" y2="${currYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="4" stroke-linecap="round"/>
       `;
 
       overlayLabelsHtml=`
@@ -686,7 +686,7 @@ export class VehicleJournal extends HTMLElement {
       const avgYPct=Math.max(8,Math.min(92,(1-m.avg/maxVal)*100));
 
       baselineLinesSvg=`
-        <line x1="0%" y1="${avgYPct.toFixed(1)}%" x2="100%" y2="${avgYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.4" stroke-linecap="round"/>
+        <line x1="0%" y1="${avgYPct.toFixed(1)}%" x2="100%" y2="${avgYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="4" stroke-linecap="round"/>
       `;
 
       overlayLabelsHtml=`

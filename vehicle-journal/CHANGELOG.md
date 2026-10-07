@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 추이 평균선과 수치 간격 개선
+
+- 커밋 제목: `vehicle-journal: improve average line spacing and labels`.
+- 변경·이유: 사용자 요청으로 SOC 추이 표시 단위를 `%p`에서 `%`로 변경(계산값 유지). 모든 추이 평균값 라벨을 선 중심에서 8px 추가 이격하고 차트 위 24px 공간 확보. 평균선은 이전 3.5px/현재 및 단일 4px로 확대. 수치 글꼴은 데스크톱 16px, 모바일 14.5px로 확대하고 그래프 높이 10px 증가.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, 이 변경 이력.
+- 검증·배포: JS 구문 및 Chromium 회귀 검증 후 main 푸시, 백업 후 두 모듈만 HA 직접 반영 예정. 실제 결과는 후속 기록. 신규 릴리즈 없음.
+- 제한: 단위 표기 변경이며 SOC 소모량 계산 변경 없음. Worker/Comma 변경 없음.
+
 ## 2026-10-07 — 글꼴 확대 및 추이 변화율 색상 강조
 
 - 구현 커밋: `98c7ebf`, `vehicle-journal: improve text readability and highlight trend changes`. 변경 이력 작성 명령이 Python 별칭의 인코딩 오류로 실패하여 바로 이 후속 기록으로 보완.

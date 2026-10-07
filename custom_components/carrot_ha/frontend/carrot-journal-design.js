@@ -1216,12 +1216,12 @@ export const journalDesign = `:host {
 .trend-card-summary strong { color: var(--trend-color); font-weight: 850; }
 .trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 6px 0; }
 .trend-headline { font-size: 19.5px; font-weight: 850; color: #ffffff; letter-spacing: -0.4px; margin: 0; line-height: 1.35; }
-.trend-chart-box { width: 100%; display: flex; flex-direction: column; position: relative; margin-top: 4px; }
-.trend-chart-svg-wrap { width: 100%; height: 75px; position: relative; }
+.trend-chart-box { width: 100%; display: flex; flex-direction: column; position: relative; margin-top: 4px; padding-top: 24px; }
+.trend-chart-svg-wrap { width: 100%; height: 85px; position: relative; }
 .trend-chart-svg { width: 100%; height: 100%; display: block; }
 
 /* 기준선 위 수치 라벨 (SVG 종횡비 왜곡 차단 - 순수 HTML 네이티브 텍스트 렌더링) */
-.trend-chart-avg-label { position: absolute; font-size: 14.5px; font-weight: 850; letter-spacing: -0.2px; transform: translateY(-100%); margin-bottom: 3px; pointer-events: none; white-space: nowrap; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95); line-height: 1; }
+.trend-chart-avg-label { position: absolute; font-size: 16px; font-weight: 850; letter-spacing: -0.2px; transform: translateY(calc(-100% - 8px)); pointer-events: none; white-space: nowrap; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95); line-height: 1; }
 .trend-chart-avg-label.pos-left { left: 6px; }
 .trend-chart-avg-label.pos-right { right: 6px; }
 .trend-chart-axis-labels { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--j-sub); line-height: 1; padding: 0 4px; }
@@ -1232,8 +1232,8 @@ export const journalDesign = `:host {
   .trend-headline { font-size: 16.5px; }
   .trend-metric-name { font-size: 14.5px; }
   .trend-card-summary { font-size: 13.5px; }
-  .trend-chart-svg-wrap { height: 65px; }
-  .trend-chart-avg-label { font-size: 13px; }
+  .trend-chart-svg-wrap { height: 75px; }
+  .trend-chart-avg-label { font-size: 14.5px; }
   .trend-chart-axis-labels { font-size: 11.5px; }
 }
 @media(max-width:420px){
