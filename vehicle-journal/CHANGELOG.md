@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 추가 추이 및 모바일 한 열 운영 검증 완료
+
+- 커밋 제목: `vehicle-journal: record new trends and mobile deployment`.
+- 대상: `209359b` 추가 지표·관측일 평균·600px 모바일 한 열, `7bd6278` 표시 상태 테스트, `82afccd` 청구량 fallback.
+- 검증: 실제 Chromium 전체 회귀 통과, 운영 Chrome 12개 카드(현재 지출 분류 1개), 추정 비용 막대 3개 확인. 440px 운영 viewport에서 두 grid 모두 단일 384px 열 확인, 테스트 520/360/320px 한 열·가로 넘침 검사 통과. 임시 viewport 원복.
+- 배포: main 푸시, HA 두 모듈 백업/부분 반영 및 최종 카드 재배포 완료. 백업 `/config/carrot_ha/deployment-backups/209359b/`, `/config/carrot_ha/deployment-backups/82afccd/`. 설치/외부 HTTP 커밋 파일 일치. 버전 `0.8.13-bc9b01c12e01`. 카드 SHA-256 `ef7d38f76491baa8f86bbb081eb5b31365df2a41959564ac16089e0c82134f4f`, 디자인 `f39ddd5ee785aa587b1a236968c6d72aff83e430443648343f826f330892a1b1`.
+- HA 재시작 및 신규 릴리즈 없음. Worker/Comma 변경 없음. iOS 앱의 실제 갱신은 사용자 새로고침 후 확인 필요.
+
 ## 2026-10-07 — 추정 비용 막대의 충전량 대체 경로 수정
 
 - 커밋 제목: `vehicle-journal: use battery charge when billed energy is absent`.
