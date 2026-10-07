@@ -521,7 +521,7 @@ export class VehicleJournal extends HTMLElement {
     const bins=Array.from({length:numBins},()=>({
       distance_km:0,energy_distance_km:0,drive_energy_kwh:0,
       battery_charge_kwh:0,billed_charge_kwh:0,charge_effective_krw:0,
-      drive_soc_used_pp:0,slow_count:0,fast_count:0,day_count:0
+      drive_soc_used_pp:0,slow_count:0,fast_count:0,unknown_count:0,day_count:0
     }));
 
     for(const row of daily){
@@ -544,6 +544,7 @@ export class VehicleJournal extends HTMLElement {
       b.drive_soc_used_pp+=row.drive_soc_used_pp||0;
       b.slow_count+=row.slow_count||0;
       b.fast_count+=row.fast_count||0;
+      b.unknown_count+=row.unknown_count||0;
       b.day_count++;
     }
 
@@ -551,13 +552,14 @@ export class VehicleJournal extends HTMLElement {
     const pastEff=prevTotals.efficiency_km_kwh!=null&&prevTotals.efficiency_km_kwh>0?+prevTotals.efficiency_km_kwh.toFixed(1):(prevTotals.drive_energy_kwh?+(prevTotals.energy_distance_km/prevTotals.drive_energy_kwh).toFixed(1):null);
     const effBars=bins.map(b=>b.drive_energy_kwh>0?+(b.energy_distance_km/b.drive_energy_kwh).toFixed(1):0);
 
-    const currDist=totals.distance_km!=null?+(totals.distance_km/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
-    const prevDist=prevTotals.distance_km!=null?+(prevTotals.distance_km/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
-    const distBars=bins.map(b=>+(b.distance_km/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+    const observedDays=(rows,key)=>Math.max(1,rows.filter(r=>r[key]!=null).length);
+    const currDist=totals.distance_km!=null?+(totals.distance_km/observedDays(daily,'distance_km')).toFixed(1):null;
+    const prevDist=prevTotals.distance_km!=null?+(prevTotals.distance_km/observedDays(prevDaily,'distance_km')).toFixed(1):null;
+    const distBars=bins.map(b=>+(b.distance_km/Math.max(1,b.day_count)).toFixed(1));
 
-    const currCharge=totals.battery_charge_kwh!=null?+(totals.battery_charge_kwh/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
-    const prevCharge=prevTotals.battery_charge_kwh!=null?+(prevTotals.battery_charge_kwh/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
-    const chargeBars=bins.map(b=>+(b.battery_charge_kwh/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+    const currCharge=totals.battery_charge_kwh!=null?+(totals.battery_charge_kwh/observedDays(daily,'battery_charge_kwh')).toFixed(1):null;
+    const prevCharge=prevTotals.battery_charge_kwh!=null?+(prevTotals.battery_charge_kwh/observedDays(prevDaily,'battery_charge_kwh')).toFixed(1):null;
+    const chargeBars=bins.map(b=>+(b.battery_charge_kwh/Math.max(1,b.day_count)).toFixed(1));
 
     const currChargeKwhTotal=totals.billed_charge_kwh||totals.battery_charge_kwh||0;
     const currRate=(totals.charge_effective_krw&&currChargeKwhTotal>0)?Math.round(totals.charge_effective_krw/currChargeKwhTotal):null;
@@ -565,9 +567,9 @@ export class VehicleJournal extends HTMLElement {
     const prevRate=(prevTotals.charge_effective_krw&&prevChargeKwhTotal>0)?Math.round(prevTotals.charge_effective_krw/prevChargeKwhTotal):null;
     const rateBars=bins.map(b=>{const kwh=b.billed_charge_kwh||b.battery_charge_kwh||0;return (b.charge_effective_krw&&kwh>0)?Math.round(b.charge_effective_krw/kwh):0;});
 
-    const currDriveSoc=totals.drive_soc_used_pp!=null?+(totals.drive_soc_used_pp/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
-    const prevDriveSoc=prevTotals.drive_soc_used_pp!=null?+(prevTotals.drive_soc_used_pp/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
-    const driveSocBars=bins.map(b=>+(b.drive_soc_used_pp/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+    const currDriveSoc=totals.drive_soc_used_pp!=null?+(totals.drive_soc_used_pp/observedDays(daily,'drive_soc_used_pp')).toFixed(1):null;
+    const prevDriveSoc=prevTotals.drive_soc_used_pp!=null?+(prevTotals.drive_soc_used_pp/observedDays(prevDaily,'drive_soc_used_pp')).toFixed(1):null;
+    const driveSocBars=bins.map(b=>+(b.drive_soc_used_pp/Math.max(1,b.day_count)).toFixed(1));
 
     const currSlowFast=(totals.slow_count||0)+(totals.fast_count||0);
     const currFastRatio=currSlowFast>0?Math.round(((totals.fast_count||0)/currSlowFast)*100):null;
@@ -575,9 +577,9 @@ export class VehicleJournal extends HTMLElement {
     const prevFastRatio=prevSlowFast>0?Math.round(((prevTotals.fast_count||0)/prevSlowFast)*100):null;
     const fastRatioBars=bins.map(b=>{const tot=(b.slow_count||0)+(b.fast_count||0);return tot>0?Math.round((b.fast_count/tot)*100):0;});
 
-    const createMetric=(id,name,icon,color,unit,currVal,pastVal,bars)=>{
-      const hasCurrent=currVal!=null&&Number.isFinite(currVal)&&(id==='fast_ratio'?currVal>=0:currVal>0);
-      const hasPast=pastVal!=null&&Number.isFinite(pastVal)&&(id==='fast_ratio'?pastVal>=0:pastVal>0);
+    const createMetric=(id,name,icon,color,unit,currVal,pastVal,bars,options={})=>{
+      const hasCurrent=currVal!=null&&Number.isFinite(currVal)&&currVal>=0;
+      const hasPast=pastVal!=null&&Number.isFinite(pastVal)&&pastVal>=0;
       let isChanging=false;
       let trendStatus='consistent';
       let headline=`${periodName} 동안 일관된 추세`;
@@ -606,15 +608,24 @@ export class VehicleJournal extends HTMLElement {
           subDesc=`${prevPeriodName}과 비슷한 안정적인 패턴이에요.`;
         }
       }else if(hasCurrent){
-        headline=`${periodName} 동안 일관된 추세`;
-        subDesc='안정적으로 기록되고 있어요.';
+        headline='이전 기간 비교 데이터 수집 중';
+        subDesc='현재 기록을 표시하고 있어요.';
+      }else{
+        headline='데이터 수집 중';
+        subDesc='이 지표를 계산할 기록이 아직 없어요.';
       }
+
+      if(options.total){
+        subDesc=subDesc.replace(' 평균 ',' 합계 ');
+      }
+      if(['distance','charge_kwh','drive_soc'].includes(id))subDesc+=' 기록이 있는 날 기준 평균이에요.';
+      if(options.note)subDesc+=` ${options.note}`;
 
       return {
         id,name,icon,color,unit,isChanging,trendStatus,headline,subDesc,changeText,
-        pastAvg:hasPast?pastVal:null,avg:hasCurrent?currVal:0,
-        pastPeriodLabel:isYear?`${Number(yearStr)-1}년 평균`:`${prevPeriodName} 평균`,
-        currPeriodLabel:isYear?`${yearStr}년 평균`:`${monthNum}월 평균`,
+        pastAvg:hasPast?pastVal:null,avg:hasCurrent?currVal:null,
+        pastPeriodLabel:`${isYear?`${Number(yearStr)-1}년`:prevPeriodName} ${options.total?'합계':'평균'}`,
+        currPeriodLabel:`${isYear?`${yearStr}년`:`${monthNum}월`} ${options.total?'합계':'평균'}`,
         startLabel:isYear?'1월':'1일',
         endLabel:isYear?'12월':`${daysInMonth}일`,
         bars:bars||[]
@@ -630,6 +641,35 @@ export class VehicleJournal extends HTMLElement {
       createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
 
+    const round=value=>value==null?null:Number(value.toFixed(1));
+    const chargeCount=t=>(t.slow_count||0)+(t.fast_count||0)+(t.unknown_count||0);
+    const cost100=(t,eff)=>{
+      const kwh=t.billed_charge_kwh??t.battery_charge_kwh;
+      eff=t.efficiency_km_kwh??eff;
+      return eff>0&&kwh>0&&t.charge_effective_krw!=null?Math.round(t.charge_effective_krw/kwh/eff*100):null;
+    };
+    const soc100=t=>t.drive_soc_used_pp!=null&&t.distance_km>0?round(t.drive_soc_used_pp/t.distance_km*100):null;
+    const perCharge=t=>chargeCount(t)>0&&t.battery_charge_kwh!=null?round(t.battery_charge_kwh/chargeCount(t)):null;
+    const spending=row=>Object.values(row.cost_categories||{}).reduce((sum,v)=>sum+(v.effective_krw||0),0);
+    const extraBins=bins.map(()=>[]);
+    for(const row of daily){
+      const i=isYear?Number(row.day.slice(5,7))-1:Math.floor((Number(row.day.slice(8,10))-1)/2);
+      if(extraBins[i])extraBins[i].push(row);
+    }
+    const observed=(fn)=>bins.map((b,i)=>extraBins[i].length?fn(b,i):null);
+    metrics.push(
+      createMetric('cost100','100km당 전기비용 (추정)','💰','#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{note:'기간 충전 단가와 전비로 추정한 주행 비용이에요.'}),
+      createMetric('total_cost',isYear?'연간 총 차량 지출':'월별 총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true,note:'실제·추정 비용을 포함해요. 진행 중 기간의 누적 지출이에요.'}),
+      createMetric('charge_count','충전 횟수','🔌','#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
+      createMetric('per_charge','회당 충전량','🔋','#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
+      createMetric('soc100','100km당 배터리 소모','🚗','#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{note:'주행거리당 SOC 소모량이에요. 주행 SOC 기록 범위에 영향을 받아요.'})
+    );
+    for(const [category,label] of Object.entries(categories)){
+      const current=totals.categories?.[category],past=prevTotals.categories?.[category];
+      if(!current&&!past)continue;
+      metrics.push(createMetric(`cost_${category}`,`${label} 지출`,'💳','#ffd60a','원',daily.length?current?.effective_krw??0:null,prevDaily.length?past?.effective_krw??0:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+(r.cost_categories?.[category]?.effective_krw||0),0)),{total:true,note:'실제·추정 비용을 포함한 기간 누적 지출이에요.'}));
+    }
+
     const changingItems=metrics.filter(m=>m.isChanging);
     const stableItems=metrics.filter(m=>!m.isChanging);
 
@@ -644,12 +684,14 @@ export class VehicleJournal extends HTMLElement {
     stableContainer.innerHTML=stableItems.map(m=>this.renderTrendCard(m)).join('');
   }
   generateTrendCardChartHtml(m){
+    if(m.avg==null)return '<div class="trends-empty-pill">데이터 수집 중</div>';
     const bars=m.bars||[];
     const isChanging=m.isChanging&&m.pastAvg!=null;
     const maxVal=Math.max(1,...bars,m.avg||0,(m.pastAvg||0))*1.25;
     const n=Math.max(1,bars.length);
 
     const barElements=bars.map((val,idx)=>{
+      if(val==null)return '';
       const heightPct=Math.max(3,(val/maxVal)*100);
       const stepPct=100/n;
       const barWPct=stepPct*0.58;
@@ -720,7 +762,7 @@ export class VehicleJournal extends HTMLElement {
     const changeIndex=m.changeText?m.subDesc.indexOf(m.changeText):-1;
     const summaryHtml=changeIndex<0?esc(m.subDesc):`${esc(m.subDesc.slice(0,changeIndex))}<strong class="trend-change">${esc(m.changeText)}</strong>${esc(m.subDesc.slice(changeIndex+m.changeText.length))}`;
     return `
-      <article class="trend-card" style="--trend-color:${m.color};">
+      <article class="trend-card" data-trend="${esc(m.id)}" style="--trend-color:${m.color};">
         <div class="trend-card-top">
           <div class="trend-title-group">
             <span class="trend-badge-icon">${m.icon}</span>

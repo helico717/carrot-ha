@@ -25,21 +25,28 @@ const path=require('path');
  await root.locator('#headline').filter({hasText:'42km'}).waitFor();
  if(await root.locator('#records img').count())throw Error('memo HTML executed');
  await root.locator('#tab1').click();
- if(await root.locator('.trend-card').count()!==6)throw Error('six trend metrics did not render');
+ if(await root.locator('.trend-card').count()!==13)throw Error('six trend metrics did not render');
  if(await root.locator('#message').getAttribute('class')==='error')throw Error('journal render error: '+await root.locator('#message').textContent());
  // Execute every metric; syntax checks cannot detect unresolved identifiers.
  await page.evaluate(()=>{
   const card=document.querySelector('carrot-vehicle-journal'),original=card.data;
+  const trend=id=>card.shadowRoot.querySelector(`[data-trend="${id}"]`);
+  if(!trend('cost100').textContent.includes('추정'))throw Error('missing estimated cost label');
+  if(!trend('distance').querySelector('.trend-chart-avg-label').textContent.includes('42km'))throw Error('observed-day distance mean wrong');
+  if(!trend('cost100').querySelector('.trend-chart-avg-label').textContent.includes('5714원'))throw Error('cost per 100km wrong');
+  if(!trend('soc100').querySelector('.trend-chart-avg-label').textContent.includes('23.8%'))throw Error('SOC per 100km wrong');
+  if(!trend('per_charge').querySelector('.trend-chart-avg-label').textContent.includes('20kWh'))throw Error('charge mean wrong');
+  if(!trend('charge_count').querySelector('.trend-chart-avg-label').textContent.includes('1회'))throw Error('charge count wrong');
   for(const scope of ['month','year']){
    card.scope=scope;card.$('month').value=scope==='year'?'2026':'2026-10';
    for(const previous of [null,{daily:original.daily,totals:{...original.totals,distance_km:21,battery_charge_kwh:10,efficiency_km_kwh:4,charge_effective_krw:2000,drive_soc_used_pp:5,fast_count:1,slow_count:0}}]){
     card.data={...original,previous};card.renderTrendsDashboard();
-    if(card.shadowRoot.querySelectorAll('.trend-card').length!==6)throw Error('missing trend metrics: '+scope);
-    if(card.shadowRoot.querySelectorAll('.trend-chart-svg').length!==6)throw Error('missing trend charts: '+scope);
+    if(card.shadowRoot.querySelectorAll('.trend-card').length!==13)throw Error('missing trend metrics: '+scope);
+    if(card.shadowRoot.querySelectorAll('.trend-chart-svg').length<6)throw Error('missing trend charts: '+scope);
     if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
     if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
     for(const change of card.shadowRoot.querySelectorAll('.trend-change')){
-     if(!/^[0-9.,]+(km|kWh|km\/kWh|원|%) (증가|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
+     if(!/^[0-9.,]+(km|kWh|km\/kWh|원|%|회) (증가|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
      if(getComputedStyle(change).color!==getComputedStyle(change.closest('.trend-card').querySelector('.trend-metric-name')).color)throw Error('change color does not match metric');
     }
     if(previous&&!card.shadowRoot.querySelector('.trend-change'))throw Error('missing change emphasis');
@@ -81,6 +88,10 @@ const path=require('path');
  await page.screenshot({path:'.preview/journal/desktop.png',fullPage:true});
  for(const width of [850,520,360,320]){
   await page.setViewportSize({width,height:1100});
+  if(width<=600){
+   const columns=await page.evaluate(()=>getComputedStyle(document.querySelector('carrot-vehicle-journal').shadowRoot.querySelector('.trends-grid')).gridTemplateColumns.split(' ').length);
+   if(columns!==1)throw Error('mobile trends must have one column at '+width);
+  }
   await page.waitForTimeout(150);
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   if(overflow)throw Error('page horizontal overflow at '+width);

@@ -1236,7 +1236,7 @@ export const journalDesign = `:host {
   .trend-chart-avg-label { font-size: 14.5px; }
   .trend-chart-axis-labels { font-size: 11.5px; }
 }
-@media(max-width:420px){
+@media(max-width:600px){
   .trends-grid { grid-template-columns: minmax(0, 1fr); }
 }
 `;
