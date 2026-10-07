@@ -898,13 +898,263 @@ export const journalDesign = `:host {
       font-size: 12px;
       color: var(--j-sub);
     }
-    .modal-footer {
+    /* ======================================================== */
+    /* [사용자 요청] 상세 기록 탭 - 사진 썸네일 & 관리 버튼 & 라이트박스 */
+    /* ======================================================== */
+    .memo-cell-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+    .memo-text-col {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      margin-top: 10px;
-      padding-top: 14px;
+      gap: 3px;
+      min-width: 0;
+      flex: 1;
+    }
+    .memo-title {
+      font-weight: 600;
+      color: var(--j-ink);
+      font-size: 13.5px;
+    }
+    .memo-desc {
+      color: var(--j-sub);
+      font-size: 12px;
+      display: block;
+      line-height: 1.35;
+    }
+    .memo-thumb-btn {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      display: inline-flex;
+      border-radius: 8px;
+      transition: transform 0.15s ease, filter 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .memo-thumb-btn:hover {
+      transform: scale(1.08);
+      filter: brightness(1.15);
+    }
+    .memo-thumb-btn:active {
+      transform: scale(0.96);
+    }
+    .thumb-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--j-border);
+      background: #141c23;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .thumb-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .thumb-spinner {
+      font-size: 15px;
+      opacity: 0.5;
+    }
+    .thumb-badge {
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      background: rgba(11, 16, 20, 0.92);
+      border: 1px solid var(--j-accent);
+      color: var(--j-accent);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 6px;
+      line-height: 1.2;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    /* 관리 열 버튼 정렬 (사진 N장, 수정, 삭제) */
+    .table td:last-child {
+      white-space: nowrap;
+    }
+    .btn-table-action {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      color: var(--j-ink);
+      font-size: 12px;
+      padding: 5px 9px;
+      min-height: 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-right: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-table-action:last-child {
+      margin-right: 0;
+    }
+    .btn-table-action:hover {
+      background: var(--j-raised);
+      border-color: var(--j-sub);
+      color: #fff;
+    }
+    .btn-table-action.btn-photo {
+      background: rgba(129, 230, 197, 0.1);
+      border-color: rgba(129, 230, 197, 0.35);
+      color: var(--j-accent);
+      font-weight: 600;
+    }
+    .btn-table-action.btn-photo:hover {
+      background: rgba(129, 230, 197, 0.2);
+      border-color: var(--j-accent);
+      color: #fff;
+    }
+
+    /* 사진 라이트박스 모달 다이얼로그 */
+    dialog#photoViewerDialog {
+      color: var(--j-ink);
+      background: #11171d;
+      border: 1px solid #334454;
+      border-radius: 22px;
+      width: min(840px, calc(100vw - 32px));
+      max-height: 90vh;
+      padding: 20px 24px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      z-index: 2100;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+    dialog#photoViewerDialog[open] {
+      display: flex;
+    }
+    dialog#photoViewerDialog::backdrop {
+      background: rgba(3, 7, 10, 0.85);
+      backdrop-filter: blur(10px);
+    }
+    .lightbox-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--j-border);
+    }
+    .lightbox-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .lightbox-title-wrap h2 {
+      font-size: 17px;
+      margin: 0;
+      font-weight: 750;
+      color: #ffffff;
+    }
+    .lightbox-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 320px;
+      max-height: 62vh;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+    .lightbox-stage {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox-stage img {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .lightbox-spinner {
+      color: var(--j-sub);
+      font-size: 14px;
+    }
+    .lightbox-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(22, 30, 37, 0.85);
+      border: 1px solid var(--j-border);
+      color: #fff;
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lightbox-nav-btn:hover {
+      background: var(--j-raised);
+      border-color: var(--j-accent);
+      color: var(--j-accent);
+      transform: translateY(-50%) scale(1.08);
+    }
+    .lightbox-nav-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+    .lightbox-nav-btn.prev { left: 10px; }
+    .lightbox-nav-btn.next { right: 10px; }
+    .lightbox-footer {
+      padding-top: 10px;
       border-top: 1px solid var(--j-border);
+      text-align: center;
+    }
+    .lightbox-caption {
+      margin: 0;
+      font-size: 13px;
+      color: var(--j-sub);
+    }
+    @media(max-width:600px){
+      dialog#photoViewerDialog {
+        padding: 16px;
+        width: calc(100vw - 20px);
+        border-radius: 16px;
+      }
+      .lightbox-body {
+        min-height: 240px;
+        max-height: 55vh;
+      }
+      .lightbox-stage img {
+        max-height: 52vh;
+      }
+      .lightbox-nav-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 24px;
+      }
+      .lightbox-nav-btn.prev { left: 6px; }
+      .lightbox-nav-btn.next { right: 6px; }
     }
 
 .shell{max-width:1280px;margin:auto}

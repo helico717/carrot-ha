@@ -1056,6 +1056,263 @@
       border-top: 1px solid var(--j-border);
     }
 
+    /* 상세 기록 테이블: 메모 란 우측 썸네일 & 관리 열 버튼 정렬 */
+    .memo-cell-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+    }
+    .memo-text-col {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .memo-cat-title {
+      font-weight: 600;
+      color: var(--j-ink);
+      font-size: 13.5px;
+    }
+    .memo-desc {
+      color: var(--j-sub);
+      font-size: 12px;
+      display: block;
+      line-height: 1.35;
+    }
+    .memo-thumb-btn {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      display: inline-flex;
+      border-radius: 8px;
+      transition: transform 0.15s ease, filter 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .memo-thumb-btn:hover {
+      transform: scale(1.08);
+      filter: brightness(1.15);
+    }
+    .memo-thumb-btn:active {
+      transform: scale(0.96);
+    }
+    .thumb-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--j-border);
+      background: #141c23;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .thumb-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .thumb-spinner {
+      font-size: 15px;
+      opacity: 0.5;
+    }
+    .thumb-badge {
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      background: rgba(11, 16, 20, 0.92);
+      border: 1px solid var(--j-accent);
+      color: var(--j-accent);
+      font-size: 10px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 6px;
+      line-height: 1.2;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    /* 관리 열 버튼 정렬 (사진 N장, 수정, 삭제) */
+    .table td:last-child {
+      white-space: nowrap;
+    }
+    .btn-table-action {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      color: var(--j-ink);
+      font-size: 12px;
+      padding: 5px 9px;
+      min-height: 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-right: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-table-action:last-child {
+      margin-right: 0;
+    }
+    .btn-table-action:hover {
+      background: var(--j-raised);
+      border-color: var(--j-sub);
+      color: #fff;
+    }
+    .btn-table-action.btn-photo {
+      background: rgba(129, 230, 197, 0.1);
+      border-color: rgba(129, 230, 197, 0.35);
+      color: var(--j-accent);
+      font-weight: 600;
+    }
+    .btn-table-action.btn-photo:hover {
+      background: rgba(129, 230, 197, 0.2);
+      border-color: var(--j-accent);
+      color: #fff;
+    }
+
+    /* 사진 라이트박스 모달 다이얼로그 */
+    dialog#photoViewerDialog {
+      color: var(--j-ink);
+      background: #11171d;
+      border: 1px solid #334454;
+      border-radius: 22px;
+      width: min(840px, calc(100vw - 32px));
+      max-height: 90vh;
+      padding: 20px 24px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.85);
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      z-index: 2100;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+    dialog#photoViewerDialog[open] {
+      display: flex;
+    }
+    dialog#photoViewerDialog::backdrop {
+      background: rgba(3, 7, 10, 0.85);
+      backdrop-filter: blur(10px);
+    }
+    .lightbox-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--j-border);
+    }
+    .lightbox-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .lightbox-title-wrap h2 {
+      font-size: 17px;
+      margin: 0;
+      font-weight: 750;
+      color: #ffffff;
+    }
+    .lightbox-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 320px;
+      max-height: 62vh;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+    .lightbox-stage {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lightbox-stage img {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    .lightbox-spinner {
+      color: var(--j-sub);
+      font-size: 14px;
+    }
+    .lightbox-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(22, 30, 37, 0.85);
+      border: 1px solid var(--j-border);
+      color: #fff;
+      font-size: 28px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .lightbox-nav-btn:hover {
+      background: var(--j-raised);
+      border-color: var(--j-accent);
+      color: var(--j-accent);
+      transform: translateY(-50%) scale(1.08);
+    }
+    .lightbox-nav-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+    .lightbox-nav-btn.prev { left: 10px; }
+    .lightbox-nav-btn.next { right: 10px; }
+    .lightbox-footer {
+      padding-top: 10px;
+      border-top: 1px solid var(--j-border);
+      text-align: center;
+    }
+    .lightbox-caption {
+      margin: 0;
+      font-size: 13px;
+      color: var(--j-sub);
+    }
+    @media(max-width:600px){
+      dialog#photoViewerDialog {
+        padding: 16px;
+        width: calc(100vw - 20px);
+        border-radius: 16px;
+      }
+      .lightbox-body {
+        min-height: 240px;
+        max-height: 55vh;
+      }
+      .lightbox-stage img {
+        max-height: 52vh;
+      }
+      .lightbox-nav-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 24px;
+      }
+      .lightbox-nav-btn.prev { left: 6px; }
+      .lightbox-nav-btn.next { right: 6px; }
+    }
+
     /* 기타 보조 탭 뷰 (주행&에너지, 절약비교, 차계부, 차량상태) */
     .tab-view {
       display: none;
@@ -1345,13 +1602,13 @@
               <button class="btn-recent-record" onclick="openRecordModal()">＋ 누락 기록 추가</button>
             </div>
             <div style="overflow-x:auto;">
-              <table style="width:100%; border-collapse:collapse; font-size:13px;">
+              <table class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
                 <thead>
                   <tr style="border-bottom:1px solid var(--j-border); text-align:left; color:var(--j-sub);">
-                    <th style="padding:8px 4px;">날짜</th>
-                    <th style="padding:8px 4px;">분류</th>
-                    <th style="padding:8px 4px;">세부 내용</th>
-                    <th style="padding:8px 4px; text-align:right;">금액 / 거리</th>
+                    <th style="padding:10px 8px;">날짜 / 출처</th>
+                    <th style="padding:10px 8px;">기록 / 메모</th>
+                    <th style="padding:10px 8px;">거리·충전·금액</th>
+                    <th style="padding:10px 8px; text-align:right;">관리</th>
                   </tr>
                 </thead>
                 <tbody id="fullLedgerBody">
@@ -1438,6 +1695,30 @@
         </button>
       </div>
     </form>
+  </dialog>
+
+  <!-- ======================================================== -->
+  <!-- [사용자 요청] 사진 확대 라이트박스 뷰어 모달 다이얼로그 (Photo Viewer) -->
+  <!-- ======================================================== -->
+  <dialog id="photoViewerDialog" aria-labelledby="lightboxTitle">
+    <div class="lightbox-header">
+      <div class="lightbox-title-wrap">
+        <h2 id="lightboxTitle">사진</h2>
+        <small id="lightboxMeta" class="muted"></small>
+      </div>
+      <button id="closeLightbox" class="modal-close-btn" type="button" onclick="closePhotoViewer()" aria-label="닫기">닫기</button>
+    </div>
+    <div class="lightbox-body">
+      <button id="lightboxPrev" class="lightbox-nav-btn prev" type="button" onclick="stepLightbox(-1)" aria-label="이전 사진">‹</button>
+      <div class="lightbox-stage">
+        <img id="lightboxImg" alt="기록 사진" />
+        <div id="lightboxSpinner" class="lightbox-spinner" hidden>사진을 불러오고 있어요...</div>
+      </div>
+      <button id="lightboxNext" class="lightbox-nav-btn next" type="button" onclick="stepLightbox(1)" aria-label="다음 사진">›</button>
+    </div>
+    <div class="lightbox-footer">
+      <p id="lightboxCaption" class="lightbox-caption"></p>
+    </div>
   </dialog>
 
   <!-- 피드백 토스트 -->
@@ -2041,32 +2322,195 @@
       `).join('');
     }
 
-    // 전체 원장 테이블 렌더링
+    // 전체 원장 테이블 렌더링 (사진 썸네일, 관리 열 액션 버튼, 라이트박스 뷰어 연동)
+    const MOCK_LEDGER_ROWS = [
+      {
+        id: 'rec-1',
+        date: '2026-10-06',
+        origin: 'manual',
+        status: 'active',
+        cat: 'washing',
+        subcategory: '손세차 & 휠 코팅',
+        memo: '비 온 뒤 셀프 세차장 방문. 철분 제거제 사용 완료',
+        amount: '17,000원',
+        photos: [
+          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=800&auto=format&fit=crop'
+        ]
+      },
+      {
+        id: 'rec-2',
+        date: '2026-10-06',
+        origin: 'auto',
+        status: 'active',
+        cat: 'charging',
+        subcategory: '아파트 완속 충전',
+        memo: '지하 2층 14번 완속 완충 (19.4 kWh)',
+        amount: '4,200원',
+        photos: []
+      },
+      {
+        id: 'rec-3',
+        date: '2026-10-03',
+        origin: 'manual',
+        status: 'active',
+        cat: 'tuning',
+        subcategory: '트렁크 매트',
+        memo: 'TPE 친환경 풀커버 매트 장착',
+        amount: '6,400원',
+        photos: [
+          'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&auto=format&fit=crop'
+        ]
+      },
+      {
+        id: 'rec-4',
+        date: '2026-10-02',
+        origin: 'auto',
+        status: 'active',
+        cat: 'charging',
+        subcategory: '고속도로 급속 충전',
+        memo: '가평휴게소 100kW 환경부 급속 충전',
+        amount: '5,420원',
+        photos: []
+      },
+      {
+        id: 'rec-5',
+        date: '2026-08-15',
+        origin: 'manual',
+        status: 'active',
+        cat: 'maintenance',
+        subcategory: '에어컨 필터 교체',
+        memo: '정기 점검 및 초미세먼지 헤파 필터 DIY 교체',
+        amount: '35,000원',
+        photos: [
+          'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=800&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=800&auto=format&fit=crop',
+          'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=800&auto=format&fit=crop'
+        ]
+      }
+    ];
+
+    let currentLightboxItem = null;
+    let currentLightboxIndex = 0;
+
     function renderFullLedgerTable() {
       const tbody = document.getElementById('fullLedgerBody');
-      const allRows = [
-        { date: '2026-10-06', cat: 'charging', title: '아파트 완속 충전', amount: '4,200원' },
-        { date: '2026-10-04', cat: 'washing', title: '자동 세차 및 실내 청소', amount: '17,000원' },
-        { date: '2026-10-03', cat: 'tuning', title: '트렁크 미끄럼방지 패드', amount: '6,400원' },
-        { date: '2026-10-02', cat: 'charging', title: '아파트 완속 충전 (24.2 kWh)', amount: '5,420원' },
-        { date: '2026-08-15', cat: 'maintenance', title: '에어컨 필터 정기 교체', amount: '35,000원' }
-      ];
-      tbody.innerHTML = allRows.map(r => {
+      if (!tbody) return;
+
+      tbody.innerHTML = MOCK_LEDGER_ROWS.map((r, rowIdx) => {
         const c = CATEGORIES[r.cat] || CATEGORIES.other;
+        const hasPhotos = r.photos && r.photos.length > 0;
+        const photoBtn = hasPhotos ? `<button class="btn-table-action btn-photo" type="button" onclick="openPhotoViewerByIndex(${rowIdx}, 0)">사진 ${r.photos.length}장</button>` : '';
+
+        let actionBtns = '';
+        if (r.origin === 'manual') {
+          actionBtns = `${photoBtn}<button class="btn-table-action" type="button" onclick="showToast('기록 수정 모달이 열립니다.')">수정</button><button class="btn-table-action" type="button" onclick="showToast('기록이 삭제되었습니다.')">삭제</button>`;
+        } else {
+          actionBtns = hasPhotos ? photoBtn : '<small class="muted">자동 원장</small>';
+        }
+
+        const memoHtml = `
+          <div class="memo-cell-wrap">
+            <div class="memo-text-col">
+              <span class="memo-cat-title">${c.label}${r.subcategory ? ' · ' + r.subcategory : ''}</span>
+              ${r.memo ? `<small class="memo-desc">${r.memo}</small>` : ''}
+            </div>
+            ${hasPhotos ? `
+              <button class="memo-thumb-btn" type="button" onclick="openPhotoViewerByIndex(${rowIdx}, 0)" aria-label="사진 보기 (${r.photos.length}장)">
+                <div class="thumb-box">
+                  <img src="${r.photos[0]}" alt="사진 썸네일" loading="lazy" />
+                </div>
+                ${r.photos.length > 1 ? `<span class="thumb-badge">+${r.photos.length}</span>` : ''}
+              </button>
+            ` : ''}
+          </div>
+        `;
+
         return `
           <tr style="border-bottom:1px solid var(--j-border);">
-            <td style="padding:10px 4px; color:var(--j-sub);">${r.date}</td>
-            <td style="padding:10px 4px;">
-              <span class="cat-highlight-pill" style="background:${c.bg}; color:${c.rawColor}; border:1px solid ${c.border};">
-                ${c.label}
-              </span>
+            <td style="padding:10px 8px; color:var(--j-sub); vertical-align:middle; width:130px;">
+              ${r.date}
+              <small style="display:block; font-size:11px; color:#62798c;">${r.origin === 'manual' ? '직접 기록' : '자동 기록'}</small>
             </td>
-            <td style="padding:10px 4px; font-weight:600;">${r.title}</td>
-            <td style="padding:10px 4px; text-align:right; font-weight:700;">${r.amount}</td>
+            <td style="padding:10px 8px; vertical-align:middle;">${memoHtml}</td>
+            <td style="padding:10px 8px; vertical-align:middle; font-weight:700; white-space:nowrap;">${r.amount}</td>
+            <td style="padding:10px 8px; text-align:right; vertical-align:middle; white-space:nowrap;">${actionBtns}</td>
           </tr>
         `;
       }).join('');
     }
+
+    // ========================================================
+    // 사진 라이트박스 뷰어 제어 로직
+    // ========================================================
+    function openPhotoViewerByIndex(rowIdx, photoIdx = 0) {
+      const item = MOCK_LEDGER_ROWS[rowIdx];
+      if (!item || !item.photos || !item.photos.length) return;
+      currentLightboxItem = item;
+      currentLightboxIndex = Math.max(0, Math.min(photoIdx, item.photos.length - 1));
+      renderLightboxPhotoModal();
+      const dlg = document.getElementById('photoViewerDialog');
+      if (dlg) dlg.showModal();
+    }
+
+    function closePhotoViewer() {
+      const dlg = document.getElementById('photoViewerDialog');
+      if (dlg) dlg.close();
+    }
+
+    function stepLightbox(delta) {
+      if (!currentLightboxItem || !currentLightboxItem.photos || !currentLightboxItem.photos.length) return;
+      const len = currentLightboxItem.photos.length;
+      currentLightboxIndex = (currentLightboxIndex + delta + len) % len;
+      renderLightboxPhotoModal();
+    }
+
+    function renderLightboxPhotoModal() {
+      if (!currentLightboxItem || !currentLightboxItem.photos) return;
+      const photos = currentLightboxItem.photos;
+      const photoUrl = photos[currentLightboxIndex];
+      const countStr = photos.length > 1 ? ` (${currentLightboxIndex + 1} / ${photos.length})` : '';
+
+      document.getElementById('lightboxTitle').textContent = `사진${countStr}`;
+      document.getElementById('lightboxMeta').textContent = `${currentLightboxItem.date} · ${currentLightboxItem.subcategory || ''}`;
+
+      const captionEl = document.getElementById('lightboxCaption');
+      if (captionEl) {
+        captionEl.textContent = currentLightboxItem.memo ? `메모: ${currentLightboxItem.memo}` : '';
+        captionEl.hidden = !currentLightboxItem.memo;
+      }
+
+      const hasMultiple = photos.length > 1;
+      document.getElementById('lightboxPrev').hidden = !hasMultiple;
+      document.getElementById('lightboxNext').hidden = !hasMultiple;
+
+      const img = document.getElementById('lightboxImg');
+      const spinner = document.getElementById('lightboxSpinner');
+      if (img) {
+        img.src = photoUrl;
+        img.hidden = false;
+        if (spinner) spinner.hidden = true;
+      }
+    }
+
+    // 라이트박스 키보드 및 바깥클릭 닫기 리스너 등록
+    window.addEventListener('DOMContentLoaded', () => {
+      const dlg = document.getElementById('photoViewerDialog');
+      if (dlg) {
+        dlg.addEventListener('click', (e) => {
+          if (e.target === dlg) closePhotoViewer();
+        });
+      }
+      window.addEventListener('keydown', (e) => {
+        if (!dlg || !dlg.open) return;
+        if (e.key === 'ArrowLeft') { e.preventDefault(); stepLightbox(-1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); stepLightbox(1); }
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('tab')) selectTab(Number(urlParams.get('tab')));
+      if (urlParams.get('lightbox') === '1') openPhotoViewerByIndex(0, 0);
+    });
 
     // ========================================================
     // 모달 다이얼로그 제어 & 기록 추가 실제 작동 로직

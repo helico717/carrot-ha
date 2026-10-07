@@ -1,5 +1,33 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 상세 기록 사진 썸네일 프리뷰, 라이트박스 확대 뷰어 및 관리 열 액션 버튼 배열
+
+- 커밋 제목: `feat(vehicle-journal): add photo thumbnail preview, lightbox viewer and rearrange action buttons in records table`.
+- 변경 내용 및 이유:
+  1. **기록 / 메모 셀 우측 썸네일 프리뷰(`memo-thumb-btn`)**:
+     - 사용자가 어떤 기록이었는지 빠르게 식별할 수 있도록, 사진이 첨부된 기록의 `기록 / 메모` 셀 우측에 작은 썸네일(44x44px)을 우측 정렬하여 표시.
+     - 사진이 2장 이상인 경우 썸네일 우측 하단에 `+N` 배지를 달아 여러 장의 사진이 있음을 직관적으로 안내.
+     - 중복 요청을 방지하기 위해 `this.thumbnailCache`(Map) 및 `disconnectedCallback` 시 blob URL 해제(`URL.revokeObjectURL`) 최적화 적용.
+  2. **사진 확대 라이트박스 뷰어 (`dialog#photoViewerDialog`) 구현**:
+     - 썸네일 또는 관리 열의 `[사진 N장]` 버튼을 누르면 사진을 크게 감상할 수 있는 라이트박스 모달 다이얼로그 노출.
+     - 2장 이상의 사진이 있는 경우 좌/우 넘기기 버튼(`‹`, `›`)과 키보드 좌/우 방향키(`ArrowLeft`, `ArrowRight`)로 탐색 지원.
+     - 현재 인덱스(예: `사진 (1 / 2)`), 메타 정보, 기록 메모를 하단 캡션으로 상세히 표시.
+     - 모달 바깥 영역 클릭 또는 `[닫기]` 버튼, ESC 키를 통한 편리한 닫기 지원.
+  3. **테이블 열 배치 및 관리 액션 버튼 정렬 순서 개편**:
+     - 기존 `거리·충전·금액` 열에 섞여 있던 사진 버튼을 제거하여 순수한 수치/금액만 정렬되도록 정리.
+     - 관리 열로 사진 버튼을 이동하여 사용자가 명시한 **`[사진 ~장]`, `[수정]`, `[삭제]`** 순서로 정확하게 배열.
+     - 버튼 스타일도 `.btn-table-action`, `.btn-photo`를 통해 줄바꿈 없이 한 줄로 단정하게 표시.
+  4. 프로토타입 HTML(`review_journal_spending.html`) 동일 마크업/스타일/인터랙션 동기화 및 캐시 버스팅 파라미터(`journal-20261007-photo-viewer-1`) 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`
+  - `review_journal_spending.html`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포 상태:
+  - Headless Chrome을 통해 모바일(402px) 및 데스크톱(1400px) 상세 기록 탭 썸네일/버튼 렌더링 검증 완료.
+  - 라이트박스 뷰어 모달(사진 확대, 네비게이션 버튼, 캡션) 렌더링 검증 완료.
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee`로 직접 배포 완료 및 2개 파일(`carrot-vehicle-journal.js`, `carrot-journal-design.js`) SHA-256 해시 일치 확인 완료.
+
 ## 2026-10-07 — 모바일 탭 균등 분할, 최근 기록 카드 높이 고정, 도넛 시인성 및 상세 기록보기 버튼 정렬
 
 - 커밋 제목: `fix(vehicle-journal): enhance mobile tabs layout, fix recent panel overflow, improve donut visibility and align hero action button`.

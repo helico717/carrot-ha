@@ -1,4 +1,4 @@
-const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-mobile-align-1';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-photo-viewer-1';
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
@@ -48,14 +48,14 @@ const styles=`
 `;
 
 export class VehicleJournal extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.entries=[];this.request=0;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
   setConfig(config){this.config=config||{};if(!this.ready)this.build();if(this.config.entry_id&&this.entry!==this.config.entry_id){this.entry=this.config.entry_id;this.data=null;this.offset=0;}this.load();}
   set hass(hass){this._hass=hass;if(!this.ready)this.build();this.load();}
   getCardSize(){return 12;}
   getGridOptions(){return {columns:36,rows:'auto',min_columns:6};}
   static getStubConfig(){return {entry_id:''};}
-  connectedCallback(){if(!this.ready)this.build();else this.resize?.observe(this.$('chart'));this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open)this.load(true);},60000);this.load();}
-  disconnectedCallback(){for(const url of this.photoURLs||[])URL.revokeObjectURL(url);this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
+  connectedCallback(){if(!this.ready)this.build();else this.resize?.observe(this.$('chart'));this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
+  disconnectedCallback(){for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
   $(id){return this.shadowRoot.getElementById(id);}
   build(){
     this.ready=true;
@@ -161,7 +161,7 @@ export class VehicleJournal extends HTMLElement {
     <label id="amountField">실제 금액 · 원<input name="actual_krw" id="actualKrw" type="text" inputmode="numeric" placeholder="0" required></label>
     <label id="startField" hidden>시작 시각 (선택)<input name="started_at" type="datetime-local"></label><label id="endField" hidden>종료 시각 (선택)<input name="ended_at" type="datetime-local"></label>
     <label id="socStartField" hidden>시작 SOC · % (선택)<input name="soc_start_percent" type="number" min="0" max="100" step="0.1"></label><label id="socEndField" hidden>종료 SOC · % (선택)<input name="soc_end_percent" type="number" min="0" max="100" step="0.1"></label><label id="odometerField" hidden>계기판 누적거리 · km (선택)<input name="odometer_km" type="number" min="0" step="0.1"></label><label class="fullfield">메모<textarea name="memo" maxlength="4000" rows="3"></textarea></label><label class="fullfield">사진 · JPG / PNG / WEBP<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>사진당 20MiB 이하, 최대 5장. 저장할 때 자동으로 축소·압축해요.</small><button id="clearPhotos" type="button" hidden>사진 선택 모두 취소</button><div class="preview" id="photoPreview"></div></label></div>
-    <p class="note">모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.</p><p class="error" id="recordError" role="alert"></p><div class="row" style="margin-top:16px"><button id="save" class="btn-record-primary" type="submit">HA에 기록 저장</button></div></form></dialog></div>`;
+    <p class="note">모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.</p><p class="error" id="recordError" role="alert"></p><div class="row" style="margin-top:16px"><button id="save" class="btn-record-primary" type="submit">HA에 기록 저장</button></div></form></dialog><dialog id="photoViewerDialog" aria-labelledby="lightboxTitle"><div class="lightbox-header"><div class="lightbox-title-wrap"><h2 id="lightboxTitle">사진</h2><small id="lightboxMeta" class="muted"></small></div><button id="closeLightbox" class="modal-close-btn" type="button" aria-label="닫기">닫기</button></div><div class="lightbox-body"><button id="lightboxPrev" class="lightbox-nav-btn prev" type="button" aria-label="이전 사진">‹</button><div class="lightbox-stage"><img id="lightboxImg" alt="기록 사진" /><div id="lightboxSpinner" class="lightbox-spinner" hidden>사진을 불러오고 있어요...</div></div><button id="lightboxNext" class="lightbox-nav-btn next" type="button" aria-label="다음 사진">›</button></div><div class="lightbox-footer"><p id="lightboxCaption" class="lightbox-caption"></p></div></dialog></div>`;
     if(this.$('month'))this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
     if(this.$('entry'))this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
@@ -170,6 +170,11 @@ export class VehicleJournal extends HTMLElement {
     for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
     for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.openRecord();
     if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
+    if(this.$('closeLightbox'))this.$('closeLightbox').onclick=()=>this.$('photoViewerDialog')?.close();
+    if(this.$('lightboxPrev'))this.$('lightboxPrev').onclick=()=>this.stepLightbox(-1);
+    if(this.$('lightboxNext'))this.$('lightboxNext').onclick=()=>this.stepLightbox(1);
+    if(this.$('photoViewerDialog'))this.$('photoViewerDialog').onclick=e=>{if(e.target===this.$('photoViewerDialog'))this.$('photoViewerDialog').close();};
+    this.shadowRoot.addEventListener('keydown',e=>{if(!this.$('photoViewerDialog')?.open)return;if(e.key==='ArrowLeft'){e.preventDefault();this.stepLightbox(-1);}if(e.key==='ArrowRight'){e.preventDefault();this.stepLightbox(1);}});
     if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(3);
     if(this.$('recordForm'))this.$('recordForm').onsubmit=event=>this.saveRecord(event);
     const actualInput=this.$('actualKrw');
@@ -459,12 +464,30 @@ export class VehicleJournal extends HTMLElement {
     this.renderSpendingComparison();
     this.$('energyStats').innerHTML=this.stat('충전량',numeric(t.battery_charge_kwh)+' kWh')+this.stat('완속 / 급속',`${numeric(t.slow_count,0)} / ${numeric(t.fast_count,0)}회`,`미확인 ${numeric(t.unknown_count,0)}회`)+this.stat('주행 소비 SOC',numeric(t.drive_soc_used_pp)+' %p','주차 소비·하루 전체 소비는 미확인');
     this.$('qualityNote').textContent=`관측된 주행의 에너지 커버리지는 ${numeric(t.energy_coverage_percent)}%예요. 원본이 없는 기간의 전비는 복원하지 않아요. 자정을 넘는 기록은 시간 비례 추정으로 배분해요. 수동 소비량은 측정값과 구분해요.`;
-    this.$('records').innerHTML=d.records.map(r=>`<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${esc(categories[r.category]||kindNames[r.kind])}${r.subcategory?' · '+esc(r.subcategory):''}<small>${esc(r.memo)}</small>${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</td><td>${this.recordValue(r)}${r.attachments?.length?`<br><button data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:''}</td><td>${r.origin==='manual'&&r.input?(r.status==='deleted'?`<button data-record="${r.id}" data-action="restore">복원</button>`:`<button data-record="${r.id}" data-action="edit">수정</button> <button data-record="${r.id}" data-action="delete">삭제</button>`):'<small>자동 원장</small>'}</td></tr>`).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
+    this.$('records').innerHTML=d.records.map(r=>{
+      const hasPhotos=r.attachments?.length>0;
+      const photoBtn=hasPhotos?`<button class="btn-table-action btn-photo" data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:'';
+      let actionButtons='';
+      if(r.origin==='manual'&&r.input){
+        if(r.status==='deleted'){
+          actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="restore">복원</button>`;
+        }else{
+          actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="edit">수정</button><button class="btn-table-action" data-record="${r.id}" data-action="delete">삭제</button>`;
+        }
+      }else{
+        actionButtons=hasPhotos?photoBtn:'<small>자동 원장</small>';
+      }
+
+      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col"><span class="memo-cat-title">${esc(categories[r.category]||kindNames[r.kind])}${r.subcategory?' · '+esc(r.subcategory):''}</span>${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
+
+      return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td>${this.recordValue(r)}</td><td>${actionButtons}</td></tr>`;
+    }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=`${this.offset+1}~${this.offset+d.records.length}번째 기록`;
     if(d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){this.$('fuel').value=d.comparison.fuel;this.$('economy').value=d.comparison.economy_km_l;this.$('fuelEntity').value=JSON.parse(d.comparison.sensor_entities_json)[d.comparison.fuel]||'';}
     if(!d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){const entity=d.fuel_sensors?.[this.$('fuel').value];if(entity){this.$('fuelEntity').value=entity;this.$('compareMessage').textContent='기존 전국 평균 유가 센서를 찾았어요. 비교 연비를 확인하고 저장해 주세요.';}}
     if(d.fuel_price&&d.comparison&&t.distance_km!=null&&t.charge_effective_krw!=null){const ice=t.distance_km/d.comparison.economy_km_l*d.fuel_price.price;const saving=ice-t.charge_effective_krw;this.$('saving').textContent=money(Math.abs(saving))+(saving>=0?'을 아꼈어요.':'이 더 들었어요.');this.$('compareDetail').innerHTML=`<p>내 전기차 ${money(t.charge_effective_krw)} · 비교 차량 ${money(ice)}</p><small>현재 HA 유가 ${money(d.fuel_price.price)}/L · ${esc(d.fuel_price.observed_at)}</small>`;}else{this.$('saving').textContent='비교에 필요한 거리·충전비·유가를 확인해 주세요.';this.$('compareDetail').textContent='원/L·KRW/L 센서 또는 gas_station_korea의 원 단위 유가 센서를 사용할 수 있어요. 비교 기준을 저장해 주세요.';}
     this.drawChart();
+    this.loadThumbnails();
   }
   recordValue(r){return r.kind==='trip'?numeric(r.distance_km)+' km':r.kind==='charge'?numeric(r.battery_charge_kwh)+' kWh':money(r.actual_krw??r.estimated_krw);}
   drawChart(){
@@ -477,9 +500,94 @@ export class VehicleJournal extends HTMLElement {
     this.$('chart').innerHTML=`<title>${esc(this.$('metric').selectedOptions[0].textContent)} 추이</title>`+Array.from({length:4},(_,i)=>{const y=t+ph*i/3;return `<line x1="${l}" y1="${y}" x2="${w-r}" y2="${y}" stroke="var(--j-border)"/><text x="${l-8}" y="${y+4}" text-anchor="end">${numeric(max*(1-i/3),1)}</text>`;}).join('')+points.map((p,i)=>`${p.value!=null?`<rect x="${p.x-pw/Math.max(1,values.length)*.28}" y="${p.y}" width="${pw/Math.max(1,values.length)*.56}" height="${t+ph-p.y}" rx="3" fill="var(--j-accent)" opacity=".25"><title>${esc(p.key)} · ${numeric(p.value)}</title></rect>`:''}${i%Math.max(1,Math.ceil(points.length/(w<420?3:6)))===0?`<text x="${p.x}" y="${h-12}" text-anchor="middle">${p.key.slice(5)}</text>`:''}`).join('')+`<path d="${path}" stroke="var(--j-accent)" stroke-width="2" fill="none"/><text x="${l}" y="14">${esc(this.$('metric').selectedOptions[0].textContent.split(' · ')[1])}</text>`;
     if(!points.length)this.$('chart').innerHTML=`<text x="${w/2}" y="120" text-anchor="middle">이 기간의 기록이 없어요.</text>`;
   }
-  async showPhotos(record){
-    this.openRecord(record);this.$('save').hidden=true;
-    try{for(const photo of record.attachments){const response=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments/${encodeURIComponent(photo.id)}`);if(!response.ok)throw new Error('사진을 읽지 못했어요.');const url=URL.createObjectURL(await response.blob());const img=document.createElement('img');img.src=url;img.alt=photo.name;img.onload=()=>URL.revokeObjectURL(url);this.$('photoPreview').append(img);}}catch(e){this.$('recordError').textContent=e.message;}
+  async loadThumbnails(){
+    if(!this.data?.records?.length||!this._hass?.fetchWithAuth)return;
+    const recordsWithPhotos=this.data.records.filter(r=>r.attachments?.length);
+    for(const r of recordsWithPhotos){
+      const thumbBox=this.shadowRoot?.querySelector(`.thumb-box[data-thumb-record="${r.id}"]`);
+      if(!thumbBox)continue;
+      const photo=r.attachments[0];
+      if(!photo?.id)continue;
+      let url=this.thumbnailCache.get(photo.id);
+      if(!url){
+        try{
+          const res=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments/${encodeURIComponent(photo.id)}`);
+          if(res.ok){
+            const blob=await res.blob();
+            url=URL.createObjectURL(blob);
+            this.thumbnailCache.set(photo.id,url);
+          }
+        }catch(e){
+          console.warn('[carrot-vehicle-journal] Thumbnail load failed:',photo.id,e);
+        }
+      }
+      if(url){
+        thumbBox.innerHTML=`<img src="${url}" alt="${esc(photo.name||'사진 썸네일')}" loading="lazy" />`;
+      }
+    }
+  }
+  openPhotoViewer(record,initialIndex=0){
+    if(!record?.attachments?.length)return;
+    this.lightboxRecord=record;
+    this.lightboxIndex=Math.max(0,Math.min(initialIndex,record.attachments.length-1));
+    this.renderLightboxPhoto();
+    this.$('photoViewerDialog')?.showModal();
+  }
+  stepLightbox(delta){
+    if(!this.lightboxRecord?.attachments?.length)return;
+    const len=this.lightboxRecord.attachments.length;
+    this.lightboxIndex=(this.lightboxIndex+delta+len)%len;
+    this.renderLightboxPhoto();
+  }
+  async renderLightboxPhoto(){
+    if(!this.lightboxRecord?.attachments?.length)return;
+    const photos=this.lightboxRecord.attachments;
+    const photo=photos[this.lightboxIndex];
+    if(!photo)return;
+
+    const countStr=photos.length>1?` (${this.lightboxIndex+1} / ${photos.length})`:'';
+    if(this.$('lightboxTitle'))this.$('lightboxTitle').textContent=`사진${countStr}`;
+    if(this.$('lightboxMeta'))this.$('lightboxMeta').textContent=photo.name||'';
+
+    const caption=this.lightboxRecord.memo||this.lightboxRecord.subcategory||'';
+    if(this.$('lightboxCaption')){
+      this.$('lightboxCaption').textContent=caption?`메모: ${caption}`:'';
+      this.$('lightboxCaption').hidden=!caption;
+    }
+
+    const hasMultiple=photos.length>1;
+    if(this.$('lightboxPrev'))this.$('lightboxPrev').hidden=!hasMultiple;
+    if(this.$('lightboxNext'))this.$('lightboxNext').hidden=!hasMultiple;
+
+    const img=this.$('lightboxImg');
+    const spinner=this.$('lightboxSpinner');
+    if(!img)return;
+
+    let url=this.thumbnailCache.get(photo.id);
+    if(url){
+      img.src=url;
+      img.hidden=false;
+      if(spinner)spinner.hidden=true;
+      return;
+    }
+
+    img.hidden=true;
+    if(spinner){spinner.hidden=false;spinner.textContent='사진을 불러오고 있어요...';}
+    try{
+      const res=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments/${encodeURIComponent(photo.id)}`);
+      if(!res.ok)throw new Error('사진을 불러오지 못했어요.');
+      const blob=await res.blob();
+      url=URL.createObjectURL(blob);
+      this.thumbnailCache.set(photo.id,url);
+      img.src=url;
+      img.hidden=false;
+      if(spinner)spinner.hidden=true;
+    }catch(e){
+      if(spinner){spinner.hidden=false;spinner.textContent=e.message||'사진 로딩 실패';}
+    }
+  }
+  showPhotos(record){
+    this.openPhotoViewer(record);
   }
   formFields(){const kind=this.$('kind').value||'expense';for(const id of ['categoryField','subcategoryField'])this.$(id).hidden=kind!=='expense';for(const id of ['distanceField','energyField'])this.$(id).hidden=kind!=='trip';for(const id of ['chargeField','modeField','billedField'])this.$(id).hidden=kind!=='charge';this.$('odometerField').hidden=kind!=='trip';for(const id of ['startField','endField','socStartField','socEndField'])this.$(id).hidden=kind==='expense';this.$('amountField').hidden=kind==='trip';}
   renderSelectedPhotos(){
