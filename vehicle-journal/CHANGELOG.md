@@ -6,7 +6,8 @@
 - 변경·이유: 차계부 디자인의 26px 이하 명시 글꼴을 1.5px 확대. 비교 설명의 변화율과 상승/감소를 해당 지표 색상과 굵은 글씨로 강조하며 텍스트 escaping 유지. 420px 이하 화면은 추이 카드를 한 열로 배치.
 - 관련 파일: `carrot-journal-design.js`, `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: 두 JS 구문 검사 및 실제 Chromium browser-check 통과. 월/연도 6개 지표, 비교 유무, 색상 일치, 빈 데이터, 수동 저장, HTML escaping, 320–850px 모바일 가로 넘침 확인.
-- 배포: 구현 main 푸시 완료. 두 화면 모듈만 백업 후 HA 직접 반영 예정이며 운영 확인은 후속 기록. 개발 정책에 따라 신규 릴리즈 없음.
+- 배포: `98c7ebf` main 푸시 및 두 화면 모듈 HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/98c7ebf/`. 설치·외부 HTTP SHA-256 일치: 카드 `2ca7177220d1ed19e9b2df1bd4950419269830c6ed18252ad893aab1a13e7ed8`, 디자인 `9f1f54ab16264253f99c9ed454fe7d63185ce124ef556a70bab7cd4fd4083d18`. 버전 API `0.8.13-53d7337406eb`. 실제 사용자 접속 Chrome 새로고침 후 6개 카드와 설명 15.5px, 변화율 5개 지표 색상 일치 및 시각적 강조 확인. HA 재시작 불필요. 개발 정책에 따라 신규 릴리즈 없음.
+- 운영 확인 기록 커밋 제목: `vehicle-journal: record deployed readability verification`. 이 항목의 배포 예정 상태를 실제 결과로 갱신.
 - 제한: 표시만 변경하며 기존 집계·데이터 보존 유지. Worker/Comma 변경 없음.
 
 ## 2026-10-07 — 패널 런타임 상태 복원 null 참조 버그 수정 (metric/period null value 예외 해소)
