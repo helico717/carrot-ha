@@ -1,5 +1,24 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 추세 탭 렌더링 중단 버그 수정 (레거시 에너지 통계 null 참조 해소)
+
+- 커밋 제목: `fix(vehicle-journal): resolve null reference error on legacy energyStats and restore trends dashboard rendering`.
+- 변경 내용 및 이유:
+  1. **레거시 DOM 노드(`energyStats`, `qualityNote`) null 참조 예외 해결**:
+     - 기존 `page1` 차트에 존재하던 `#energyStats` 및 `#qualityNote` 요소가 새 Apple Health 추세 대시보드로 개편되면서 제거되었으나, `renderData()` 내에서 해당 요소의 `.innerHTML`에 직접 접근하던 코드가 남아있어 `TypeError: Cannot set properties of null (setting 'innerHTML')` 예외가 발생하던 문제를 해결.
+     - 해당 예외로 인해 `renderData()`의 후속 실행인 `this.renderTrendsDashboard()` 호출이 차단되고 `#message`에 에러가 출력되던 현상을 원천 차단.
+  2. **추세 지표 생성(`createMetric`) 및 차트 렌더러 안전성 강화**:
+     - 지표 값이 0인 경우(예: 급속 충전 0%) 및 이전 기간 데이터가 없는 경우 `NaN` 또는 `Infinity`가 발생하지 않도록 유효성 검사 강화.
+     - `maxVal` 계산 시 기본 최솟값 1을 보장하여 0으로 나누기 오류 완전 차단.
+  3. 캐시 버스팅 파라미터(`journal-20261007-trends-fix-1`) 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포 상태:
+  - Python 유닛 테스트 310개 전수 통과 (`OK, skipped=4`).
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee`로 직접 배포 완료 및 `carrot-vehicle-journal.js` SHA-256 해시(`14bf2333...`) 일치 확인 완료.
+  - HTTP 정적 서빙 엔드포인트(`http://192.168.0.140:8123/carrot_ha_static/...`) 최신 수정본 응답 확인 완료.
+
 ## 2026-10-07 — 주행&에너지 탭 '추세' 개편, Apple Health 스타일 2열 추세 대시보드 및 폰트 왜곡 해소
 
 - 커밋 제목: `feat(vehicle-journal): revamp trends tab with Apple Health style 2-column dashboard and fix text distortion`.

@@ -1,4 +1,4 @@
-const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-trends-dashboard-1';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-trends-fix-1';
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
@@ -459,8 +459,6 @@ export class VehicleJournal extends HTMLElement {
     this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="18.5" font-weight="850" letter-spacing="-0.5">${money(total)}</text>`;
     this.renderRecentExpenses();
     this.renderSpendingComparison();
-    this.$('energyStats').innerHTML=this.stat('충전량',numeric(t.battery_charge_kwh)+' kWh')+this.stat('완속 / 급속',`${numeric(t.slow_count,0)} / ${numeric(t.fast_count,0)}회`,`미확인 ${numeric(t.unknown_count,0)}회`)+this.stat('주행 소비 SOC',numeric(t.drive_soc_used_pp)+' %p','주차 소비·하루 전체 소비는 미확인');
-    this.$('qualityNote').textContent=`관측된 주행의 에너지 커버리지는 ${numeric(t.energy_coverage_percent)}%예요. 원본이 없는 기간의 전비는 복원하지 않아요. 자정을 넘는 기록은 시간 비례 추정으로 배분해요. 수동 소비량은 측정값과 구분해요.`;
     this.$('records').innerHTML=d.records.map(r=>{
       const hasPhotos=r.attachments?.length>0;
       const photoBtn=hasPhotos?`<button class="btn-table-action btn-photo" data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:'';
@@ -578,8 +576,8 @@ export class VehicleJournal extends HTMLElement {
     const fastRatioBars=bins.map(b=>{const tot=(b.slow_count||0)+(b.fast_count||0);return tot>0?Math.round((b.fast_count/tot)*100):0;});
 
     const createMetric=(id,name,icon,color,unit,currVal,pastVal,bars)=>{
-      const hasCurrent=currVal!=null&&currVal>0;
-      const hasPast=pastVal!=null&&pastVal>0;
+      const hasCurrent=currVal!=null&&Number.isFinite(currVal)&&(id==='fast_ratio'?currVal>=0:currVal>0);
+      const hasPast=pastVal!=null&&Number.isFinite(pastVal)&&(id==='fast_ratio'?pastVal>=0:pastVal>0);
       let isChanging=false;
       let trendStatus='consistent';
       let headline=`${periodName} 동안 일관된 추세`;
@@ -587,7 +585,7 @@ export class VehicleJournal extends HTMLElement {
 
       if(hasCurrent&&hasPast){
         const diff=currVal-pastVal;
-        const diffPct=(diff/pastVal)*100;
+        const diffPct=pastVal>0?(diff/pastVal)*100:(currVal>0?100:0);
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
           if(diff>0){
@@ -643,9 +641,9 @@ export class VehicleJournal extends HTMLElement {
     stableContainer.innerHTML=stableItems.map(m=>this.renderTrendCard(m)).join('');
   }
   generateTrendCardChartHtml(m){
-    const bars=m.bars;
+    const bars=m.bars||[];
     const isChanging=m.isChanging&&m.pastAvg!=null;
-    const maxVal=Math.max(...bars,m.avg,(m.pastAvg||0))*1.25||1;
+    const maxVal=Math.max(1,...bars,m.avg||0,(m.pastAvg||0))*1.25;
     const n=Math.max(1,bars.length);
 
     const barElements=bars.map((val,idx)=>{
