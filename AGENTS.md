@@ -11,6 +11,10 @@
 > 3. Disconnects local changes from git history, causing duplicated work, broken deployments, and confusion across AI sessions.
 >
 > All code running on Comma **MUST** be committed and pushed to git, then pulled cleanly on the device.
+>
+> 🛑 **CRITICAL RULE FOR VEHICLE JOURNAL (차계부 작업 필수 지침):**
+> 차계부(`vehicle_journal`) 관련 모든 작업 및 커밋은 빠짐없이 `vehicle-journal/CHANGELOG.md`에 변경 내용, 이유, 관련 파일, 검증 및 배포 상태를 즉시 기록해야 합니다.
+> 작업 전 반드시 [vehicle-journal/AGENTS.md](vehicle-journal/AGENTS.md) 및 [.agents/rules/vehicle-journal.md](.agents/rules/vehicle-journal.md) 지침을 준수하세요.
 
 ---
 

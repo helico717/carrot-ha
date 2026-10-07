@@ -1,5 +1,36 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 헤더 타이틀 간소화, 최근 지출 전체 스크롤 표시 및 상세 기록 탭 이동 연동
+
+- 커밋 제목: `vehicle-journal: simplify header title, expand recent expenses to full list, and link detail records tab`.
+- 변경·이유:
+  1. **헤더 브랜드 및 타이틀 개편**:
+     - 상단 영문 키커 `CARROT HA · EV JOURNAL`을 완전히 삭제하여 시각적 노이즈 제거.
+     - 메인 타이틀 `내 차의 생활`을 사용자 요청에 따라 직관적인 `차계부`로 변경.
+  2. **최근 기록이에요 표시 범위 확장 (이번달 전체 지출 스크롤)**:
+     - `renderRecentExpenses()`에서 기존 4개 제한(`slice(0, 4)`)을 완전히 제거.
+     - 이번달(선택된 기간)에 발생한 모든 활성 지출 기록(`status === 'active' && kind === 'expense'`)을 스크롤 컨테이너(`.recent-list-wrap`)에 누락 없이 전체 렌더링하도록 확장.
+     - 지출 건수가 많아져도 부드러운 스크롤을 통해 이번달의 모든 지출 내역을 한눈에 탐색 가능.
+  3. **상세 기록 탭 명칭 변경 및 원클릭 이동 버튼 연동**:
+     - 네비게이션 탭의 맨 오른쪽 4번째 탭 명칭을 `차계부`에서 `상세 기록`으로 변경 (`['대시보드', '주행 & 에너지', '절약 비교', '상세 기록']`).
+     - 영웅 카드의 액션 버튼 텍스트를 `절약 계산 살펴보기 →`에서 `상세 기록보기 →`로 변경.
+     - 버튼 클릭 시 3번째 탭(절약 비교) 대신 4번째 탭(인덱스 3: `상세 기록`)으로 즉시 전환(`this.selectTab(3)`)되도록 연결.
+  4. **프로젝트 규칙 동기화**:
+     - `.agents/rules/vehicle-journal.md` 생성 및 루트 `AGENTS.md` 상단에 차계부 작업 지침 및 CHANGELOG 기록 필수 규칙을 등록.
+  5. **캐시 버스팅 갱신**:
+     - `carrot-journal-panel.js` 및 `carrot-vehicle-journal.js` 모듈 버전을 `?v=journal-20261007-detail-link-1`로 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `custom_components/carrot_ha/frontend/carrot-journal-panel.js`
+  - `review_journal_spending.html`
+  - `AGENTS.md`
+  - `.agents/rules/vehicle-journal.md`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포:
+  - JS 문법 검사(`node --check`) 및 Python 300 tests 전체 통과.
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee` 직접 배포 완료 및 파일 SHA-256 일치 확인.
+  - HA HTTP 정적 엔드포인트 응답 검증 완료 (브랜드 삭제, 타이틀 `차계부`, 탭 `상세 기록`, 버튼 `상세 기록보기 →` 확인).
+
 ## 2026-10-07 — 지출 비교 바 차트 비율 복원 및 상단 카드 높이 균형 최적화
 
 - 커밋 제목: `vehicle-journal: restore bar chart scale to 175px and balance hero card proportions`.

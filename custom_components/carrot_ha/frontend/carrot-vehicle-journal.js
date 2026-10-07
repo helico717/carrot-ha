@@ -1,4 +1,4 @@
-import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-chart-fix-1';
+import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-detail-link-1';
 import {preserveView} from './carrot-view-state.js';
 // HA-local EV journal. No remote polling, browser token or localStorage records.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -58,8 +58,8 @@ export class VehicleJournal extends HTMLElement {
   build(){
     this.ready=true;
     this.shadowRoot.innerHTML=`<style>${styles}${journalDesign}</style><div class="shell">
-    <header class="mast"><div class="mast-left"><div class="brand">CARROT HA · EV JOURNAL</div><div class="title-controls-row"><h2>내 차의 생활</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
-    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','주행 & 에너지','절약 비교','차계부'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
+    <header class="mast"><div class="mast-left"><div class="title-controls-row"><h2>차계부</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
+    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','주행 & 에너지','절약 비교','상세 기록'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
     <section id="page0" role="tabpanel" aria-labelledby="tab0">
           <div class="grid">
 
@@ -68,7 +68,7 @@ export class VehicleJournal extends HTMLElement {
               <h1 id="headline">기록을 불러오고 있어요.</h1>
               <div class="stats" id="briefStats"></div>
               <div class="hero-btn-wrap" style="margin-top: auto;">
-                <button id="gotoCompare" style="font-size:13px; padding:7px 14px; min-height:34px;">절약 계산 살펴보기 →</button>
+                <button id="gotoCompare" style="font-size:13px; padding:7px 14px; min-height:34px;">상세 기록보기 →</button>
               </div>
             </article>
 
@@ -168,7 +168,7 @@ export class VehicleJournal extends HTMLElement {
     for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
     for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.openRecord();
     if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
-    if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(2);
+    if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(3);
     if(this.$('recordForm'))this.$('recordForm').onsubmit=event=>this.saveRecord(event);
     const actualInput=this.$('actualKrw');
     if(actualInput)actualInput.oninput=e=>{const raw=e.target.value.replace(/[^\d]/g,'');e.target.value=raw?Number(raw).toLocaleString('ko-KR'):'';};
@@ -240,7 +240,7 @@ export class VehicleJournal extends HTMLElement {
     }return result;
   }
   renderRecentExpenses(){
-    const expenses=this.data.records.filter(record=>record.status==='active'&&record.kind==='expense').slice(0,4);
+    const expenses=this.data.records.filter(record=>record.status==='active'&&record.kind==='expense');
     this.$('recent').innerHTML=expenses.map(record=>{
       const key=['charging','maintenance','washing','tuning'].includes(record.category)?record.category:'other',color=this.categoryColor(key);
       let title=record.subcategory||record.memo;
