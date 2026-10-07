@@ -16,12 +16,12 @@ export async function mountJournalPanel(panel,loadedVersion){
   try{saved=JSON.parse(sessionStorage.getItem(viewKey)||'null');sessionStorage.removeItem(viewKey);}catch{}
   if(saved&&Date.now()-saved.time<120000&&saved.path===location.pathname){
     if(['month','year'].includes(saved.scope))card.setScope(saved.scope);
-    if(typeof saved.month==='string'){card.$('month').value=saved.month;}
+    if(typeof saved.month==='string'&&card.$('month')){card.$('month').value=saved.month;}
     if(typeof saved.entry==='string')card.entry=saved.entry;
     if(Number.isInteger(saved.offset)&&saved.offset>=0)card.offset=saved.offset;
     if(Number.isInteger(saved.tab)&&saved.tab>=0&&saved.tab<4)card.selectTab(saved.tab);
-    if(['distance_km','drive_energy_kwh','battery_charge_kwh','drive_soc_used_pp','charge_effective_krw','efficiency'].includes(saved.metric)){card.metric=saved.metric;card.$('metric').value=saved.metric;}
-    if(['day','week','month'].includes(saved.period)){card.period=saved.period;card.$('period').value=saved.period;}
+    if(['distance_km','drive_energy_kwh','battery_charge_kwh','drive_soc_used_pp','charge_effective_krw','efficiency'].includes(saved.metric)){card.metric=saved.metric;if(card.$('metric'))card.$('metric').value=saved.metric;}
+    if(['day','week','month'].includes(saved.period)){card.period=saved.period;if(card.$('period'))card.$('period').value=saved.period;}
     if(['charging','maintenance','washing','tuning','other'].includes(saved.comparisonCategory))card.comparisonCategory=saved.comparisonCategory;
     const restore=()=>{card.removeEventListener('journal-rendered',restore);requestAnimationFrame(()=>requestAnimationFrame(()=>{
       ancestors(card).forEach((node,i)=>{const position=saved.scroll?.[i];if(position){node.scrollLeft=position[0];node.scrollTop=position[1];}});
@@ -35,7 +35,7 @@ export async function mountJournalPanel(panel,loadedVersion){
     if(card.hasPendingInput()){
       panel.shadowRoot.getElementById('updateMessage').textContent=' 작성 중인 기록·사진 또는 비교 기준을 먼저 저장하거나 취소해 주세요.';return;
     }
-    const view={path:location.pathname,time:Date.now(),scope:card.scope,month:card.$('month').value,entry:card.entry,tab:card.tab,offset:card.offset,metric:card.metric,period:card.period,comparisonCategory:card.comparisonCategory,
+    const view={path:location.pathname,time:Date.now(),scope:card.scope,month:card.$('month')?.value,entry:card.entry,tab:card.tab,offset:card.offset,metric:card.metric,period:card.period,comparisonCategory:card.comparisonCategory,
       scroll:ancestors(card).map(node=>[node.scrollLeft,node.scrollTop]),inside:[...card.shadowRoot.querySelectorAll('[id]')].filter(node=>node.scrollLeft||node.scrollTop).map(node=>[node.id,node.scrollLeft,node.scrollTop])};
     try{sessionStorage.setItem(viewKey,JSON.stringify(view));}catch{panel.shadowRoot.getElementById('updateMessage').textContent=' 화면 위치를 보존하지 못했어요. 브라우저 저장 공간을 확인해 주세요.';return;}
     location.reload();

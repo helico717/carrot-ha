@@ -1,5 +1,19 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 패널 런타임 상태 복원 null 참조 버그 수정 (metric/period null value 예외 해소)
+
+- 커밋 제목: `fix(vehicle-journal): guard against null metric and period select elements during state restoration in panel runtime`.
+- 변경 내용 및 이유:
+  1. **패널 런타임(`carrot-journal-panel-runtime.js`) 상태 복원 시 `null` 프로퍼티 할당 예외 해결**:
+     - 사용자가 화면 새로고침 또는 '새 화면 버전 적용'을 실행할 때 `sessionStorage`에 보관된 마지막 상태(`saved`)를 복원하는 과정에서, 구형 `page1` 차트에 존재했던 `#metric` 및 `#period` select 요소를 `card.$('metric').value = saved.metric;`으로 직접 설정하려다 `TypeError: Cannot set properties of null (setting 'value')`가 발생하며 패널 마운트 전체가 중단되던 버그 수정.
+     - `card.$('metric')` 및 `card.$('period')`에 안전한 존재 유무 검사(`if(card.$('...'))`) 및 `card.$('month')?.value` 옵셔널 체이닝을 추가하여 예외 발생을 원천 차단.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-panel-runtime.js`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포 상태:
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee`로 직접 배포 완료 및 `carrot-journal-panel-runtime.js` SHA-256 해시(`af7541eb...`) 일치 확인 완료.
+  - HTTP 정적 서빙 엔드포인트(`http://192.168.0.140:8123/carrot_ha_static/...`) 최신 수정본 응답 확인 완료.
+
 ## 2026-10-07 — 추세 탭 렌더링 중단 버그 수정 (레거시 에너지 통계 null 참조 해소)
 
 - 커밋 제목: `fix(vehicle-journal): resolve null reference error on legacy energyStats and restore trends dashboard rendering`.
