@@ -605,6 +605,47 @@
       font-size: 14px;
     }
 
+    /* 영웅 카드 하단 액션 버튼 영역 (텍스트 시작선 완벽 일치 & 모바일 상하 여백 최적화) */
+    .hero-btn-wrap {
+      margin-top: auto;
+      padding-top: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+    }
+    .stage-mobile .hero-btn-wrap, .stage-max .hero-btn-wrap {
+      margin-top: 14px;
+      padding-top: 18px;
+    }
+    .btn-hero-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(32, 44, 54, 0.75);
+      border: 1px solid var(--j-border);
+      border-radius: 11px;
+      color: var(--j-ink);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      min-height: 36px;
+      cursor: pointer;
+      margin: 0;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-hero-action:hover {
+      background: var(--j-raised);
+      border-color: var(--j-accent);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .btn-hero-action:active {
+      transform: translateY(1px);
+    }
+
     /* 전월/전일/전년 대비 지출 비교 카드 */
     .comparison-panel {
       display: flex;
@@ -845,8 +886,9 @@
       flex-direction: column;
     }
     .stage-mobile .recent-panel, .stage-max .recent-panel {
-      height: auto;
-      min-height: 205px;
+      height: 270px;
+      display: flex;
+      flex-direction: column;
     }
     .recent-panel-header {
       display: flex;
@@ -1168,8 +1210,8 @@
                   <strong id="heroStat3">248<span class="stat-unit">원</span></strong>
                 </div>
               </div>
-              <div style="margin-top: 8px;">
-                <button style="font-size:13px; padding:8px 14px; min-height:36px;" onclick="selectTab(3)">상세 기록보기 →</button>
+              <div class="hero-btn-wrap">
+                <button class="btn-hero-action" type="button" onclick="selectTab(3)">상세 기록보기 →</button>
               </div>
             </article>
 
@@ -1939,18 +1981,18 @@
         `;
       });
       circlesHtml += `
-        <text x="80" y="77" text-anchor="middle" fill="var(--j-sub)" font-size="11.5">${d.centerLabel}</text>
-        <text x="80" y="97" text-anchor="middle" fill="var(--j-ink)" font-size="14" font-weight="750">${d.total}</text>
+        <text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${d.centerLabel}</text>
+        <text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="18.5" font-weight="850" letter-spacing="-0.5">${d.total}</text>
       `;
       svg.innerHTML = circlesHtml;
 
-      // [사용자 요청] 각 카테고리 하단 세부 텍스트 제거하고 라벨과 금액만 깔끔하게 정렬
+      // [사용자 요청] 각 카테고리 라벨과 금액 시인성 대폭 강화
       list.innerHTML = d.categories.map(c => `
         <div class="list-row">
-          <span style="display:inline-flex; align-items:center;">
-            <span class="legend-dot" style="display:inline-block; margin-right:8px; background:${c.color};"></span>${c.label}
+          <span style="display:inline-flex; align-items:center; font-size:15px; font-weight:600; color:var(--j-ink);">
+            <span class="legend-dot" style="display:inline-block; width:9px; height:9px; margin-right:9px; background:${c.color};"></span>${c.label}
           </span>
-          <strong style="font-variant-numeric:tabular-nums; font-size:14px;">${c.amount}</strong>
+          <strong style="font-variant-numeric:tabular-nums; font-size:16px; font-weight:750; color:#ffffff;">${c.amount}</strong>
         </div>
       `).join('');
     }

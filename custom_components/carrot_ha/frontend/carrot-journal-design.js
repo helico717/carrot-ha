@@ -1,2 +1,940 @@
 // Approved prototype styles adapted for a live HA shadow root.
-export const journalDesign = ":host {\n      color-scheme: dark;\n      --j-bg: #0b1014;\n      --j-surface: #161e25;\n      --j-raised: #202c36;\n      --j-border: #2a3945;\n      --j-ink: #f1f6fa;\n      --j-sub: #a8bdca;\n      --j-accent: #81e6c5;\n      --j-blue: #7bb6ff;\n      --j-red: #ff5c5c;\n      --j-red-bg: rgba(255, 92, 92, 0.15);\n      --j-blue-bg: rgba(123, 182, 255, 0.15);\n\n      /* 카테고리 고유 색상 팔레트 (5대 핵심 분류 확정) */\n      --cat-charging: #81e6c5;     /* 충전비: Carrot 민트 그린 */\n      --cat-maintenance: #f59e0b;  /* 정비/소모품비: 앰버 오렌지 */\n      --cat-washing: #60a5fa;      /* 세차비: 산뜻한 스카이 블루 */\n      --cat-tuning: #c084fc;       /* 튜닝: 스타일리시 퍼플 */\n      --cat-other: #94a3b8;        /* 기타: 뉴트럴 슬레이트 그레이 */\n    }\n:host{display:block;color:var(--j-ink);font:15px/1.65 system-ui,-apple-system,sans-serif;word-break:keep-all;overflow-wrap:break-word}\n    /* 차계부 본체 레이아웃 */\n    .shell {\n      background: var(--j-bg);\n      border-radius: 24px;\n      padding: 30px;\n      min-width: 0;\n      width: 100%;\n    }@media(max-width:600px){.shell{\n      padding: 16px 16px 32px;\n      border-radius: 0;\n    }}\n\n    /* 상단 마스트헤드 및 기간 단위 선택기(일/월/년) */\n    .mast {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      gap: 16px;\n      margin-bottom: 20px;\n    }\n    .mast-left {\n      display: flex;\n      flex-direction: column;\n      gap: 4px;\n      min-width: 0;\n    }\n    .brand {\n      color: var(--j-sub);\n      font-size: 11px;\n      letter-spacing: 2px;\n      font-weight: 600;\n    }\n    .title-controls-row {\n      display: flex;\n      align-items: center;\n      gap: 10px;\n      flex-wrap: wrap;\n    }\n    .title-controls-row h2 {\n      font-size: 24px;\n      margin: 0;\n      white-space: nowrap;\n      letter-spacing: -0.5px;\n    }\n    .select-pill, .date-pill {\n      background: var(--j-surface);\n      border: 1px solid var(--j-border);\n      border-radius: 10px;\n      padding: 7px 11px;\n      font-size: 13px;\n      color: var(--j-ink);\n      cursor: pointer;\n      outline: none;\n      transition: all 0.2s ease;\n    }\n    .select-pill:hover, .date-pill:hover,\n    .select-pill:focus, .date-pill:focus {\n      border-color: var(--j-accent);\n    }\n\n    /* 우측 버튼 및 기간 선택기 그룹 */\n    .mast-right {\n      display: flex;\n      align-items: center;\n      gap: 10px;\n      flex-wrap: wrap;\n    }\n\n    /* 일별/월별/연도별 선택기 */\n    .period-segmented {\n      display: inline-flex;\n      background: var(--j-surface);\n      border: 1px solid var(--j-border);\n      border-radius: 12px;\n      padding: 3px;\n      gap: 3px;\n    }\n    .period-tab-btn {\n      background: transparent;\n      border: 0;\n      color: var(--j-sub);\n      font-size: 13px;\n      font-weight: 600;\n      padding: 6px 14px;\n      min-height: 36px;\n      border-radius: 9px;\n      cursor: pointer;\n      white-space: nowrap;\n      transition: all 0.15s ease;\n    }\n    .period-tab-btn:hover {\n      color: var(--j-ink);\n    }\n    .period-tab-btn.active {\n      background: var(--j-raised);\n      color: var(--j-ink);\n      box-shadow: 0 2px 8px rgba(0,0,0,0.3);\n      font-weight: 750;\n    }\n\n    /* + 기록 남기기 버튼 (통일된 당근 민트 액센트) */\n    .btn-record-primary {\n      background: var(--j-accent);\n      color: #07221b;\n      border: 0;\n      font-size: 14.5px;\n      font-weight: 750;\n      padding: 10px 20px;\n      min-height: 42px;\n      border-radius: 12px;\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      gap: 6px;\n      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.25);\n      cursor: pointer;\n      white-space: nowrap;\n      transition: all 0.2s ease;\n    }\n    .btn-record-primary:hover {\n      filter: brightness(1.1);\n      box-shadow: 0 6px 18px rgba(129, 230, 197, 0.38);\n      transform: translateY(-1px);\n    }\n    .btn-record-primary:active {\n      transform: translateY(1px);\n    }\n\n    /* [사용자 요청] 최근 기록 카드의 + 기록 버튼: 상단과 동일한 스타일 유지 */\n    .btn-recent-record {\n      background: var(--j-accent);\n      color: #07221b;\n      border: 0;\n      font-size: 12.5px;\n      font-weight: 750;\n      padding: 6px 13px;\n      min-height: 32px;\n      border-radius: 9px;\n      display: inline-flex;\n      align-items: center;\n      gap: 4px;\n      box-shadow: 0 2px 8px rgba(129, 230, 197, 0.28);\n      cursor: pointer;\n      white-space: nowrap;\n      transition: all 0.2s ease;\n    }\n    .btn-recent-record:hover {\n      filter: brightness(1.12);\n      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.45);\n      transform: translateY(-1px);\n    }@media(max-width:600px){/* 아이폰 16 프로 (402px) 마스트헤드 레이아웃 */\n    .mast, .mast{\n      flex-direction: column;\n      align-items: stretch;\n      gap: 12px;\n      margin-bottom: 14px;\n    }}@media(max-width:600px){.title-controls-row{\n      gap: 8px;\n      flex-wrap: nowrap;\n    }}@media(max-width:600px){.title-controls-row h2{\n      font-size: 20px;\n      flex-shrink: 0;\n    }}@media(max-width:600px){.select-pill, .date-pill{\n      font-size: 12px;\n      padding: 6px 8px;\n      flex: 1;\n      min-width: 0;\n    }}@media(max-width:600px){.mast-right{\n      display: flex;\n      flex-direction: column;\n      gap: 8px;\n      width: 100%;\n    }}@media(max-width:600px){.period-segmented{\n      width: 100%;\n      display: flex;\n    }}@media(max-width:600px){.period-tab-btn{\n      flex: 1;\n      padding: 6px 0;\n      font-size: 12.5px;\n      text-align: center;\n    }}@media(max-width:600px){.btn-record-primary{\n      width: 100%;\n      min-height: 44px;\n      font-size: 14.5px;\n      border-radius: 12px;\n    }}\n\n    /* 탭 네비게이션 */\n    .tabs {\n      display: flex;\n      background: var(--j-surface);\n      padding: 5px;\n      gap: 4px;\n      border-radius: 14px;\n      margin: 16px 0;\n      overflow-x: auto;\n      scrollbar-width: none;\n    }\n    .tabs::-webkit-scrollbar { display: none; }\n    .tabs button {\n      flex: 1;\n      background: transparent;\n      color: var(--j-sub);\n      border: 0;\n      white-space: nowrap;\n      min-height: 38px;\n      font-size: 13px;\n      padding: 6px 10px;\n    }\n    .tabs button[aria-selected=\"true\"] {\n      background: var(--j-raised);\n      color: var(--j-ink);\n      font-weight: 700;\n    }\n\n    /* 그리드 시스템 */\n    .grid {\n      display: grid;\n      grid-template-columns: repeat(12, minmax(0, 1fr));\n      gap: 18px;\n    }\n    .panel {\n      background: var(--j-surface);\n      border: 1px solid var(--j-border);\n      border-radius: 22px;\n      padding: 22px;\n      min-width: 0;\n      position: relative;\n    }\n    .wide { grid-column: span 8; }\n    .narrow { grid-column: span 4; }\n    .half { grid-column: span 6; }\n    .full { grid-column: span 12; }@media(max-width:600px){/* 모바일 환경 그리드 강제 1열 */\n    .grid, .grid{\n      display: flex;\n      flex-direction: column;\n      gap: 14px;\n    }}@media(max-width:600px){.panel{\n      padding: 18px 16px;\n      border-radius: 20px;\n    }}\n\n    /* [영웅 카드: 큼직하고 웅장한 타이포그래피 (3줄 어절 줄바꿈) + 클린 그라디언트] */\n    .hero {\n      position: relative;\n      border-radius: 28px;\n      padding: 26px 28px 22px 28px;\n      background: linear-gradient(130deg, #183b37 0%, var(--j-surface) 100%);\n      border: 1px solid var(--j-border);\n      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);\n      display: flex;\n      flex-direction: column;\n      justify-content: space-between;\n    }@media(max-width:600px){.hero{\n      padding: 22px 18px 24px;\n      border-radius: 22px;\n    }}\n    .kicker {\n      font-size: 11px;\n      letter-spacing: 2px;\n      color: var(--j-sub);\n      margin-bottom: 12px;\n      font-weight: 700;\n      text-transform: uppercase;\n    }\n    h1 {\n      font-size: clamp(34px, 4vw, 44px);\n      line-height: 1.25;\n      letter-spacing: -1px;\n      margin: 0;\n      font-weight: 850;\n      color: #ffffff;\n      word-break: keep-all;\n    }@media(max-width:600px){h1{\n      font-size: 34px;\n      line-height: 1.26;\n      letter-spacing: -0.8px;\n      font-weight: 850;\n      word-break: keep-all;\n    }}\n    .h-phrase {\n      display: inline-block;\n      white-space: nowrap;\n    }\n    h2 { font-size: 18.5px; margin: 0; }\n    .accent { color: var(--j-accent); }\n    .muted { color: var(--j-sub); }\n    .note { font-size: 12.5px; margin-top: 12px; }\n    .stats {\n      display: grid;\n      grid-template-columns: repeat(3, minmax(0, 1fr));\n      gap: 14px;\n      margin: 16px 0 14px 0;\n    }@media(max-width:600px){.stats{\n      grid-template-columns: repeat(3, minmax(0, 1fr));\n      gap: 8px;\n      margin: 12px 0 8px;\n    }}\n    .stat {\n      min-width: 0;\n      display: flex;\n      flex-direction: column;\n    }\n    .stat small {\n      display: flex;\n      align-items: flex-end;\n      min-height: 28px;\n      color: var(--j-sub);\n      font-size: 11.5px;\n      line-height: 1.3;\n      margin-bottom: 4px;\n      letter-spacing: -0.3px;\n      word-break: keep-all;\n    }@media(max-width:600px){.stat small{\n      font-size: 11px;\n      letter-spacing: -0.5px;\n      min-height: 26px;\n    }}\n    .stat strong {\n      display: block;\n      font-size: 21px;\n      font-variant-numeric: tabular-nums;\n      margin: 0;\n      white-space: nowrap;\n      overflow: hidden;\n      text-overflow: ellipsis;\n      line-height: 1.15;\n    }@media(max-width:600px){.stat strong{\n      font-size: 18px;\n      letter-spacing: -0.5px;\n    }}\n    .stat-unit {\n      font-size: 12.5px;\n      font-weight: 600;\n      color: var(--j-sub);\n      margin-left: 2px;\n      letter-spacing: normal;\n    }@media(max-width:600px){.stat-unit{\n      font-size: 11.5px;\n      margin-left: 1.5px;\n    }}\n    .stat-empty {\n      font-size: 15px;\n      font-weight: 600;\n      color: var(--j-sub);\n      letter-spacing: -0.3px;\n    }@media(max-width:600px){.stat-empty{\n      font-size: 14px;\n    }}\n\n    /* 전월/전일/전년 대비 지출 비교 카드 */\n    .comparison-panel {\n      padding: 18px 20px;\n      display: flex;\n      flex-direction: column;\n      justify-content: space-between;\n      transition: border-color 0.3s ease;\n    }\n    .comparison-panel.is-more {\n      border-color: rgba(239, 68, 68, 0.4);\n    }\n    .comparison-panel.is-less {\n      border-color: rgba(96, 165, 250, 0.4);\n    }\n\n    .card-header-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      margin-bottom: 6px;\n    }\n    .card-header-row h2 {\n      font-size: 16px;\n      margin: 0;\n    }\n\n    .spend-headline {\n      margin-top: 2px;\n      margin-bottom: 10px;\n      min-height: 0;\n    }\n    .spend-context {\n      font-size: 12px;\n      color: var(--j-sub);\n      margin-bottom: 3px;\n    }\n    .spend-statement {\n      font-size: 16px;\n      font-weight: 600;\n      line-height: 1.45;\n      letter-spacing: -0.4px;\n      color: var(--j-ink);\n      word-break: keep-all;\n    }@media(max-width:600px){.spend-statement{\n      font-size: 15px;\n    }}\n    .domain-tag {\n      display: inline-block;\n      color: var(--j-accent);\n      font-weight: 700;\n    }\n    .amount-highlight {\n      font-weight: 700;\n      font-variant-numeric: tabular-nums;\n    }\n    .trend-text-more {\n      color: #ff5c5c;\n      font-weight: 700;\n      background: var(--j-red-bg);\n      padding: 1px 6px;\n      border-radius: 6px;\n    }\n    .trend-text-less {\n      color: #7bb6ff;\n      font-weight: 700;\n      background: var(--j-blue-bg);\n      padding: 1px 6px;\n      border-radius: 6px;\n    }\n\n    .trend-badge {\n      display: inline-flex;\n      align-items: center;\n      justify-content: center;\n      font-size: 12.5px;\n      font-weight: 700;\n      padding: 3px 10px;\n      border-radius: 20px;\n      font-variant-numeric: tabular-nums;\n      letter-spacing: -0.2px;\n      line-height: 1.3;\n    }\n    .trend-badge.more {\n      background: rgba(239, 68, 68, 0.2);\n      color: #ff7878;\n      border: 1px solid rgba(239, 68, 68, 0.4);\n    }\n    .trend-badge.less {\n      background: rgba(59, 130, 246, 0.2);\n      color: #93c5fd;\n      border: 1px solid rgba(59, 130, 246, 0.4);\n    }\n\n    /* 바 그래프 컨테이너 & 툴팁 */\n    .chart-container {\n      position: relative;\n      background: rgba(11, 16, 20, 0.6);\n      border: 1px solid rgba(42, 57, 69, 0.7);\n      border-radius: 16px;\n      padding: 10px 12px 8px;\n      margin-top: auto;\n    }\n    .bar-chart-svg {\n      width: 100%;\n      height: 175px;\n      display: block;\n      overflow: visible;\n    }\n\n    .bar-segment {\n      cursor: pointer;\n      transition: opacity 0.2s ease, filter 0.2s ease;\n      -webkit-tap-highlight-color: transparent;\n    }\n    .bar-segment:hover {\n      filter: brightness(1.28);\n    }\n    .is-hovering .bar-segment {\n      opacity: 0.35;\n    }\n    .is-hovering .bar-segment.highlighted {\n      opacity: 1;\n      filter: brightness(1.25);\n    }\n\n    .chart-tooltip {\n      position: absolute;\n      background: rgba(22, 30, 37, 0.98);\n      border: 1px solid #3b5062;\n      border-radius: 10px;\n      padding: 6px 11px;\n      font-size: 12px;\n      color: var(--j-ink);\n      pointer-events: none;\n      box-shadow: 0 8px 24px rgba(0,0,0,0.6);\n      z-index: 20;\n      white-space: nowrap;\n      transition: opacity 0.15s ease, transform 0.15s ease;\n      opacity: 0;\n      transform: translate(-50%, -100%);\n    }\n    .chart-tooltip.visible {\n      opacity: 1;\n    }\n    .tooltip-dot {\n      display: inline-block;\n      width: 8px;\n      height: 8px;\n      border-radius: 50%;\n      margin-right: 5px;\n      vertical-align: middle;\n    }\n\n    .legend-row {\n      display: flex;\n      flex-wrap: wrap;\n      gap: 3px 8px;\n      justify-content: center;\n      margin-top: 6px;\n      padding-top: 6px;\n      border-top: 1px solid rgba(42, 57, 69, 0.4);\n    }\n    .legend-item {\n      display: inline-flex;\n      align-items: center;\n      gap: 4.5px;\n      font-size: 11.5px;\n      color: var(--j-sub);\n      cursor: pointer;\n      padding: 3px 6px;\n      border-radius: 6px;\n      transition: all 0.15s ease;\n      user-select: none;\n      -webkit-tap-highlight-color: transparent;\n    }\n    .legend-item:hover, .legend-item.active {\n      color: var(--j-ink);\n      background: var(--j-raised);\n    }\n    .legend-dot {\n      width: 8px;\n      height: 8px;\n      border-radius: 50%;\n    }\n\n    /* ======================================================== */\n    /* [사용자 요청] 어디에 썼을까요? 카드 크기 고정 & 상하 중앙 정렬  */\n    /* ======================================================== */\n    .donut-panel {\n      height: 250px; /* 불필요한 하단 여백이 남지 않도록 고정 */\n      display: flex;\n      flex-direction: column;\n    }@media(max-width:600px){.donut-panel{\n      height: auto;\n      min-height: 205px;\n    }}\n    .cost-layout {\n      flex: 1;\n      display: flex;\n      align-items: center; /* 파이차트와 카테고리 목록 상하 수평축 일치 */\n      gap: 22px;\n      margin-top: 6px;\n      min-height: 0;\n    }\n    .donut {\n      width: 140px;\n      height: 140px;\n      flex-shrink: 0;\n    }@media(max-width:600px){.donut{\n      width: 120px;\n      height: 120px;\n    }}\n    .cost-list {\n      flex: 1;\n      min-width: 140px;\n      display: flex;\n      flex-direction: column;\n      justify-content: center; /* 1개든 2~3개든 파이차트 정중앙 수평선과 일치 */\n      height: 100%;\n    }\n    .cost-list .list-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      gap: 12px;\n      padding: 10px 0;\n      border-bottom: 1px solid var(--j-border);\n      font-size: 13.5px;\n    }\n    .cost-list .list-row:last-child {\n      border-bottom: 0; /* 단일 항목이거나 마지막 항목일 때 밑줄 제거 */\n    }\n\n    /* ======================================================== */\n    /* [사용자 요청] 최근 기록이에요 카드 (지출 전용 & 색상 하이라이트) */\n    /* ======================================================== */\n    .recent-panel {\n      height: 250px; /* 어디에 썼을까요 카드와 높이 통일 */\n      display: flex;\n      flex-direction: column;\n    }@media(max-width:600px){.recent-panel{\n      height: auto;\n      min-height: 205px;\n    }}\n    .recent-panel-header {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      margin-bottom: 8px;\n    }\n    .recent-list-wrap {\n      flex: 1;\n      overflow-y: auto;\n      min-height: 0;\n      scrollbar-width: thin;\n      scrollbar-color: #2a3945 transparent;\n    }\n    .recent-list-wrap::-webkit-scrollbar {\n      width: 4px;\n    }\n    .recent-list-wrap::-webkit-scrollbar-thumb {\n      background: #2a3945;\n      border-radius: 4px;\n    }\n    .recent-expense-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      gap: 12px;\n      padding: 10px 0;\n      border-bottom: 1px solid var(--j-border);\n      font-size: 13px;\n    }\n    .recent-expense-row:last-child {\n      border-bottom: 0;\n    }\n    .recent-left {\n      display: flex;\n      flex-direction: column;\n      gap: 3px;\n      min-width: 0;\n    }\n    .recent-title-line {\n      display: flex;\n      align-items: center;\n      gap: 8px;\n      flex-wrap: wrap;\n    }\n    /* 카테고리별 색상 하이라이트 뱃지 */\n    .cat-highlight-pill {\n      display: inline-flex;\n      align-items: center;\n      gap: 4px;\n      font-size: 11px;\n      font-weight: 700;\n      padding: 2px 7px;\n      border-radius: 6px;\n      letter-spacing: -0.2px;\n      line-height: 1.2;\n    }\n    .recent-item-title {\n      color: var(--j-ink);\n      font-weight: 600;\n    }\n    .recent-date-sub {\n      color: var(--j-sub);\n      font-size: 11.5px;\n    }\n    .recent-amount {\n      font-size: 14.5px;\n      font-weight: 700;\n      font-variant-numeric: tabular-nums;\n      color: var(--j-ink);\n      white-space: nowrap;\n    }\n\n    /* ======================================================== */\n    /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */\n    /* ======================================================== */\n    dialog#recordDialog {\n      color: var(--j-ink);\n      background: #141c23;\n      border: 1px solid #334454;\n      border-radius: 24px;\n      width: min(580px, calc(100% - 24px));\n      padding: 24px 26px;\n      max-height: 90vh;\n      overflow-y: auto;\n      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);\n      position: fixed;\n      inset: 0;\n      margin: auto;\n      z-index: 2000;\n    }\n    dialog#recordDialog::backdrop {\n      background: rgba(4, 8, 12, 0.75);\n      backdrop-filter: blur(8px);\n    }\n    .modal-header-row {\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n      margin-bottom: 18px;\n      padding-bottom: 14px;\n      border-bottom: 1px solid var(--j-border);\n    }\n    .modal-close-btn {\n      background: var(--j-surface);\n      border: 1px solid var(--j-border);\n      color: var(--j-sub);\n      font-size: 13px;\n      font-weight: 600;\n      padding: 6px 14px;\n      min-height: 32px;\n      border-radius: 8px;\n    }\n    .modal-close-btn:hover {\n      color: var(--j-ink);\n      border-color: #486074;\n    }\n    .form-grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 14px;\n      margin-bottom: 18px;\n    }@media(max-width:600px){.form-grid{\n      grid-template-columns: 1fr;\n      gap: 12px;\n    }}\n    .form-field {\n      display: flex;\n      flex-direction: column;\n      gap: 6px;\n      font-size: 12.5px;\n      color: var(--j-sub);\n    }\n    .form-field.full {\n      grid-column: 1 / -1;\n    }\n    .form-field input, .form-field select, .form-field textarea {\n      background: #0d1318;\n      border: 1px solid var(--j-border);\n      border-radius: 10px;\n      padding: 9px 12px;\n      font-size: 13.5px;\n      color: var(--j-ink);\n      outline: none;\n      transition: border-color 0.2s ease;\n    }\n    .form-field input:focus, .form-field select:focus, .form-field textarea:focus {\n      border-color: var(--j-accent);\n    }\n    .file-input-box {\n      border: 1px dashed var(--j-border);\n      border-radius: 10px;\n      padding: 10px;\n      background: #0b1014;\n      font-size: 12px;\n      color: var(--j-sub);\n    }\n    .modal-footer {\n      display: flex;\n      flex-direction: column;\n      gap: 12px;\n      margin-top: 10px;\n      padding-top: 14px;\n      border-top: 1px solid var(--j-border);\n    }\n\n\n.shell{max-width:1280px;margin:auto}.status{margin:24px 0 10px;padding:12px 16px;font-size:12.5px;color:var(--j-sub);background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;text-align:center}\n#headline{font-weight:850}.cost-list{min-width:0}.recent-list-wrap{min-height:100px}\n.period-tab-btn:focus-visible,.legend-item:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}\n#recordDialog .fields label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--j-sub)}\n#recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318}\n#recordDialog .row.spaced{padding-bottom:14px;border-bottom:1px solid var(--j-border);margin-bottom:18px}\n@media(max-width:850px){.wide,.narrow,.half{grid-column:span 12}.mast{flex-wrap:wrap}}\n@media(max-width:600px){.shell{padding:16px}.tabs{flex-wrap:nowrap}.tabs button{flex:0 0 auto;font-size:12px;min-width:72px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.cost-layout{gap:12px;flex-wrap:nowrap}.cost-list .list-row{gap:6px;font-size:12px}.title-controls-row{flex-wrap:wrap}.title-controls-row .date-pill{max-width:145px}.stat strong{font-size:18px}.stat-unit{font-size:11.5px}}\n@media(max-width:360px){.shell{padding:12px}.stat strong{font-size:16px}.stat-unit{font-size:10px}.donut{width:105px;height:105px}.h-phrase{white-space:normal}}\n" + `@media(max-width:600px){#headline{font-size:clamp(22px,6.5vw,34px)}.legend-item{padding:6px 8px;min-height:32px;background:transparent;border:0}.trend-badge{white-space:nowrap;flex-shrink:0}.tabs{overflow-x:auto}}` + `.title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}.legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size:11px}.trend-badge{white-space:nowrap;flex-shrink:0}`;
+export const journalDesign = `:host {
+      color-scheme: dark;
+      --j-bg: #0b1014;
+      --j-surface: #161e25;
+      --j-raised: #202c36;
+      --j-border: #2a3945;
+      --j-ink: #f1f6fa;
+      --j-sub: #a8bdca;
+      --j-accent: #81e6c5;
+      --j-blue: #7bb6ff;
+      --j-red: #ff5c5c;
+      --j-red-bg: rgba(255, 92, 92, 0.15);
+      --j-blue-bg: rgba(123, 182, 255, 0.15);
+
+      /* 카테고리 고유 색상 팔레트 (5대 핵심 분류 확정) */
+      --cat-charging: #81e6c5;     /* 충전비: Carrot 민트 그린 */
+      --cat-maintenance: #f59e0b;  /* 정비/소모품비: 앰버 오렌지 */
+      --cat-washing: #60a5fa;      /* 세차비: 산뜻한 스카이 블루 */
+      --cat-tuning: #c084fc;       /* 튜닝: 스타일리시 퍼플 */
+      --cat-other: #94a3b8;        /* 기타: 뉴트럴 슬레이트 그레이 */
+    }
+:host{display:block;color:var(--j-ink);font:15px/1.65 system-ui,-apple-system,sans-serif;word-break:keep-all;overflow-wrap:break-word}
+    /* 차계부 본체 레이아웃 */
+    .shell {
+      background: var(--j-bg);
+      border-radius: 24px;
+      padding: 30px;
+      min-width: 0;
+      width: 100%;
+    }
+    @media(max-width:600px){
+      .shell{
+        padding: 16px 16px 32px;
+        border-radius: 0;
+      }
+    }
+
+    /* 상단 마스트헤드 및 기간 단위 선택기(일/월/년) */
+    .mast {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .mast-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .brand {
+      color: var(--j-sub);
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: 600;
+    }
+    .title-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title-controls-row h2 {
+      font-size: 24px;
+      margin: 0;
+      white-space: nowrap;
+      letter-spacing: -0.5px;
+    }
+    .select-pill, .date-pill {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 10px;
+      padding: 7px 11px;
+      font-size: 13px;
+      color: var(--j-ink);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .select-pill:hover, .date-pill:hover,
+    .select-pill:focus, .date-pill:focus {
+      border-color: var(--j-accent);
+    }
+
+    /* 우측 버튼 및 기간 선택기 그룹 */
+    .mast-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* 일별/월별/연도별 선택기 */
+    .period-segmented {
+      display: inline-flex;
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 12px;
+      padding: 3px;
+      gap: 3px;
+    }
+    .period-tab-btn {
+      background: transparent;
+      border: 0;
+      color: var(--j-sub);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      min-height: 36px;
+      border-radius: 9px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .period-tab-btn:hover {
+      color: var(--j-ink);
+    }
+    .period-tab-btn.active {
+      background: var(--j-raised);
+      color: var(--j-ink);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-weight: 750;
+    }
+
+    /* + 기록 남기기 버튼 (통일된 당근 민트 액센트) */
+    .btn-record-primary {
+      background: var(--j-accent);
+      color: #07221b;
+      border: 0;
+      font-size: 14.5px;
+      font-weight: 750;
+      padding: 10px 20px;
+      min-height: 42px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.25);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .btn-record-primary:hover {
+      filter: brightness(1.1);
+      box-shadow: 0 6px 18px rgba(129, 230, 197, 0.38);
+      transform: translateY(-1px);
+    }
+    .btn-record-primary:active {
+      transform: translateY(1px);
+    }
+
+    /* 최근 기록 카드의 + 기록 버튼: 상단과 동일한 스타일 유지 */
+    .btn-recent-record {
+      background: var(--j-accent);
+      color: #07221b;
+      border: 0;
+      font-size: 12.5px;
+      font-weight: 750;
+      padding: 6px 13px;
+      min-height: 32px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(129, 230, 197, 0.28);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .btn-recent-record:hover {
+      filter: brightness(1.12);
+      box-shadow: 0 4px 14px rgba(129, 230, 197, 0.45);
+      transform: translateY(-1px);
+    }
+    @media(max-width:600px){
+      .mast {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .title-controls-row {
+        gap: 8px;
+        flex-wrap: nowrap;
+      }
+      .title-controls-row h2 {
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .select-pill, .date-pill {
+        font-size: 12px;
+        padding: 6px 8px;
+        flex: 1;
+        min-width: 0;
+      }
+      .mast-right {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      .period-segmented {
+        width: 100%;
+        display: flex;
+      }
+      .period-tab-btn {
+        flex: 1;
+        padding: 6px 0;
+        font-size: 12.5px;
+        text-align: center;
+      }
+      .btn-record-primary {
+        width: 100%;
+        min-height: 44px;
+        font-size: 14.5px;
+        border-radius: 12px;
+      }
+    }
+
+    /* 탭 네비게이션: 4개 탭 균등 분할 및 모바일 최적화 */
+    .tabs {
+      display: flex;
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--j-surface);
+      padding: 5px;
+      gap: 4px;
+      border-radius: 14px;
+      margin: 16px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs button {
+      flex: 1 1 0px;
+      min-width: 0;
+      background: transparent;
+      color: var(--j-sub);
+      border: 0;
+      white-space: nowrap;
+      min-height: 38px;
+      font-size: 13px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .tabs button[aria-selected="true"] {
+      background: var(--j-raised);
+      color: var(--j-ink);
+      font-weight: 700;
+    }
+    @media(max-width:600px){
+      .tabs {
+        overflow-x: hidden;
+        padding: 4px;
+        gap: 4px;
+        margin: 14px 0;
+      }
+      .tabs button {
+        flex: 1 1 0px;
+        min-width: 0;
+        font-size: 12.5px;
+        padding: 8px 2px;
+      }
+    }
+
+    /* 그리드 시스템 */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .panel {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      border-radius: 22px;
+      padding: 22px;
+      min-width: 0;
+      position: relative;
+    }
+    .wide { grid-column: span 8; }
+    .narrow { grid-column: span 4; }
+    .half { grid-column: span 6; }
+    .full { grid-column: span 12; }
+    @media(max-width:600px){
+      .grid {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .panel {
+        padding: 18px 16px;
+        border-radius: 20px;
+      }
+    }
+
+    /* [영웅 카드: 큼직하고 웅장한 타이포그래피 + 클린 그라디언트] */
+    .hero {
+      position: relative;
+      border-radius: 28px;
+      padding: 26px 28px 22px 28px;
+      background: linear-gradient(130deg, #183b37 0%, var(--j-surface) 100%);
+      border: 1px solid var(--j-border);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    @media(max-width:600px){
+      .hero {
+        padding: 22px 18px 24px;
+        border-radius: 22px;
+      }
+    }
+    .kicker {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--j-sub);
+      margin-bottom: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(34px, 4vw, 44px);
+      line-height: 1.25;
+      letter-spacing: -1px;
+      margin: 0;
+      font-weight: 850;
+      color: #ffffff;
+      word-break: keep-all;
+    }
+    @media(max-width:600px){
+      h1 {
+        font-size: 34px;
+        line-height: 1.26;
+        letter-spacing: -0.8px;
+        font-weight: 850;
+        word-break: keep-all;
+      }
+    }
+    .h-phrase {
+      display: inline-block;
+      white-space: nowrap;
+    }
+    h2 { font-size: 18.5px; margin: 0; }
+    .accent { color: var(--j-accent); }
+    .muted { color: var(--j-sub); }
+    .note { font-size: 12.5px; margin-top: 12px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0 14px 0;
+    }
+    @media(max-width:600px){
+      .stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 12px 0 8px;
+      }
+    }
+    .stat {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .stat small {
+      display: flex;
+      align-items: flex-end;
+      min-height: 28px;
+      color: var(--j-sub);
+      font-size: 11.5px;
+      line-height: 1.3;
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
+      word-break: keep-all;
+    }
+    @media(max-width:600px){
+      .stat small {
+        font-size: 11px;
+        letter-spacing: -0.5px;
+        min-height: 26px;
+      }
+    }
+    .stat strong {
+      display: block;
+      font-size: 21px;
+      font-variant-numeric: tabular-nums;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.15;
+    }
+    @media(max-width:600px){
+      .stat strong {
+        font-size: 18px;
+        letter-spacing: -0.5px;
+      }
+    }
+    .stat-unit {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--j-sub);
+      margin-left: 2px;
+      letter-spacing: normal;
+    }
+    @media(max-width:600px){
+      .stat-unit {
+        font-size: 11.5px;
+        margin-left: 1.5px;
+      }
+    }
+    .stat-empty {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--j-sub);
+      letter-spacing: -0.3px;
+    }
+    @media(max-width:600px){
+      .stat-empty {
+        font-size: 14px;
+      }
+    }
+
+    /* 영웅 카드 하단 액션 버튼 영역 (텍스트 시작선 완벽 일치 & 모바일 상하 여백 최적화) */
+    .hero-btn-wrap {
+      margin-top: auto;
+      padding-top: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+    }
+    @media(max-width:600px){
+      .hero-btn-wrap {
+        margin-top: 14px;
+        padding-top: 18px;
+      }
+    }
+    .btn-hero-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(32, 44, 54, 0.75);
+      border: 1px solid var(--j-border);
+      border-radius: 11px;
+      color: var(--j-ink);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 14px;
+      min-height: 36px;
+      cursor: pointer;
+      margin: 0;
+      box-sizing: border-box;
+      transition: all 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-hero-action:hover {
+      background: var(--j-raised);
+      border-color: var(--j-accent);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .btn-hero-action:active {
+      transform: translateY(1px);
+    }
+
+    /* 전월/전일/전년 대비 지출 비교 카드 */
+    .comparison-panel {
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.3s ease;
+    }
+    .comparison-panel.is-more {
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+    .comparison-panel.is-less {
+      border-color: rgba(96, 165, 250, 0.4);
+    }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .card-header-row h2 {
+      font-size: 16px;
+      margin: 0;
+    }
+
+    .spend-headline {
+      margin-top: 2px;
+      margin-bottom: 10px;
+      min-height: 0;
+    }
+    .spend-context {
+      font-size: 12px;
+      color: var(--j-sub);
+      margin-bottom: 3px;
+    }
+    .spend-statement {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.45;
+      letter-spacing: -0.4px;
+      color: var(--j-ink);
+      word-break: keep-all;
+    }
+    @media(max-width:600px){
+      .spend-statement {
+        font-size: 15px;
+      }
+    }
+    .domain-tag {
+      display: inline-block;
+      color: var(--j-accent);
+      font-weight: 700;
+    }
+    .amount-highlight {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .trend-text-more {
+      color: #ff5c5c;
+      font-weight: 700;
+      background: var(--j-red-bg);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+    .trend-text-less {
+      color: #7bb6ff;
+      font-weight: 700;
+      background: var(--j-blue-bg);
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+
+    .trend-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.2px;
+      line-height: 1.3;
+    }
+    .trend-badge.more {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ff7878;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .trend-badge.less {
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+
+    /* 바 그래프 컨테이너 & 툴팁 */
+    .chart-container {
+      position: relative;
+      background: rgba(11, 16, 20, 0.6);
+      border: 1px solid rgba(42, 57, 69, 0.7);
+      border-radius: 16px;
+      padding: 10px 12px 8px;
+      margin-top: auto;
+    }
+    .bar-chart-svg {
+      width: 100%;
+      height: 175px;
+      display: block;
+      overflow: visible;
+    }
+
+    .bar-segment {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .bar-segment:hover {
+      filter: brightness(1.28);
+    }
+    .is-hovering .bar-segment {
+      opacity: 0.35;
+    }
+    .is-hovering .bar-segment.highlighted {
+      opacity: 1;
+      filter: brightness(1.25);
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      background: rgba(22, 30, 37, 0.98);
+      border: 1px solid #3b5062;
+      border-radius: 10px;
+      padding: 6px 11px;
+      font-size: 12px;
+      color: var(--j-ink);
+      pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 20;
+      white-space: nowrap;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      opacity: 0;
+      transform: translate(-50%, -100%);
+    }
+    .chart-tooltip.visible {
+      opacity: 1;
+    }
+    .tooltip-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px 8px;
+      justify-content: center;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(42, 57, 69, 0.4);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4.5px;
+      font-size: 11.5px;
+      color: var(--j-sub);
+      cursor: pointer;
+      padding: 3px 6px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .legend-item:hover, .legend-item.active {
+      color: var(--j-ink);
+      background: var(--j-raised);
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 어디에 썼을까요? 카드 크기 고정 & 글자 시인성 강화 */
+    /* ======================================================== */
+    .donut-panel {
+      height: 250px;
+      display: flex;
+      flex-direction: column;
+    }
+    @media(max-width:600px){
+      .donut-panel {
+        height: auto;
+        min-height: 215px;
+      }
+    }
+    .cost-layout {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      margin-top: 6px;
+      min-height: 0;
+    }
+    .donut {
+      width: 146px;
+      height: 146px;
+      flex-shrink: 0;
+    }
+    @media(max-width:600px){
+      .donut {
+        width: 132px;
+        height: 132px;
+      }
+    }
+    .cost-list {
+      flex: 1;
+      min-width: 140px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+    }
+    .cost-list .list-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--j-border);
+      font-size: 15px;
+    }
+    .cost-list .list-row:last-child {
+      border-bottom: 0;
+    }
+    @media(max-width:600px){
+      .cost-list .list-row {
+        gap: 8px;
+        font-size: 14px;
+        padding: 8px 0;
+      }
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 최근 기록이에요 카드 (모바일 270px 고정 & 내부 스크롤) */
+    /* ======================================================== */
+    .recent-panel {
+      height: 250px;
+      display: flex;
+      flex-direction: column;
+    }
+    @media(max-width:600px){
+      .recent-panel {
+        height: 270px;
+        display: flex;
+        flex-direction: column;
+      }
+    }
+    .recent-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .recent-list-wrap {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      min-height: 0;
+      scrollbar-width: thin;
+      scrollbar-color: #2a3945 transparent;
+    }
+    .recent-list-wrap::-webkit-scrollbar {
+      width: 4px;
+    }
+    .recent-list-wrap::-webkit-scrollbar-thumb {
+      background: #2a3945;
+      border-radius: 4px;
+    }
+    .recent-expense-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--j-border);
+      font-size: 13px;
+    }
+    .recent-expense-row:last-child {
+      border-bottom: 0;
+    }
+    .recent-left {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .recent-title-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    /* 카테고리별 색상 하이라이트 뱃지 */
+    .cat-highlight-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: -0.2px;
+      line-height: 1.2;
+    }
+    .recent-item-title {
+      color: var(--j-ink);
+      font-weight: 600;
+    }
+    .recent-date-sub {
+      color: var(--j-sub);
+      font-size: 11.5px;
+    }
+    .recent-amount {
+      font-size: 14.5px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--j-ink);
+      white-space: nowrap;
+    }
+
+    /* ======================================================== */
+    /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */
+    /* ======================================================== */
+    dialog#recordDialog {
+      color: var(--j-ink);
+      background: #141c23;
+      border: 1px solid #334454;
+      border-radius: 24px;
+      width: min(580px, calc(100% - 24px));
+      padding: 24px 26px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      z-index: 2000;
+    }
+    dialog#recordDialog::backdrop {
+      background: rgba(4, 8, 12, 0.75);
+      backdrop-filter: blur(8px);
+    }
+    .modal-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--j-border);
+    }
+    .modal-close-btn {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      color: var(--j-sub);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      min-height: 32px;
+      border-radius: 8px;
+    }
+    .modal-close-btn:hover {
+      color: var(--j-ink);
+      border-color: #486074;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    @media(max-width:600px){
+      .form-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12.5px;
+      color: var(--j-sub);
+    }
+    .form-field.full {
+      grid-column: 1 / -1;
+    }
+    .form-field input, .form-field select, .form-field textarea {
+      background: #0d1318;
+      border: 1px solid var(--j-border);
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      color: var(--j-ink);
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
+      border-color: var(--j-accent);
+    }
+    .file-input-box {
+      border: 1px dashed var(--j-border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #0b1014;
+      font-size: 12px;
+      color: var(--j-sub);
+    }
+    .modal-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--j-border);
+    }
+
+.shell{max-width:1280px;margin:auto}
+.status{margin:24px 0 10px;padding:12px 16px;font-size:12.5px;color:var(--j-sub);background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;text-align:center}
+#headline{font-weight:850}.cost-list{min-width:0}.recent-list-wrap{min-height:100px}
+.period-tab-btn:focus-visible,.legend-item:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
+#recordDialog .fields label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--j-sub)}
+#recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318}
+#recordDialog .row.spaced{padding-bottom:14px;border-bottom:1px solid var(--j-border);margin-bottom:18px}
+@media(max-width:850px){.wide,.narrow,.half{grid-column:span 12}.mast{flex-wrap:wrap}}
+@media(max-width:600px){
+  .shell{padding:16px}
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cost-layout{gap:12px;flex-wrap:nowrap}
+  .title-controls-row{flex-wrap:wrap}
+  .title-controls-row .date-pill{max-width:145px}
+  .stat strong{font-size:18px}
+  .stat-unit{font-size:11.5px}
+  #headline{font-size:clamp(22px,6.5vw,34px)}
+  .legend-item{padding:6px 8px;min-height:32px;background:transparent;border:0}
+  .trend-badge{white-space:nowrap;flex-shrink:0}
+}
+@media(max-width:360px){
+  .shell{padding:12px}
+  .stat strong{font-size:16px}
+  .stat-unit{font-size:10px}
+  .donut{width:115px;height:115px}
+  .h-phrase{white-space:normal}
+}
+.title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}
+.legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size:11px}
+.trend-badge{white-space:nowrap;flex-shrink:0}
+`;

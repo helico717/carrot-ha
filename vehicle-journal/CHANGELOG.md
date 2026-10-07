@@ -1,5 +1,33 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 모바일 탭 균등 분할, 최근 기록 카드 높이 고정, 도넛 시인성 및 상세 기록보기 버튼 정렬
+
+- 커밋 제목: `fix(vehicle-journal): enhance mobile tabs layout, fix recent panel overflow, improve donut visibility and align hero action button`.
+- 변경 내용 및 이유:
+  1. **모바일 최근 기록 카드(`recent-panel`) 무한 세로 확장 해결**:
+     - `@media(max-width:600px)` 미디어쿼리에서 `height: auto;`로 인해 카드가 자식 항목 수만큼 세로로 무한히 길어지던 문제를 해결하고, 모바일에서도 `height: 270px; display: flex; flex-direction: column;`로 적절한 높이를 유지하도록 수정.
+     - 내부 `.recent-list-wrap`의 `flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;`를 통해 약 3~4건이 노출되고 부드러운 터치 스크롤로 이번 달 전체 목록을 훑어볼 수 있도록 복원.
+  2. **모바일 상단 네비게이션 탭(`tabs`) 4개 25% 균등 분할 및 정렬 정상화**:
+     - 레거시 인라인/미디어쿼리의 `flex: 0 0 auto; min-width: 72px/90px/140px;` 잔재를 완전히 제거.
+     - `.tabs`에 `display: flex; width: 100%; box-sizing: border-box; padding: 4px; gap: 4px;`, `.tabs button`에 `flex: 1 1 0px; min-width: 0; font-size: 12.5px; padding: 8px 2px; text-align: center;`를 적용하여 4개 탭(`대시보드`, `주행 & 에너지`, `절약 비교`, `상세 기록`)이 모바일 화면 폭을 1/4(25%)씩 가로 스크롤이나 여백 없이 꽉 채우도록 완벽 수정.
+  3. **'어디에 썼을까요?' 도넛 차트 및 카테고리 목록 폰트 크기 확대 및 시인성 대폭 개선**:
+     - 도넛 차트 SVG 중앙 라벨: `font-size: 13px, font-weight: 600`, 중앙 금액: `font-size: 18.5px, font-weight: 850, fill: #ffffff`로 굵고 선명하게 확대.
+     - 도넛 SVG 크기 모바일 120px -> 132px (데스크톱 146px)로 확대.
+     - 오른쪽 카테고리 목록: 카테고리명 `font-size: 15px; font-weight: 600;`, 색상 도트 `9px`, 금액 `font-size: 16px; font-weight: 750; color: #ffffff;`로 시인성 확보.
+  4. **영웅 카드 '상세 기록보기' 버튼 위치 및 수직 기준선 정렬**:
+     - 모바일에서 위의 통계 수치(`233.7 kWh`)와 너무 붙어있던 문제를 `.hero-btn-wrap`에 `padding-top: 18px; margin-top: 14px;` (데스크톱 `padding-top: 22px; margin-top: auto;`)를 적용하여 넉넉하고 시원한 상하 간격 유지.
+     - 버튼 클래스 `.btn-hero-action`에 `margin: 0; box-sizing: border-box;`를 부여하고, 영웅 카드의 헤드라인(`10월 달에는`) 및 통계 텍스트(`이번달 충전량`)가 시작하는 좌측 수직 기준선(0px)과 1px의 오차 없이 완벽히 일치시켜 통일감 확보.
+  5. 프로토타입 HTML(`review_journal_spending.html`) 동일 스타일 동기화 및 캐시 버스팅 파라미터(`journal-20261007-mobile-align-1`) 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `review_journal_spending.html`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포 상태:
+  - Headless Chrome 뷰포트(402x1400 및 1280x900) 렌더링 검증 완료.
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee`로 직접 배포 완료 및 2개 파일(`carrot-journal-design.js`, `carrot-vehicle-journal.js`) SHA-256 해시 일치 확인 완료.
+  - HTTP 정적 서빙 엔드포인트(`http://192.168.0.140:8123/carrot_ha_static/...`) 최신 버전(`journal-20261007-mobile-align-1`) 응답 검증 완료.
+
 ## 2026-10-07 — 고정 로더의 main 및 HA 배포 확인
 
 - 커밋 제목: `vehicle-journal: record stable loader HA deployment and initial restart requirement`.
