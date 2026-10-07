@@ -1187,4 +1187,53 @@ export const journalDesign = `:host {
 .title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}
 .legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size:11px}
 .trend-badge{white-space:nowrap;flex-shrink:0}
+
+/* [Apple Health 스타일 추세(Trends) 대시보드] */
+.trends-container { display: flex; flex-direction: column; gap: 24px; }
+.trends-header { margin-bottom: 4px; }
+.trends-main-title { font-size: 26px; font-weight: 850; color: #ffffff; margin: 0 0 6px 0; letter-spacing: -0.6px; }
+.trends-main-desc { font-size: 13.5px; color: var(--j-sub); margin: 0; line-height: 1.5; }
+.trends-section { display: flex; flex-direction: column; gap: 12px; }
+.trends-section-title { font-size: 19px; font-weight: 750; color: #ffffff; margin: 0; letter-spacing: -0.4px; display: flex; align-items: center; gap: 8px; }
+.trends-empty-pill { background: var(--j-surface); border: 1px solid var(--j-border); color: var(--j-sub); border-radius: 12px; padding: 16px 20px; font-size: 14px; font-weight: 600; text-align: center; }
+
+/* 2열 그리드 레이아웃 & 2가지 예외 규칙 */
+.trends-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+/* [예외 1] 변동 있는 추세 항목이 1개일 경우 2열이 아닌 1열(전폭 100%)로 표시 */
+.trends-grid.single-item .trend-card { grid-column: 1 / -1; }
+/* [예외 2] 2열 배열에서 홀수로 인해 최하단에 혼자 남은 카드 -> 1열(전폭 100%) 자동 확장 */
+.trends-grid .trend-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* 추세 카드 스타일링 */
+.trend-card { background: #141c23; border: 1px solid var(--j-border); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); transition: transform 0.2s ease, border-color 0.2s ease; box-sizing: border-box; }
+.trend-card:hover { border-color: rgba(255, 255, 255, 0.22); transform: translateY(-2px); }
+.trend-card-top { display: flex; justify-content: space-between; align-items: center; }
+.trend-title-group { display: flex; align-items: center; gap: 8px; }
+.trend-badge-icon { font-size: 16px; line-height: 1; }
+.trend-metric-name { font-size: 15px; font-weight: 750; letter-spacing: -0.3px; }
+.trend-arrow { color: #647b8e; font-size: 18px; font-weight: 600; line-height: 1; }
+.trend-card-summary { font-size: 14px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
+.trend-card-summary strong { color: #ffffff; font-weight: 850; }
+.trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 6px 0; }
+.trend-headline { font-size: 18px; font-weight: 850; color: #ffffff; letter-spacing: -0.4px; margin: 0; line-height: 1.35; }
+.trend-chart-box { width: 100%; display: flex; flex-direction: column; position: relative; margin-top: 4px; }
+.trend-chart-svg-wrap { width: 100%; height: 75px; position: relative; }
+.trend-chart-svg { width: 100%; height: 100%; display: block; }
+
+/* 기준선 위 수치 라벨 (SVG 종횡비 왜곡 차단 - 순수 HTML 네이티브 텍스트 렌더링) */
+.trend-chart-avg-label { position: absolute; font-size: 13px; font-weight: 850; letter-spacing: -0.2px; transform: translateY(-100%); margin-bottom: 3px; pointer-events: none; white-space: nowrap; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95); line-height: 1; }
+.trend-chart-avg-label.pos-left { left: 6px; }
+.trend-chart-avg-label.pos-right { right: 6px; }
+.trend-chart-axis-labels { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--j-sub); line-height: 1; padding: 0 4px; }
+
+@media(max-width:600px){
+  .trends-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .trend-card { padding: 14px 14px; border-radius: 16px; gap: 8px; }
+  .trend-headline { font-size: 15px; }
+  .trend-metric-name { font-size: 13px; }
+  .trend-card-summary { font-size: 12px; }
+  .trend-chart-svg-wrap { height: 65px; }
+  .trend-chart-avg-label { font-size: 11.5px; }
+  .trend-chart-axis-labels { font-size: 10px; }
+}
 `;

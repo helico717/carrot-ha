@@ -1313,6 +1313,236 @@
       .lightbox-nav-btn.next { right: 6px; }
     }
 
+    /* ======================================================== */
+    /* [Apple Health 스타일 추세(Trends) 대시보드]                */
+    /* ======================================================== */
+    .trends-container {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .trends-header {
+      margin-bottom: 4px;
+    }
+    .trends-main-title {
+      font-size: 26px;
+      font-weight: 850;
+      color: #ffffff;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.6px;
+    }
+    .trends-main-desc {
+      font-size: 13.5px;
+      color: var(--j-sub);
+      margin: 0;
+      line-height: 1.5;
+    }
+    .trends-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .trends-section-title {
+      font-size: 19px;
+      font-weight: 750;
+      color: #ffffff;
+      margin: 0;
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .trends-empty-pill {
+      background: var(--j-surface);
+      border: 1px solid var(--j-border);
+      color: var(--j-sub);
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* 2열 그리드 레이아웃 & 2가지 예외 규칙 */
+    .trends-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    /* [예외 1] 변동 있는 추세 항목이 1개일 경우 2열이 아닌 1열(전폭 100%)로 표시 */
+    .trends-grid.single-item .trend-card {
+      grid-column: 1 / -1;
+    }
+    /* [예외 2] 2열 배열에서 홀수로 인해 최하단에 혼자 남은 카드 -> 1열(전폭 100%) 자동 확장 */
+    .trends-grid .trend-card:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+
+    /* 추세 카드 스타일링 (Apple Health 카드 정밀 구현) */
+    .trend-card {
+      background: #141c23;
+      border: 1px solid var(--j-border);
+      border-radius: 20px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+    .trend-card:hover {
+      border-color: rgba(255, 255, 255, 0.22);
+      transform: translateY(-2px);
+    }
+    .trend-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .trend-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .trend-badge-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+    .trend-metric-name {
+      font-size: 15px;
+      font-weight: 750;
+      letter-spacing: -0.3px;
+    }
+    .trend-arrow {
+      color: #647b8e;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .trend-card-summary {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2ecf3;
+      line-height: 1.45;
+      margin: 0;
+      letter-spacing: -0.2px;
+    }
+    .trend-card-summary strong {
+      color: #ffffff;
+      font-weight: 850;
+    }
+    .trend-diff-highlight {
+      display: inline-block;
+      font-size: 12.5px;
+      font-weight: 750;
+      padding: 2px 7px;
+      border-radius: 6px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .trend-diff-up {
+      background: rgba(129, 230, 197, 0.15);
+      color: var(--j-accent);
+      border: 1px solid rgba(129, 230, 197, 0.4);
+    }
+    .trend-diff-down {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.4);
+    }
+    .trend-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.08);
+      margin: 4px 0 6px 0;
+    }
+    .trend-headline {
+      font-size: 18px;
+      font-weight: 850;
+      color: #ffffff;
+      letter-spacing: -0.4px;
+      margin: 0;
+      line-height: 1.35;
+    }
+    .trend-chart-box {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      margin-top: 4px;
+    }
+    .trend-chart-svg-wrap {
+      width: 100%;
+      height: 75px;
+      position: relative;
+    }
+    .trend-chart-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* 기준선 위 수치 라벨 (SVG 종횡비 왜곡 차단 - 순수 HTML 네이티브 텍스트 렌더링) */
+    .trend-chart-avg-label {
+      position: absolute;
+      font-size: 13px;
+      font-weight: 850;
+      letter-spacing: -0.2px;
+      transform: translateY(-100%);
+      margin-bottom: 3px;
+      pointer-events: none;
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+      line-height: 1;
+    }
+    .trend-chart-avg-label.pos-left {
+      left: 6px;
+    }
+    .trend-chart-avg-label.pos-right {
+      right: 6px;
+    }
+    .trend-chart-axis-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--j-sub);
+      line-height: 1;
+      padding: 0 4px;
+    }
+
+    @media(max-width:600px){
+      .trends-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .trend-card {
+        padding: 14px 14px;
+        border-radius: 16px;
+        gap: 8px;
+      }
+      .trend-headline {
+        font-size: 15px;
+      }
+      .trend-metric-name {
+        font-size: 13px;
+      }
+      .trend-card-summary {
+        font-size: 12px;
+      }
+      .trend-chart-svg-wrap {
+        height: 65px;
+      }
+      .trend-chart-avg-label {
+        font-size: 11.5px;
+      }
+      .trend-chart-axis-labels {
+        font-size: 10px;
+      }
+    }
+
     /* 기타 보조 탭 뷰 (주행&에너지, 절약비교, 차계부, 차량상태) */
     .tab-view {
       display: none;
@@ -1439,7 +1669,7 @@
         <!-- 5대 탭 목록 (완전 작동 전환) -->
         <nav class="tabs" role="tablist">
           <button role="tab" id="tab0" aria-selected="true" onclick="selectTab(0)">대시보드</button>
-          <button role="tab" id="tab1" aria-selected="false" onclick="selectTab(1)">주행 & 에너지</button>
+          <button role="tab" id="tab1" aria-selected="false" onclick="selectTab(1)">추세</button>
           <button role="tab" id="tab2" aria-selected="false" onclick="selectTab(2)">절약 비교</button>
           <button role="tab" id="tab3" aria-selected="false" onclick="selectTab(3)">상세 기록</button>
         </nav>
@@ -1548,26 +1778,31 @@
           </div>
         </section>
 
-        <!-- [탭 1: 주행 & 에너지] -->
+        <!-- [탭 1: 추세 (Apple Health 추세 대시보드)] -->
         <section class="tab-view" id="view1">
-          <article class="panel">
-            <h2>달리고 충전한 흐름이에요.</h2>
-            <div style="display:flex; gap:10px; margin: 15px 0; flex-wrap:wrap;">
-              <select class="select-pill" id="energyMetricSelect" onchange="renderEnergyTabChart()">
-                <option value="distance">주행거리 · km</option>
-                <option value="cost">충전비 · 원</option>
-                <option value="eff">전비 · km/kWh</option>
-              </select>
+          <div class="trends-container">
+            <!-- 상단 헤더 -->
+            <div class="trends-header">
+              <h2 class="trends-main-title">추세</h2>
+              <p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p>
             </div>
-            <div style="background:rgba(11,16,20,0.6); border:1px solid #2a3945; border-radius:16px; padding:16px; height:200px; display:flex; align-items:flex-end; gap:8px;" id="energyChartBars">
-              <!-- 주행 에너지 차트 바 -->
+
+            <!-- 섹션 1: 변동 있는 추세 -->
+            <div class="trends-section" id="changingTrendsSection">
+              <h3 class="trends-section-title">변동 있는 추세</h3>
+              <div class="trends-grid" id="changingTrendsGrid">
+                <!-- 동적 렌더링 -->
+              </div>
             </div>
-            <div class="stats" style="margin-top:18px;">
-              <div class="stat"><small>총 충전량</small><strong id="energyChargeTotal">242.8 kWh</strong></div>
-              <div class="stat"><small>완속 / 급속</small><strong>9회 / 2회</strong></div>
-              <div class="stat"><small>주행 에너지 커버리지</small><strong>98.5%</strong></div>
+
+            <!-- 섹션 2: 변동 없는 추세 -->
+            <div class="trends-section" id="stableTrendsSection">
+              <h3 class="trends-section-title">변동 없는 추세</h3>
+              <div class="trends-grid" id="stableTrendsGrid">
+                <!-- 동적 렌더링 -->
+              </div>
             </div>
-          </article>
+          </div>
         </section>
 
         <!-- [탭 2: 절약 비교] -->
@@ -1751,7 +1986,7 @@
         comparison: {
           kicker: 'DAILY SPENDING COMPARISON',
           title: '어제 지출과 비교',
-          context: '어제(10/5) 대비 오늘(10/6) 지출 추이',
+          context: '어제(10/5) 대비 오늘(10/6) 지출 추세',
           baseLabel: '어제',
           prevName: '어제 (10/5)',
           currName: '오늘 (10/6)',
@@ -1788,7 +2023,7 @@
         comparison: {
           kicker: 'MONTHLY SPENDING COMPARISON',
           title: '지난달 지출과 비교',
-          context: '9월 대비 10월 지출 추이',
+          context: '9월 대비 10월 지출 추세',
           baseLabel: '지난달',
           prevName: '지난달 (9월)',
           currName: '이번달 (10월)',
@@ -1831,7 +2066,7 @@
         comparison: {
           kicker: 'YEARLY SPENDING COMPARISON',
           title: '작년 지출과 비교',
-          context: '2025년 대비 2026년 연간 지출 추이',
+          context: '2025년 대비 2026년 연간 지출 추세',
           baseLabel: '작년',
           prevName: '작년 (2025년)',
           currName: '올해 (2026년)',
@@ -1935,7 +2170,7 @@
         if (btn) btn.setAttribute('aria-selected', i === idx ? 'true' : 'false');
         if (view) view.classList.toggle('active', i === idx);
       }
-      if (idx === 1) renderEnergyTabChart();
+      if (idx === 1) renderTrendsDashboard();
       if (idx === 3) renderFullLedgerTable();
     }
 
@@ -2028,6 +2263,9 @@
 
       // 4. 최근 기록이에요 (지출 전용 갱신)
       renderRecentCard();
+
+      // 5. Apple Health 스타일 추세 대시보드 갱신
+      renderTrendsDashboard();
     }
 
     // 2번: 비교 카드 렌더링
@@ -2208,7 +2446,7 @@
         <rect x="${xCurr - barW/2}" y="${yCurr}" width="${barW}" height="${hCurr}" rx="8"
               fill="none" stroke="${trendColor}" stroke-width="1.5" pointer-events="none"/>
 
-        <!-- 추이 연결선 & 마커 -->
+        <!-- 추세 연결선 & 마커 -->
         <line x1="${xPrev}" y1="${yPrev}" x2="${xCurr}" y2="${yCurr}" stroke="${trendColor}" stroke-width="3" stroke-linecap="round"/>
         <circle cx="${xPrev}" cy="${yPrev}" r="5" fill="#f1f6fa" stroke="#32485c" stroke-width="2.5"/>
         <circle cx="${xCurr}" cy="${yCurr}" r="6" fill="#fff" stroke="${trendColor}" stroke-width="3"/>
@@ -2308,18 +2546,291 @@
       }).join('');
     }
 
-    // 주행&에너지 탭 바 차트 렌더링
-    function renderEnergyTabChart() {
-      const metric = document.getElementById('energyMetricSelect').value;
-      const container = document.getElementById('energyChartBars');
-      const heights = metric === 'distance' ? [35, 60, 42, 85, 20, 70, 95] : metric === 'cost' ? [20, 50, 0, 75, 0, 45, 90] : [70, 65, 80, 75, 85, 78, 82];
-      const days = ['10/1', '10/2', '10/3', '10/4', '10/5', '10/6', '10/7'];
-      container.innerHTML = heights.map((h, i) => `
-        <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;">
-          <div style="width:100%; max-width:28px; height:${h}%; background:var(--j-accent); border-radius:6px 6px 0 0; opacity:0.85;"></div>
-          <span style="font-size:11px; color:var(--j-sub); margin-top:6px;">${days[i]}</span>
+    // ========================================================
+    // [Apple Health 스타일 공식 추세 대시보드 렌더링 로직]
+    // ========================================================
+    const TREND_METRICS = [
+      {
+        id: 'efficiency',
+        name: '평균 전비',
+        icon: '⚡',
+        color: '#81e6c5',
+        unit: 'km/kWh',
+        isChanging: true, // [UP 케이스: 증가 추세]
+        trendStatus: 'up',
+        month: {
+          headline: '10월 동안 증가 추세',
+          subDesc: '지난달 평균 4.8 km/kWh 대비 12.5% 상승했어요.',
+          pastAvg: 4.8,
+          avg: 5.4,
+          pastPeriodLabel: '9월 평균',
+          currPeriodLabel: '10월 평균',
+          // 31일을 2일씩 묶은 16개 바 (과거 12개 + 최근 상승 4개)
+          bars: [4.7, 4.8, 4.9, 4.8, 4.7, 4.9, 4.8, 4.9, 5.0, 4.8, 4.9, 4.8, 5.3, 5.5, 5.6, 5.8]
+        },
+        year: {
+          headline: '2026년 동안 증가 추세',
+          subDesc: '작년 평균 5.0 km/kWh 대비 꾸준히 개선되고 있어요.',
+          pastAvg: 5.0,
+          avg: 5.6,
+          pastPeriodLabel: '상반기 평균',
+          currPeriodLabel: '하반기 평균',
+          bars: [4.8, 4.9, 5.0, 4.9, 5.1, 5.0, 5.2, 5.4, 5.6, 5.8, 5.9, 6.0]
+        }
+      },
+      {
+        id: 'distance',
+        name: '일일 주행거리',
+        icon: '🚗',
+        color: '#ff9f0a',
+        unit: 'km',
+        isChanging: true, // [DOWN 케이스: 감소 추세]
+        trendStatus: 'down',
+        month: {
+          headline: '10월 동안 감소 추세',
+          subDesc: '지난달 평균 56.4 km 대비 14.2% 줄어들었어요.',
+          pastAvg: 56.4,
+          avg: 41.2,
+          pastPeriodLabel: '9월 평균',
+          currPeriodLabel: '10월 평균',
+          bars: [58, 55, 60, 56, 54, 58, 55, 57, 56, 54, 55, 56, 44, 40, 38, 42]
+        },
+        year: {
+          headline: '2026년 동안 감소 추세',
+          subDesc: '작년 평균 1,520 km 대비 월 주행거리가 감소했어요.',
+          pastAvg: 1520,
+          avg: 1301,
+          pastPeriodLabel: '상반기 평균',
+          currPeriodLabel: '하반기 평균',
+          bars: [1540, 1500, 1520, 1510, 1490, 1530, 1420, 1380, 1320, 1280, 1250, 1290]
+        }
+      },
+      {
+        id: 'charge_kwh',
+        name: '일일 충전량',
+        icon: '🔌',
+        color: '#30b0c7',
+        unit: 'kWh',
+        isChanging: false, // [동일 케이스: 일관된 추세]
+        trendStatus: 'consistent',
+        month: {
+          headline: '10월 동안 일관된 추세',
+          subDesc: '하루 평균 12.4 kWh를 충전하여 안정적인 패턴이에요.',
+          avg: 12.4,
+          startLabel: '1일',
+          endLabel: '31일',
+          bars: [10, 14, 0, 21, 13, 0, 17, 24, 0, 12, 15, 0, 23, 17, 0, 24]
+        },
+        year: {
+          headline: '2026년 동안 일관된 추세',
+          subDesc: '월평균 242 kWh를 충전하여 전년과 동일한 수준이에요.',
+          avg: 242,
+          startLabel: '1월',
+          endLabel: '12월',
+          bars: [230, 225, 245, 255, 238, 242, 260, 250, 232, 240, 235, 242]
+        }
+      },
+      {
+        id: 'charge_rate',
+        name: 'kWh당 충전 단가',
+        icon: '💳',
+        color: '#ffd60a',
+        unit: '원',
+        isChanging: false, // [동일 케이스: 일관된 추세]
+        trendStatus: 'consistent',
+        month: {
+          headline: '10월 동안 일관된 추세',
+          subDesc: 'kWh당 평균 248원으로 단가 변동이 거의 없어요.',
+          avg: 248,
+          startLabel: '1일',
+          endLabel: '31일',
+          bars: [235, 245, 240, 252, 258, 248, 242, 255, 250, 246, 252, 248, 240, 255, 245, 248]
+        },
+        year: {
+          headline: '2026년 동안 일관된 추세',
+          subDesc: '연간 kWh당 평균 252원으로 안정적으로 유지되었어요.',
+          avg: 252,
+          startLabel: '1월',
+          endLabel: '12월',
+          bars: [260, 258, 250, 248, 245, 252, 255, 254, 250, 248, 252, 256]
+        }
+      },
+      {
+        id: 'drive_soc',
+        name: '주행 소모 SOC',
+        icon: '🔋',
+        color: '#af52de',
+        unit: '%p',
+        isChanging: false, // [동일 케이스: 일관된 추세]
+        trendStatus: 'consistent',
+        month: {
+          headline: '10월 동안 일관된 추세',
+          subDesc: '하루 평균 배터리를 18.5%p 사용하여 균일해요.',
+          avg: 18.5,
+          startLabel: '1일',
+          endLabel: '31일',
+          bars: [16, 20, 14, 19, 23, 17, 12, 27, 16, 18, 20, 15, 14, 25, 19, 15]
+        },
+        year: {
+          headline: '2026년 동안 일관된 추세',
+          subDesc: '하루 평균 18.2%p를 사용하여 배터리 효율이 일정해요.',
+          avg: 18.2,
+          startLabel: '1월',
+          endLabel: '12월',
+          bars: [19, 18, 18, 17, 16, 17, 18, 19, 18, 18, 20, 21]
+        }
+      },
+      {
+        id: 'fast_ratio',
+        name: '급속 충전 비중',
+        icon: '⚡',
+        color: '#ff453a',
+        unit: '%',
+        isChanging: false, // [동일 케이스: 일관된 추세]
+        trendStatus: 'consistent',
+        month: {
+          headline: '10월 동안 일관된 추세',
+          subDesc: '전체 충전 중 급속 충전 비중이 15%로 안정적이에요.',
+          avg: 15,
+          startLabel: '1일',
+          endLabel: '31일',
+          bars: [0, 20, 0, 25, 0, 0, 30, 0, 0, 20, 0, 0, 25, 0, 0, 20]
+        },
+        year: {
+          headline: '2026년 동안 일관된 추세',
+          subDesc: '완속 충전 위주의 건강한 배터리 패턴을 유지하고 있어요.',
+          avg: 16,
+          startLabel: '1월',
+          endLabel: '12월',
+          bars: [18, 15, 12, 14, 20, 22, 18, 15, 14, 15, 16, 17]
+        }
+      }
+    ];
+
+    // Apple Health 공식 추세 차트 렌더러 (텍스트 눌림 100% 방지: 순수 HTML 오버레이 레이아웃)
+    function generateTrendCardChartHtml(m, d) {
+      const bars = d.bars;
+      const isChanging = m.isChanging && d.pastAvg != null;
+      const maxVal = Math.max(...bars, d.avg, (d.pastAvg || 0)) * 1.25 || 1;
+      const n = bars.length;
+
+      // SVG 내부 바 그래픽 계산
+      const barElements = bars.map((val, idx) => {
+        const heightPct = Math.max(3, (val / maxVal) * 100);
+        const stepPct = 100 / n;
+        const barWPct = stepPct * 0.58;
+        const xPct = idx * stepPct + (stepPct - barWPct) / 2;
+        const yPct = 100 - heightPct;
+        return `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${barWPct.toFixed(2)}%" height="${heightPct.toFixed(2)}%" rx="2" fill="rgba(255,255,255,0.18)">
+          <title>${val}${m.unit}</title>
+        </rect>`;
+      }).join('');
+
+      let baselineLinesSvg = '';
+      let overlayLabelsHtml = '';
+      let axisLabelsHtml = '';
+
+      if (isChanging) {
+        // [Apple Health 공식] 변동이 있을 때: 과거 회색 기준선 vs 최근 컬러 기준선 (스텝 분할)
+        const pastYPct = Math.max(8, Math.min(92, (1 - d.pastAvg / maxVal) * 100));
+        const currYPct = Math.max(8, Math.min(92, (1 - d.avg / maxVal) * 100));
+        const splitXPct = ((n - 4) / n) * 100; // 마지막 4개 바가 최근 기간
+
+        baselineLinesSvg = `
+          <!-- 과거 기준선 (회색) -->
+          <line x1="0%" y1="${pastYPct.toFixed(1)}%" x2="${(splitXPct - 1.5).toFixed(1)}%" y2="${pastYPct.toFixed(1)}%" stroke="#718698" stroke-width="2.2" stroke-linecap="round"/>
+          <!-- 최근 변동 기준선 (지표 고유 컬러 실선) -->
+          <line x1="${(splitXPct + 1.5).toFixed(1)}%" y1="${currYPct.toFixed(1)}%" x2="100%" y2="${currYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.8" stroke-linecap="round"/>
+        `;
+
+        // 절대 위치 HTML 텍스트 오버레이 (SVG 변환 왜곡 완전 차단)
+        overlayLabelsHtml = `
+          <span class="trend-chart-avg-label pos-left" style="top:${pastYPct.toFixed(1)}%; color:#8fa4b5;">${d.pastAvg}${m.unit}</span>
+          <span class="trend-chart-avg-label pos-right" style="top:${currYPct.toFixed(1)}%; color:${m.color};">${d.avg}${m.unit}</span>
+        `;
+
+        axisLabelsHtml = `
+          <div class="trend-chart-axis-labels">
+            <span style="color:#718698;">${d.pastPeriodLabel}</span>
+            <span style="color:${m.color}; font-weight:750;">${d.currPeriodLabel}</span>
+          </div>
+        `;
+      } else {
+        // [Apple Health 공식] 변동이 없을 때(동일/일관): 단일 컬러 기준선 관통
+        const avgYPct = Math.max(8, Math.min(92, (1 - d.avg / maxVal) * 100));
+
+        baselineLinesSvg = `
+          <line x1="0%" y1="${avgYPct.toFixed(1)}%" x2="100%" y2="${avgYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.4" stroke-linecap="round"/>
+        `;
+
+        overlayLabelsHtml = `
+          <span class="trend-chart-avg-label pos-left" style="top:${avgYPct.toFixed(1)}%; color:${m.color};">${d.avg}${m.unit}</span>
+        `;
+
+        axisLabelsHtml = `
+          <div class="trend-chart-axis-labels">
+            <span>${d.startLabel}</span>
+            <span>${d.endLabel}</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="trend-chart-box">
+          <div class="trend-chart-svg-wrap">
+            <svg class="trend-chart-svg" width="100%" height="100%">
+              <g>${barElements}</g>
+              ${baselineLinesSvg}
+            </svg>
+            ${overlayLabelsHtml}
+          </div>
+          ${axisLabelsHtml}
         </div>
-      `).join('');
+      `;
+    }
+
+    function renderTrendsDashboard() {
+      const changingContainer = document.getElementById('changingTrendsGrid');
+      const stableContainer = document.getElementById('stableTrendsGrid');
+      if (!changingContainer || !stableContainer) return;
+
+      const p = currentPeriod === 'year' ? 'year' : 'month';
+
+      const changingItems = TREND_METRICS.filter(m => m.isChanging);
+      const stableItems = TREND_METRICS.filter(m => !m.isChanging);
+
+      // [예외 1] 변동 있는 추세 항목이 1개일 경우 1열(전폭 100%) 클래스 부여 (2개 이상이면 자동 2열)
+      changingContainer.classList.toggle('single-item', changingItems.length === 1);
+
+      function renderCard(m) {
+        const d = m[p];
+        const chartHtml = generateTrendCardChartHtml(m, d);
+
+        return `
+          <article class="trend-card">
+            <div class="trend-card-top">
+              <div class="trend-title-group">
+                <span class="trend-badge-icon">${m.icon}</span>
+                <span class="trend-metric-name" style="color:${m.color};">${m.name}</span>
+              </div>
+              <span class="trend-arrow">›</span>
+            </div>
+            <h4 class="trend-headline">${d.headline}</h4>
+            <p class="trend-card-summary">${d.subDesc}</p>
+            <div class="trend-divider"></div>
+            ${chartHtml}
+          </article>
+        `;
+      }
+
+      if (changingItems.length === 0) {
+        changingContainer.innerHTML = `<div class="trends-empty-pill" style="grid-column: 1 / -1;">최근 감지된 유의미한 변동이 없어요.</div>`;
+      } else {
+        changingContainer.innerHTML = changingItems.map(renderCard).join('');
+      }
+
+      // 변동 없는 추세: 기본 2열 + [예외 2 적용] 홀수로 최하단에 남은 카드는 CSS :last-child:nth-child(odd)로 1열 전폭 자동 확장
+      stableContainer.innerHTML = stableItems.map(renderCard).join('');
     }
 
     // 전체 원장 테이블 렌더링 (사진 썸네일, 관리 열 액션 버튼, 라이트박스 뷰어 연동)
@@ -2666,6 +3177,9 @@
     } else if (urlParams.get('mode') === 'max') {
       setDeviceMode('max');
     }
+    if (urlParams.get('period') === 'year') {
+      setPeriod('year');
+    }
     if (urlParams.get('empty') === '1') {
       toggleEmptyStatsTest(true);
     }
@@ -2674,6 +3188,9 @@
       document.getElementById('recordAmount').value = '50,000';
     }
     renderAllDashboardCards();
+    if (urlParams.has('tab')) {
+      selectTab(Number(urlParams.get('tab')));
+    }
   </script>
 </body>
 </html>

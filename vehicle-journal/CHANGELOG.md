@@ -1,5 +1,48 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 주행&에너지 탭 '추세' 개편, Apple Health 스타일 2열 추세 대시보드 및 폰트 왜곡 해소
+
+- 커밋 제목: `feat(vehicle-journal): revamp trends tab with Apple Health style 2-column dashboard and fix text distortion`.
+- 변경 내용 및 이유:
+  1. **탭 명칭 및 용어 개편 (`주행 & 에너지` ➔ `추세`, '추이' ➔ '추세')**:
+     - 상단 네비게이션 2번째 탭 명칭을 `주행 & 에너지`에서 **`추세`**로 변경 (`['대시보드', '추세', '절약 비교', '상세 기록']`).
+     - 지출 비교 문구, 차트 라벨, 툴팁, 설명문 등 UI 전반에서 사용되던 용어 '추이'를 전부 **`추세`**로 통일.
+  2. **Apple Health 공식 추세(Trends) 대시보드 완벽 재현**:
+     - 상단 헤더: `추세` 타이틀 & 안내 문구 (`주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.`).
+     - **섹션 1: 변동 있는 추세**: 최근 기간 기준 ±5% 이상 유의미한 변동이 감지된 항목 배치 (없으면 `최근 감지된 유의미한 변동이 없어요.` 배너 노출).
+     - **섹션 2: 변동 없는 추세**: 안정적인 패턴을 유지 중인 항목 배치.
+     - **Apple 공식 3가지 추세 시각화 패턴 정밀 구현**:
+       * **증가 추세 (`up`)**: 과거 회색 기준선(좌측) vs 최근 컬러 기준선(우측 상단 상승 스텝) + 헤드라인 `... 동안 증가 추세`.
+       * **감소 추세 (`down`)**: 과거 회색 기준선(좌측) vs 최근 컬러 기준선(우측 하단 하강 스텝) + 헤드라인 `... 동안 감소 추세`.
+       * **일관된 추세 (`consistent`)**: 전체 기간을 관통하는 단일 컬러 기준선 + 헤드라인 `... 동안 일관된 추세`.
+  3. **2열 그리드 및 2대 예외 레이아웃 규칙 구현**:
+     - 기본 2열 카드 그리드 레이아웃 (`repeat(2, minmax(0, 1fr))`).
+     - **[예외 1]** 변동 있는 추세 항목이 1개일 경우: 2열이 아닌 1열(전폭 100%)로 표시 (`.trends-grid.single-item`).
+     - **[예외 2]** 2열 배열에서 홀수로 인해 최하단에 혼자 남은 카드: 1열(전폭 100%)로 자동 확장 (`:last-child:nth-child(odd)`).
+  4. **바(Bar) 그래프 집계 단위 사용자 맞춤 사양 적용**:
+     - **월별 (`month`)**: 31일을 2일씩 묶은 평균값(16개 바)으로 표시하여 가독성 극대화 + X축 `1일` / `31일`.
+     - **연도별 (`year`)**: 1년 12개월을 각 달 단위(12개 바)로 표시 + X축 `1월` / `12월`.
+  5. **핵심 6대 지표 선정 (팬텀 드레인 완전 배제)**:
+     - ⚡ 평균 전비 (`efficiency`, km/kWh, #81e6c5)
+     - 🚗 일일 주행거리 (`distance`, km, #ff9f0a)
+     - 🔌 일일 충전량 (`charge_kwh`, kWh, #30b0c7)
+     - 💳 kWh당 충전 단가 (`charge_rate`, 원, #ffd60a)
+     - 🔋 주행 소모 SOC (`drive_soc`, %p, #af52de)
+     - ⚡ 급속 충전 비중 (`fast_ratio`, %, #ff453a)
+     - 실측 불가능한 '주차 중 대기 방전(팬텀 드레인)'은 사용자 지침에 따라 완전히 배제.
+  6. **데스크톱/모바일 텍스트 눌림/왜곡 100% 해소**:
+     - SVG `<text>`의 비율 찌그러짐 문제를 해결하기 위해, SVG는 순수 그래픽(바, 기준선)만 렌더링하고 모든 수치와 축 라벨은 HTML 네이티브 레이어로 오버레이 분리하여 모든 해상도에서 폰트 선명도 보장.
+  7. 프로토타입 HTML(`review_journal_spending.html`) 및 컴포넌트(`carrot-vehicle-journal.js`, `carrot-journal-design.js`) 동기화 및 캐시 버스팅 파라미터(`journal-20261007-trends-dashboard-1`) 갱신.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`
+  - `review_journal_spending.html`
+  - `vehicle-journal/CHANGELOG.md`
+- 검증 및 배포 상태:
+  - Headless Chrome을 통해 모바일(402px) 및 데스크톱(1400px) 추세 탭, 2열 레이아웃, 예외 규칙, 글자 눌림 해소 렌더링 검증 완료.
+  - Python 유닛 테스트 310개 전수 통과 (`OK, skipped=4`).
+  - HA 실서버(`192.168.0.140`)에 SSH `sudo tee`로 직접 배포 완료 및 2개 파일(`carrot-vehicle-journal.js`, `carrot-journal-design.js`) SHA-256 해시 일치 확인 완료.
+
 ## 2026-10-07 — 상세 기록 사진 썸네일 프리뷰, 라이트박스 확대 뷰어 및 관리 열 액션 버튼 배열
 
 - 커밋 제목: `feat(vehicle-journal): add photo thumbnail preview, lightbox viewer and rearrange action buttons in records table`.

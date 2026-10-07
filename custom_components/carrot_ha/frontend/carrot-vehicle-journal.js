@@ -1,4 +1,4 @@
-const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-photo-viewer-1';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-trends-dashboard-1';
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
@@ -54,14 +54,14 @@ export class VehicleJournal extends HTMLElement {
   getCardSize(){return 12;}
   getGridOptions(){return {columns:36,rows:'auto',min_columns:6};}
   static getStubConfig(){return {entry_id:''};}
-  connectedCallback(){if(!this.ready)this.build();else this.resize?.observe(this.$('chart'));this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
+  connectedCallback(){if(!this.ready)this.build();this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
   disconnectedCallback(){for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
   $(id){return this.shadowRoot.getElementById(id);}
   build(){
     this.ready=true;
     this.shadowRoot.innerHTML=`<style>${styles}${journalDesign}</style><div class="shell">
     <header class="mast"><div class="mast-left"><div class="title-controls-row"><h2>차계부</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
-    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','주행 & 에너지','절약 비교','상세 기록'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
+    <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','추세','절약 비교','상세 기록'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
     <section id="page0" role="tabpanel" aria-labelledby="tab0">
           <div class="grid">
 
@@ -145,7 +145,7 @@ export class VehicleJournal extends HTMLElement {
 
           </div>
         </section>
-    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><article class="panel"><h2>달리고 충전한 흐름이에요.</h2><div class="chart-controls"><select id="metric" aria-label="추이 지표"><option value="distance_km">주행거리 · km</option><option value="drive_energy_kwh">주행 소비 · kWh</option><option value="battery_charge_kwh">충전량 · kWh</option><option value="charge_effective_krw">충전비 · 원</option><option value="efficiency">전비 · km/kWh</option><option value="drive_soc_used_pp">주행 사용 SOC · %p</option></select><select id="period" aria-label="집계 단위"><option value="day">1일 단위</option><option value="week">1주 단위</option><option value="month">1개월 단위</option></select></div><svg id="chart" class="chart" role="img" aria-label="날짜별 추이"></svg><div class="stats" id="energyStats"></div><p class="note" id="qualityNote"></p></article></section>
+    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><div class="trends-section" id="changingTrendsSection"><h3 class="trends-section-title">변동 있는 추세</h3><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
     <section id="page2" role="tabpanel" aria-labelledby="tab2" hidden><div class="grid"><article class="panel wide hero"><h2>같은 거리를 다른 차로 달렸다면요.</h2><div class="compare-value" id="saving">유가 센서를 먼저 연결해 주세요.</div><div id="compareDetail"></div><p class="note">선택 기간의 충전비와 현재 유가 기준 예상 유류비만 비교해요. 전체 차량 유지비 절감은 아니에요.</p></article><article class="panel narrow"><h2>비교 기준을 정해요.</h2><form id="compareForm"><div class="fields"><label class="fullfield">비교 유종<select id="fuel"><option value="gasoline">휘발유</option><option value="diesel">경유</option><option value="premium">고급유</option></select></label><label class="fullfield">비교 연비 · km/L<input id="economy" type="number" min="1" max="50" step="0.1" value="12" required></label><label class="fullfield">HA 유가 센서<input id="fuelEntity" placeholder="sensor.fuel_price" required></label></div><button class="primary" type="submit">HA에 비교 기준 저장</button><p class="note" id="compareMessage" role="status"></p></form></article></div></section>
     <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="row spaced"><h2>차에 남긴 기록이에요.</h2><button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button></div><p class="note">자동 주행·충전·결제와 직접 남긴 기록을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="table-wrap"><table class="table"><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th>거리·충전·금액</th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
     <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
@@ -179,8 +179,6 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('recordForm'))this.$('recordForm').onsubmit=event=>this.saveRecord(event);
     const actualInput=this.$('actualKrw');
     if(actualInput)actualInput.oninput=e=>{const raw=e.target.value.replace(/[^\d]/g,'');e.target.value=raw?Number(raw).toLocaleString('ko-KR'):'';};
-    if(this.$('metric'))this.$('metric').onchange=()=>{this.metric=this.$('metric').value;this.drawChart();};
-    if(this.$('period'))this.$('period').onchange=()=>{this.period=this.$('period').value;this.drawChart();};
     if(this.$('previous'))this.$('previous').onclick=()=>{this.offset=Math.max(0,this.offset-100);this.load(true);};
     if(this.$('next'))this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
     if(this.$('records'))this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
@@ -191,9 +189,8 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('photos'))this.$('photos').onchange=()=>{this.selectedPhotos=[...this.$('photos').files];this.renderSelectedPhotos();};
     this.$('clearPhotos').onclick=e=>{e.preventDefault();this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();};
     if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
-    if(this.$('chart')){this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));}
   }
-  selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
+  selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.renderTrendsDashboard();}
   hasPendingInput(){return !!(this.$('recordDialog')?.open||this.$('save')?.disabled||this.draftDirty||this.comparisonDirty||this.pendingWrites||this.selectedPhotos?.length);}
   async call(type,params={}){const write=['record/save','record/status','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}finally{if(write)this.pendingWrites--;}}
   async load(force=false){
@@ -391,7 +388,7 @@ export class VehicleJournal extends HTMLElement {
         <rect x="${xCurr - barW/2}" y="${yCurr}" width="${barW}" height="${hCurr}" rx="8"
               fill="none" stroke="${trendColor}" stroke-width="1.5" pointer-events="none"/>
 
-        <!-- 추이 연결선 & 마커 -->
+        <!-- 추세 연결선 & 마커 -->
         <line x1="${xPrev}" y1="${yPrev}" x2="${xCurr}" y2="${yCurr}" stroke="${trendColor}" stroke-width="3" stroke-linecap="round"/>
         <circle cx="${xPrev}" cy="${yPrev}" r="5" fill="#f1f6fa" stroke="#32485c" stroke-width="2.5"/>
         <circle cx="${xCurr}" cy="${yCurr}" r="6" fill="#fff" stroke="${trendColor}" stroke-width="3"/>
@@ -486,19 +483,254 @@ export class VehicleJournal extends HTMLElement {
     if(d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){this.$('fuel').value=d.comparison.fuel;this.$('economy').value=d.comparison.economy_km_l;this.$('fuelEntity').value=JSON.parse(d.comparison.sensor_entities_json)[d.comparison.fuel]||'';}
     if(!d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){const entity=d.fuel_sensors?.[this.$('fuel').value];if(entity){this.$('fuelEntity').value=entity;this.$('compareMessage').textContent='기존 전국 평균 유가 센서를 찾았어요. 비교 연비를 확인하고 저장해 주세요.';}}
     if(d.fuel_price&&d.comparison&&t.distance_km!=null&&t.charge_effective_krw!=null){const ice=t.distance_km/d.comparison.economy_km_l*d.fuel_price.price;const saving=ice-t.charge_effective_krw;this.$('saving').textContent=money(Math.abs(saving))+(saving>=0?'을 아꼈어요.':'이 더 들었어요.');this.$('compareDetail').innerHTML=`<p>내 전기차 ${money(t.charge_effective_krw)} · 비교 차량 ${money(ice)}</p><small>현재 HA 유가 ${money(d.fuel_price.price)}/L · ${esc(d.fuel_price.observed_at)}</small>`;}else{this.$('saving').textContent='비교에 필요한 거리·충전비·유가를 확인해 주세요.';this.$('compareDetail').textContent='원/L·KRW/L 센서 또는 gas_station_korea의 원 단위 유가 센서를 사용할 수 있어요. 비교 기준을 저장해 주세요.';}
-    this.drawChart();
+    this.renderTrendsDashboard();
     this.loadThumbnails();
   }
   recordValue(r){return r.kind==='trip'?numeric(r.distance_km)+' km':r.kind==='charge'?numeric(r.battery_charge_kwh)+' kWh':money(r.actual_krw??r.estimated_krw);}
-  drawChart(){
-    if(!this.data||!this.$('chart')||this.tab!==1)return;
-    const groups=new Map();for(const row of this.data.daily){let key=row.day;if(this.period==='month')key=key.slice(0,7);if(this.period==='week'){const dt=new Date(key+'T00:00:00Z');dt.setUTCDate(dt.getUTCDate()-((dt.getUTCDay()+6)%7));key=dt.toISOString().slice(0,10);}const group=groups.get(key)||{key,value:null,distance:0,energy:0};if(this.metric==='efficiency'){group.distance+=row.energy_distance_km||0;group.energy+=row.drive_energy_kwh||0;group.value=group.energy?group.distance/group.energy:null;}else if(row[this.metric]!=null)group.value=(group.value||0)+row[this.metric];groups.set(key,group);}
-    const values=[...groups.values()],w=Math.max(280,this.$('chart').getBoundingClientRect().width),h=240,l=64,r=16,b=40,t=25,pw=w-l-r,ph=h-b-t,max=Math.max(1,...values.map(v=>v.value||0))*1.15;
-    this.$('chart').setAttribute('viewBox',`0 0 ${w} ${h}`);
-    const points=values.map((v,i)=>({...v,x:l+(i+.5)*pw/Math.max(1,values.length),y:t+ph*(1-(v.value||0)/max)}));
-    let path='',previousValid=false;for(const p of points){if(p.value==null){previousValid=false;continue;}path+=(previousValid?'L':'M')+p.x+','+p.y+' ';previousValid=true;}
-    this.$('chart').innerHTML=`<title>${esc(this.$('metric').selectedOptions[0].textContent)} 추이</title>`+Array.from({length:4},(_,i)=>{const y=t+ph*i/3;return `<line x1="${l}" y1="${y}" x2="${w-r}" y2="${y}" stroke="var(--j-border)"/><text x="${l-8}" y="${y+4}" text-anchor="end">${numeric(max*(1-i/3),1)}</text>`;}).join('')+points.map((p,i)=>`${p.value!=null?`<rect x="${p.x-pw/Math.max(1,values.length)*.28}" y="${p.y}" width="${pw/Math.max(1,values.length)*.56}" height="${t+ph-p.y}" rx="3" fill="var(--j-accent)" opacity=".25"><title>${esc(p.key)} · ${numeric(p.value)}</title></rect>`:''}${i%Math.max(1,Math.ceil(points.length/(w<420?3:6)))===0?`<text x="${p.x}" y="${h-12}" text-anchor="middle">${p.key.slice(5)}</text>`:''}`).join('')+`<path d="${path}" stroke="var(--j-accent)" stroke-width="2" fill="none"/><text x="${l}" y="14">${esc(this.$('metric').selectedOptions[0].textContent.split(' · ')[1])}</text>`;
-    if(!points.length)this.$('chart').innerHTML=`<text x="${w/2}" y="120" text-anchor="middle">이 기간의 기록이 없어요.</text>`;
+  renderTrendsDashboard(){
+    const changingContainer=this.$('changingTrendsGrid');
+    const stableContainer=this.$('stableTrendsGrid');
+    if(!changingContainer||!stableContainer||!this.data)return;
+
+    const daily=this.data.daily||[];
+    const prevDaily=this.data.previous?.daily||[];
+    const totals=this.data.totals||{};
+    const prevTotals=this.data.previous?.totals||{};
+    const isYear=this.scope==='year';
+    const monthVal=this.$('month')?.value||new Date().toLocaleDateString('sv-SE').slice(0,7);
+    const yearStr=monthVal.slice(0,4);
+    const monthNum=Number(monthVal.slice(5,7));
+    const periodName=isYear?`${yearStr}년`:`${monthNum}월`;
+    const prevPeriodName=isYear?'지난해':'지난달';
+
+    if(daily.length===0){
+      changingContainer.classList.remove('single-item');
+      changingContainer.innerHTML='<div class="trends-empty-pill" style="grid-column: 1 / -1;">이 기간에 기록된 주행 및 충전 데이터가 아직 없어요.</div>';
+      stableContainer.innerHTML='';
+      return;
+    }
+
+    let numBins=16;
+    let daysInMonth=31;
+    if(!isYear){
+      const yr=Number(yearStr),mo=monthNum;
+      daysInMonth=new Date(yr,mo,0).getDate();
+      numBins=Math.ceil(daysInMonth/2);
+    }else{
+      numBins=12;
+    }
+
+    const bins=Array.from({length:numBins},()=>({
+      distance_km:0,energy_distance_km:0,drive_energy_kwh:0,
+      battery_charge_kwh:0,billed_charge_kwh:0,charge_effective_krw:0,
+      drive_soc_used_pp:0,slow_count:0,fast_count:0,day_count:0
+    }));
+
+    for(const row of daily){
+      const dayStr=row.day;
+      let binIdx=0;
+      if(!isYear){
+        const d=Number(dayStr.slice(8,10));
+        binIdx=Math.min(numBins-1,Math.floor((d-1)/2));
+      }else{
+        const m=Number(dayStr.slice(5,7));
+        binIdx=Math.min(11,m-1);
+      }
+      const b=bins[binIdx];
+      b.distance_km+=row.distance_km||0;
+      b.energy_distance_km+=row.energy_distance_km||0;
+      b.drive_energy_kwh+=row.drive_energy_kwh||0;
+      b.battery_charge_kwh+=row.battery_charge_kwh||0;
+      b.billed_charge_kwh+=row.billed_charge_kwh||0;
+      b.charge_effective_krw+=row.charge_effective_krw||0;
+      b.drive_soc_used_pp+=row.drive_soc_used_pp||0;
+      b.slow_count+=row.slow_count||0;
+      b.fast_count+=row.fast_count||0;
+      b.day_count++;
+    }
+
+    const currEff=totals.efficiency_km_kwh!=null&&totals.efficiency_km_kwh>0?+totals.efficiency_km_kwh.toFixed(1):(totals.drive_energy_kwh?+(totals.energy_distance_km/totals.drive_energy_kwh).toFixed(1):null);
+    const pastEff=prevTotals.efficiency_km_kwh!=null&&prevTotals.efficiency_km_kwh>0?+prevTotals.efficiency_km_kwh.toFixed(1):(prevTotals.drive_energy_kwh?+(prevTotals.energy_distance_km/prevTotals.drive_energy_kwh).toFixed(1):null);
+    const effBars=bins.map(b=>b.drive_energy_kwh>0?+(b.energy_distance_km/b.drive_energy_kwh).toFixed(1):0);
+
+    const currDist=totals.distance_km!=null?+(totals.distance_km/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
+    const prevDist=prevTotals.distance_km!=null?+(prevTotals.distance_km/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
+    const distBars=bins.map(b=>+(b.distance_km/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+
+    const currCharge=totals.battery_charge_kwh!=null?+(totals.battery_charge_kwh/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
+    const prevCharge=prevTotals.battery_charge_kwh!=null?+(prevTotals.battery_charge_kwh/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
+    const chargeBars=bins.map(b=>+(b.battery_charge_kwh/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+
+    const currChargeKwhTotal=totals.billed_charge_kwh||totals.battery_charge_kwh||0;
+    const currRate=(totals.charge_effective_krw&&currChargeKwhTotal>0)?Math.round(totals.charge_effective_krw/currChargeKwhTotal):null;
+    const prevChargeKwhTotal=prevTotals.billed_charge_kwh||prevTotals.battery_charge_kwh||0;
+    const prevRate=(prevTotals.charge_effective_krw&&prevChargeKwhTotal>0)?Math.round(prevTotals.charge_effective_krw/prevChargeKwhTotal):null;
+    const rateBars=bins.map(b=>{const kwh=b.billed_charge_kwh||b.battery_charge_kwh||0;return (b.charge_effective_krw&&kwh>0)?Math.round(b.charge_effective_krw/kwh):0;});
+
+    const currDriveSoc=totals.drive_soc_used_pp!=null?+(totals.drive_soc_used_pp/(isYear?Math.max(1,daily.length):daysInMonth)).toFixed(1):null;
+    const prevDriveSoc=prevTotals.drive_soc_used_pp!=null?+(prevTotals.drive_soc_used_pp/(isYear?Math.max(1,prevDaily.length):30)).toFixed(1):null;
+    const driveSocBars=bins.map(b=>+(b.drive_soc_used_pp/Math.max(1,isYear?(b.day_count||30):2)).toFixed(1));
+
+    const currSlowFast=(totals.slow_count||0)+(totals.fast_count||0);
+    const currFastRatio=currSlowFast>0?Math.round(((totals.fast_count||0)/currSlowFast)*100):null;
+    const prevSlowFast=(prevTotals.slow_count||0)+(prevTotals.fast_count||0);
+    const prevFastRatio=prevSlowFast>0?Math.round(((prevTotals.fast_count||0)/prevSlowFast)*100):null;
+    const fastRatioBars=bins.map(b=>{const tot=(b.slow_count||0)+(b.fast_count||0);return tot>0?Math.round((b.fast_count/tot)*100):0;});
+
+    const createMetric=(id,name,icon,color,unit,currVal,pastVal,bars)=>{
+      const hasCurrent=currVal!=null&&currVal>0;
+      const hasPast=pastVal!=null&&pastVal>0;
+      let isChanging=false;
+      let trendStatus='consistent';
+      let headline=`${periodName} 동안 일관된 추세`;
+      let subDesc='현재 관측된 패턴을 안정적으로 유지하고 있어요.';
+
+      if(hasCurrent&&hasPast){
+        const diff=currVal-pastVal;
+        const diffPct=(diff/pastVal)*100;
+        if(Math.abs(diffPct)>=5.0){
+          isChanging=true;
+          if(diff>0){
+            trendStatus='up';
+            headline=`${periodName} 동안 증가 추세`;
+            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${Math.abs(diffPct).toFixed(1)}% 상승했어요.`;
+          }else{
+            trendStatus='down';
+            headline=`${periodName} 동안 감소 추세`;
+            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${Math.abs(diffPct).toFixed(1)}% 감소했어요.`;
+          }
+        }else{
+          trendStatus='consistent';
+          headline=`${periodName} 동안 일관된 추세`;
+          subDesc=`${prevPeriodName}과 비슷한 안정적인 패턴이에요.`;
+        }
+      }else if(hasCurrent){
+        headline=`${periodName} 동안 일관된 추세`;
+        subDesc='안정적으로 기록되고 있어요.';
+      }
+
+      return {
+        id,name,icon,color,unit,isChanging,trendStatus,headline,subDesc,
+        pastAvg:hasPast?pastVal:null,avg:hasCurrent?currVal:0,
+        pastPeriodLabel:isYear?`${Number(yearStr)-1}년 평균`:`${prevPeriodName} 평균`,
+        currPeriodLabel:isYear?`${yearStr}년 평균`:`${monthNum}월 평균`,
+        startLabel:isYear?'1월':'1일',
+        endLabel:isYear?'12월':`${daysInMonth}일`,
+        bars:bars||[]
+      };
+    };
+
+    const metrics=[
+      createMetric('efficiency','평균 전비','⚡','#81e6c5','km/kWh',currEff,pastEff,effBars),
+      createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,pastDist,distBars),
+      createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,pastCharge,chargeBars),
+      createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,pastRate,rateBars),
+      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%p',currDriveSoc,pastDriveSoc,driveSocBars),
+      createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,pastFastRatio,fastRatioBars)
+    ];
+
+    const changingItems=metrics.filter(m=>m.isChanging);
+    const stableItems=metrics.filter(m=>!m.isChanging);
+
+    changingContainer.classList.toggle('single-item',changingItems.length===1);
+
+    if(changingItems.length===0){
+      changingContainer.innerHTML='<div class="trends-empty-pill" style="grid-column: 1 / -1;">최근 감지된 유의미한 변동이 없어요.</div>';
+    }else{
+      changingContainer.innerHTML=changingItems.map(m=>this.renderTrendCard(m)).join('');
+    }
+
+    stableContainer.innerHTML=stableItems.map(m=>this.renderTrendCard(m)).join('');
+  }
+  generateTrendCardChartHtml(m){
+    const bars=m.bars;
+    const isChanging=m.isChanging&&m.pastAvg!=null;
+    const maxVal=Math.max(...bars,m.avg,(m.pastAvg||0))*1.25||1;
+    const n=Math.max(1,bars.length);
+
+    const barElements=bars.map((val,idx)=>{
+      const heightPct=Math.max(3,(val/maxVal)*100);
+      const stepPct=100/n;
+      const barWPct=stepPct*0.58;
+      const xPct=idx*stepPct+(stepPct-barWPct)/2;
+      const yPct=100-heightPct;
+      return `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${barWPct.toFixed(2)}%" height="${heightPct.toFixed(2)}%" rx="2" fill="rgba(255,255,255,0.18)"><title>${val}${m.unit}</title></rect>`;
+    }).join('');
+
+    let baselineLinesSvg='';
+    let overlayLabelsHtml='';
+    let axisLabelsHtml='';
+
+    if(isChanging){
+      const pastYPct=Math.max(8,Math.min(92,(1-m.pastAvg/maxVal)*100));
+      const currYPct=Math.max(8,Math.min(92,(1-m.avg/maxVal)*100));
+      const splitXPct=((n-4)/n)*100;
+
+      baselineLinesSvg=`
+        <line x1="0%" y1="${pastYPct.toFixed(1)}%" x2="${(splitXPct-1.5).toFixed(1)}%" y2="${pastYPct.toFixed(1)}%" stroke="#718698" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="${(splitXPct+1.5).toFixed(1)}%" y1="${currYPct.toFixed(1)}%" x2="100%" y2="${currYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.8" stroke-linecap="round"/>
+      `;
+
+      overlayLabelsHtml=`
+        <span class="trend-chart-avg-label pos-left" style="top:${pastYPct.toFixed(1)}%; color:#8fa4b5;">${m.pastAvg}${m.unit}</span>
+        <span class="trend-chart-avg-label pos-right" style="top:${currYPct.toFixed(1)}%; color:${m.color};">${m.avg}${m.unit}</span>
+      `;
+
+      axisLabelsHtml=`
+        <div class="trend-chart-axis-labels">
+          <span style="color:#718698;">${m.pastPeriodLabel}</span>
+          <span style="color:${m.color}; font-weight:750;">${m.currPeriodLabel}</span>
+        </div>
+      `;
+    }else{
+      const avgYPct=Math.max(8,Math.min(92,(1-m.avg/maxVal)*100));
+
+      baselineLinesSvg=`
+        <line x1="0%" y1="${avgYPct.toFixed(1)}%" x2="100%" y2="${avgYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="2.4" stroke-linecap="round"/>
+      `;
+
+      overlayLabelsHtml=`
+        <span class="trend-chart-avg-label pos-left" style="top:${avgYPct.toFixed(1)}%; color:${m.color};">${m.avg}${m.unit}</span>
+      `;
+
+      axisLabelsHtml=`
+        <div class="trend-chart-axis-labels">
+          <span>${m.startLabel}</span>
+          <span>${m.endLabel}</span>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="trend-chart-box">
+        <div class="trend-chart-svg-wrap">
+          <svg class="trend-chart-svg" width="100%" height="100%">
+            <g>${barElements}</g>
+            ${baselineLinesSvg}
+          </svg>
+          ${overlayLabelsHtml}
+        </div>
+        ${axisLabelsHtml}
+      </div>
+    `;
+  }
+  renderTrendCard(m){
+    const chartHtml=this.generateTrendCardChartHtml(m);
+    return `
+      <article class="trend-card">
+        <div class="trend-card-top">
+          <div class="trend-title-group">
+            <span class="trend-badge-icon">${m.icon}</span>
+            <span class="trend-metric-name" style="color:${m.color};">${esc(m.name)}</span>
+          </div>
+          <span class="trend-arrow">›</span>
+        </div>
+        <h4 class="trend-headline">${esc(m.headline)}</h4>
+        <p class="trend-card-summary">${esc(m.subDesc)}</p>
+        <div class="trend-divider"></div>
+        ${chartHtml}
+      </article>
+    `;
   }
   async loadThumbnails(){
     if(!this.data?.records?.length||!this._hass?.fetchWithAuth)return;
