@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 글꼴 확대 및 추이 변화율 색상 강조
+
+- 구현 커밋: `98c7ebf`, `vehicle-journal: improve text readability and highlight trend changes`. 변경 이력 작성 명령이 Python 별칭의 인코딩 오류로 실패하여 바로 이 후속 기록으로 보완.
+- 변경·이유: 차계부 디자인의 26px 이하 명시 글꼴을 1.5px 확대. 비교 설명의 변화율과 상승/감소를 해당 지표 색상과 굵은 글씨로 강조하며 텍스트 escaping 유지. 420px 이하 화면은 추이 카드를 한 열로 배치.
+- 관련 파일: `carrot-journal-design.js`, `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: 두 JS 구문 검사 및 실제 Chromium browser-check 통과. 월/연도 6개 지표, 비교 유무, 색상 일치, 빈 데이터, 수동 저장, HTML escaping, 320–850px 모바일 가로 넘침 확인.
+- 배포: 구현 main 푸시 완료. 두 화면 모듈만 백업 후 HA 직접 반영 예정이며 운영 확인은 후속 기록. 개발 정책에 따라 신규 릴리즈 없음.
+- 제한: 표시만 변경하며 기존 집계·데이터 보존 유지. Worker/Comma 변경 없음.
+
 ## 2026-10-07 — 패널 런타임 상태 복원 null 참조 버그 수정 (metric/period null value 예외 해소)
 
 - 커밋 제목: `fix(vehicle-journal): guard against null metric and period select elements during state restoration in panel runtime`.
