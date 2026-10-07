@@ -1,5 +1,32 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — bf6cd33 화면 미반영 원인 및 배포 검증 지침 보완
+
+- 커밋 제목: `vehicle-journal: document stale sidebar entrypoint cache and deployment verification`.
+- 조사 대상: bf6cd33b9bef8a6c2b28bd2dc6b2db61f94b16e5. 이전 기록의 파일 배포·HTTP
+  검증은 확인됐지만 실제 브라우저 적용을 보장하지 못했다. 특정 에이전트의 행동은
+  추측하지 않고 코드와 운영 응답·Chrome에서 확인한 누락 단계를 기록한다.
+- 확인 시각: 한국 시간 2026-10-07 11:28~11:35 전후.
+- 서버 검증: HA 설치 패널 SHA-256 `41489a45c4c8dfe736f2609571f7e16296e4b68be1c4bdb3f5e9defa35fcadf1`,
+  카드 `e886ddcd1fc68afbc455264b099190823ab4e5a4a8253efbfabac7d53adca7b3`.
+  로컬 bf6cd33과 일치하며 내부 HTTP 응답 및 외부 패널 HTTP 응답도 일치했다.
+  내부 압축 허용 요청도 같은 해시였다. 설치 파일 누락은 재현되지 않았다.
+- 브라우저 검증: 실제 사용자 Chrome에서 강력 새로고침 후에도 이전 제목·탭·버튼을
+  확인했다. DOM 최상위 패널 URL은 `carrot-journal-panel.js?v=0.8.13-b7431cc4e5b2`.
+  Network에서 이전 `carrot-vehicle-journal.js?v=journal-20261007-chart-fix-1`과
+  design 모듈 요청을 확인했고 Workbox `StrategyHandler.js:160`·디스크 캐시가 표시됐다.
+- 원인: `async_setup`이 시작 시 등록한 최상위 URL이 JS 직접 배포 후 유지된다.
+  이전 패널 캐시가 이전 import를 계속 사용하므로 하위 import 버전 갱신만으로는 부족하다.
+- 관련 파일: `vehicle-journal/AGENTS.md`, `vehicle-journal/deployment.md`,
+  `.agents/rules/vehicle-journal.md`, `vehicle-journal/CHANGELOG.md`.
+- 변경·이유: 최상위 URL부터 실제 화면·클릭 결과까지 배포 검증하도록 지침 보완.
+  JS 변경이면 재시작이 항상 불필요하다는 기존 배포 문구를 정정했다.
+- 검증·배포 상태: 문서만 수정, diff/지침 동기화 확인. main 커밋·푸시 대상.
+  실행 코드 재배포·HA 재시작·새 릴리즈는 수행하지 않았다. 현재 화면 적용 해결은
+  사용자 HA 재시작 후 최상위 URL 갱신 및 화면 확인이 남아 있다.
+- 제한: HA Docker 읽기는 SSH 앱 보호 모드로 불가했으며 보호 설정을 변경하지 않았다.
+  캐시 전체 삭제·운영 DB/사진/설정 변경 없음. Cloudflare·Comma 변경/배포 없음.
+
 ## 2026-10-07 — 헤더 타이틀 간소화, 최근 지출 전체 스크롤 표시 및 상세 기록 탭 이동 연동
 
 - 커밋 제목: `vehicle-journal: simplify header title, expand recent expenses to full list, and link detail records tab`.
