@@ -1,5 +1,11 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 추정 비용 막대의 충전량 대체 경로 수정
+
+- 커밋 제목: `vehicle-journal: use battery charge when billed energy is absent`.
+- 이유: 운영 확인에서 합산 bin의 청구량 기본값 0이 배터리 충전량 fallback을 막아 추정 비용 막대가 사라짐. 양수 청구량이 있을 때만 우선 사용하고 나머지는 배터리 충전량 사용.
+- 관련 파일: `carrot-vehicle-journal.js`, 이 변경 이력. 회귀 및 재배포 결과는 후속 기록.
+
 ## 2026-10-07 — 모바일 추이 열 수 테스트의 표시 상태 수정
 
 - 커밋 제목: `vehicle-journal: inspect mobile columns while trends are visible`.

@@ -644,7 +644,7 @@ export class VehicleJournal extends HTMLElement {
     const round=value=>value==null?null:Number(value.toFixed(1));
     const chargeCount=t=>(t.slow_count||0)+(t.fast_count||0)+(t.unknown_count||0);
     const cost100=(t,eff)=>{
-      const kwh=t.billed_charge_kwh??t.battery_charge_kwh;
+      const kwh=t.billed_charge_kwh>0?t.billed_charge_kwh:t.battery_charge_kwh;
       eff=t.efficiency_km_kwh??eff;
       return eff>0&&kwh>0&&t.charge_effective_krw!=null?Math.round(t.charge_effective_krw/kwh/eff*100):null;
     };
