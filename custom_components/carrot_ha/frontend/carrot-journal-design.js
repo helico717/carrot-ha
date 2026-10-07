@@ -52,7 +52,7 @@ export const journalDesign = `:host {
     }
     .brand {
       color: var(--j-sub);
-      font-size: 11px;
+      font-size: 12.5px;
       letter-spacing: 2px;
       font-weight: 600;
     }
@@ -63,7 +63,7 @@ export const journalDesign = `:host {
       flex-wrap: wrap;
     }
     .title-controls-row h2 {
-      font-size: 24px;
+      font-size: 25.5px;
       margin: 0;
       white-space: nowrap;
       letter-spacing: -0.5px;
@@ -73,7 +73,7 @@ export const journalDesign = `:host {
       border: 1px solid var(--j-border);
       border-radius: 10px;
       padding: 7px 11px;
-      font-size: 13px;
+      font-size: 14.5px;
       color: var(--j-ink);
       cursor: pointer;
       outline: none;
@@ -105,7 +105,7 @@ export const journalDesign = `:host {
       background: transparent;
       border: 0;
       color: var(--j-sub);
-      font-size: 13px;
+      font-size: 14.5px;
       font-weight: 600;
       padding: 6px 14px;
       min-height: 36px;
@@ -129,7 +129,7 @@ export const journalDesign = `:host {
       background: var(--j-accent);
       color: #07221b;
       border: 0;
-      font-size: 14.5px;
+      font-size: 16px;
       font-weight: 750;
       padding: 10px 20px;
       min-height: 42px;
@@ -157,7 +157,7 @@ export const journalDesign = `:host {
       background: var(--j-accent);
       color: #07221b;
       border: 0;
-      font-size: 12.5px;
+      font-size: 14px;
       font-weight: 750;
       padding: 6px 13px;
       min-height: 32px;
@@ -187,11 +187,11 @@ export const journalDesign = `:host {
         flex-wrap: nowrap;
       }
       .title-controls-row h2 {
-        font-size: 20px;
+        font-size: 21.5px;
         flex-shrink: 0;
       }
       .select-pill, .date-pill {
-        font-size: 12px;
+        font-size: 13.5px;
         padding: 6px 8px;
         flex: 1;
         min-width: 0;
@@ -209,13 +209,13 @@ export const journalDesign = `:host {
       .period-tab-btn {
         flex: 1;
         padding: 6px 0;
-        font-size: 12.5px;
+        font-size: 14px;
         text-align: center;
       }
       .btn-record-primary {
         width: 100%;
         min-height: 44px;
-        font-size: 14.5px;
+        font-size: 16px;
         border-radius: 12px;
       }
     }
@@ -242,7 +242,7 @@ export const journalDesign = `:host {
       border: 0;
       white-space: nowrap;
       min-height: 38px;
-      font-size: 13px;
+      font-size: 14.5px;
       padding: 6px 8px;
       border-radius: 10px;
       cursor: pointer;
@@ -267,7 +267,7 @@ export const journalDesign = `:host {
       .tabs button {
         flex: 1 1 0px;
         min-width: 0;
-        font-size: 12.5px;
+        font-size: 14px;
         padding: 8px 2px;
       }
     }
@@ -321,7 +321,7 @@ export const journalDesign = `:host {
       }
     }
     .kicker {
-      font-size: 11px;
+      font-size: 12.5px;
       letter-spacing: 2px;
       color: var(--j-sub);
       margin-bottom: 12px;
@@ -350,10 +350,10 @@ export const journalDesign = `:host {
       display: inline-block;
       white-space: nowrap;
     }
-    h2 { font-size: 18.5px; margin: 0; }
+    h2 { font-size: 20px; margin: 0; }
     .accent { color: var(--j-accent); }
     .muted { color: var(--j-sub); }
-    .note { font-size: 12.5px; margin-top: 12px; }
+    .note { font-size: 14px; margin-top: 12px; }
     .stats {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -377,7 +377,7 @@ export const journalDesign = `:host {
       align-items: flex-end;
       min-height: 28px;
       color: var(--j-sub);
-      font-size: 11.5px;
+      font-size: 13px;
       line-height: 1.3;
       margin-bottom: 4px;
       letter-spacing: -0.3px;
@@ -385,14 +385,14 @@ export const journalDesign = `:host {
     }
     @media(max-width:600px){
       .stat small {
-        font-size: 11px;
+        font-size: 12.5px;
         letter-spacing: -0.5px;
         min-height: 26px;
       }
     }
     .stat strong {
       display: block;
-      font-size: 21px;
+      font-size: 22.5px;
       font-variant-numeric: tabular-nums;
       margin: 0;
       white-space: nowrap;
@@ -402,12 +402,12 @@ export const journalDesign = `:host {
     }
     @media(max-width:600px){
       .stat strong {
-        font-size: 18px;
+        font-size: 19.5px;
         letter-spacing: -0.5px;
       }
     }
     .stat-unit {
-      font-size: 12.5px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--j-sub);
       margin-left: 2px;
@@ -415,19 +415,19 @@ export const journalDesign = `:host {
     }
     @media(max-width:600px){
       .stat-unit {
-        font-size: 11.5px;
+        font-size: 13px;
         margin-left: 1.5px;
       }
     }
     .stat-empty {
-      font-size: 15px;
+      font-size: 16.5px;
       font-weight: 600;
       color: var(--j-sub);
       letter-spacing: -0.3px;
     }
     @media(max-width:600px){
       .stat-empty {
-        font-size: 14px;
+        font-size: 15.5px;
       }
     }
 
@@ -454,7 +454,7 @@ export const journalDesign = `:host {
       border: 1px solid var(--j-border);
       border-radius: 11px;
       color: var(--j-ink);
-      font-size: 13px;
+      font-size: 14.5px;
       font-weight: 600;
       padding: 8px 14px;
       min-height: 36px;
@@ -496,7 +496,7 @@ export const journalDesign = `:host {
       margin-bottom: 6px;
     }
     .card-header-row h2 {
-      font-size: 16px;
+      font-size: 17.5px;
       margin: 0;
     }
 
@@ -506,12 +506,12 @@ export const journalDesign = `:host {
       min-height: 0;
     }
     .spend-context {
-      font-size: 12px;
+      font-size: 13.5px;
       color: var(--j-sub);
       margin-bottom: 3px;
     }
     .spend-statement {
-      font-size: 16px;
+      font-size: 17.5px;
       font-weight: 600;
       line-height: 1.45;
       letter-spacing: -0.4px;
@@ -520,7 +520,7 @@ export const journalDesign = `:host {
     }
     @media(max-width:600px){
       .spend-statement {
-        font-size: 15px;
+        font-size: 16.5px;
       }
     }
     .domain-tag {
@@ -551,7 +551,7 @@ export const journalDesign = `:host {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 12.5px;
+      font-size: 14px;
       font-weight: 700;
       padding: 3px 10px;
       border-radius: 20px;
@@ -608,7 +608,7 @@ export const journalDesign = `:host {
       border: 1px solid #3b5062;
       border-radius: 10px;
       padding: 6px 11px;
-      font-size: 12px;
+      font-size: 13.5px;
       color: var(--j-ink);
       pointer-events: none;
       box-shadow: 0 8px 24px rgba(0,0,0,0.6);
@@ -643,7 +643,7 @@ export const journalDesign = `:host {
       display: inline-flex;
       align-items: center;
       gap: 4.5px;
-      font-size: 11.5px;
+      font-size: 13px;
       color: var(--j-sub);
       cursor: pointer;
       padding: 3px 6px;
@@ -710,7 +710,7 @@ export const journalDesign = `:host {
       gap: 12px;
       padding: 10px 0;
       border-bottom: 1px solid var(--j-border);
-      font-size: 15px;
+      font-size: 16.5px;
     }
     .cost-list .list-row:last-child {
       border-bottom: 0;
@@ -718,7 +718,7 @@ export const journalDesign = `:host {
     @media(max-width:600px){
       .cost-list .list-row {
         gap: 8px;
-        font-size: 14px;
+        font-size: 15.5px;
         padding: 8px 0;
       }
     }
@@ -766,7 +766,7 @@ export const journalDesign = `:host {
       gap: 12px;
       padding: 10px 0;
       border-bottom: 1px solid var(--j-border);
-      font-size: 13px;
+      font-size: 14.5px;
     }
     .recent-expense-row:last-child {
       border-bottom: 0;
@@ -788,7 +788,7 @@ export const journalDesign = `:host {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 11px;
+      font-size: 12.5px;
       font-weight: 700;
       padding: 2px 7px;
       border-radius: 6px;
@@ -801,10 +801,10 @@ export const journalDesign = `:host {
     }
     .recent-date-sub {
       color: var(--j-sub);
-      font-size: 11.5px;
+      font-size: 13px;
     }
     .recent-amount {
-      font-size: 14.5px;
+      font-size: 16px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: var(--j-ink);
@@ -845,7 +845,7 @@ export const journalDesign = `:host {
       background: var(--j-surface);
       border: 1px solid var(--j-border);
       color: var(--j-sub);
-      font-size: 13px;
+      font-size: 14.5px;
       font-weight: 600;
       padding: 6px 14px;
       min-height: 32px;
@@ -871,7 +871,7 @@ export const journalDesign = `:host {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      font-size: 12.5px;
+      font-size: 14px;
       color: var(--j-sub);
     }
     .form-field.full {
@@ -882,7 +882,7 @@ export const journalDesign = `:host {
       border: 1px solid var(--j-border);
       border-radius: 10px;
       padding: 9px 12px;
-      font-size: 13.5px;
+      font-size: 15px;
       color: var(--j-ink);
       outline: none;
       transition: border-color 0.2s ease;
@@ -895,7 +895,7 @@ export const journalDesign = `:host {
       border-radius: 10px;
       padding: 10px;
       background: #0b1014;
-      font-size: 12px;
+      font-size: 13.5px;
       color: var(--j-sub);
     }
     /* ======================================================== */
@@ -918,11 +918,11 @@ export const journalDesign = `:host {
     .memo-title {
       font-weight: 600;
       color: var(--j-ink);
-      font-size: 13.5px;
+      font-size: 15px;
     }
     .memo-desc {
       color: var(--j-sub);
-      font-size: 12px;
+      font-size: 13.5px;
       display: block;
       line-height: 1.35;
     }
@@ -963,7 +963,7 @@ export const journalDesign = `:host {
       display: block;
     }
     .thumb-spinner {
-      font-size: 15px;
+      font-size: 16.5px;
       opacity: 0.5;
     }
     .thumb-badge {
@@ -973,7 +973,7 @@ export const journalDesign = `:host {
       background: rgba(11, 16, 20, 0.92);
       border: 1px solid var(--j-accent);
       color: var(--j-accent);
-      font-size: 10px;
+      font-size: 11.5px;
       font-weight: 800;
       padding: 1px 4px;
       border-radius: 6px;
@@ -989,7 +989,7 @@ export const journalDesign = `:host {
       background: var(--j-surface);
       border: 1px solid var(--j-border);
       color: var(--j-ink);
-      font-size: 12px;
+      font-size: 13.5px;
       padding: 5px 9px;
       min-height: 30px;
       border-radius: 8px;
@@ -1057,7 +1057,7 @@ export const journalDesign = `:host {
       gap: 10px;
     }
     .lightbox-title-wrap h2 {
-      font-size: 17px;
+      font-size: 18.5px;
       margin: 0;
       font-weight: 750;
       color: #ffffff;
@@ -1090,7 +1090,7 @@ export const journalDesign = `:host {
     }
     .lightbox-spinner {
       color: var(--j-sub);
-      font-size: 14px;
+      font-size: 15.5px;
     }
     .lightbox-nav-btn {
       position: absolute;
@@ -1132,7 +1132,7 @@ export const journalDesign = `:host {
     }
     .lightbox-caption {
       margin: 0;
-      font-size: 13px;
+      font-size: 14.5px;
       color: var(--j-sub);
     }
     @media(max-width:600px){
@@ -1151,17 +1151,17 @@ export const journalDesign = `:host {
       .lightbox-nav-btn {
         width: 38px;
         height: 38px;
-        font-size: 24px;
+        font-size: 25.5px;
       }
       .lightbox-nav-btn.prev { left: 6px; }
       .lightbox-nav-btn.next { right: 6px; }
     }
 
 .shell{max-width:1280px;margin:auto}
-.status{margin:24px 0 10px;padding:12px 16px;font-size:12.5px;color:var(--j-sub);background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;text-align:center}
+.status{margin:24px 0 10px;padding:12px 16px;font-size: 14px;color:var(--j-sub);background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;text-align:center}
 #headline{font-weight:850}.cost-list{min-width:0}.recent-list-wrap{min-height:100px}
 .period-tab-btn:focus-visible,.legend-item:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
-#recordDialog .fields label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--j-sub)}
+#recordDialog .fields label{display:flex;flex-direction:column;gap:6px;font-size: 14px;color:var(--j-sub)}
 #recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318}
 #recordDialog .row.spaced{padding-bottom:14px;border-bottom:1px solid var(--j-border);margin-bottom:18px}
 @media(max-width:850px){.wide,.narrow,.half{grid-column:span 12}.mast{flex-wrap:wrap}}
@@ -1171,31 +1171,31 @@ export const journalDesign = `:host {
   .cost-layout{gap:12px;flex-wrap:nowrap}
   .title-controls-row{flex-wrap:wrap}
   .title-controls-row .date-pill{max-width:145px}
-  .stat strong{font-size:18px}
-  .stat-unit{font-size:11.5px}
+  .stat strong{font-size: 19.5px}
+  .stat-unit{font-size: 13px}
   #headline{font-size:clamp(22px,6.5vw,34px)}
   .legend-item{padding:6px 8px;min-height:32px;background:transparent;border:0}
   .trend-badge{white-space:nowrap;flex-shrink:0}
 }
 @media(max-width:360px){
   .shell{padding:12px}
-  .stat strong{font-size:16px}
-  .stat-unit{font-size:10px}
+  .stat strong{font-size: 17.5px}
+  .stat-unit{font-size: 11.5px}
   .donut{width:115px;height:115px}
   .h-phrase{white-space:normal}
 }
 .title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}
-.legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size:11px}
+.legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size: 12.5px}
 .trend-badge{white-space:nowrap;flex-shrink:0}
 
 /* [Apple Health 스타일 추세(Trends) 대시보드] */
 .trends-container { display: flex; flex-direction: column; gap: 24px; }
 .trends-header { margin-bottom: 4px; }
-.trends-main-title { font-size: 26px; font-weight: 850; color: #ffffff; margin: 0 0 6px 0; letter-spacing: -0.6px; }
-.trends-main-desc { font-size: 13.5px; color: var(--j-sub); margin: 0; line-height: 1.5; }
+.trends-main-title { font-size: 27.5px; font-weight: 850; color: #ffffff; margin: 0 0 6px 0; letter-spacing: -0.6px; }
+.trends-main-desc { font-size: 15px; color: var(--j-sub); margin: 0; line-height: 1.5; }
 .trends-section { display: flex; flex-direction: column; gap: 12px; }
-.trends-section-title { font-size: 19px; font-weight: 750; color: #ffffff; margin: 0; letter-spacing: -0.4px; display: flex; align-items: center; gap: 8px; }
-.trends-empty-pill { background: var(--j-surface); border: 1px solid var(--j-border); color: var(--j-sub); border-radius: 12px; padding: 16px 20px; font-size: 14px; font-weight: 600; text-align: center; }
+.trends-section-title { font-size: 20.5px; font-weight: 750; color: #ffffff; margin: 0; letter-spacing: -0.4px; display: flex; align-items: center; gap: 8px; }
+.trends-empty-pill { background: var(--j-surface); border: 1px solid var(--j-border); color: var(--j-sub); border-radius: 12px; padding: 16px 20px; font-size: 15.5px; font-weight: 600; text-align: center; }
 
 /* 2열 그리드 레이아웃 & 2가지 예외 규칙 */
 .trends-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -1209,31 +1209,34 @@ export const journalDesign = `:host {
 .trend-card:hover { border-color: rgba(255, 255, 255, 0.22); transform: translateY(-2px); }
 .trend-card-top { display: flex; justify-content: space-between; align-items: center; }
 .trend-title-group { display: flex; align-items: center; gap: 8px; }
-.trend-badge-icon { font-size: 16px; line-height: 1; }
-.trend-metric-name { font-size: 15px; font-weight: 750; letter-spacing: -0.3px; }
-.trend-arrow { color: #647b8e; font-size: 18px; font-weight: 600; line-height: 1; }
-.trend-card-summary { font-size: 14px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
-.trend-card-summary strong { color: #ffffff; font-weight: 850; }
+.trend-badge-icon { font-size: 17.5px; line-height: 1; }
+.trend-metric-name { font-size: 16.5px; font-weight: 750; letter-spacing: -0.3px; }
+.trend-arrow { color: #647b8e; font-size: 19.5px; font-weight: 600; line-height: 1; }
+.trend-card-summary { overflow-wrap: anywhere; font-size: 15.5px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
+.trend-card-summary strong { color: var(--trend-color); font-weight: 850; }
 .trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 6px 0; }
-.trend-headline { font-size: 18px; font-weight: 850; color: #ffffff; letter-spacing: -0.4px; margin: 0; line-height: 1.35; }
+.trend-headline { font-size: 19.5px; font-weight: 850; color: #ffffff; letter-spacing: -0.4px; margin: 0; line-height: 1.35; }
 .trend-chart-box { width: 100%; display: flex; flex-direction: column; position: relative; margin-top: 4px; }
 .trend-chart-svg-wrap { width: 100%; height: 75px; position: relative; }
 .trend-chart-svg { width: 100%; height: 100%; display: block; }
 
 /* 기준선 위 수치 라벨 (SVG 종횡비 왜곡 차단 - 순수 HTML 네이티브 텍스트 렌더링) */
-.trend-chart-avg-label { position: absolute; font-size: 13px; font-weight: 850; letter-spacing: -0.2px; transform: translateY(-100%); margin-bottom: 3px; pointer-events: none; white-space: nowrap; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95); line-height: 1; }
+.trend-chart-avg-label { position: absolute; font-size: 14.5px; font-weight: 850; letter-spacing: -0.2px; transform: translateY(-100%); margin-bottom: 3px; pointer-events: none; white-space: nowrap; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95); line-height: 1; }
 .trend-chart-avg-label.pos-left { left: 6px; }
 .trend-chart-avg-label.pos-right { right: 6px; }
-.trend-chart-axis-labels { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--j-sub); line-height: 1; padding: 0 4px; }
+.trend-chart-axis-labels { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--j-sub); line-height: 1; padding: 0 4px; }
 
 @media(max-width:600px){
   .trends-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .trend-card { padding: 14px 14px; border-radius: 16px; gap: 8px; }
-  .trend-headline { font-size: 15px; }
-  .trend-metric-name { font-size: 13px; }
-  .trend-card-summary { font-size: 12px; }
+  .trend-headline { font-size: 16.5px; }
+  .trend-metric-name { font-size: 14.5px; }
+  .trend-card-summary { font-size: 13.5px; }
   .trend-chart-svg-wrap { height: 65px; }
-  .trend-chart-avg-label { font-size: 11.5px; }
-  .trend-chart-axis-labels { font-size: 10px; }
+  .trend-chart-avg-label { font-size: 13px; }
+  .trend-chart-axis-labels { font-size: 11.5px; }
+}
+@media(max-width:420px){
+  .trends-grid { grid-template-columns: minmax(0, 1fr); }
 }
 `;

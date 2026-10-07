@@ -38,6 +38,11 @@ const path=require('path');
     if(card.shadowRoot.querySelectorAll('.trend-chart-svg').length!==6)throw Error('missing trend charts: '+scope);
     if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
     if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
+    for(const change of card.shadowRoot.querySelectorAll('.trend-change')){
+     if(!/^[0-9.]+% (상승|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
+     if(getComputedStyle(change).color!==getComputedStyle(change.closest('.trend-card').querySelector('.trend-metric-name')).color)throw Error('change color does not match metric');
+    }
+    if(previous&&!card.shadowRoot.querySelector('.trend-change'))throw Error('missing change emphasis');
    }
   }
   card.data={...original,daily:[]};card.renderTrendsDashboard();

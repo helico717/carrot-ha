@@ -582,12 +582,14 @@ export class VehicleJournal extends HTMLElement {
       let trendStatus='consistent';
       let headline=`${periodName} 동안 일관된 추세`;
       let subDesc='현재 관측된 패턴을 안정적으로 유지하고 있어요.';
+      let changeText='';
 
       if(hasCurrent&&hasPast){
         const diff=currVal-pastVal;
         const diffPct=pastVal>0?(diff/pastVal)*100:(currVal>0?100:0);
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
+          changeText=`${Math.abs(diffPct).toFixed(1)}% ${diff>0?'상승':'감소'}`;
           if(diff>0){
             trendStatus='up';
             headline=`${periodName} 동안 증가 추세`;
@@ -608,7 +610,7 @@ export class VehicleJournal extends HTMLElement {
       }
 
       return {
-        id,name,icon,color,unit,isChanging,trendStatus,headline,subDesc,
+        id,name,icon,color,unit,isChanging,trendStatus,headline,subDesc,changeText,
         pastAvg:hasPast?pastVal:null,avg:hasCurrent?currVal:0,
         pastPeriodLabel:isYear?`${Number(yearStr)-1}년 평균`:`${prevPeriodName} 평균`,
         currPeriodLabel:isYear?`${yearStr}년 평균`:`${monthNum}월 평균`,
@@ -714,8 +716,10 @@ export class VehicleJournal extends HTMLElement {
   }
   renderTrendCard(m){
     const chartHtml=this.generateTrendCardChartHtml(m);
+    const changeIndex=m.changeText?m.subDesc.indexOf(m.changeText):-1;
+    const summaryHtml=changeIndex<0?esc(m.subDesc):`${esc(m.subDesc.slice(0,changeIndex))}<strong class="trend-change">${esc(m.changeText)}</strong>${esc(m.subDesc.slice(changeIndex+m.changeText.length))}`;
     return `
-      <article class="trend-card">
+      <article class="trend-card" style="--trend-color:${m.color};">
         <div class="trend-card-top">
           <div class="trend-title-group">
             <span class="trend-badge-icon">${m.icon}</span>
@@ -724,7 +728,7 @@ export class VehicleJournal extends HTMLElement {
           <span class="trend-arrow">›</span>
         </div>
         <h4 class="trend-headline">${esc(m.headline)}</h4>
-        <p class="trend-card-summary">${esc(m.subDesc)}</p>
+        <p class="trend-card-summary">${summaryHtml}</p>
         <div class="trend-divider"></div>
         ${chartHtml}
       </article>
