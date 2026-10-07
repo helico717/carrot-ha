@@ -650,6 +650,12 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   manifest/태그/새 Release/Cloudflare/Comma/운영 DB/사진/화면 코드 변경 없음.
 # 2026-10-07 — 원시 CAN 수집 공유 용량 상한 10GB
 
+- 배포 확정: `5a0e8fa77f5ef59283651428316ce453f51969c6`를 main에 푸시했다.
+  can_capture.py/services.yaml을 백업 후 HA에 부분 반영하고 커밋 SHA-256과 일치 확인.
+  백업: `/config/carrot_ha/deployment-backups/5a0e8fa77f5ef59283651428316ce453f51969c6/`.
+  운영 로그 직접 삭제·HA 재시작은 수행하지 않았다. 실행 중 상한의 10GB 전환은
+  사용자 HA 재시작 후 상태 센서 limit_bytes 확인 대기다.
+
 - 커밋 제목: `vehicle-journal: lower HA raw CAN storage ceiling to 10 GB`.
 - 변경·이유: 사용자 요청으로 HA 원시 CAN 파일의 모든 엔트리 공유 상한을
   20,000,000,000에서 10,000,000,000 bytes로 낮춘다. 기존 메타데이터 예약량과
