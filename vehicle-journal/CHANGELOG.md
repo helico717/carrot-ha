@@ -1,5 +1,25 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 고정 로더의 main 및 HA 배포 확인
+
+- 커밋 제목: `vehicle-journal: record stable loader HA deployment and initial restart requirement`.
+- 구현 커밋 `65c73ebc3ce9e47910dd870e163524cacb75c4bb`의 원격 main 반영 확인.
+  해당 커밋에서 추출한 runtime/카드/패널 3개를 순서대로 HA에 직접 반영했다.
+- 기존 파일 백업: `/config/carrot_ha/deployment-backups/65c73ebc3ce9e47910dd870e163524cacb75c4bb/`.
+  새 runtime은 기존 파일 부재 마커를 남겼다. DB·사진·설정은 배포/백업 대상이 아니다.
+- 설치 SHA-256 및 사용자 외부 HA HTTP 응답이 커밋과 모두 일치:
+  - panel: `d77bcf6dc8c96a4bfceadb46c952cb5aabc6a1e0509d23b794c59ac3700294fd`
+  - runtime: `b130a5ecefd09d7159d5743ebdeb4a3c07fc56cdddb02cc9764f699274b9e7f0`
+  - card: `6afffa093447fecd900c1cb7eff45147656ad29bec3010ee389719dc6fc46bb2`
+- 버전 API 응답 `0.8.13-b05e079cc9b3` 확인. 서버 배포는 완료했지만 기존 운영
+  브라우저의 패널 등록 URL은 HA 시작 시 값이므로 **사용자 HA 재시작 1회 및
+  새로고침 이후 실제 전환 확인은 대기**다. 에이전트가 재시작하지 않았다.
+- 새 로더/업데이트/복원 동작의 합성 Chrome 및 기존 UI·사진 회귀는 통과했다.
+  향후 JS 화면 모듈 변경은 재시작 없이 갱신 가능하다. 사용자 요청에 따라 임시
+  디버깅 버튼/모니터/뷰 저장은 수정·실사용 검증 완료 후 제거하며 고정 로더는 유지한다.
+- 관련 파일: CHANGELOG.md 및 deployment.md 현재 인계 상태. 문서만 추가 수정했고
+  main 커밋·푸시한다. 새 릴리즈·Cloudflare·Comma 변경/배포 없음.
+
 ## 2026-10-07 — 고정 로더 및 임시 화면 업데이트 버튼
 
 - 커밋 제목: `vehicle-journal: load current frontend modules without HA restarts`.
