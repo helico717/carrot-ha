@@ -1,5 +1,7 @@
-import {journalDesign} from './carrot-journal-design.js?v=journal-20261007-detail-link-1';
-import {preserveView} from './carrot-view-state.js';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-live-loader-1';
+const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
+const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
+const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
 // HA-local EV journal. No remote polling, browser token or localStorage records.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{maximumFractionDigits:digits}):'—';
@@ -177,14 +179,18 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('previous'))this.$('previous').onclick=()=>{this.offset=Math.max(0,this.offset-100);this.load(true);};
     if(this.$('next'))this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
     if(this.$('records'))this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
-    if(this.$('compareForm'))this.$('compareForm').onsubmit=async event=>{event.preventDefault();try{await this.call('comparison/save',{fuel:this.$('fuel').value,economy_km_l:Number(this.$('economy').value),entity_id:this.$('fuelEntity').value});this.$('compareMessage').textContent='비교 기준을 저장했어요.';await this.load(true);}catch(e){this.$('compareMessage').textContent=e.message||'저장하지 못했어요.';}};
+    this.$('recordForm').addEventListener('input',()=>{this.draftDirty=true;});
+    this.$('compareForm').addEventListener('input',()=>{this.comparisonDirty=true;});
+    this.$('recordDialog').addEventListener('close',()=>{if(!this.$('save').disabled){this.draftDirty=false;this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();}});
+    if(this.$('compareForm'))this.$('compareForm').onsubmit=async event=>{event.preventDefault();try{await this.call('comparison/save',{fuel:this.$('fuel').value,economy_km_l:Number(this.$('economy').value),entity_id:this.$('fuelEntity').value});this.comparisonDirty=false;this.$('compareMessage').textContent='비교 기준을 저장했어요.';await this.load(true);}catch(e){this.$('compareMessage').textContent=e.message||'저장하지 못했어요.';}};
     if(this.$('photos'))this.$('photos').onchange=()=>{this.selectedPhotos=[...this.$('photos').files];this.renderSelectedPhotos();};
     this.$('clearPhotos').onclick=e=>{e.preventDefault();this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();};
     if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
     if(this.$('chart')){this.resize=new ResizeObserver(()=>this.drawChart());this.resize.observe(this.$('chart'));}
   }
   selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.drawChart();}
-  call(type,params={}){return this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}
+  hasPendingInput(){return !!(this.$('recordDialog')?.open||this.$('save')?.disabled||this.draftDirty||this.comparisonDirty||this.pendingWrites||this.selectedPhotos?.length);}
+  async call(type,params={}){const write=['record/save','record/status','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}finally{if(write)this.pendingWrites--;}}
   async load(force=false){
     if(!this._hass?.callWS||!this.isConnected)return;
     if(this.loading){if(force)this.reloadPending=true;return;}
@@ -203,7 +209,7 @@ export class VehicleJournal extends HTMLElement {
       const [data,previous]=await Promise.all([this.call('query',{from:range.from,to:range.to,offset:selectedOffset}),this.call('query',{from:range.previousFrom,to:range.previousTo,offset:0}).catch(()=>null)]);
       data.previous=previous;
       if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month')?.value!==month||this.scope!==scope)return;
-      this.data=data;preserveView(this,()=>this.renderData());
+      this.data=data;preserveView(this,()=>this.renderData());this.dispatchEvent(new Event('journal-rendered'));
     }catch(error){
       if(this.$('message')){
         this.$('message').textContent=error.message||'HA 차계부에 연결하지 못했어요.';
@@ -455,8 +461,8 @@ export class VehicleJournal extends HTMLElement {
     this.$('qualityNote').textContent=`관측된 주행의 에너지 커버리지는 ${numeric(t.energy_coverage_percent)}%예요. 원본이 없는 기간의 전비는 복원하지 않아요. 자정을 넘는 기록은 시간 비례 추정으로 배분해요. 수동 소비량은 측정값과 구분해요.`;
     this.$('records').innerHTML=d.records.map(r=>`<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${esc(categories[r.category]||kindNames[r.kind])}${r.subcategory?' · '+esc(r.subcategory):''}<small>${esc(r.memo)}</small>${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</td><td>${this.recordValue(r)}${r.attachments?.length?`<br><button data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:''}</td><td>${r.origin==='manual'&&r.input?(r.status==='deleted'?`<button data-record="${r.id}" data-action="restore">복원</button>`:`<button data-record="${r.id}" data-action="edit">수정</button> <button data-record="${r.id}" data-action="delete">삭제</button>`):'<small>자동 원장</small>'}</td></tr>`).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=`${this.offset+1}~${this.offset+d.records.length}번째 기록`;
-    if(d.comparison&&this.shadowRoot.activeElement?.closest('#compareForm')==null){this.$('fuel').value=d.comparison.fuel;this.$('economy').value=d.comparison.economy_km_l;this.$('fuelEntity').value=JSON.parse(d.comparison.sensor_entities_json)[d.comparison.fuel]||'';}
-    if(!d.comparison&&this.shadowRoot.activeElement?.closest('#compareForm')==null){const entity=d.fuel_sensors?.[this.$('fuel').value];if(entity){this.$('fuelEntity').value=entity;this.$('compareMessage').textContent='기존 전국 평균 유가 센서를 찾았어요. 비교 연비를 확인하고 저장해 주세요.';}}
+    if(d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){this.$('fuel').value=d.comparison.fuel;this.$('economy').value=d.comparison.economy_km_l;this.$('fuelEntity').value=JSON.parse(d.comparison.sensor_entities_json)[d.comparison.fuel]||'';}
+    if(!d.comparison&&!this.comparisonDirty&&this.shadowRoot.activeElement?.closest('#compareForm')==null){const entity=d.fuel_sensors?.[this.$('fuel').value];if(entity){this.$('fuelEntity').value=entity;this.$('compareMessage').textContent='기존 전국 평균 유가 센서를 찾았어요. 비교 연비를 확인하고 저장해 주세요.';}}
     if(d.fuel_price&&d.comparison&&t.distance_km!=null&&t.charge_effective_krw!=null){const ice=t.distance_km/d.comparison.economy_km_l*d.fuel_price.price;const saving=ice-t.charge_effective_krw;this.$('saving').textContent=money(Math.abs(saving))+(saving>=0?'을 아꼈어요.':'이 더 들었어요.');this.$('compareDetail').innerHTML=`<p>내 전기차 ${money(t.charge_effective_krw)} · 비교 차량 ${money(ice)}</p><small>현재 HA 유가 ${money(d.fuel_price.price)}/L · ${esc(d.fuel_price.observed_at)}</small>`;}else{this.$('saving').textContent='비교에 필요한 거리·충전비·유가를 확인해 주세요.';this.$('compareDetail').textContent='원/L·KRW/L 센서 또는 gas_station_korea의 원 단위 유가 센서를 사용할 수 있어요. 비교 기준을 저장해 주세요.';}
     this.drawChart();
   }
@@ -514,7 +520,7 @@ export class VehicleJournal extends HTMLElement {
       const result=await this.call('record/save',{record_id:this.pendingId,expected_version:this.editing?.version||0,payload});
       this.editing={id:result.id,version:result.version,input:payload};
       for(const file of preparedPhotos){const body=new FormData();body.append('record_id',result.id);body.append('file',file);const response=await this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments`,{method:'POST',body});if(!response.ok)throw new Error('기록은 저장했지만 사진을 저장하지 못했어요. 사진을 다시 골라 주세요.');}
-      this.$('recordDialog').close();this.offset=0;await this.load(true);
+      this.draftDirty=false;this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();this.$('recordDialog').close();this.offset=0;await this.load(true);
     }catch(error){this.$('recordError').textContent=error.message||'기록을 저장하지 못했어요.';}
     finally{this.$('save').disabled=false;this.$('photos').disabled=false;this.$('clearPhotos').disabled=false;for(const button of this.$('photoPreview').querySelectorAll('button'))button.disabled=false;}
   }

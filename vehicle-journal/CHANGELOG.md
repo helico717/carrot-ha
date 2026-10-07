@@ -1,5 +1,38 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 고정 로더 및 임시 화면 업데이트 버튼
+
+- 커밋 제목: `vehicle-journal: load current frontend modules without HA restarts`.
+- 변경·이유: 시작 시 고정된 패널 URL이 이전 모듈을 계속 사용하는 문제를 해결한다.
+  패널은 고정 로더로 유지하고 마운트 시 no-store 로컬 버전 API를 조회하여 최신
+  runtime/카드/디자인/뷰 도우미 전체에 동일한 파일 해시 버전을 전달한다.
+- 열린 패널은 표시 중 60초마다 및 visibility 복귀 때 버전을 확인한다. 변경이 있으면
+  임시 ‘새 화면 버전 적용’ 버튼을 표시하며 자동으로 페이지를 재로딩하지 않는다.
+  대화상자·사진·미저장 비교 입력·진행 중 쓰기가 있으면 갱신을 차단한다.
+- 적용 버튼은 기간/차량/탭/페이지/추이 설정/비교 분류/스크롤만 탭별 sessionStorage에
+  보관하고 새 문서 API 렌더 후 animation frame 두 번을 거쳐 복원한다. 2분 유효,
+  같은 경로로 제한하며 읽은 즉시 삭제한다. 기록·메모·사진·토큰 저장 없음.
+- 사용자 추가 지시: 버튼은 **디버깅용 임시 기능**이다. 수정·실사용 검증이 끝나면
+  버튼/배너/주기 버전 확인/visibility 리스너/뷰 복원 저장을 제거한다. 고정 로더와
+  최신 버전 모듈 로딩은 유지한다. AGENTS 및 deployment에 제거 범위를 명시했다.
+- 카드의 비교 입력이 백그라운드 렌더로 덮어써지지 않도록 보호하고, 기록 창을
+  닫아 취소하면 선택 사진을 정리한다. 저장/상태변경 등 진행 중 쓰기도 갱신을 막는다.
+- 관련 파일: frontend/carrot-journal-panel.js, carrot-journal-panel-runtime.js,
+  carrot-vehicle-journal.js; vehicle-journal/AGENTS.md, deployment.md, CHANGELOG.md;
+  .agents/rules/vehicle-journal.md; tests/loader-update.cjs, browser-check.cjs,
+  photo-selection.cjs. frontend 경로는 custom_components/carrot_ha/frontend/ 아래다.
+- 검증: Python 차계부 14개 및 schema 9개 통과. Chrome 최신 모듈 체인/초기 hass 전달/
+  입력 보호/재로딩 선택·스크롤 복원/임시 저장 제거 통과. 사진 선택·압축·저장·수정
+  회귀 및 기존 UI/탭/차트/수동 저장/escaping/데스크톱·모바일 검증 통과.
+  browser-check의 이미 제거된 day scope 버튼 검증을 정리했으며 비동기 패널 초기
+  속성 검증은 실제 import를 사용하는 loader-update로 이동했다. JS 문법/diff 확인.
+- 배포 상태: 검증 후 main 커밋·푸시 및 승인된 HA 직접 배포 대상. 최초 로더 전환은
+  사용자 HA 재시작 1회가 필요하며 운영 브라우저의 전환 후 검증은 대기한다.
+  이후 화면 모듈은 HA 재시작 없이 새로고침/임시 적용 버튼으로 갱신한다. Python
+  또는 고정 로더 자체 변경은 별도 재시작 판단이 필요하다.
+- Cloudflare/Comma/DB/사진/설정/manifest/태그/Release 변경 없음. 디버깅 정책에
+  따라 이번에는 새 릴리즈를 발행하지 않는다. 백업/서버 배포 확인은 후속 기록에 남긴다.
+
 ## 2026-10-07 — bf6cd33 화면 미반영 원인 및 배포 검증 지침 보완
 
 - 커밋 제목: `vehicle-journal: document stale sidebar entrypoint cache and deployment verification`.

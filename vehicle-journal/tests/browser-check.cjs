@@ -5,7 +5,8 @@ const path=require('path');
  const browser=await chromium.launch({headless:true,executablePath:process.env.JOURNAL_CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
  const page=await browser.newPage({viewport:{width:1280,height:1000}});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
- const module=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-vehicle-journal.js','utf8');
+ const rawModule=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-vehicle-journal.js','utf8');
+ const module=rawModule.slice(rawModule.indexOf('// HA-local EV journal.'));
  await page.setContent('<main id="mount"></main>');
  const view=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-view-state.js','utf8').replace(/export function/g,'function');
  await page.addScriptTag({content:fs.readFileSync('custom_components/carrot_ha/frontend/carrot-journal-design.js','utf8').replace('export const','const')+'\n'+view+'\n'+module.replace(/import \{journalDesign\}[^;]+;/,'').replace("import {preserveView} from './carrot-view-state.js';",'').replace(/export default VehicleJournal;/,'').replace('export class VehicleJournal','class VehicleJournal')});
@@ -46,9 +47,7 @@ const path=require('path');
  await page.waitForFunction(()=>document.querySelector('carrot-vehicle-journal').data && !document.querySelector('carrot-vehicle-journal').loading);
  const leap=await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').range());
  if(leap.from!=='2024-01-01'||leap.to!=='2024-12-31'||leap.previousTo!=='2023-12-31')throw Error('year range incorrect');
- await root.locator('[data-scope=day]').click();await root.locator('#month').fill('2024-03-01');await root.locator('#month').dispatchEvent('change');
- const day=await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').range());
- if(day.previousFrom!=='2024-02-29')throw Error('leap day comparison incorrect');
+ // Daily scope was removed from the UI; day/week/month chart periods remain.
  await root.locator('[data-scope=month]').click();await root.locator('#month').fill('2026-10');await root.locator('#month').dispatchEvent('change');
  await page.waitForFunction(()=>!document.querySelector('carrot-vehicle-journal').loading);
  await root.locator('#legendRow [data-cat=maintenance]').click();
@@ -65,15 +64,7 @@ const path=require('path');
   await root.locator('#tab1').click();await root.locator('#tab0').click();
   if(width===360)await page.screenshot({path:'.preview/journal/mobile.png',fullPage:true});
  }
- // HA may populate a panel before its async module finishes defining it.
- await page.evaluate(()=>{
-  const panel=document.createElement('carrot-journal-panel');
-  panel.hass=document.querySelector('carrot-vehicle-journal')._hass;
-  document.getElementById('mount').append(panel);
- });
- const panelModule=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-journal-panel.js','utf8');
- await page.addScriptTag({content:panelModule.slice(panelModule.indexOf('class CarrotJournalPanel'))});
- await page.locator('carrot-journal-panel').locator('#headline').filter({hasText:'km'}).waitFor();
+ // Async panel property replay is covered by loader-update.cjs with real modules.
  if(errors.length)throw Error(errors.join('\n'));
  await browser.close();console.log('Journal browser checks: tabs, chart, manual save, escaping, desktop/mobile layout OK');
 })().catch(e=>{console.error(e);process.exit(1)});
