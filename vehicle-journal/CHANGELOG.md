@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 평균선 및 실제 단위 변경 운영 적용 확인
+
+- 커밋 제목: `vehicle-journal: record average chart and metric unit deployment`.
+- 대상: 평균선/여백/글꼴 및 % 접미사 변경 `6aaf7c4`, 실제 단위 변화량 `a40d67c`.
+- 검증: 두 변경 Chromium 회귀 통과. 설치 및 외부 HTTP 응답이 커밋 파일과 일치. 운영 Chrome에서 6개 추이, km/kWh/원/% 변화량, p 제거, 평균값 글꼴 16px 및 라벨 높이에 추가 8px 이격, 굵어진 평균선을 확인.
+- 배포: main 푸시 및 HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/6aaf7c4/`, `/config/carrot_ha/deployment-backups/a40d67c/`. 최종 버전 API `0.8.13-e2d8cc5b72ce`. 카드 SHA-256 `99ea699ab17cb3a82a2c84c1d98dc7139e26b9e613cb039c1e7657f947616df0`, 디자인 `49d53f7d176afdeda5a073fe1063cd6945d664860f3ea7d1df2fcfc6e5f95972`.
+- HA 재시작·신규 릴리즈·Worker/Comma 변경 없음. 기존 추이 집계의 부분 월 평균 및 미관측 0 표시 한계는 유지되며 후속 계산 개선 대상으로 남음.
+
 ## 2026-10-07 — 추이 변화량을 지표의 실제 단위로 표시
 
 - 커밋 제목: `vehicle-journal: show trend changes in metric units`.
