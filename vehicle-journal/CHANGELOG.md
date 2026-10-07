@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-07 — 추이 변화량을 지표의 실제 단위로 표시
+
+- 커밋 제목: `vehicle-journal: show trend changes in metric units`.
+- 변경·이유: 상대 퍼센트 대신 이전/현재 평균의 실제 차이를 표시. 거리 km, 충전 kWh, 전비 km/kWh, 단가 원, SOC/급속 비중 % 사용. 원은 정수, 나머지는 소수 한 자리 이내와 천 단위 구분. 카드 색상 강조 유지. 변동 분류 기준(상대 차이 5%)은 유지.
+- 관련 파일: `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증·배포: Chromium 회귀 후 main 푸시 및 기존 코드 백업 후 HA 부분 반영 예정. 실제 결과는 후속 기록.
+- 제한: SOC/급속 비중 변화는 두 비율의 산술 차이이며 요청에 따라 p 접미사 생략. 집계 계산은 변경하지 않음. Worker/Comma 변경 없음.
+
 ## 2026-10-07 — 추이 평균선과 수치 간격 개선
 
 - 커밋 제목: `vehicle-journal: improve average line spacing and labels`.

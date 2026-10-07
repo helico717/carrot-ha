@@ -589,15 +589,16 @@ export class VehicleJournal extends HTMLElement {
         const diffPct=pastVal>0?(diff/pastVal)*100:(currVal>0?100:0);
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
-          changeText=`${Math.abs(diffPct).toFixed(1)}% ${diff>0?'상승':'감소'}`;
+          const changeValue=unit==='원'?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
+          changeText=`${changeValue.toLocaleString('ko-KR')}${unit} ${diff>0?'증가':'감소'}`;
           if(diff>0){
             trendStatus='up';
             headline=`${periodName} 동안 증가 추세`;
-            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${Math.abs(diffPct).toFixed(1)}% 상승했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${changeText}했어요.`;
           }else{
             trendStatus='down';
             headline=`${periodName} 동안 감소 추세`;
-            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${Math.abs(diffPct).toFixed(1)}% 감소했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${changeText}했어요.`;
           }
         }else{
           trendStatus='consistent';
