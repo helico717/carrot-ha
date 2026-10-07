@@ -166,6 +166,37 @@ class TestNewSensors(unittest.TestCase):
             summary['rolling30_drive_energy_kwh'] = energy
             self.assertIsNone(values(runtime)['rolling30_efficiency_kpl'])
 
+    def test_compact_sensor_attributes_and_defaults(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS, LastTripSensor, ChargingSessionSensor
+        from custom_components.carrot_ha.entity_migration import COMPACT_SENSORS
+        runtime = self._make_runtime({}, {'month_slow_kwh': 12, 'month_fast_kwh': 8,
+            'month_charge_kwh': 20, 'month_distance_km': 100, 'month_trip_count': 4,
+            'trip_count': 50, 'recorded_distance_km': 1200,
+            'last_trip_distance_km': 10, 'last_trip_duration_s': 900,
+            'last_trip_avg_kph': 40, 'last_trip_max_kph': 65,
+            'last_trip_at': '2026-10-01T12:00:00Z'})
+        entry=runtime['entry']; entry.entry_id='compact-test'
+        def attach(sensor):
+            sensor.hass=types.SimpleNamespace(data={'carrot_ha':{entry.entry_id:runtime}})
+            return sensor
+        for key in FIELDS:
+            sensor=VehicleSensor(entry,key,*FIELDS[key])
+            self.assertEqual(sensor._attr_entity_registry_enabled_default, key not in COMPACT_SENSORS)
+        charge=attach(VehicleSensor(entry,'month_charge_kwh',*FIELDS['month_charge_kwh']))
+        self.assertEqual(charge.extra_state_attributes['slow_kwh'],12)
+        self.assertEqual(charge.extra_state_attributes['fast_kwh'],8)
+        for key in ('month_distance_km','rolling30_distance_km'):
+            attrs=attach(VehicleSensor(entry,key,*FIELDS[key])).extra_state_attributes
+            self.assertEqual(attrs['month_trip_count'],4)
+            self.assertEqual(attrs['recorded_trip_count'],50)
+            self.assertEqual(attrs['recorded_distance_km'],1200)
+        attrs=attach(LastTripSensor(entry)).extra_state_attributes
+        self.assertEqual((attrs['distance_km'],attrs['duration_s'],attrs['avg_speed_kph'],attrs['max_speed_kph'],attrs['ended_at']),
+            (10,900,40,65,'2026-10-01T12:00:00Z'))
+        attrs=attach(ChargingSessionSensor(entry)).extra_state_attributes
+        self.assertIn('eta_80',attrs)
+        self.assertIn('eta_100',attrs)
+
     def test_stale_door_retains_last_value(self):
         # Door fields are no longer in OPTIONAL_FIELDS; they retain last-known values.
         now = datetime.now(timezone.utc)

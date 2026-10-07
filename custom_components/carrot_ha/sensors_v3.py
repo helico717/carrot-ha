@@ -4,6 +4,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import SENSOR_FIELDS, CHARGE_TEMPERATURE_DISPLAY, battery_monitor_attributes
+from .entity_migration import COMPACT_SENSORS
 
 GEAR_DISPLAY = {
     'park': 'P',
@@ -87,6 +88,7 @@ ID4_DIAGNOSTIC_KEYS = {
 class VehicleSensor(VehicleEntity,SensorEntity):
     def __init__(self,entry,key,name,unit,icon,device_class,precision=None):
         self.configure(entry,key,name,icon)
+        self._attr_entity_registry_enabled_default = key not in COMPACT_SENSORS
         self._attr_native_unit_of_measurement=unit
         self._attr_device_class=device_class
         if precision is not None:
@@ -157,6 +159,9 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                     attrs['recent_efficiency_distance_km'] = self.data.get('recent_efficiency_distance_km')
         elif self.key=='soc_percent':
             attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
+        elif self.key == 'month_charge_kwh':
+            attrs.update(slow_kwh=self.data.get('month_slow_kwh'),
+                         fast_kwh=self.data.get('month_fast_kwh'))
         if self.key.startswith('rolling30_'):
             attrs.update(period_days=30, period_basis='rolling_720_hours',
                          trip_time_basis='observed_at', summary_updated_at=self.runtime.get('cloud_last_sync'),
@@ -170,6 +175,10 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                          month_energy_distance_km=self.data.get('month_energy_distance_km'),
                          month_drive_energy_kwh=self.data.get('month_drive_energy_kwh'),
                          month_energy_coverage_percent=self.data.get('month_energy_coverage_percent'))
+        if self.key in ('rolling30_distance_km', 'month_distance_km'):
+            attrs.update(month_trip_count=self.data.get('month_trip_count'),
+                         recorded_trip_count=self.data.get('trip_count'),
+                         recorded_distance_km=self.data.get('recorded_distance_km'))
         return attrs
 
 

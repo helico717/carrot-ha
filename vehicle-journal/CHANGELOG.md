@@ -613,3 +613,30 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   사용자 HA 재시작 후 엔티티 등록/실제 값 확인은 대기다. 현재 개발 기간에는 HACS
   재다운로드를 혼용하지 않으며, 이후 새 베타 릴리즈에 최신 차계부 수정도 포함해
   태그·파일 해시와 누적 변경 기록을 검증한다.
+# 2026-10-07 — 중복 차량 엔티티 12개를 속성으로 통합
+
+- 커밋 제목: `vehicle-journal: compact duplicate vehicle sensors with reversible migration`.
+- 변경·이유: 최근 주행 상세 5개·충전 ETA 2개·월 완속/급속량 2개·월 주행횟수 1개·
+  누적 기록 횟수/거리 2개를 기존 복합 센서 속성으로 제공하고 기본 비활성화한다.
+  Comma 엔티티는 전부 유지한다. 자동화에서 참조하는 배터리/충전/연결/남은시간,
+  현재 아이폰 위젯의 월 전비·거리는 유지한다. 별도 요약 엔티티를 추가하지 않는다.
+- 전환: config entry data의 버전 마커로 최초 1회만 비활성화한다. 등록 ID·기록을
+  삭제하지 않고 사용자가 다시 활성화한 선택을 재시작·옵션 저장 후에도 유지한다.
+  새 설치도 상세 센서를 기본 비활성화하지만 설정에서 다시 활성화할 수 있다.
+- 속성: 월 충전량에 slow_kwh/fast_kwh, 월 거리 및 최근 30일 거리에
+  month_trip_count/recorded_trip_count/recorded_distance_km을 추가한다. 최근 주행 및
+  충전 세션의 기존 속성으로 상세값을 제공한다. 누적 기록은 보존 중인 archive 기준이다.
+- 영향 확인: HA 등록 81개/활성 81개와 축소 대상 12개를 읽기 전용 확인했다.
+  조회한 HA YAML/Lovelace 설정에 대상 ID 직접 참조 없음. 아이폰·외부 카드의
+  모든 설정을 조회한 것은 아니며 필요한 상세 센서는 재활성화할 수 있다.
+  기본 적용 후 등록 81개·활성 69개 예상. 실제 전환은 사용자 HA 재시작 후 확인한다.
+- 관련 파일: custom_components/carrot_ha/{entity_migration.py,sensors_v3.py},
+  tests/{test_entity_migration.py,test_new_sensors.py}, docs/entities.md.
+- 검증: 마이그레이션 4건(12개 한정/Comma·필수 보존/재활성화/다른 차량/옵션 저장),
+  센서 속성·기본 활성 정책 포함 19건 통과. rolling/monthly 각 4건·latest 6건·증분 5건·
+  이력 캐시 1건, dashboard/카메라 14건, Worker 증분·benchmark 및 Comma parameter
+  polling 4건 통과. 차계부 14건·schema 9건 통과. 프론트엔드 변경 없음.
+- 배포: main 커밋·푸시 후 현재 개발 정책의 백업·부분 배포 대상으로 센서 및
+  migration Python 2개만 반영한다. 기존 설치 파일 해시와 수정 전 커밋 일치 확인.
+  코드 반영/해시·백업 확인은 후속 기록으로 확정하고 사용자 재시작·69개 확인은 대기다.
+  manifest/태그/새 Release/Cloudflare/Comma/운영 DB/사진/화면 코드 변경 없음.

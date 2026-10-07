@@ -22,6 +22,33 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 
 ## 2. 신규 복합 센서 (Composite Sensors)
 
+### 중복 엔티티 축소 및 호환성
+
+아래 12개 상세 센서는 복합 센서의 속성으로 제공하고 기본 비활성화합니다.
+기존 설치에서는 최초 적용 시 한 번만 비활성화하며 등록 ID와 기록을 삭제하지
+않습니다. 이후 사용자가 다시 활성화하면 HA 재시작·옵션 저장 후에도 유지됩니다.
+전환 여부는 config entry data의 `vehicle_entity_compaction_version=1`로 기록합니다.
+Comma 엔티티, 충전 전력/모드/남은시간·충전 여부·배터리·연결 상태 및 기존
+월 전비/월 주행거리는 유지합니다.
+
+| 비활성화되는 내부 키 | 값 조회 위치 |
+| --- | --- |
+| `last_trip_distance_km` | `last_trip`의 상태 및 `distance_km` |
+| `last_trip_duration_s` | `last_trip.duration_s` |
+| `last_trip_avg_kph`, `last_trip_max_kph` | `last_trip.avg_speed_kph`, `max_speed_kph` |
+| `last_trip_at` | `last_trip.ended_at` |
+| `eta_80`, `eta_100` | `charging_session.eta_80`, `eta_100` |
+| `month_slow_kwh`, `month_fast_kwh` | `month_charge_kwh.slow_kwh`, `fast_kwh` |
+| `month_trip_count` | `month_distance_km.month_trip_count` 및 최근 30일 거리 속성 |
+| `trip_count`, `recorded_distance_km` | `month_distance_km.recorded_trip_count`, `recorded_distance_km` 및 최근 30일 거리 속성 |
+
+예: `{{ state_attr('sensor.id_4_last_trip', 'avg_speed_kph') }}`.
+사용자 지정 ID가 있으면 실제 엔티티 ID를 확인합니다. 자동화·위젯·타사 카드가
+위 상세 ID를 사용한다면 속성 조회로 바꾸거나 해당 상세 센서를 다시 활성화합니다.
+비활성화 센서는 새로운 독립 상태/장기 통계 기록을 만들지 않습니다. 기존 이력은
+삭제하지 않으며 차량 dashboard·차계부의 별도 로컬 DB 수집/계산은 그대로 유지됩니다.
+현재 운영 설치의 등록 수 81개는 유지하고 활성 수는 최초 적용 후 69개가 됩니다.
+
 서드파티 EV 대시보드 카드(예: Vehicle Card, Minimalist UI)와 편리한 Home Assistant 자동화를 지원하기 위해 추가된 고기능 복합 센서입니다.
 
 ### 최근 30일 주행 엔티티

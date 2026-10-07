@@ -15,7 +15,7 @@ class Registry:
         for key, entity_id in keys.items():
             self.entities[entity_id] = types.SimpleNamespace(
                 entity_id=entity_id, unique_id='car_' + key, platform='carrot_ha',
-                domain=entity_id.split('.')[0], device_id='vehicle')
+                domain=entity_id.split('.')[0], device_id='vehicle', disabled_by=None)
 
     def async_get(self, key):
         return self.entities.get(key)
@@ -32,16 +32,49 @@ class Registry:
 
 
 class MigrationTest(unittest.TestCase):
-    def migrate(self, registry):
+    def migrate(self, registry, entry=None):
         helpers = types.ModuleType('homeassistant.helpers')
         helpers.entity_registry = types.SimpleNamespace(
+            RegistryEntryDisabler=types.SimpleNamespace(INTEGRATION='integration'),
             async_get=lambda hass: registry,
             async_entries_for_config_entry=lambda reg, entry: list(reg.entities.values()))
         helpers.device_registry = types.SimpleNamespace(async_get=lambda hass: types.SimpleNamespace(
             async_get_or_create=lambda **kw: types.SimpleNamespace(id='comma')))
-        entry = types.SimpleNamespace(entry_id='entry', data={'device_id': 'car'})
+        entry = entry or types.SimpleNamespace(entry_id='entry', data={'device_id': 'car'}, options={})
+        def update(entry, **kwargs):
+            entry.data = kwargs['data']
+        hass = types.SimpleNamespace(config_entries=types.SimpleNamespace(async_update_entry=update))
         with patch.dict(sys.modules, {'homeassistant.helpers': helpers}):
-            migration.migrate_entities(None, entry)
+            migration.migrate_entities(hass, entry)
+        return entry
+
+    def test_compaction_once_preserves_comma_and_manual_enable(self):
+        keys = migration.COMPACT_SENSORS | {'comma_cpu_temperature_c', 'comma_online',
+            'soc_percent', 'actual_charge_power_w', 'charge_mode', 'time_to_80_s', 'time_to_100_s',
+            'month_efficiency_kpl', 'month_distance_km'}
+        registry = Registry({key: 'sensor.custom_' + key for key in keys})
+        entry = self.migrate(registry)
+        self.assertEqual(sum(e.disabled_by == 'integration' for e in registry.entities.values()), 12)
+        for key in keys-migration.COMPACT_SENSORS:
+            entity = next(e for e in registry.entities.values() if e.unique_id == 'car_'+key)
+            self.assertIsNone(entity.disabled_by)
+        registry.async_get('sensor.custom_last_trip_at').disabled_by = None
+        self.migrate(registry, entry)
+        self.assertIsNone(registry.async_get('sensor.custom_last_trip_at').disabled_by)
+        self.assertEqual(entry.data[migration.COMPACTION_DATA_KEY], 1)
+        entry.options = {'soc_capacity_kwh': 78}
+        self.migrate(registry, entry)
+        self.assertIsNone(registry.async_get('sensor.custom_last_trip_at').disabled_by)
+
+    def test_preserves_user_disabled_and_other_vehicle(self):
+        registry = Registry({'last_trip_at': 'sensor.custom_end', 'eta_80': 'sensor.other_eta'})
+        registry.async_get('sensor.custom_end').disabled_by = 'user'
+        registry.async_get('sensor.other_eta').unique_id = 'other_eta_80'
+        entry = types.SimpleNamespace(entry_id='entry', data={'device_id':'car'}, options={'soc_capacity_kwh':77})
+        self.migrate(registry, entry)
+        self.assertEqual(registry.async_get('sensor.custom_end').disabled_by, 'user')
+        self.assertIsNone(registry.async_get('sensor.other_eta').disabled_by)
+        self.assertEqual(entry.options['soc_capacity_kwh'], 77)
 
     def test_migration_and_repeat(self):
         registry = Registry({
