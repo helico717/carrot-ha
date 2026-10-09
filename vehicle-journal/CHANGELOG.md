@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 날짜 선택기 이전·다음 및 현재 기간 복귀 버튼
+
+- 커밋 제목: `vehicle-journal: add date navigation and current period buttons`.
+- 변경·이유: 날짜 입력 왼쪽 이전/오른쪽 다음 버튼과 그 오른쪽 현재 범위 복귀 버튼 추가. 월별은 한 달씩 이동·‘이번 달’, 연도별은 한 해씩 이동·‘올해’. 현재 범위는 HA 설정 시간대 기준. 기존 입력과 선택 탭 유지, 기간 변경 시 상세 기록 페이지 초기화, 기존 오래된 응답 거부 경로 사용.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: JS 구문 및 실제 Chromium 회귀 통과. 12월→1월/역방향·연도 이동·현재 월/연도 복귀·레이블·페이지 초기화·탭 유지 검증. 320–850px 모바일 가로 넘침 및 기존 입력/금액/스크롤 회귀 통과. 모바일 합성 화면 육안 확인.
+- 배포: main 커밋·푸시 후 두 모듈 백업/HA 직접 반영 예정. 운영 화면 적용은 후속 상태로 구분. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 화폐 구분 쉼표 수정 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record grouped currency deployment`.

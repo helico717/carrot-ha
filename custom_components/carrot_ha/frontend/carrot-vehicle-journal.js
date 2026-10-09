@@ -61,7 +61,7 @@ export class VehicleJournal extends HTMLElement {
   build(){
     this.ready=true;
     this.shadowRoot.innerHTML=`<style>${styles}${journalDesign}</style><div class="shell">
-    <header class="mast"><div class="mast-left"><div class="title-controls-row"><h2>차계부</h2><select class="select-pill" id="entry" aria-label="차량"></select><input class="date-pill" id="month" type="month" aria-label="기록 기간"></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
+    <header class="mast"><div class="mast-left"><div class="title-controls-row"><h2>차계부</h2><select class="select-pill" id="entry" aria-label="차량"></select><div class="date-navigation" role="group" aria-label="기록 기간 이동"><button class="date-step" id="periodPrev" type="button" aria-label="이전 달" title="이전 달">‹</button><input class="date-pill" id="month" type="month" aria-label="기록 기간"><button class="date-step" id="periodNext" type="button" aria-label="다음 달" title="다음 달">›</button><button class="date-current" id="periodCurrent" type="button" title="현재 기간으로 돌아가기">이번 달</button></div></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
     <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','추세','절약 비교','상세 기록'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
     <section id="page0" role="tabpanel" aria-labelledby="tab0">
           <div class="grid">
@@ -166,6 +166,9 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('month'))this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
     if(this.$('entry'))this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
+    this.$('periodPrev').onclick=()=>this.stepPeriod(-1);
+    this.$('periodNext').onclick=()=>this.stepPeriod(1);
+    this.$('periodCurrent').onclick=()=>this.selectCurrentPeriod();
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]'))button.onclick=()=>this.setScope(button.dataset.scope);
     this.$('legendRow').onclick=event=>{const button=event.target.closest('[data-cat]');if(button){this.comparisonCategory=this.comparisonCategory===button.dataset.cat?null:button.dataset.cat;this.renderSpendingComparison();}};
     for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
@@ -223,12 +226,32 @@ export class VehicleJournal extends HTMLElement {
   }
   setScope(scope){
     if(!['month','year'].includes(scope)||scope===this.scope)return;
-    const today=new Date().toLocaleDateString('sv-SE');
+    const today=this.currentPeriodDate();
     this.scope=scope;this.offset=0;
     const input=this.$('month');input.type=scope==='year'?'number':'month';
     if(scope==='year'){input.min='1900';input.max='2100';input.value=today.slice(0,4);}else{input.removeAttribute('min');input.removeAttribute('max');input.value=today.slice(0,7);}
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]')){const active=button.dataset.scope===scope;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
+    this.updatePeriodNavigation();
     this.load(true);
+  }
+  currentPeriodDate(){return new Date().toLocaleDateString('sv-SE',{timeZone:this._hass?.config?.time_zone||undefined});}
+  updatePeriodNavigation(){
+    const unit=this.scope==='year'?'해':'달';
+    for(const [id,label] of [['periodPrev',`이전 ${unit}`],['periodNext',`다음 ${unit}`]]){this.$(id).setAttribute('aria-label',label);this.$(id).title=label;}
+    this.$('periodCurrent').textContent=this.scope==='year'?'올해':'이번 달';
+  }
+  selectCurrentPeriod(){
+    const today=this.currentPeriodDate();
+    this.$('month').value=today.slice(0,this.scope==='year'?4:7);
+    this.offset=0;this.load(true);
+  }
+  stepPeriod(direction){
+    const range=this.range();if(!range)return;
+    const date=new Date(range.from+'T00:00:00Z');
+    if(this.scope==='year')date.setUTCFullYear(date.getUTCFullYear()+direction);else date.setUTCMonth(date.getUTCMonth()+direction);
+    const year=date.getUTCFullYear();if(year<1||year>9999||(this.scope==='year'&&(year<1900||year>2100)))return;
+    this.$('month').value=date.toISOString().slice(0,this.scope==='year'?4:7);
+    this.offset=0;this.load(true);
   }
   range(){
     const value=this.$('month')?.value;

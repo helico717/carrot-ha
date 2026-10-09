@@ -1185,6 +1185,14 @@ export const journalDesign = `:host {
   .h-phrase{white-space:normal}
 }
 .title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}
+.date-navigation{display:grid;grid-template-columns:36px minmax(0,180px) 36px auto;align-items:center;gap:6px;max-width:100%;min-width:0}
+.date-navigation .date-pill{box-sizing:border-box;min-width:0;width:100%;max-width:180px}
+.date-step,.date-current{box-sizing:border-box;min-height:38px;border:1px solid var(--j-border);border-radius:10px;background:var(--j-surface);color:var(--j-ink);cursor:pointer}
+.date-step{padding:0;font-size:25px;line-height:1}
+.date-current{padding:6px 10px;font-size:14px;white-space:nowrap;color:var(--j-accent);font-weight:750}
+.date-step:hover,.date-current:hover{border-color:var(--j-accent)}
+.date-step:focus-visible,.date-current:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
+@media(max-width:600px){.date-navigation{grid-template-columns:30px minmax(0,145px) 30px auto;gap:4px}.date-navigation .date-pill{padding:7px 5px}.date-current{padding:6px;font-size:13px}}
 .legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size: 12.5px}
 .trend-badge{white-space:nowrap;flex-shrink:0}
 
