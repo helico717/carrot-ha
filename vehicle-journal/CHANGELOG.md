@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 화폐 구분 쉼표 수정 HA 반영 확인
+
+- 커밋 제목: `vehicle-journal: record grouped currency deployment`.
+- 대상: `e6d122d` 화폐 표시·공통 지침. main 푸시 및 HA 코드 백업/직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/e6d122d1098494e7b1384aa5f561437153915634/`.
+- 검증: 카드 설치 및 HA 로컬 HTTP SHA-256 `b4a4dc7a38b7e94952050a3299a1bb37a8e19b0f515c0eefbaab443c56671903` 일치. 배포 도구가 함께 반영한 디자인은 기존 해시와 동일. Node 10건 및 실제 Chromium 차계부 회귀 통과.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 모든 대시보드 화폐 천 단위 구분 규칙
 
 - 커밋 제목: `vehicle-journal: enforce grouped currency labels across trends`.
