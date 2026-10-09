@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 날짜 선택기 버튼 HA 반영 확인
+
+- 커밋 제목: `vehicle-journal: record date navigation deployment`.
+- 대상: `1ff8bd5` 날짜 이동/현재 기간 복귀. main 푸시 및 두 모듈 백업/HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/1ff8bd5b84ef7ebb6692723917b7c0728d85c734/`.
+- 검증: 최종 실제 Chromium 회귀 통과. 설치/HA 로컬 HTTP SHA-256 카드 `0fbff875399f35f88d391dbee8810b5b8aa2abae9cca6efd44a6491ea55f2e2a`, 디자인 `e39b537d8d5914783ee4bb2691a38fc7e6e615c18a36f9b91c59bb4945995a4d` 일치.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 날짜 선택기 이전·다음 및 현재 기간 복귀 버튼
 
 - 커밋 제목: `vehicle-journal: add date navigation and current period buttons`.
