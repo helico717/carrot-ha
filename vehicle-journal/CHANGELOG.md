@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 추세 카드 제목 위계 및 변화 단어 강조
+
+- 커밋 제목: `vehicle-journal: clarify trend text hierarchy and direction emphasis`.
+- 변경·이유: 첫 줄 지표 제목을 둘째 줄보다 크게 표시(데스크톱 21.5/17.5px, 모바일 18.5/15.5px). 둘째 줄 증가·감소·일관 단어에 카드 테마 색상과 굵기를 적용. ‘안정적인 패턴이에요’를 ‘일관된 추세예요’로 변경.
+- 범위: 카드 제목 명칭 변경은 사용자 사전 검토 대상으로 남기며 이번 수정에는 포함하지 않음. 계산·집계 유지.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: JS 두 모듈 구문 및 실제 Chromium 회귀 통과. 월/연도 비교, 증가·감소·일관 강조 색상, 데스크톱/모바일 글자 위계, 320–850px 레이아웃, 입력·escaping·스크롤 검증 포함.
+- 배포: main 커밋·푸시 및 두 모듈 백업 후 HA 직접 반영 예정. 설치/HTTP/운영 브라우저 확인 상태는 후속 기록으로 구분. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-07 — 추가 추이 및 모바일 한 열 운영 검증 완료
 
 - 커밋 제목: `vehicle-journal: record new trends and mobile deployment`.

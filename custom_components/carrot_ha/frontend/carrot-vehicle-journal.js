@@ -605,7 +605,7 @@ export class VehicleJournal extends HTMLElement {
         }else{
           trendStatus='consistent';
           headline=`${periodName} 동안 일관된 추세`;
-          subDesc=`${prevPeriodName}과 비슷한 안정적인 패턴이에요.`;
+          subDesc=`${prevPeriodName}과 비슷한 일관된 추세예요.`;
         }
       }else if(hasCurrent){
         headline='이전 기간 비교 데이터 수집 중';
@@ -761,6 +761,7 @@ export class VehicleJournal extends HTMLElement {
     const chartHtml=this.generateTrendCardChartHtml(m);
     const changeIndex=m.changeText?m.subDesc.indexOf(m.changeText):-1;
     const summaryHtml=changeIndex<0?esc(m.subDesc):`${esc(m.subDesc.slice(0,changeIndex))}<strong class="trend-change">${esc(m.changeText)}</strong>${esc(m.subDesc.slice(changeIndex+m.changeText.length))}`;
+    const headlineHtml=esc(m.headline).replace(/증가|감소|일관/g,word=>`<strong class="trend-direction">${word}</strong>`);
     return `
       <article class="trend-card" data-trend="${esc(m.id)}" style="--trend-color:${m.color};">
         <div class="trend-card-top">
@@ -770,7 +771,7 @@ export class VehicleJournal extends HTMLElement {
           </div>
           <span class="trend-arrow">›</span>
         </div>
-        <h4 class="trend-headline">${esc(m.headline)}</h4>
+        <h4 class="trend-headline">${headlineHtml}</h4>
         <p class="trend-card-summary">${summaryHtml}</p>
         <div class="trend-divider"></div>
         ${chartHtml}
