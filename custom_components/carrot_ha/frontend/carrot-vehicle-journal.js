@@ -618,8 +618,6 @@ export class VehicleJournal extends HTMLElement {
       if(options.total){
         subDesc=subDesc.replace(' 평균 ',' 합계 ');
       }
-      if(['distance','charge_kwh','drive_soc'].includes(id))subDesc+=' 기록이 있는 날 기준 평균이에요.';
-      if(options.note)subDesc+=` ${options.note}`;
 
       return {
         id,name,icon,color,unit,isChanging,trendStatus,headline,subDesc,changeText,
@@ -634,11 +632,11 @@ export class VehicleJournal extends HTMLElement {
 
     const metrics=[
       createMetric('efficiency','평균 전비','⚡','#81e6c5','km/kWh',currEff,pastEff,effBars),
-      createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
-      createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
+      createMetric('distance','하루 평균 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
+      createMetric('charge_kwh','하루 평균 배터리 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
       createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,prevRate,rateBars),
-      createMetric('drive_soc','주행 소모 SOC','🔋','#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
-      createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
+      createMetric('drive_soc','하루 평균 주행 배터리 사용률','🔋','#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
+      createMetric('fast_ratio','완속·급속 충전 중 급속 충전 비율','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
 
     const round=value=>value==null?null:Number(value.toFixed(1));
@@ -658,16 +656,16 @@ export class VehicleJournal extends HTMLElement {
     }
     const observed=(fn)=>bins.map((b,i)=>extraBins[i].length?fn(b,i):null);
     metrics.push(
-      createMetric('cost100','100km당 전기비용 (추정)','💰','#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{note:'기간 충전 단가와 전비로 추정한 주행 비용이에요.'}),
-      createMetric('total_cost',isYear?'연간 총 차량 지출':'월별 총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true,note:'실제·추정 비용을 포함해요. 진행 중 기간의 누적 지출이에요.'}),
-      createMetric('charge_count','충전 횟수','🔌','#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
-      createMetric('per_charge','회당 충전량','🔋','#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
-      createMetric('soc100','100km당 배터리 소모','🚗','#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{note:'주행거리당 SOC 소모량이에요. 주행 SOC 기록 범위에 영향을 받아요.'})
+      createMetric('cost100','100km를 달리는 데 드는 충전 비용 (추정)','💰','#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{}),
+      createMetric('total_cost',isYear?'선택한 연도의 총 차량 지출':'선택한 달의 총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true}),
+      createMetric('charge_count',isYear?'선택한 연도의 총 충전 횟수':'선택한 달의 총 충전 횟수','🔌','#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
+      createMetric('per_charge','충전 1회당 평균 배터리 충전량','🔋','#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
+      createMetric('soc100','100km를 달릴 때 사용한 배터리 비율','🚗','#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{})
     );
     for(const [category,label] of Object.entries(categories)){
       const current=totals.categories?.[category],past=prevTotals.categories?.[category];
       if(!current&&!past)continue;
-      metrics.push(createMetric(`cost_${category}`,`${label} 지출`,'💳','#ffd60a','원',daily.length?current?.effective_krw??0:null,prevDaily.length?past?.effective_krw??0:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+(r.cost_categories?.[category]?.effective_krw||0),0)),{total:true,note:'실제·추정 비용을 포함한 기간 누적 지출이에요.'}));
+      metrics.push(createMetric(`cost_${category}`,`선택한 ${isYear?'연도':'달'}의 ${label} 총지출`,'💳','#ffd60a','원',daily.length?current?.effective_krw??0:null,prevDaily.length?past?.effective_krw??0:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+(r.cost_categories?.[category]?.effective_krw||0),0)),{total:true}));
     }
 
     const changingItems=metrics.filter(m=>m.isChanging);

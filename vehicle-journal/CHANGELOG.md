@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 승인된 추세 제목 및 비교 문구 간소화
+
+- 커밋 제목: `vehicle-journal: clarify metric titles and simplify trend summaries`.
+- 변경·이유: 사용자 승인 제목 적용. ‘평균 전비’와 ‘kWh당 충전 단가’는 유지. 하루 평균·주행 사용률·급속 충전 분모·100km 비용/배터리 비율·1회 평균 충전량 명시. 총 지출/충전 횟수/분류별 지출은 선택한 달 또는 연도를 제목에 명시.
+- 셋째 줄: 기록일 기준 평균, 추정 계산식, 실제·추정 포함, 누적 지출, SOC 기록 범위 등 모든 부가 설명 제거. 비교 수치·변화량 및 일관/수집 상태만 유지. 계산과 데이터는 변경하지 않음.
+- 관련 파일: `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: JS 구문 및 실제 Chromium 회귀 통과. 승인 제목과 유지 대상 두 제목, 부가 설명 제거, 비교 문장, 월/연도·입력·스크롤·모바일 320–850px 확인.
+- 배포: main 커밋·푸시 후 코드 백업 및 HA 카드 모듈 직접 반영 예정. 설치/HTTP/운영 브라우저 상태는 후속 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 글자 크기 교환 및 테마 강조 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record trend typography deployment`.

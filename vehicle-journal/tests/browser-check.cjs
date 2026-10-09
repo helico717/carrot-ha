@@ -58,12 +58,17 @@ const path=require('path');
      }
      if(previous&&!headline.querySelector('.trend-direction'))throw Error('missing headline direction emphasis');
      if(item.textContent.includes('안정적인 패턴'))throw Error('legacy stable wording remains');
+     const summary=item.querySelector('.trend-card-summary').textContent;
+     if(/기록이 있는 날|기간 충전 단가|실제·추정 비용|누적 지출|주행거리당 SOC|기록 범위/.test(summary))throw Error('unrequested explanatory text remains');
+     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|원|%|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
     }
    }
   }
   card.data={...original,daily:[]};card.renderTrendsDashboard();
   if(!card.$('changingTrendsGrid').textContent.includes('데이터가 아직 없어요'))throw Error('missing empty trend state');
   card.scope='month';card.$('month').value='2026-10';card.data=original;card.renderTrendsDashboard();
+  const expected={efficiency:'평균 전비',charge_rate:'kWh당 충전 단가',distance:'하루 평균 주행거리',charge_kwh:'하루 평균 배터리 충전량',drive_soc:'하루 평균 주행 배터리 사용률',fast_ratio:'완속·급속 충전 중 급속 충전 비율',cost100:'100km를 달리는 데 드는 충전 비용 (추정)',total_cost:'선택한 달의 총 차량 지출',charge_count:'선택한 달의 총 충전 횟수',per_charge:'충전 1회당 평균 배터리 충전량',soc100:'100km를 달릴 때 사용한 배터리 비율'};
+  for(const [id,title] of Object.entries(expected))if(trend(id).querySelector('.trend-metric-name').textContent!==title)throw Error('incorrect approved title: '+id);
  });
  await root.locator('#add').click();
  await root.locator('input[name="date"]').fill('2026-09-02');await root.locator('#actualKrw').fill('123');
