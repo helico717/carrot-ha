@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 추세 제목·비교 문구 HA 반영 확인
+
+- 커밋 제목: `vehicle-journal: record simplified trend deployment`.
+- 대상: `4ea12c3` 승인 제목과 부가 설명 제거. 최종 Chromium 검증 통과 및 main 푸시 완료.
+- 배포: 기존 코드 백업 후 카드 반영 완료. 배포 도구가 디자인 모듈도 동일 커밋에서 다시 반영했으며 디자인은 이전과 동일. 백업 `/config/carrot_ha/deployment-backups/4ea12c389f8db865fd5db59f491ff5a1a4811ed8/`.
+- 검증: 카드 설치/HA 로컬 HTTP SHA-256 `1f21361eec7774ad22e727eb780983747aa87ecc36c22252541d9024da1b7d71` 일치. 디자인 기존 해시 `dcdd3ddb97b1dad4420ace5004dd489c6d60cad5c8aa0211d55f40739d5a4705` 일치.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 승인된 추세 제목 및 비교 문구 간소화
 
 - 커밋 제목: `vehicle-journal: clarify metric titles and simplify trend summaries`.
