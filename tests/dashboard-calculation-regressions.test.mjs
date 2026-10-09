@@ -13,6 +13,20 @@ const trip = (start, end, extra = {}) => ({data: {
   duration_s: 600, distance_m: 10000, energy_wh: 2000, efficiency_km_kwh: 5, ...extra
 }});
 
+test('Korean and English dashboards group charge totals and unit prices by thousands', () => {
+  for (const Class of [Korean, English]) {
+    const card = new Class();
+    card.tab = 'charge';
+    card._hass = {config:{time_zone:'Asia/Seoul'}};
+    card.charges = [{data:{started_at:`${day}T08:00:00+09:00`,ended_at:`${day}T09:00:00+09:00`,duration_s:3600,energy_kwh:10,actual_cost_krw:1234567,effective_cost_krw:1234567}}];
+    card.chargeDay = day;
+    const history = card.chargeHistory();
+    assert.match(history, /1,234,567/);
+    assert.match(history, /123,457/);
+    assert.doesNotMatch(history, />1234567(?:원|\s*<)/);
+  }
+});
+
 test('unknown or rejected energy never becomes zero consumption in merged trips', () => {
   for (const extra of [{energy_wh: undefined}, {energy_wh: 2000, energy_rejected: true}]) {
     const raw = [trip('08:00', '08:10'), trip('08:20', '08:30', extra), trip('08:40', '08:50')];

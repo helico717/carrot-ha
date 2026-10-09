@@ -33,7 +33,7 @@ const path=require('path');
   const trend=id=>card.shadowRoot.querySelector(`[data-trend="${id}"]`);
   if(!trend('cost100').textContent.includes('추정'))throw Error('missing estimated cost label');
   if(!trend('distance').querySelector('.trend-chart-avg-label').textContent.includes('42km'))throw Error('observed-day distance mean wrong');
-  if(!trend('cost100').querySelector('.trend-chart-avg-label').textContent.includes('5714원'))throw Error('cost per 100km wrong');
+  if(!trend('cost100').querySelector('.trend-chart-avg-label').textContent.includes('5,714원'))throw Error('cost per 100km wrong');
   if(!trend('soc100').querySelector('.trend-chart-avg-label').textContent.includes('23.8%'))throw Error('SOC per 100km wrong');
   if(!trend('per_charge').querySelector('.trend-chart-avg-label').textContent.includes('20kWh'))throw Error('charge mean wrong');
   if(!trend('charge_count').querySelector('.trend-chart-avg-label').textContent.includes('1회'))throw Error('charge count wrong');
@@ -59,6 +59,12 @@ const path=require('path');
      if(previous&&!headline.querySelector('.trend-direction'))throw Error('missing headline direction emphasis');
      if(item.textContent.includes('안정적인 패턴'))throw Error('legacy stable wording remains');
      const summary=item.querySelector('.trend-card-summary').textContent;
+     const metricId=item.dataset.trend;
+     if(metricId==='charge_rate'||metricId==='cost100'||metricId==='total_cost'||metricId.startsWith('cost_')){
+      for(const text of [summary,...[...item.querySelectorAll('.trend-chart-avg-label,svg title')].map(el=>el.textContent)]){
+       if(/\d{4,}\s*원/.test(text))throw Error('currency grouping missing: '+text);
+      }
+     }
      if(/기록이 있는 날|기간 충전 단가|실제·추정 비용|누적 지출|주행거리당 SOC|기록 범위/.test(summary))throw Error('unrequested explanatory text remains');
      if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|원|%|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
     }

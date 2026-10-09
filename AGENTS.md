@@ -265,6 +265,15 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 
 ## 7. Version Management & HACS Release Policy
 
+### 모든 대시보드 화폐 표기 공통 규칙 — 2026-10-09
+
+- 한국어·영어·디버그 차량 대시보드와 차계부 등 모든 화면의 화폐 금액은 정수부에
+  세 자리마다 천 단위 구분 쉼표를 반드시 표시한다. 예: `4,859원`, `1,234,567 KRW`.
+- 합계·평균·단가·비교 기준 금액·증감액·차트 수치·툴팁·금액 입력 표시에도 적용한다.
+  원화 소수 자릿수와 반올림은 기존 정책을 유지하고, 0·음수·미확인 의미를 보존한다.
+- 금액을 문자열에 원시 숫자로 삽입하지 말고 기존 locale 숫자/화폐 포매터를 사용한다.
+  API·저장·계산 값은 숫자로 유지하며 쉼표는 표시 단계에서만 적용한다.
+
 - **Current Minor Version**: `0.8.x` (current: `0.8.9`).
 - **Strict Rule**: Maintain version `0.8`! Do **NOT** bump to `0.9` or `1.0` until all planned feature milestones and stabilization testing are complete.
 

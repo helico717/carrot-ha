@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 모든 대시보드 화폐 천 단위 구분 규칙
+
+- 커밋 제목: `vehicle-journal: enforce grouped currency labels across trends`.
+- 변경·이유: 사용자 공통 규칙을 루트/차계부 AGENTS 및 `.agents/rules/vehicle-journal.md`에 명시. 모든 화면의 금액·단가·증감·비교·차트·툴팁은 세 자리마다 쉼표 표시. 계산/저장은 숫자 유지.
+- 실행 변경: 차계부 추세 이전 기간 비교 금액, 과거/현재 그래프 수치, 막대 SVG 툴팁에서 누락된 천 단위 쉼표 적용. 기존 변화량·요약·원장·도넛·절약 비교는 이미 locale 포매터 사용. 한국어/영어/디버그 차량 대시보드와 결제 창도 기존 locale 금액 표시를 확인해 불필요한 실행 코드 변경 없음.
+- 관련 파일: `AGENTS.md`, `vehicle-journal/AGENTS.md`, `.agents/rules/vehicle-journal.md`, `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, `tests/dashboard-calculation-regressions.test.mjs`, 이 변경 이력.
+- 검증: 차량 계산/표시 Node 10건 통과(한국어/영어 충전 금액 1,234,567 및 단가 123,457 포함). 실제 Chromium 차계부 회귀 통과(월/연도 금액 라벨/툴팁/비교, 기존 모바일/입력/스크롤). git diff whitespace 검사 통과.
+- 배포: 커밋·main 푸시 후 HA 직접 반영 예정. 설치/HTTP 및 운영 브라우저 적용은 후속 기록. 디버깅 정책에 따라 신규 릴리즈 없음. Worker/Comma 변경 없음.
+
 ## 2026-10-09 — 추세 제목·비교 문구 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record simplified trend deployment`.

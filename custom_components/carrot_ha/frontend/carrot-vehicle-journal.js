@@ -6,6 +6,7 @@ const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{maximumFractionDigits:digits}):'—';
 const money=value=>Number.isFinite(value)?numeric(value,0)+'원':'미확인';
+const trendValue=(value,unit)=>unit==='원'?numeric(value,0):String(value);
 const categories={charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',other:'기타'};
 const uuid=()=>{if(crypto.randomUUID)return crypto.randomUUID();const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;};
 // Normalize locally before upload; camera originals never leave this browser.
@@ -596,11 +597,11 @@ export class VehicleJournal extends HTMLElement {
           if(diff>0){
             trendStatus='up';
             headline=`${periodName} 동안 증가 추세`;
-            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${changeText}했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${trendValue(pastVal,unit)} ${unit} 대비 ${changeText}했어요.`;
           }else{
             trendStatus='down';
             headline=`${periodName} 동안 감소 추세`;
-            subDesc=`${prevPeriodName} 평균 ${pastVal} ${unit} 대비 ${changeText}했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${trendValue(pastVal,unit)} ${unit} 대비 ${changeText}했어요.`;
           }
         }else{
           trendStatus='consistent';
@@ -695,7 +696,7 @@ export class VehicleJournal extends HTMLElement {
       const barWPct=stepPct*0.58;
       const xPct=idx*stepPct+(stepPct-barWPct)/2;
       const yPct=100-heightPct;
-      return `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${barWPct.toFixed(2)}%" height="${heightPct.toFixed(2)}%" rx="2" fill="rgba(255,255,255,0.18)"><title>${val}${m.unit}</title></rect>`;
+      return `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${barWPct.toFixed(2)}%" height="${heightPct.toFixed(2)}%" rx="2" fill="rgba(255,255,255,0.18)"><title>${trendValue(val,m.unit)}${m.unit}</title></rect>`;
     }).join('');
 
     let baselineLinesSvg='';
@@ -713,8 +714,8 @@ export class VehicleJournal extends HTMLElement {
       `;
 
       overlayLabelsHtml=`
-        <span class="trend-chart-avg-label pos-left" style="top:${pastYPct.toFixed(1)}%; color:#8fa4b5;">${m.pastAvg}${m.unit}</span>
-        <span class="trend-chart-avg-label pos-right" style="top:${currYPct.toFixed(1)}%; color:${m.color};">${m.avg}${m.unit}</span>
+        <span class="trend-chart-avg-label pos-left" style="top:${pastYPct.toFixed(1)}%; color:#8fa4b5;">${trendValue(m.pastAvg,m.unit)}${m.unit}</span>
+        <span class="trend-chart-avg-label pos-right" style="top:${currYPct.toFixed(1)}%; color:${m.color};">${trendValue(m.avg,m.unit)}${m.unit}</span>
       `;
 
       axisLabelsHtml=`
@@ -731,7 +732,7 @@ export class VehicleJournal extends HTMLElement {
       `;
 
       overlayLabelsHtml=`
-        <span class="trend-chart-avg-label pos-left" style="top:${avgYPct.toFixed(1)}%; color:${m.color};">${m.avg}${m.unit}</span>
+        <span class="trend-chart-avg-label pos-left" style="top:${avgYPct.toFixed(1)}%; color:${m.color};">${trendValue(m.avg,m.unit)}${m.unit}</span>
       `;
 
       axisLabelsHtml=`
