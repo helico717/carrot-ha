@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 기존 첫째·둘째 줄 글자 크기를 정확히 교환
+
+- 커밋 제목: `vehicle-journal: swap original trend title and headline sizes`.
+- 변경·이유: 사용자 추가 요청에 따라 원래 크기를 그대로 교환. 데스크톱 첫째 줄 19.5px/둘째 줄 16.5px, 모바일 첫째 줄 16.5px/둘째 줄 14.5px. `1e6e2a0`의 확대 수치를 대체하며 문구·테마 색상 강조 유지.
+- 관련 파일: `carrot-journal-design.js`, 이 변경 이력.
+- 검증: 실제 Chromium 회귀 재실행 예정. 배포: 두 변경을 합쳐 최종 커밋 코드만 백업 후 HA 직접 반영 예정. 운영 브라우저 확인은 별도 기록. 제목 명칭은 사전 검토 대기.
+
 ## 2026-10-09 — 추세 카드 제목 위계 및 변화 단어 강조
 
 - 커밋 제목: `vehicle-journal: clarify trend text hierarchy and direction emphasis`.
