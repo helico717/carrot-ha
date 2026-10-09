@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 미래 기간 차단 HA 반영 확인
+
+- 커밋 제목: `vehicle-journal: record future period guard deployment`.
+- 대상: `1f28d55` 미래 기간 차단. main 푸시·두 모듈 백업·HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/1f28d55cf5dbee03b442528f5f6f191c08d088ae/`.
+- 검증: 최종 실제 Chromium 회귀 통과. 설치/HA 로컬 HTTP SHA-256 카드 `0354271504849915606b7aef8d4d18131e1ec1efc8095c37e3032d81d95f3375`, 디자인 `acb24e4e0ec87d05fd9373a7dc9c6d16f7b8b935c025bf2cc7684a103944098e` 일치.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 날짜 선택기 미래 기간 선택 차단
 
 - 커밋 제목: `vehicle-journal: prevent selecting future journal periods`.
