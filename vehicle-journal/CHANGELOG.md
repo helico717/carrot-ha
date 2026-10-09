@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 글자 크기 교환 및 테마 강조 HA 반영 확인
+
+- 커밋 제목: `vehicle-journal: record trend typography deployment`.
+- 대상: `1e6e2a0` 문구·강조 및 `2e63285` 원래 크기 교환. 최종 두 화면 모듈을 `2e632858cfb8ef928181b26fbcb307c11a82889c`에서 추출해 배포.
+- 검증: 최종 Chromium 회귀 통과. 설치 파일 및 HA 로컬 HTTP 응답 SHA-256 모두 커밋 코드와 일치. 카드 `3618001cb4a22f91bb3b73eb66cbff780810e12f78c001501b1c5cd633aa160e`, 디자인 `dcdd3ddb97b1dad4420ace5004dd489c6d60cad5c8aa0211d55f40739d5a4705`.
+- 배포: main 푸시·기존 코드 백업·두 모듈 HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/2e632858cfb8ef928181b26fbcb307c11a82889c/`. 실제 사용자 접속 주소의 운영 브라우저 적용은 미확인으로 사용자 새로고침 후 확인 대기. HA 재시작은 실행하지 않음.
+- 제한: 카드 제목 명칭은 사용자 검토 후 변경. 신규 릴리즈·Worker·Comma 변경 없음. 운영 브라우저 적용 완료를 주장하지 않음.
+
 ## 2026-10-09 — 기존 첫째·둘째 줄 글자 크기를 정확히 교환
 
 - 커밋 제목: `vehicle-journal: swap original trend title and headline sizes`.
