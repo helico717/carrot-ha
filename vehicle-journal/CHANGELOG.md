@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-09 — 날짜 선택기 미래 기간 선택 차단
+
+- 커밋 제목: `vehicle-journal: prevent selecting future journal periods`.
+- 변경·이유: HA 시간대의 현재 월/연도를 입력 max로 설정. 현재 기간의 다음 버튼 비활성화 및 비활성 스타일 적용. 직접 입력 또는 복원된 미래 값은 조회 전 현재 기간으로 보정. 이동 함수와 range 검증에서도 미래 값 거부. 기존 월/연도 범위 의미 유지.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: JS 구문 및 실제 Chromium 회귀 통과. 월/연도 max·입력 rangeOverflow·현재 기간 다음 버튼 비활성화·직접 미래 입력 보정·이동 함수 우회 차단·월/연도 과거 이동 및 현재 복귀 확인. 기존 모바일/입력/금액/스크롤 회귀 유지. 최초 검사에서 Playwright fill이 change를 발생시켜 이미 보정된 값을 검사한 테스트 순서 문제를 수정한 뒤 통과.
+- 배포: main 커밋·푸시 후 HA 두 모듈 백업 및 직접 반영 예정. 운영 브라우저 확인은 별도 상태로 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 날짜 선택기 버튼 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record date navigation deployment`.

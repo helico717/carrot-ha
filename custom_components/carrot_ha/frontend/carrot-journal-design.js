@@ -1191,6 +1191,7 @@ export const journalDesign = `:host {
 .date-step{padding:0;font-size:25px;line-height:1}
 .date-current{padding:6px 10px;font-size:14px;white-space:nowrap;color:var(--j-accent);font-weight:750}
 .date-step:hover,.date-current:hover{border-color:var(--j-accent)}
+.date-step:disabled{opacity:.35;cursor:not-allowed;transform:none;border-color:var(--j-border)}
 .date-step:focus-visible,.date-current:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
 @media(max-width:600px){.date-navigation{grid-template-columns:30px minmax(0,145px) 30px auto;gap:4px}.date-navigation .date-pill{padding:7px 5px}.date-current{padding:6px;font-size:13px}}
 .legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size: 12.5px}

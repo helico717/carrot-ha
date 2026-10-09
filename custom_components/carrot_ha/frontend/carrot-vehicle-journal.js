@@ -163,7 +163,8 @@ export class VehicleJournal extends HTMLElement {
     <label id="startField" hidden>시작 시각 (선택)<input name="started_at" type="datetime-local"></label><label id="endField" hidden>종료 시각 (선택)<input name="ended_at" type="datetime-local"></label>
     <label id="socStartField" hidden>시작 SOC · % (선택)<input name="soc_start_percent" type="number" min="0" max="100" step="0.1"></label><label id="socEndField" hidden>종료 SOC · % (선택)<input name="soc_end_percent" type="number" min="0" max="100" step="0.1"></label><label id="odometerField" hidden>계기판 누적거리 · km (선택)<input name="odometer_km" type="number" min="0" step="0.1"></label><label class="fullfield">메모<textarea name="memo" maxlength="4000" rows="3"></textarea></label><label class="fullfield">사진 · JPG / PNG / WEBP<input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple><small>사진당 20MiB 이하, 최대 5장. 저장할 때 자동으로 축소·압축해요.</small><button id="clearPhotos" type="button" hidden>사진 선택 모두 취소</button><div class="preview" id="photoPreview"></div></label></div>
     <p class="note">모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.</p><p class="error" id="recordError" role="alert"></p><div class="row" style="margin-top:16px"><button id="save" class="btn-record-primary" type="submit">HA에 기록 저장</button></div></form></dialog><dialog id="photoViewerDialog" aria-labelledby="lightboxTitle"><div class="lightbox-header"><div class="lightbox-title-wrap"><h2 id="lightboxTitle">사진</h2><small id="lightboxMeta" class="muted"></small></div><button id="closeLightbox" class="modal-close-btn" type="button" aria-label="닫기">닫기</button></div><div class="lightbox-body"><button id="lightboxPrev" class="lightbox-nav-btn prev" type="button" aria-label="이전 사진">‹</button><div class="lightbox-stage"><img id="lightboxImg" alt="기록 사진" /><div id="lightboxSpinner" class="lightbox-spinner" hidden>사진을 불러오고 있어요...</div></div><button id="lightboxNext" class="lightbox-nav-btn next" type="button" aria-label="다음 사진">›</button></div><div class="lightbox-footer"><p id="lightboxCaption" class="lightbox-caption"></p></div></dialog></div>`;
-    if(this.$('month'))this.$('month').value=new Date().toLocaleDateString('sv-SE').slice(0,7);
+    if(this.$('month'))this.$('month').value=this.currentPeriodDate().slice(0,7);
+    this.updatePeriodNavigation();
     if(this.$('entry'))this.$('entry').onchange=()=>{this.entry=this.$('entry').value;this.offset=0;this.load(true);};
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
     this.$('periodPrev').onclick=()=>this.stepPeriod(-1);
@@ -199,6 +200,7 @@ export class VehicleJournal extends HTMLElement {
   async call(type,params={}){const write=['record/save','record/status','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,entry_id:this.entry,...params});}finally{if(write)this.pendingWrites--;}}
   async load(force=false){
     if(!this._hass?.callWS||!this.isConnected)return;
+    this.updatePeriodNavigation();
     if(this.loading){if(force)this.reloadPending=true;return;}
     if(!force&&this.data)return;
     this.loading=true;const generation=++this.request;
@@ -229,13 +231,18 @@ export class VehicleJournal extends HTMLElement {
     const today=this.currentPeriodDate();
     this.scope=scope;this.offset=0;
     const input=this.$('month');input.type=scope==='year'?'number':'month';
-    if(scope==='year'){input.min='1900';input.max='2100';input.value=today.slice(0,4);}else{input.removeAttribute('min');input.removeAttribute('max');input.value=today.slice(0,7);}
+    if(scope==='year'){input.min='1900';input.value=today.slice(0,4);}else{input.removeAttribute('min');input.value=today.slice(0,7);}
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]')){const active=button.dataset.scope===scope;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
     this.updatePeriodNavigation();
     this.load(true);
   }
   currentPeriodDate(){return new Date().toLocaleDateString('sv-SE',{timeZone:this._hass?.config?.time_zone||undefined});}
+  currentPeriodValue(){return this.currentPeriodDate().slice(0,this.scope==='year'?4:7);}
   updatePeriodNavigation(){
+    const input=this.$('month'),current=this.currentPeriodValue();
+    input.max=current;
+    if(input.value>current)input.value=current;
+    this.$('periodNext').disabled=!input.value||input.value>=current;
     const unit=this.scope==='year'?'해':'달';
     for(const [id,label] of [['periodPrev',`이전 ${unit}`],['periodNext',`다음 ${unit}`]]){this.$(id).setAttribute('aria-label',label);this.$(id).title=label;}
     this.$('periodCurrent').textContent=this.scope==='year'?'올해':'이번 달';
@@ -243,19 +250,24 @@ export class VehicleJournal extends HTMLElement {
   selectCurrentPeriod(){
     const today=this.currentPeriodDate();
     this.$('month').value=today.slice(0,this.scope==='year'?4:7);
+    this.updatePeriodNavigation();
     this.offset=0;this.load(true);
   }
   stepPeriod(direction){
     const range=this.range();if(!range)return;
     const date=new Date(range.from+'T00:00:00Z');
     if(this.scope==='year')date.setUTCFullYear(date.getUTCFullYear()+direction);else date.setUTCMonth(date.getUTCMonth()+direction);
-    const year=date.getUTCFullYear();if(year<1||year>9999||(this.scope==='year'&&(year<1900||year>2100)))return;
-    this.$('month').value=date.toISOString().slice(0,this.scope==='year'?4:7);
+    const year=date.getUTCFullYear();if(year<1||year>9999||(this.scope==='year'&&year<1900))return;
+    const value=date.toISOString().slice(0,this.scope==='year'?4:7);
+    if(value>this.currentPeriodValue())return;
+    this.$('month').value=value;
+    this.updatePeriodNavigation();
     this.offset=0;this.load(true);
   }
   range(){
     const value=this.$('month')?.value;
     if(!value||!({month:/^\d{4}-\d{2}$/,year:/^\d{4}$/}[this.scope]).test(value))return null;
+    if(value>this.currentPeriodValue())return null;
     const [year,month=1]=value.split('-').map(Number),date=new Date(Date.UTC(year,month-1,1));
     if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1)return null;
     const iso=d=>d.toISOString().slice(0,10),end=new Date(date),previous=new Date(date),previousEnd=new Date(date);
