@@ -163,6 +163,7 @@ const path=require('path');
  const originalColumns=await columns();
  await root.locator('#showTrips').check();await loaded();
  if(await root.locator('#records tr').count()!==4)throw Error('trip checkbox did not include all records');
+ await root.locator('#ledgerDropdown summary').click();
  await root.locator('[data-ledger-category=trip]').click();await loaded();
  if(await root.locator('#records tr').count()!==1||!await root.locator('#records').textContent().then(text=>text.includes('주행')))throw Error('trip-only filter failed');
  await root.locator('[data-ledger-category=charging]').click();await loaded();
@@ -180,6 +181,8 @@ const path=require('path');
   if(!window.ledgerQueries.some(q=>q.include_trips===false&&q.record_categories?.includes('charging')))throw Error('ledger filter not sent to server');
   card._hass.callWS=window.ledgerCall;card.data=window.ledgerOriginal;card.recordCategories.clear();card.showTrips=false;card.renderData();
  });
+ if(!await root.locator('#ledgerAll').isChecked()||await root.locator('#ledgerFilterSummary').textContent()!=='전체')throw Error('dropdown selection state incorrect');
+ await root.locator('#ledgerDropdown summary').click();
  fs.mkdirSync('.preview/journal',{recursive:true});
  await page.screenshot({path:'.preview/journal/desktop.png',fullPage:true});
  for(const width of [850,520,360,320]){
@@ -195,7 +198,9 @@ const path=require('path');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   if(overflow)throw Error('page horizontal overflow at '+width);
   await root.locator('#tab3').click();
+  await root.locator('#ledgerDropdown summary').click();
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('ledger horizontal page overflow at '+width);
+  await root.locator('#ledgerDropdown summary').click();
   await root.locator('#tab1').click();await root.locator('#tab0').click();
   if(width===360)await page.screenshot({path:'.preview/journal/mobile.png',fullPage:true});
  }

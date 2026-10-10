@@ -991,10 +991,14 @@ export const journalDesign = `:host {
     .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:16px 0 20px}
     .ledger-trip-toggle{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-weight:650;min-height:32px}
     .ledger-trip-toggle input{width:18px;height:18px;margin:0;accent-color:var(--j-accent)}
-    .ledger-category-filters{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:220px}
-    .ledger-filter-chip{border:1px solid var(--j-border);background:var(--j-surface);border-radius:9px;color:var(--category-color,var(--j-ink));padding:5px 9px;font-size:13px;min-height:32px;cursor:pointer}
-    .ledger-filter-chip[aria-pressed="true"]{border-color:var(--category-color,var(--j-accent));background:var(--j-raised);font-weight:800;box-shadow:inset 0 -2px var(--category-color,var(--j-accent))}
-    .ledger-filter-chip:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
+    .ledger-dropdown{position:relative;max-width:100%}
+    .ledger-dropdown summary{cursor:pointer;min-height:34px;box-sizing:border-box;padding:4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650}
+    #ledgerFilterSummary{margin-left:8px;color:var(--j-accent);font-size:13px}
+    .ledger-category-filters{position:absolute;left:0;top:calc(100% + 6px);z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:4px;width:260px;max-width:calc(100vw - 72px);padding:10px;box-sizing:border-box;border:1px solid var(--j-border);border-radius:12px;background:var(--j-surface);box-shadow:0 12px 30px #0008}
+    .ledger-filter-option{display:flex;align-items:center;gap:7px;color:var(--category-color,var(--j-ink));padding:5px 3px;font-size:13px;cursor:pointer;min-height:30px}
+    .ledger-filter-option input{width:17px;height:17px;margin:0;accent-color:var(--category-color,var(--j-accent));flex-shrink:0}
+    .ledger-dropdown summary:focus-visible,.ledger-filter-option input:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
+    @media(max-width:520px){.ledger-dropdown{position:static}.ledger-filters{position:relative}.ledger-category-filters{left:0;top:100%}}
     .table td:last-child {
       white-space: nowrap;
     }

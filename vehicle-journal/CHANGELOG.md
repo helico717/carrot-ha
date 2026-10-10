@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-11 — 상세 기록 분류 선택을 체크박스 드롭다운으로 변경
+
+- 커밋 제목: `vehicle-journal: use checkbox dropdown for ledger categories`.
+- 변경·이유: 사용자 추가 요청으로 `f3d81b0`의 펼쳐진 분류 버튼 대신 ‘분류 선택’ 드롭다운 내부에 ‘전체’ 및 분류별 체크박스 배치. 복수 선택·선택 개수 표시·카테고리 색상 유지. 바깥 주행 표시 체크박스와 고정 표/로컬 서버 필터는 유지.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
+- 검증: 실제 Chromium 드롭다운 열기·복수 체크·전체 상태·기존 원장/추세/입력/모바일 회귀 통과. 좁은 화면 열린 메뉴의 가로 넘침 검사 포함. 배포는 main 푸시 후 두 화면 모듈 반영 예정.
+- 이전 배포 확인: `f3d81b0` 네 실행 모듈의 설치 해시 및 두 화면 모듈 HA HTTP 일치. 백업 `/config/carrot_ha/deployment-backups/f3d81b0cdccf1fcc8b8a6f2a11272027c8087163/`. 운영 Chrome 기본 주행 숨김 25행/주행만 72행/주행·충전비 복수 96행과 분류 색상·고정 열 확인. 이는 재시작 전 기존 서버 조회 페이지의 화면 필터 검증이며 기간 전체 서버 필터 완료가 아님. 이번 드롭다운 변경이 이전 화면을 대체함.
+- 제한: 사용자 HA 재시작 후 새 Python 서버 필터 활성화 및 운영 전체 페이지 확인 필요. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-11 — 상세 기록 주행 표시·복수 분류 필터와 고정 열 너비
 
 - 커밋 제목: `vehicle-journal: add ledger filters and stable category columns`.
