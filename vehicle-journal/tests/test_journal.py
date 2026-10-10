@@ -94,6 +94,31 @@ class JournalTests(unittest.TestCase):
             with self.assertRaises((ValueError,TypeError)):self.journal.save_manual(str(uuid4()),0,dict(base,**patch))
         with self.assertRaises(ValueError):self.journal.query('2026-09-02','2026-09-01')
 
+    def test_record_filters_apply_before_pagination_without_changing_totals(self):
+        for i in range(101):
+            self.journal.save_manual(str(uuid4()),0,{'kind':'trip','date':'2026-09-03','distance_km':1})
+        for category in ('charging','maintenance','washing'):
+            self.journal.save_manual(str(uuid4()),0,{'kind':'expense','date':'2026-09-02','category':category,'actual_krw':1000})
+        original=self.journal.query('2026-09-01','2026-09-30')
+        hidden=self.journal.query('2026-09-01','2026-09-30',100,0,False,[])
+        self.assertEqual(len(hidden['records']),3)
+        self.assertFalse(hidden['has_more'])
+        self.assertEqual(hidden['totals'],original['totals'])
+        self.assertEqual(hidden['record_count'],original['record_count'])
+        trip_page=self.journal.query('2026-09-01','2026-09-30',100,0,True,['trip'])
+        self.assertTrue(trip_page['has_more'])
+        self.assertEqual(len(trip_page['records']),100)
+        self.assertEqual(len(self.journal.query('2026-09-01','2026-09-30',100,100,True,['trip'])['records']),1)
+        selected=self.journal.query('2026-09-01','2026-09-30',100,0,False,['charging','maintenance'])
+        self.assertEqual({r['category'] for r in selected['records']},{'charging','maintenance'})
+        self.assertEqual(len(selected['recent_records']),3)
+        self.assertEqual(self.journal.query('2026-09-01','2026-09-30',100,0,False,['trip'])['records'],[])
+        with self.assertRaises(ValueError):Journal(self.journal.path,'other-entry','other-car','Asia/Seoul')
+        other=Journal(Path(self.tmp.name)/'other.sqlite3','other-entry','other-car','Asia/Seoul')
+        self.assertEqual(other.query('2026-09-01','2026-09-30',100,0,True,['trip'])['records'],[])
+        for include,filters in ((1,[]),(True,"charging"),(True,["bogus"]),(True,["charging' OR 1=1"])):
+            with self.assertRaises(ValueError):self.journal.query('2026-09-01','2026-09-30',100,0,include,filters)
+
     def test_durable_outbox_and_failed_guard(self):
         self.archive.put(self.charge())
         with self.archive.connect() as db:

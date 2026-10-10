@@ -250,16 +250,30 @@ class Journal:
                 db.execute('DELETE FROM dirty_days WHERE vehicle_id=? AND day=? AND accounting_timezone=?',
                            (self.vehicle,value,self.time_zone))
 
-    def query(self, start, end, limit=100, offset=0):
+    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None):
         a,b=day(start),day(end)
         if b<a or (b-a).days>365 or type(limit) is not int or not 1<=limit<=100 or type(offset) is not int or offset<0:
             raise ValueError('조회 기간과 페이지를 확인해 주세요.')
+        if type(include_trips) is not bool or (record_categories is not None and
+                (not isinstance(record_categories,list) or any(not isinstance(key,str) or key not in CATEGORIES|{'trip'} for key in record_categories))):
+            raise ValueError('기록 필터를 확인해 주세요.')
+        record_categories=sorted(set(record_categories or []))
+        record_filter=" AND r.kind!='trip'" if not include_trips else ''
+        filter_params=[]
+        if record_categories:
+            clauses=[]
+            for key in record_categories:
+                if key=='trip':clauses.append("r.kind='trip'")
+                elif key=='charging':clauses.append("(r.kind='charge' OR e.category='charging')")
+                else:
+                    clauses.append('e.category=?');filter_params.append(key)
+            record_filter+=' AND ('+' OR '.join(clauses)+')'
         with self.lock,self.connect() as db:
             db.row_factory=sqlite3.Row
             daily=[dict(row) for row in db.execute('''SELECT * FROM daily_summaries WHERE vehicle_id=?
                 AND accounting_timezone=? AND day BETWEEN ? AND ? ORDER BY day''',
                 (self.vehicle,self.time_zone,start,end))]
-            rows=db.execute('''SELECT r.id,r.kind,r.origin,r.status,r.version,r.quality_json,r.extra_json,
+            record_sql='''SELECT r.id,r.kind,r.origin,r.status,r.version,r.quality_json,r.extra_json,
                 m.started_at,m.ended_at,m.distance_km,m.drive_energy_kwh,m.battery_charge_kwh,m.billed_charge_kwh,
                 COALESCE(m.charge_mode,(SELECT m2.charge_mode FROM expense_members em JOIN mobility m2 ON m2.vehicle_id=em.vehicle_id AND m2.record_id=em.charge_id WHERE em.vehicle_id=r.vehicle_id AND em.expense_id=r.id LIMIT 1)) AS charge_mode,
                 m.memo AS mobility_memo,e.accounting_date,e.category,e.subcategory,
@@ -268,8 +282,12 @@ class Journal:
                 LEFT JOIN expenses e ON e.vehicle_id=r.vehicle_id AND e.record_id=r.id
                 WHERE r.vehicle_id=? AND r.status IN ('active','excluded','deleted') AND
                 COALESCE(e.accounting_date,(SELECT MIN(p.day) FROM day_parts p WHERE p.vehicle_id=r.vehicle_id AND p.record_id=r.id AND p.accounting_timezone=?)) BETWEEN ? AND ?
-                ORDER BY COALESCE(e.accounting_date,m.started_at) DESC,r.id LIMIT ? OFFSET ?''',
-                (self.vehicle,self.time_zone,start,end,limit+1,offset)).fetchall()
+                {record_filter}
+                ORDER BY COALESCE(e.accounting_date,m.started_at) DESC,r.id LIMIT ? OFFSET ?'''
+            rows=db.execute(record_sql.format(record_filter=record_filter),
+                (self.vehicle,self.time_zone,start,end,*filter_params,limit+1,offset)).fetchall()
+            recent_records=[dict(row) for row in db.execute(record_sql.format(record_filter=" AND r.kind='expense' AND r.status='active'"),
+                (self.vehicle,self.time_zone,start,end,5,0))]
             # SQL date offset is only a prefilter; exact timezone dates are persisted below.
             records=[dict(r) for r in rows[:limit]]
             for record in records:
@@ -284,7 +302,7 @@ class Journal:
         for row in daily:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
             row['quality']=json.loads(row.pop('quality_json'))
-        for row in records:
+        for row in records+recent_records:
             row['input']=json.loads(row.pop('extra_json')).get('input');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         totals={key:sum(r[key] for r in daily if r[key] is not None) if any(r[key] is not None for r in daily) else None
                 for key in (*METRICS,'charge_actual_krw','charge_estimated_krw','charge_effective_krw','slow_count','fast_count','unknown_count')}
@@ -296,7 +314,7 @@ class Journal:
                 target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})
                 for key in target:target[key]+=cost[key]
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'daily':daily,'records':records,'has_more':len(rows)>limit,'totals':totals,
+        return {'daily':daily,'records':records,'recent_records':recent_records,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 

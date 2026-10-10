@@ -1,5 +1,18 @@
 # 차계부 변경 이력
 
+## 2026-10-11 — 상세 기록 주행 표시·복수 분류 필터와 고정 열 너비
+
+- 커밋 제목: `vehicle-journal: add ledger filters and stable category columns`.
+- 원인: 현재 상세 기록 렌더는 조회 records 전체를 조건 없이 출력하며 주행 숨김 조건이 없었음. 이전 패치가 사라진 경위는 미확인.
+- 변경·이유: 설명 아래 기본 해제 ‘주행 기록 표시’ 체크박스와 복수 분류 버튼 추가. 주행 분류 선택 시 체크 자동 활성화, 주행 체크 해제 시 해당 분류 제거. 선택 분류는 OR 조건, 분류 미선택은 허용된 전체 기록. 필터 변경 시 페이지 초기화·오래된 비동기 응답 거부. 필터 상태는 화면 인스턴스에서 유지하고 신규 화면은 주행 숨김 기본값.
+- 표: 4월 참고의 비율에 맞춰 날짜 14%/기록 49%/값 13%/관리 24% 고정. 긴 메모 줄바꿈·사진·관리 버튼 지원. 모바일은 표 내부 가로 스크롤로 열 유지. 분류 제목은 기존 소비 카테고리 색상 적용(주행은 파랑).
+- HA 로컬 조회: 필터를 LIMIT/OFFSET 전에 적용하여 다른 페이지의 기록 누락 방지. 주행/충전비/모든 비용 분류 복수 지원, daily/totals/전체 record_count 유지. 최근 지출은 별도 최근 비용 목록으로 유지. DB 스키마/원본 기록/Cloudflare 요청 변경 없음.
+- 호환: 새 서버의 record_filters_supported 응답 후 필터 인자를 사용. HA 재시작 전에는 기존 조회 결과의 화면 필터만 제공하고 전체 기간 필터 적용에 재시작이 필요함을 표시.
+- 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle_journal/store.py`, `vehicle_journal/api.py`, `vehicle-journal/tests/browser-check.cjs`, `vehicle-journal/tests/test_journal.py`, 이 변경 이력.
+- 검증: 실제 Chromium 회귀(기본 숨김·주행만·복수 선택·해제·서버 필터 인자·열 너비·최근 지출·모바일/입력/금액/스크롤) 통과. Python 원장/사진/권한 14건 통과(101건 초과 페이지·집계 보존·잘못된 필터/차량 매핑 포함). 기존 dashboard freshness Node 10건 통과.
+- 테스트 환경: 샌드박스 임시 SQLite 접근 오류 후 승인 경로 실행. Windows 기존 테스트 정리 3건은 SQLite 핸들 GC 전 파일 삭제 오류이며, 임시 하네스에서 cleanup 전 GC로 전체 14건 통과. 기존 runtime schedule 전체 discover는 응답 대기로 중단했으며 해당 테스트·실기 동작 성공을 주장하지 않음.
+- 배포: main 커밋·푸시 및 네 실행 모듈 백업/직접 반영 예정. Python 적용은 사용자 HA 재시작 필요. 실제 운영 탭 연결 확인, 배포 후 화면과 신규 서버 조회 검증 상태는 후속 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+
 ## 2026-10-09 — 미래 기간 차단 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record future period guard deployment`.

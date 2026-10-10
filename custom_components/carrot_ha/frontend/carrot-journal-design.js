@@ -982,6 +982,19 @@ export const journalDesign = `:host {
     }
 
     /* 관리 열 버튼 정렬 (사진 N장, 수정, 삭제) */
+    .ledger-table{table-layout:fixed;min-width:760px}
+    .ledger-date-col{width:14%}.ledger-memo-col{width:49%}.ledger-value-col{width:13%}.ledger-actions-col{width:24%}
+    .ledger-table td{overflow-wrap:anywhere;vertical-align:middle}
+    .ledger-table .memo-text-col{min-width:0}
+    #page3 .ledger-table td:last-child{white-space:normal}
+    .ledger-table .btn-table-action{margin-bottom:4px}
+    .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:16px 0 20px}
+    .ledger-trip-toggle{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-weight:650;min-height:32px}
+    .ledger-trip-toggle input{width:18px;height:18px;margin:0;accent-color:var(--j-accent)}
+    .ledger-category-filters{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:220px}
+    .ledger-filter-chip{border:1px solid var(--j-border);background:var(--j-surface);border-radius:9px;color:var(--category-color,var(--j-ink));padding:5px 9px;font-size:13px;min-height:32px;cursor:pointer}
+    .ledger-filter-chip[aria-pressed="true"]{border-color:var(--category-color,var(--j-accent));background:var(--j-raised);font-weight:800;box-shadow:inset 0 -2px var(--category-color,var(--j-accent))}
+    .ledger-filter-chip:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
     .table td:last-child {
       white-space: nowrap;
     }

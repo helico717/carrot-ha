@@ -141,6 +141,45 @@ const path=require('path');
  if(await root.locator('#legendRow [data-cat=maintenance]').getAttribute('aria-pressed')!=='true')throw Error('comparison filter failed');
  await root.locator('#legendRow [data-cat=maintenance]').click();
  if(await root.locator('#recordForm select[name=category] option').count()!==4)throw Error('expense modal categories incorrect');
+ // Ledger filters must not mutate the briefing or its totals.
+ await root.locator('#tab3').click();
+ await page.evaluate(()=>{
+  const card=document.querySelector('carrot-vehicle-journal');window.ledgerOriginal=card.data;window.ledgerCall=card._hass.callWS;
+  const records=[{id:'trip',kind:'trip',origin:'automatic',status:'active',started_at:'2026-10-01T01:00:00Z',distance_km:10},
+   {id:'charge',kind:'charge',origin:'automatic',status:'active',started_at:'2026-10-01T02:00:00Z',battery_charge_kwh:20},
+   {id:'cost',kind:'expense',category:'charging',origin:'automatic',status:'active',accounting_date:'2026-10-01',actual_krw:6000},
+   {...card.data.records[0],memo:'A very long memo '.repeat(60)}];
+  window.ledgerQueries=[];
+  card._hass.callWS=async msg=>{
+   if(!msg.type.endsWith('/query'))return window.ledgerCall(msg);
+   window.ledgerQueries.push(msg);
+   const filtered=records.filter(r=>(msg.include_trips!==false||r.kind!=='trip')&&(!msg.record_categories?.length||msg.record_categories.includes(card.recordCategory(r))));
+   return {...window.ledgerOriginal,records:filtered,has_more:false,record_filters_supported:true,recent_records:records.filter(r=>r.kind==='expense')};
+  };
+  card.recordFiltersSupported=true;card.data={...card.data,records};card.renderData();
+ });
+ if(await root.locator('#showTrips').isChecked()||await root.locator('#records tr').count()!==3)throw Error('trips not hidden by default');
+ const columns=()=>root.locator('.ledger-table th').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().width));
+ const originalColumns=await columns();
+ await root.locator('#showTrips').check();await loaded();
+ if(await root.locator('#records tr').count()!==4)throw Error('trip checkbox did not include all records');
+ await root.locator('[data-ledger-category=trip]').click();await loaded();
+ if(await root.locator('#records tr').count()!==1||!await root.locator('#records').textContent().then(text=>text.includes('주행')))throw Error('trip-only filter failed');
+ await root.locator('[data-ledger-category=charging]').click();await loaded();
+ if(await root.locator('#records tr').count()!==3)throw Error('multiple ledger categories failed');
+ await root.locator('#showTrips').uncheck();await loaded();
+ if(await root.locator('#records tr').count()!==2)throw Error('unchecking trips did not preserve other category');
+ await root.locator('[data-ledger-category=maintenance]').click();await loaded();
+ if(await root.locator('#records tr').count()!==3)throw Error('category OR filter failed');
+ const filteredColumns=await columns();
+ if(filteredColumns.some((width,i)=>Math.abs(width-originalColumns[i])>1))throw Error('ledger columns change with records');
+ await page.evaluate(()=>{
+  const card=document.querySelector('carrot-vehicle-journal');
+  for(const row of card.shadowRoot.querySelectorAll('#records tr'))if(getComputedStyle(row.querySelector('.memo-cat-title')).color==='rgb(241, 246, 250)')throw Error('missing ledger category color');
+  if(card.$('recent').querySelectorAll('.recent-expense-row').length!==2)throw Error('filters changed recent expenses');
+  if(!window.ledgerQueries.some(q=>q.include_trips===false&&q.record_categories?.includes('charging')))throw Error('ledger filter not sent to server');
+  card._hass.callWS=window.ledgerCall;card.data=window.ledgerOriginal;card.recordCategories.clear();card.showTrips=false;card.renderData();
+ });
  fs.mkdirSync('.preview/journal',{recursive:true});
  await page.screenshot({path:'.preview/journal/desktop.png',fullPage:true});
  for(const width of [850,520,360,320]){
@@ -155,6 +194,8 @@ const path=require('path');
   await page.waitForTimeout(150);
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   if(overflow)throw Error('page horizontal overflow at '+width);
+  await root.locator('#tab3').click();
+  if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('ledger horizontal page overflow at '+width);
   await root.locator('#tab1').click();await root.locator('#tab0').click();
   if(width===360)await page.screenshot({path:'.preview/journal/mobile.png',fullPage:true});
  }
