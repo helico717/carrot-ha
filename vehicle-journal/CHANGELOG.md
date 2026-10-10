@@ -5,7 +5,7 @@
 - 커밋 제목: `vehicle-journal: align ledger categories with spending policy`.
 - 변경·이유: 드롭다운에 저장용 전체 분류를 노출했던 오류 수정. 충전비·정비 / 소모품·세차비·튜닝·기타만 표시. 기존 보험·세금·주차비·통행료 기록은 삭제 없이 기타 표시/색상/필터에 통합하고 서버도 페이지 분할 전에 같은 조건 적용. 수기 입력의 기존 네 분류 유지.
 - 관련 파일: frontend 카드, vehicle_journal/store.py, Python/Chromium 회귀, 이 변경 이력.
-- 검증·배포: 다섯 분류만 노출·기존 기타 분류 통합 조회 회귀 예정. 검증 후 main 푸시 및 변경 실행 코드 백업/HA 직접 반영. Python 필터는 사용자 HA 재시작 후 활성화하며 운영 전체 조회 검증은 별도. DB·사진·Worker·Comma 변경 없음.
+- 검증·배포: Chromium 전체 회귀 및 Python 원장/권한 14개 통과. 다섯 분류만 노출·보험/세금/주차/통행료/기타 통합 조회 검증. `b030055a6aa4bd508bf5299ad5802f1329fab32e` main 푸시, HA 백업/직접 반영과 설치/JS HTTP 해시 일치 확인. 백업 `/config/carrot_ha/deployment-backups/b030055a6aa4bd508bf5299ad5802f1329fab32e/`. 운영 Chrome 새로고침 후 드롭다운 전체 및 다섯 지출 분류만 표시 확인. Python 필터는 사용자 HA 재시작 후 활성화하며 운영 전체 조회 검증은 대기. DB·사진·Worker·Comma 변경 없음.
 
 ## 2026-10-11 — 상세 기록을 차량 지출 전용으로 변경
 
