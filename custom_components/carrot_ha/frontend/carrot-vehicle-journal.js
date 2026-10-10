@@ -49,7 +49,7 @@ const styles=`
 `;
 
 export class VehicleJournal extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.showTrips=false;this.recordCategories=new Set();this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.recordCategories=new Set();this.recordSort='time';this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
   setConfig(config){this.config=config||{};if(!this.ready)this.build();if(this.config.entry_id&&this.entry!==this.config.entry_id){this.entry=this.config.entry_id;this.data=null;this.offset=0;}this.load();}
   set hass(hass){this._hass=hass;if(!this.ready)this.build();this.load();}
   getCardSize(){return 12;}
@@ -148,7 +148,7 @@ export class VehicleJournal extends HTMLElement {
         </section>
     <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><div class="trends-section" id="changingTrendsSection"><h3 class="trends-section-title">변동 있는 추세</h3><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
     <section id="page2" role="tabpanel" aria-labelledby="tab2" hidden><div class="grid"><article class="panel wide hero"><h2>같은 거리를 다른 차로 달렸다면요.</h2><div class="compare-value" id="saving">유가 센서를 먼저 연결해 주세요.</div><div id="compareDetail"></div><p class="note">선택 기간의 충전비와 현재 유가 기준 예상 유류비만 비교해요. 전체 차량 유지비 절감은 아니에요.</p></article><article class="panel narrow"><h2>비교 기준을 정해요.</h2><form id="compareForm"><div class="fields"><label class="fullfield">비교 유종<select id="fuel"><option value="gasoline">휘발유</option><option value="diesel">경유</option><option value="premium">고급유</option></select></label><label class="fullfield">비교 연비 · km/L<input id="economy" type="number" min="1" max="50" step="0.1" value="12" required></label><label class="fullfield">HA 유가 센서<input id="fuelEntity" placeholder="sensor.fuel_price" required></label></div><button class="primary" type="submit">HA에 비교 기준 저장</button><p class="note" id="compareMessage" role="status"></p></form></article></div></section>
-    <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="row spaced"><h2>차에 남긴 기록이에요.</h2><button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button></div><p class="note">자동 주행·충전·결제와 직접 남긴 기록을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="ledger-filters" id="ledgerFilters"><label class="ledger-trip-toggle"><input type="checkbox" id="showTrips">주행 기록 표시</label><details class="ledger-dropdown" id="ledgerDropdown"><summary>분류 선택 <span id="ledgerFilterSummary">전체</span></summary><div class="ledger-category-filters" role="group" aria-label="기록 분류 선택 (복수 선택)"><label class="ledger-filter-option"><input type="checkbox" id="ledgerAll" checked>전체</label>${Object.entries({trip:"주행",...categories}).map(([key,label])=>`<label class="ledger-filter-option" style="--category-color:${this.categoryColor(key)}"><input type="checkbox" data-ledger-category="${key}">${esc(label)}</label>`).join('')}</div></details></div><div class="table-wrap"><table class="table ledger-table"><colgroup><col class="ledger-date-col"><col class="ledger-memo-col"><col class="ledger-value-col"><col class="ledger-actions-col"></colgroup><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th>거리·충전·금액</th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
+    <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="row spaced"><h2>차량 지출 내역이에요.</h2><button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button></div><p class="note">자동 충전 결제와 직접 남긴 차량 지출을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="ledger-filters" id="ledgerFilters"><details class="ledger-dropdown" id="ledgerDropdown"><summary>분류 선택 <span id="ledgerFilterSummary">전체</span></summary><div class="ledger-category-filters" role="group" aria-label="기록 분류 선택 (복수 선택)"><label class="ledger-filter-option"><input type="checkbox" id="ledgerAll" checked>전체</label>${Object.entries(categories).map(([key,label])=>`<label class="ledger-filter-option" style="--category-color:${this.categoryColor(key)}"><input type="checkbox" data-ledger-category="${key}">${esc(label)}</label>`).join('')}</div></details></div><div class="table-wrap"><table class="table ledger-table"><colgroup><col class="ledger-date-col"><col class="ledger-memo-col"><col class="ledger-value-col"><col class="ledger-actions-col"></colgroup><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th id="ledgerAmountHeader" aria-sort="none"><button id="ledgerSort" type="button" aria-label="금액 정렬 변경">금액 · 시간순</button></th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
     <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
     <p class="footer" id="footer">차계부는 HA 로컬 DB에 보관해요. 누락 데이터는 0으로 채우지 않아요.</p>
     <dialog id="recordDialog" aria-labelledby="dialogTitle"><form id="recordForm"><div class="row spaced"><h2 id="dialogTitle">놓친 기록을 남겨요.</h2><button id="close" class="modal-close-btn" type="button" aria-label="닫기">닫기</button></div><div class="fields">
@@ -171,9 +171,9 @@ export class VehicleJournal extends HTMLElement {
     this.$('periodNext').onclick=()=>this.stepPeriod(1);
     this.$('periodCurrent').onclick=()=>this.selectCurrentPeriod();
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]'))button.onclick=()=>this.setScope(button.dataset.scope);
-    this.$('showTrips').onchange=()=>{this.showTrips=this.$('showTrips').checked;if(!this.showTrips)this.recordCategories.delete('trip');this.changeLedgerFilters();};
+    this.$('ledgerSort').onclick=()=>{this.recordSort={time:'amount_desc',amount_desc:'amount_asc',amount_asc:'time'}[this.recordSort];this.changeLedgerFilters();};
     this.$('ledgerAll').onclick=()=>{this.recordCategories.clear();this.changeLedgerFilters();};
-    for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.onclick=()=>{const key=button.dataset.ledgerCategory;if(this.recordCategories.has(key))this.recordCategories.delete(key);else{this.recordCategories.add(key);if(key==='trip')this.showTrips=true;}this.changeLedgerFilters();};
+    for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.onclick=()=>{const key=button.dataset.ledgerCategory;if(this.recordCategories.has(key))this.recordCategories.delete(key);else{this.recordCategories.add(key);}this.changeLedgerFilters();};
     this.$('legendRow').onclick=event=>{const button=event.target.closest('[data-cat]');if(button){this.comparisonCategory=this.comparisonCategory===button.dataset.cat?null:button.dataset.cat;this.renderSpendingComparison();}};
     for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
     for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.openRecord();
@@ -217,11 +217,11 @@ export class VehicleJournal extends HTMLElement {
       if(!this.entry)throw new Error('HA에서 차계부 통합을 아직 찾지 못했어요. 업데이트와 재시작을 확인해 주세요.');
       const month=this.$('month')?.value;const range=this.range();if(!range)throw new Error('기록 기간을 골라 주세요.');const scope=this.scope;
       const selectedEntry=this.entry,selectedOffset=this.offset,selectedFilters=this.ledgerFilterKey();
-      const filterParams=this.recordFiltersSupported?{include_trips:this.showTrips,record_categories:[...this.recordCategories]}:{};
+      const filterParams=this.recordFiltersSupported?{include_trips:false,expenses_only:true,record_sort:this.recordSort,record_categories:[...this.recordCategories]}:{};
       const [data,previous]=await Promise.all([this.call('query',{from:range.from,to:range.to,offset:selectedOffset,...filterParams}),this.call('query',{from:range.previousFrom,to:range.previousTo,offset:0}).catch(()=>null)]);
       data.previous=previous;
       if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month')?.value!==month||this.scope!==scope||this.ledgerFilterKey()!==selectedFilters)return;
-      if(data.record_filters_supported&&!this.recordFiltersSupported){this.recordFiltersSupported=true;this.reloadPending=true;}
+      if(data.expense_sort_supported&&!this.recordFiltersSupported){this.recordFiltersSupported=true;this.reloadPending=true;}
       this.data=data;preserveView(this,()=>this.renderData());this.dispatchEvent(new Event('journal-rendered'));
     }catch(error){
       if(this.$('message')){
@@ -280,11 +280,12 @@ export class VehicleJournal extends HTMLElement {
     if(this.scope==='year'){end.setUTCMonth(11,31);previous.setUTCFullYear(year-1);previousEnd.setUTCFullYear(year-1);previousEnd.setUTCMonth(11,31);}
     return {from:iso(date),to:iso(end),previousFrom:iso(previous),previousTo:iso(previousEnd)};
   }
-  ledgerFilterKey(){return JSON.stringify([this.showTrips,[...this.recordCategories].sort()]);}
+  ledgerFilterKey(){return JSON.stringify([this.recordSort,[...this.recordCategories].sort()]);}
   recordCategory(record){return record.kind==='trip'?'trip':record.kind==='charge'?'charging':record.category||'other';}
   changeLedgerFilters(){this.offset=0;this.updateLedgerFilters();this.load(true);}
   updateLedgerFilters(){
-    this.$('showTrips').checked=this.showTrips;
+    this.$('ledgerSort').textContent='금액 · '+({time:'시간순',amount_desc:'높은 순',amount_asc:'낮은 순'}[this.recordSort]);
+    this.$('ledgerAmountHeader').setAttribute('aria-sort',{time:'none',amount_desc:'descending',amount_asc:'ascending'}[this.recordSort]);
     this.$('ledgerAll').checked=this.recordCategories.size===0;
     this.$('ledgerFilterSummary').textContent=this.recordCategories.size?`${this.recordCategories.size}개 선택`:'전체';
     for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.checked=this.recordCategories.has(button.dataset.ledgerCategory);
@@ -510,7 +511,8 @@ export class VehicleJournal extends HTMLElement {
     this.renderRecentExpenses();
     this.renderSpendingComparison();
     this.updateLedgerFilters();
-    const visibleRecords=d.records.filter(r=>(this.showTrips||r.kind!=='trip')&&(!this.recordCategories.size||this.recordCategories.has(this.recordCategory(r))));
+    const visibleRecords=d.records.filter(r=>(r.kind==='expense')&&(!this.recordCategories.size||this.recordCategories.has(this.recordCategory(r))));
+    if(this.recordSort!=='time')visibleRecords.sort((a,b)=>{const av=a.actual_krw??a.estimated_krw,bv=b.actual_krw??b.estimated_krw;return av==null?(bv==null?0:1):bv==null?-1:(av-bv)*(this.recordSort==='amount_desc'?-1:1);});
     this.$('records').innerHTML=visibleRecords.map(r=>{
       const hasPhotos=r.attachments?.length>0;
       const photoBtn=hasPhotos?`<button class="btn-table-action btn-photo" data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:'';
@@ -527,7 +529,7 @@ export class VehicleJournal extends HTMLElement {
 
       const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col"><span class="memo-cat-title" style="color:${this.categoryColor(this.recordCategory(r))}">${esc(categories[r.category]||kindNames[r.kind])}${r.subcategory?' · '+esc(r.subcategory):''}</span>${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
 
-      return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td>${this.recordValue(r)}</td><td>${actionButtons}</td></tr>`;
+      return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td>${money(r.actual_krw??r.estimated_krw)}</td><td>${actionButtons}</td></tr>`;
     }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=visibleRecords.length?`${this.offset+1}~${this.offset+visibleRecords.length}번째 기록`:'표시할 기록이 없어요.';
     if(!this.recordFiltersSupported)this.$('pageLabel').textContent+=' · 전체 기간 필터 적용을 위해 HA 재시작이 필요해요.';
@@ -537,7 +539,6 @@ export class VehicleJournal extends HTMLElement {
     this.renderTrendsDashboard();
     this.loadThumbnails();
   }
-  recordValue(r){return r.kind==='trip'?numeric(r.distance_km)+' km':r.kind==='charge'?numeric(r.battery_charge_kwh)+' kWh':money(r.actual_krw??r.estimated_krw);}
   renderTrendsDashboard(){
     const changingContainer=this.$('changingTrendsGrid');
     const stableContainer=this.$('stableTrendsGrid');

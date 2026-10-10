@@ -57,13 +57,13 @@ async def entries(hass,connection,msg):
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/query',vol.Required('entry_id'):str,
     vol.Required('from'):str,vol.Required('to'):str,vol.Optional('offset',default=0):int,
-    vol.Optional('include_trips',default=True):bool,vol.Optional('record_categories',default=[]):[str]})
+    vol.Optional('include_trips',default=True):bool,vol.Optional('record_categories',default=[]):[str],vol.Optional('expenses_only',default=False):bool,vol.Optional('record_sort',default='time'):vol.In(['time','amount_desc','amount_asc'])})
 @websocket_api.async_response
 async def query(hass,connection,msg):
     r=runtime(hass,connection,msg)
     if r:
         try:
-            result=await hass.async_add_executor_job(r['journal'].query,msg['from'],msg['to'],100,msg['offset'],msg['include_trips'],msg['record_categories'])
+            result=await hass.async_add_executor_job(r['journal'].query,msg['from'],msg['to'],100,msg['offset'],msg['include_trips'],msg['record_categories'],msg['expenses_only'],msg['record_sort'])
             from ..vehicle import values
             live=values(r)
             result['latest']={key:live.get(key) for key in ('soc_percent','range_km','range_estimated','driving','onroad','charging','doors_locked','odometer_km','outside_temp_c','last_received','measured_at')}

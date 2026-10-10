@@ -988,9 +988,9 @@ export const journalDesign = `:host {
     .ledger-table .memo-text-col{min-width:0}
     #page3 .ledger-table td:last-child{white-space:normal}
     .ledger-table .btn-table-action{margin-bottom:4px}
+    #ledgerSort{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer}
+    #ledgerSort:focus-visible{outline:2px solid var(--j-accent);outline-offset:4px}
     .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:16px 0 20px}
-    .ledger-trip-toggle{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-weight:650;min-height:32px}
-    .ledger-trip-toggle input{width:18px;height:18px;margin:0;accent-color:var(--j-accent)}
     .ledger-dropdown{position:relative;max-width:100%}
     .ledger-dropdown summary{cursor:pointer;min-height:34px;box-sizing:border-box;padding:4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650}
     #ledgerFilterSummary{margin-left:8px;color:var(--j-accent);font-size:13px}

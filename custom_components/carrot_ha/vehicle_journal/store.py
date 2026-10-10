@@ -250,15 +250,19 @@ class Journal:
                 db.execute('DELETE FROM dirty_days WHERE vehicle_id=? AND day=? AND accounting_timezone=?',
                            (self.vehicle,value,self.time_zone))
 
-    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None):
+    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None, expenses_only=False, record_sort='time'):
         a,b=day(start),day(end)
         if b<a or (b-a).days>365 or type(limit) is not int or not 1<=limit<=100 or type(offset) is not int or offset<0:
             raise ValueError('조회 기간과 페이지를 확인해 주세요.')
-        if type(include_trips) is not bool or (record_categories is not None and
+        if record_sort not in ('time','amount_desc','amount_asc'):raise ValueError('정렬 기준을 확인해 주세요.')
+        if type(expenses_only) is not bool or type(include_trips) is not bool or (record_categories is not None and
                 (not isinstance(record_categories,list) or any(not isinstance(key,str) or key not in CATEGORIES|{'trip'} for key in record_categories))):
             raise ValueError('기록 필터를 확인해 주세요.')
         record_categories=sorted(set(record_categories or []))
         record_filter=" AND r.kind!='trip'" if not include_trips else ''
+        if expenses_only:record_filter=" AND r.kind='expense'"
+        time_order='COALESCE(e.accounting_date,m.started_at) DESC,r.id'
+        record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
         if record_categories:
             clauses=[]
@@ -283,10 +287,10 @@ class Journal:
                 WHERE r.vehicle_id=? AND r.status IN ('active','excluded','deleted') AND
                 COALESCE(e.accounting_date,(SELECT MIN(p.day) FROM day_parts p WHERE p.vehicle_id=r.vehicle_id AND p.record_id=r.id AND p.accounting_timezone=?)) BETWEEN ? AND ?
                 {record_filter}
-                ORDER BY COALESCE(e.accounting_date,m.started_at) DESC,r.id LIMIT ? OFFSET ?'''
-            rows=db.execute(record_sql.format(record_filter=record_filter),
+                ORDER BY {record_order} LIMIT ? OFFSET ?'''
+            rows=db.execute(record_sql.format(record_filter=record_filter,record_order=record_order),
                 (self.vehicle,self.time_zone,start,end,*filter_params,limit+1,offset)).fetchall()
-            recent_records=[dict(row) for row in db.execute(record_sql.format(record_filter=" AND r.kind='expense' AND r.status='active'"),
+            recent_records=[dict(row) for row in db.execute(record_sql.format(record_filter=" AND r.kind='expense' AND r.status='active'",record_order=time_order),
                 (self.vehicle,self.time_zone,start,end,5,0))]
             # SQL date offset is only a prefilter; exact timezone dates are persisted below.
             records=[dict(r) for r in rows[:limit]]
@@ -314,7 +318,7 @@ class Journal:
                 target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})
                 for key in target:target[key]+=cost[key]
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'daily':daily,'records':records,'recent_records':recent_records,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'daily':daily,'records':records,'recent_records':recent_records,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 
