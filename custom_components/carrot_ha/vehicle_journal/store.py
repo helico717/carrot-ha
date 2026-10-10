@@ -269,6 +269,7 @@ class Journal:
             for key in record_categories:
                 if key=='trip':clauses.append("r.kind='trip'")
                 elif key=='charging':clauses.append("(r.kind='charge' OR e.category='charging')")
+                elif key=='other' and expenses_only:clauses.append("e.category NOT IN ('charging','maintenance','washing','tuning')")
                 else:
                     clauses.append('e.category=?');filter_params.append(key)
             record_filter+=' AND ('+' OR '.join(clauses)+')'
@@ -318,7 +319,7 @@ class Journal:
                 target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})
                 for key in target:target[key]+=cost[key]
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'daily':daily,'records':records,'recent_records':recent_records,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 

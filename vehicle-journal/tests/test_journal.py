@@ -125,6 +125,11 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(high['records'][0]['actual_krw'],9000)
         self.assertEqual(low['records'][0]['actual_krw'],1000)
         self.assertTrue(high['has_more'])
+        for category in ('insurance','tax','toll','other'):
+            self.journal.save_manual(str(uuid4()),0,{'kind':'expense','date':'2026-09-01','category':category,'actual_krw':500})
+        grouped=self.journal.query('2026-09-01','2026-09-30',100,0,False,['other'],True)
+        self.assertEqual({r['category'] for r in grouped['records']},{'insurance','tax','parking','toll','other'})
+        self.assertEqual(len(grouped['records']),5)
         with self.assertRaises(ValueError):self.journal.query('2026-09-01','2026-09-30',100,0,False,[],True,'invalid')
         self.assertEqual(self.journal.query('2026-09-01','2026-09-30',100,0,False,['trip'])['records'],[])
         with self.assertRaises(ValueError):Journal(self.journal.path,'other-entry','other-car','Asia/Seoul')
