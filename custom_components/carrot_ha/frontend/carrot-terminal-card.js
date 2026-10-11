@@ -45,6 +45,13 @@ class CarrotTerminalCard extends HTMLElement {
     this._decoder = new TextDecoder('utf-8');
     this._promptTimer = null;
     this._hasOutputThisSession = false;
+    this._gitStatus = {};
+    this._gitTimer = null;
+    this._gitRequest = 0;
+    this._gitVisibility = () => {
+      clearTimeout(this._gitTimer);
+      if (!document.hidden) this._refreshGitStatus();
+    };
   }
 
   static getStubConfig() { return {device_id: 'test-id4'}; }
@@ -54,6 +61,10 @@ class CarrotTerminalCard extends HTMLElement {
       throw new Error('device_id가 필요합니다.');
     }
     const changed = this._config?.device_id !== config.device_id;
+    if (changed) {
+      this._gitStatus = {};
+      this._gitRequest++;
+    }
     this._config = {...config, device_id: config.device_id.trim()};
     this._render();
     if (changed) this._resubscribe();
@@ -68,9 +79,13 @@ class CarrotTerminalCard extends HTMLElement {
   connectedCallback() {
     this._render();
     this._resubscribe();
+    document.addEventListener('visibilitychange', this._gitVisibility);
   }
 
   disconnectedCallback() {
+    document.removeEventListener('visibilitychange', this._gitVisibility);
+    clearTimeout(this._gitTimer);
+    this._gitRequest++;
     this._release();
     this._unsubscribe?.();
     this._unsubscribe = null;
@@ -88,6 +103,7 @@ class CarrotTerminalCard extends HTMLElement {
 
   async _resubscribe() {
     if (!this.isConnected || !this._hass || !this._config?.device_id) return;
+    this._refreshGitStatus();
     if (this._unsubscribe) {
       this._unsubscribe();
       this._unsubscribe = null;
@@ -100,6 +116,43 @@ class CarrotTerminalCard extends HTMLElement {
     } catch (error) {
       this._setMessage(error.message || '터미널 상태 구독 실패', true);
     }
+  }
+
+  async _refreshGitStatus() {
+    clearTimeout(this._gitTimer);
+    if (!this.isConnected || !this._hass || !this._config?.device_id || document.hidden) return;
+    const request = ++this._gitRequest;
+    try {
+      const result = await this._hass.callWS({type: 'carrot_ha/terminal/git_status', device_id: this._config.device_id});
+      if (request !== this._gitRequest || !this.isConnected) return;
+      this._gitStatus = result;
+    } catch (_) {
+      if (request !== this._gitRequest || !this.isConnected) return;
+      this._gitStatus = {...this._gitStatus, error: 'ha_unavailable'};
+    }
+    this._paintGitStatus();
+    this._gitTimer = setTimeout(() => this._refreshGitStatus(), 30000);
+  }
+
+  _paintGitStatus() {
+    const status = this.shadowRoot.getElementById('git-status');
+    const message = this.shadowRoot.getElementById('git-message');
+    const details = this.shadowRoot.getElementById('git-info');
+    if (!status || !message || !details) return;
+    const git = this._gitStatus;
+    const sha = git.installed_commit?.slice(0, 8);
+    let comparison = !sha ? '설치 커밋 미확인' : git.comparison === 'identical' ? '최신 커밋과 동일' :
+      git.comparison === 'diverged' ? `분기됨 · 최신 쪽 ${git.behind}개 / 기기 쪽 ${git.ahead}개` :
+      git.ahead > 0 ? `기기 쪽 ${git.ahead}개 추가 커밋` : Number.isInteger(git.behind) ? `${git.behind}개 커밋 뒤처짐` : '차이 확인 불가';
+    status.textContent = `${sha || '—'} · ${comparison}${git.error ? ' · 조회 오류' : ''}`;
+    message.textContent = git.latest_message ? `최신 ${git.latest_commit.slice(0, 8)}: ${git.latest_message.split('\n')[0]}` : '최신 커밋 확인 중 또는 조회 불가';
+    message.title = git.latest_message || '';
+    const format = value => {
+      const date = new Date(value);
+      return value && Number.isFinite(date.getTime()) ? date.toLocaleString() : '미확인';
+    };
+    details.title = `${git.branch || ''} · 기기 마지막 보고 ${format(git.installed_measured_at)} · GitHub 확인 ${format(git.checked_at)}${git.cached ? ' (저장된 결과)' : ''}`;
+    status.textContent += ' · 마지막 기기 보고 기준';
   }
 
   _fit() {
@@ -364,6 +417,10 @@ class CarrotTerminalCard extends HTMLElement {
           background: var(--card-background-color, #14171d);
           border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         }
+        #git-info { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 10px 22px;
+          border-bottom: 1px solid var(--divider-color, rgba(255,255,255,.08)); font-size: 12px; }
+        #git-status { color: var(--primary-text-color); }
+        #git-message { color: var(--secondary-text-color); overflow-wrap: anywhere; }
         h2 { margin: 0; flex: 1; font-size: 15px; font-weight: 700; color: var(--primary-text-color, #fff); }
         #badge {
           font-size: 11px;
@@ -549,6 +606,10 @@ class CarrotTerminalCard extends HTMLElement {
           </button>
         </div>
 
+        <div id="git-info" role="status" aria-live="polite">
+          <span id="git-status">커밋 확인 중</span><span id="git-message"></span>
+        </div>
+
         <!-- Navigation & Helper Keys -->
         <div class="keys">
           <button data-key="esc" disabled>Esc</button>
@@ -630,6 +691,7 @@ class CarrotTerminalCard extends HTMLElement {
     });
 
     this._renderState();
+    this._paintGitStatus();
   }
 
   getCardSize() { return 10; }

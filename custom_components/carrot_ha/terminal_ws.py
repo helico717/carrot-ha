@@ -96,3 +96,28 @@ def async_register(hass):
     websocket_api.async_register_command(hass, acquire)
     websocket_api.async_register_command(hass, terminal_input)
     websocket_api.async_register_command(hass, release)
+    websocket_api.async_register_command(hass, git_status)
+
+
+@websocket_api.websocket_command({vol.Required('type'): 'carrot_ha/terminal/git_status', vol.Required('device_id'): str})
+@websocket_api.async_response
+async def git_status(hass, connection, msg):
+    if not _require_admin(connection, msg):
+        return
+    runtime = next((r for r in hass.data.get(DOMAIN, {}).values() if isinstance(r, dict)
+                    and 'entry' in r and r['entry'].data['device_id'] == msg['device_id']), None)
+    if runtime is None:
+        connection.send_error(msg['id'], 'not_found', 'Vehicle is not configured')
+        return
+    from .git_status import GitStatus
+    from aiohttp import ClientTimeout
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+    checker = runtime.setdefault('git_status_checker', GitStatus())
+    session = async_get_clientsession(hass)
+    async def fetch(path):
+        async with session.get('https://api.github.com' + path, timeout=ClientTimeout(total=8),
+                               headers={'Accept': 'application/vnd.github+json'}, allow_redirects=False) as response:
+            response.raise_for_status()
+            return await response.json()
+    data = (runtime.get('latest') or {}).get('data') or {}
+    connection.send_result(msg['id'], await checker.get(data, fetch))
