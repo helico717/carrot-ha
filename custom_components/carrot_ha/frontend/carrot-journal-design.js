@@ -1002,7 +1002,8 @@ export const journalDesign = `:host {
       #page3 .ledger-table td:nth-child(1){grid-area:date;font-size:12px;color:var(--j-sub)}
       #page3 .ledger-table td:nth-child(1) small{display:inline;margin-left:6px}
       #page3 .ledger-table td:nth-child(2){grid-area:memo}
-      #page3 .ledger-table td:nth-child(3){grid-area:amount;align-self:center;text-align:right;font-size:17px;font-weight:750;white-space:nowrap}
+      #page3 .ledger-table td:nth-child(3){grid-area:amount;align-self:center;text-align:right;font-size:17px;font-weight:750;white-space:nowrap;color:var(--j-ink)}
+      #page3 #ledgerSort{color:var(--j-sub)}
       #page3 .ledger-table td:nth-child(4){grid-area:actions;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
       #page3 .ledger-table .memo-cell-wrap{gap:8px;align-items:flex-start}
       #page3 .ledger-table .memo-cat-title{font-size:14px;line-height:1.5;font-weight:700}
