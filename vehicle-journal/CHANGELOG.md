@@ -1,5 +1,11 @@
 # 차계부 변경 이력
 
+## 2026-10-11 — 모든 유종의 연결 상태와 개별 수정
+
+- 커밋 제목: `vehicle-journal: show and edit all fuel sensor connections`.
+- 유가 연결 기준에 세 유종 상태/현재 가격과 작은 수정 버튼 표시. 선택 유종과 무관하게 센서 수정/저장/취소 가능. 수동 연결 우선, 다른 유종 연결을 덮어쓰던 저장 오류 수정(기존 매핑 병합). 입력 중 새로고침에 따른 폼 값 덮어쓰기 방지. DB 스키마 변경 없음.
+- 관련 파일: frontend 카드/디자인, vehicle_journal/api.py, 변경 이력. 검증 후 main 푸시 및 HA 백업 직접 반영 예정. Python 저장 수정은 사용자 HA 재시작 후 활성화.
+
 ## 2026-10-11 — HA 절약 비교를 확정 로컬 스타일에 맞춤
 
 - 커밋 제목: `vehicle-journal: match savings comparison to approved prototype`.

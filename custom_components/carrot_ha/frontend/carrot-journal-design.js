@@ -1017,6 +1017,10 @@ export const journalDesign = `:host {
     @media(max-width:760px){#page2 .savings-layout{grid-template-columns:1fr}#page2 .savings-hero .compare-value{font-size:34px}}
     @media(max-width:420px){#page2 .fuel-topline{gap:6px}#page2 .fuel-topline label{font-size:11px}#page2 .fuel-switch{gap:3px}#page2 .fuel-switch button.compact{font-size:10px;padding:5px 4px}}
     .savings-hero{display:flex;flex-direction:column;justify-content:space-between;gap:28px}
+    #page2 .fuel-connection-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--j-border);font-size:13px}
+    #page2 .fuel-connection-row small{display:block;font-size:12px}
+    #page2 #compareForm{margin-top:12px}
+    #page2 #compareForm input{padding:6px 8px;font-size:12px;min-height:30px;margin:6px 0 10px}
     .savings-hero h2,.savings-hero .compare-value{margin:0}.savings-hero .compare-value{padding-block:16px}
     .savings-controls{display:flex;align-items:center}.controls-content{width:100%;min-width:0}
     .savings-controls input[type=range]{width:100%;padding:0;margin:18px 0;accent-color:var(--j-accent)}

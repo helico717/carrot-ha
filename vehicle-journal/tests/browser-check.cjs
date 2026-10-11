@@ -159,6 +159,12 @@ const path=require('path');
  if(await root.locator('#compareDistance').inputValue()!=='1200')throw Error('recorded distance reset');
  await root.locator('[data-compare-fuel=premium]').click();
  if(!(await root.locator('#saving').textContent()).includes('확인'))throw Error('missing price treated as zero');
+ await root.locator('#page2 .settings summary').click();
+ if(await root.locator('.fuel-connection-row').count()!==3)throw Error('all fuel connection states missing');
+ await root.locator('[data-edit-fuel=gasoline]').click();
+ if(await root.locator('#editFuel').inputValue()!=='gasoline'||await root.locator('#fuelEntity').inputValue()!=='sensor.average_gasoline')throw Error('independent fuel editor failed');
+ await root.locator('#cancelFuelEdit').click();
+ if(await root.locator('#compareForm').isVisible())throw Error('fuel edit cancel failed');
  // Ledger filters must not mutate the briefing or its totals.
  await root.locator('#tab3').click();
  await page.evaluate(()=>{

@@ -115,10 +115,14 @@ async def comparison_save(hass,connection,msg):
         fuel=msg['fuel'];economy=msg['economy_km_l'];entity=msg['entity_id']
         if fuel not in ('gasoline','diesel','premium') or number(economy) is None or not 1<=economy<=50 or not entity.startswith('sensor.') or len(entity)>255:raise ValueError('Invalid comparison')
         with r['journal'].lock,r['journal'].connect() as db:
+            import json
+            previous=db.execute('SELECT sensor_entities_json FROM comparison_settings WHERE vehicle_id=?',(r['journal'].vehicle,)).fetchone()
+            entities=json.loads(previous[0]) if previous else {}
+            entities[fuel]=entity
             db.execute('''INSERT INTO comparison_settings VALUES (?,?,?,?,1,?) ON CONFLICT(vehicle_id)
                 DO UPDATE SET fuel=excluded.fuel,economy_km_l=excluded.economy_km_l,
                 sensor_entities_json=excluded.sensor_entities_json,version=comparison_settings.version+1,updated_at=excluded.updated_at''',
-                (r['journal'].vehicle,fuel,economy,encode({fuel:entity}),now()))
+                (r['journal'].vehicle,fuel,economy,encode(entities),now()))
         return {'saved':True}
     await execute(hass,connection,msg,write)
 
