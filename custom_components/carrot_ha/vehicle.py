@@ -4,6 +4,7 @@ from .battery import calibrated_soc, estimate_charging_times
 from .charging_power import charging_power
 from .telemetry import combined_lock_state
 import math
+from .location import location_values
 from .telemetry import OPTIONAL_FIELDS, FRESHNESS_SECONDS
 
 def values(runtime):
@@ -38,8 +39,7 @@ def values(runtime):
         data[target] = gps.get(source)
     data['gps_accuracy_m'] = round(gps['accuracyM'], 1) if isinstance(gps.get('accuracyM'), (int, float)) else None
     data['bearing_deg'] = int(round(gps['bearingDeg'])) if isinstance(gps.get('bearingDeg'), (int, float)) else None
-    speed = gps.get('speedMps')
-    data['speed_kph'] = round(speed*3.6,1) if isinstance(speed,(int,float)) else None
+    data.update(location_values(data, datetime.now(timezone.utc)))
     wheel_speed = data.get('wheel_speed_mps')
     data['wheel_speed_kph'] = round(wheel_speed*3.6,1) if isinstance(wheel_speed,(int,float)) else None
     data['last_received'] = latest.get('observed_at')
@@ -264,6 +264,4 @@ def values(runtime):
         except (ValueError, TypeError, AttributeError):
             data[key] = None
 
-    parking = data.get('parking') or data.get('last_trip_parking') or {}
-    data.update(parking_latitude=parking.get('latitude'),parking_longitude=parking.get('longitude'),parking_at=parking.get('measured_at') or parking.get('t'))
     return data

@@ -758,7 +758,7 @@ class CarrotDashboard extends HTMLElement {
         :`<span class="parking-chip-badge"><i class="dot"></i>Parked${parkDur&&parkDur!=='—'?` · ${esc(parkDur)} ago`:''}</span>`;
       const captionSub=isDriving
         ?'Current vehicle position · Will be updated to new parking location when trip ends'
-        :'Last recorded parking location';
+        :v.parking_estimated?`Estimated parking · Last GPS fix · GPS measured ${time(v.parking_gps_at, this._hass?.config?.time_zone)}`:'Last recorded parking location';
       return `<section class="panel"><div class="paneltitle parking-heading"><div class="parking-heading-wrap"><div class="parking-heading-left"><h2>${isDriving?'Vehicle location':'Parking location'}</h2>${chipHtml}</div><span class="sub">${timeStr}</span></div></div><div class="map"></div><div class="route-caption"><b>${lat==null?'Waiting for location':`${n(lat,5)}, ${n(lng,5)}`}</b><p class="sub">${captionSub}</p></div></section><div class="tiles parking-tiles">${tiles}</div>`;
     }
     if(this.tab==='vehicle')return this.vehicleStatusView(v);
@@ -1272,7 +1272,7 @@ class CarrotDashboard extends HTMLElement {
         </span>`;
     }
 
-    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span>${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at, tz)}</small></span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
+    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>Outside <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span>${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>Parking location</b><small>${v.parking_latitude==null?'Waiting for location':time(v.parking_at, tz)}</small>${v.parking_estimated?'<small>Estimated parking · Last GPS fix</small>':''}</span><em>Map →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>Recent trips</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'No records'}</small><small>${latest?shortDuration(latest.duration_s):'Waiting for a new trip'}</small></span><em>View →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
@@ -1283,10 +1283,11 @@ class CarrotDashboard extends HTMLElement {
   vehicleStatus(v){
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;
     if(online==='off')return {key:'offline',label:'Offline'};
-    const isMoving=(v?.speed_kph>3);
-    const isCharging=(Boolean(v?.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving;
-    if(isCharging)return {key:'charging',label:'Charging'};
     const driving=Object.prototype.hasOwnProperty.call(v||{},'driving')?v?.driving:v?.onroad;
+    const gpsAge=(Date.now()-Date.parse(v?.gps_measured_at||v?.gps?.measured_at))/1000;
+    const isMoving=(gpsAge>=0&&gpsAge<=30&&v?.gps_fresh!==false&&v?.speed_kph>3);
+    const isCharging=(Boolean(v?.charging)||this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on')&&!isMoving&&!driving;
+    if(isCharging)return {key:'charging',label:'Charging'};
     if(driving)return {key:'driving',label:'Driving'};
     if(driving===false)return {key:'parked',label:'Parked'};
     if(online!=='on'&&!this.isFromCache&&(!v||!Object.keys(v).length))return {key:'unknown',label:'Checking connection'};

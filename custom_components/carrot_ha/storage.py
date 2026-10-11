@@ -343,7 +343,7 @@ class Archive(ChargeCosts):
                 last_trip_consumed_soc=trip.get('soc_used_percent'),
             )
             route = trip.get('route') or []
-            if route: summary['last_trip_parking'] = dict(route[-1],measured_at=trip.get('ended_at'))
+            if route: summary['last_trip_parking'] = dict(route[-1],gps_measured_at=route[-1].get('t') or route[-1].get('measured_at'),measured_at=trip.get('ended_at'))
             summary['last_trip_avg_kph'] = round(trip['distance_m']/trip['duration_s']*3.6,1) if trip.get('duration_s') and trip.get('distance_m') is not None else None
             speeds = [p.get('speedMps',p.get('speed_mps')) for p in route]
             speeds = [v for v in speeds if isinstance(v,(int,float))]
