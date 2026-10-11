@@ -988,6 +988,30 @@ export const journalDesign = `:host {
     .ledger-table .memo-text-col{min-width:0}
     #page3 .ledger-table td:last-child{white-space:normal}
     .ledger-table .btn-table-action{margin-bottom:4px}
+    @media(max-width:760px){
+      #page3 .table-wrap{overflow:visible}
+      #page3 .ledger-table{display:block;min-width:0;table-layout:auto;margin-top:8px}
+      #page3 .ledger-table colgroup{display:none}
+      #page3 .ledger-table thead{display:block}
+      #page3 .ledger-table thead tr{display:flex;justify-content:flex-end}
+      #page3 .ledger-table thead th{display:none}
+      #page3 .ledger-table thead #ledgerAmountHeader{display:block;padding:8px 0;font-size:12px;border:0}
+      #page3 .ledger-table tbody{display:block}
+      #page3 .ledger-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'memo amount' 'date date' 'actions actions';gap:8px 12px;padding:18px 0;border-bottom:1px solid var(--j-border)}
+      #page3 .ledger-table td{display:block;padding:0;border:0;min-width:0}
+      #page3 .ledger-table td:nth-child(1){grid-area:date;font-size:12px;color:var(--j-sub)}
+      #page3 .ledger-table td:nth-child(1) small{display:inline;margin-left:6px}
+      #page3 .ledger-table td:nth-child(2){grid-area:memo}
+      #page3 .ledger-table td:nth-child(3){grid-area:amount;align-self:center;text-align:right;font-size:17px;font-weight:750;white-space:nowrap}
+      #page3 .ledger-table td:nth-child(4){grid-area:actions;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+      #page3 .ledger-table .memo-cell-wrap{gap:8px;align-items:flex-start}
+      #page3 .ledger-table .memo-cat-title{font-size:14px;line-height:1.5;font-weight:700}
+      #page3 .ledger-table .memo-desc{font-size:12px;line-height:1.5}
+      #page3 .ledger-table .memo-thumb-btn{flex-shrink:0}
+      #page3 .ledger-table .btn-table-action{padding:5px 9px;font-size:12px;min-height:32px;margin:0}
+      #page3 .ledger-table td[colspan]{grid-column:1/-1;grid-area:auto}
+      #page3 .ledger-table td:nth-child(4)>small{font-size:11px}
+    }
     #ledgerSort{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer}
     #ledgerSort:focus-visible{outline:2px solid var(--j-accent);outline-offset:4px}
     #page2 .savings-layout{grid-template-columns:1.4fr 1fr;gap:18px}

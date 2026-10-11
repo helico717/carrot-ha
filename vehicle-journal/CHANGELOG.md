@@ -1,5 +1,11 @@
 # 차계부 변경 이력
 
+## 2026-10-11 — 모바일 상세 기록을 세로 지출 목록으로 변경
+
+- 커밋 제목: `vehicle-journal: display mobile ledger as expense list`.
+- 사용자 사진에서 금액/관리를 보기 위해 가로 스크롤해야 했던 문제 수정. 760px 이하 상세 기록은 분류/메모와 우측 금액, 아래 날짜/출처·관리 버튼의 목록 배치. 기존 사진/수정/삭제/복원·분류필터·페이지·금액 정렬 유지. 넓은 화면의 고정 열 표 유지.
+- 관련 파일: frontend 디자인, 모바일 Chromium 검증, 변경 이력. 검증 후 main 푸시/HA 백업 직접 반영 예정. Python/DB/Worker/Comma 변경 없음. beta.2 태그는 유지.
+
 ## 2026-10-11 — 0.8.14-beta.2 누적 pre-release 준비
 
 - 커밋 제목: `vehicle-journal: prepare 0.8.14-beta.2 prerelease`.

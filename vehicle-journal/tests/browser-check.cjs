@@ -224,6 +224,12 @@ const path=require('path');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   if(overflow)throw Error('page horizontal overflow at '+width);
   await root.locator('#tab3').click();
+  if(width<=760){
+   const fits=await root.locator('#records tr').evaluateAll(rows=>rows.every(row=>{const r=row.getBoundingClientRect();return [...row.querySelectorAll('td:nth-child(3),td:nth-child(4) button')].every(el=>{const b=el.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1;});}));
+   if(!fits)throw Error('mobile ledger amount/actions require horizontal scrolling at '+width);
+   if(await root.locator('.ledger-table').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('mobile ledger internal overflow at '+width);
+   if(width===360)await page.screenshot({path:'.preview/journal/mobile-ledger.png',fullPage:true});
+  }
   await root.locator('#ledgerDropdown summary').click();
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('ledger horizontal page overflow at '+width);
   await root.locator('#ledgerDropdown summary').click();
