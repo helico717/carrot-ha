@@ -990,6 +990,32 @@ export const journalDesign = `:host {
     .ledger-table .btn-table-action{margin-bottom:4px}
     #ledgerSort{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer}
     #ledgerSort:focus-visible{outline:2px solid var(--j-accent);outline-offset:4px}
+    #page2 .savings-layout{grid-template-columns:1.4fr 1fr;gap:18px}
+    #page2 .savings-layout>.panel{grid-column:auto;padding:22px;border-radius:17px}
+    #page2 .savings-hero{background:linear-gradient(135deg,#183e36,#17252c)}
+    #page2 .savings-hero h2{font-size:25px;font-weight:700;line-height:1.4}
+    #page2 .savings-hero .compare-value{font-size:42px;font-weight:760;line-height:1.2;letter-spacing:-1px;padding-block:8px;color:#81e6c5}
+    #page2 #compareBasis{margin:6px 0 16px;font-size:15px;line-height:1.65}
+    #page2 .savings-controls label{font-size:13px;color:var(--j-sub)}
+    #page2 .savings-controls .slider-title{color:var(--j-ink)}
+    #page2 .savings-controls input[type=range]{min-height:0;height:16px;margin:6px 0 0;border:0;border-radius:0;background:transparent}
+    #page2 .savings-controls small{font-size:12.5px;line-height:1.65}
+    #page2 .savings-controls hr{margin:16px 0}
+    #page2 .savings-controls .row{gap:15px;flex-wrap:nowrap}
+    #page2 .savings-controls .compact{border-radius:7px;white-space:nowrap;font-weight:400}
+    #page2 .fuel-topline{margin-bottom:22px;gap:12px}
+    #page2 .fuel-topline label{flex:1;font-size:12px}
+    #page2 .fuel-switch{gap:6px;flex-shrink:0}
+    #page2 .fuel-switch button.compact{font-size:11px;padding:5px 6px}
+    #page2 .fuel-switch button.active{font-weight:700}
+    #page2 #comparePrice{margin:0 0 20px}
+    #page2 .savings-controls .settings{padding:12px 16px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-bg);margin-top:20px}
+    #page2 .savings-controls summary{font-size:15px;line-height:1.65}
+    #page2 .savings-bars .row{font-size:15px;line-height:1.65;margin-bottom:8px}
+    #page2 .cost-bar{height:16px;margin:0 0 20px;background:#243540}
+    #page2 .cost-bar:last-child{margin-bottom:0}
+    @media(max-width:760px){#page2 .savings-layout{grid-template-columns:1fr}#page2 .savings-hero .compare-value{font-size:34px}}
+    @media(max-width:420px){#page2 .fuel-topline{gap:6px}#page2 .fuel-topline label{font-size:11px}#page2 .fuel-switch{gap:3px}#page2 .fuel-switch button.compact{font-size:10px;padding:5px 4px}}
     .savings-hero{display:flex;flex-direction:column;justify-content:space-between;gap:28px}
     .savings-hero h2,.savings-hero .compare-value{margin:0}.savings-hero .compare-value{padding-block:16px}
     .savings-controls{display:flex;align-items:center}.controls-content{width:100%;min-width:0}
