@@ -8,4 +8,4 @@ HA 0.8.14-beta.2 운영 DB를 읽기 전용으로 확인했다. 좌표·인증 �
 검증: 위치 Python 4, 양 언어 화면 4, 대시보드 loading/lazy/view-state/dependency/trip 포함 25, cloud live 6, incremental 5, history cache 1, CAN charging 8, power/lock 9, emergency 3, smoothing 36, Comma parameter polling 4 통과. Worker benchmark 기존 1요청/1쿼리 경로 유지.
 기존 검사 제약: Worker incremental의 LF 전용 schema replace가 Windows CRLF에서 실패하여 measurements_json 중복 컬럼 오류. camera-360 테스트 기존 vm의 import.meta 오류. 해당 소스 변경 없음. camera lifecycle 3건 통과.
 
-배포: v0.8.14-beta.3 발행 준비. HACS 설치·HA 재시작 후 실차 확인은 남아 있다.
+배포: 2026-10-11 21:02 KST main 및 v0.8.14-beta.3 태그 f348766521355922a9ee53f46f2abbd212224a0b 푸시. GitHub prerelease=true 및 릴리스 노트 확인. HACS Release Actions 성공: https://github.com/helico717/carrot-ha/actions/runs/38137787339 . 릴리스: https://github.com/helico717/carrot-ha/releases/tag/v0.8.14-beta.3 . HACS 설치·HA 재시작 후 실차 확인은 남아 있다.
