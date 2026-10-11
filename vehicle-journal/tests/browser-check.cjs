@@ -141,6 +141,24 @@ const path=require('path');
  if(await root.locator('#legendRow [data-cat=maintenance]').getAttribute('aria-pressed')!=='true')throw Error('comparison filter failed');
  await root.locator('#legendRow [data-cat=maintenance]').click();
  if(await root.locator('#recordForm select[name=category] option').count()!==4)throw Error('expense modal categories incorrect');
+ // Approved savings sliders use the selected vehicle and local HA fuel sensors.
+ await root.locator('#tab2').click();
+ await page.evaluate(()=>{
+  const card=document.querySelector('carrot-vehicle-journal');
+  card.data.totals={...card.data.totals,distance_km:1200,efficiency_km_kwh:6,battery_charge_kwh:200,billed_charge_kwh:200,charge_effective_krw:64000};
+  card._hass.states={'sensor.average_gasoline':{state:'1800',attributes:{unit_of_measurement:'원/L'}},'sensor.average_diesel':{state:'1700',attributes:{unit_of_measurement:'원/L'}}};
+  card.savingsKey=null;card.renderData();
+ });
+ if(!(await root.locator('#saving').textContent()).includes('80,000'))throw Error('savings baseline calculation');
+ await root.locator('[data-compare-fuel=diesel]').click();
+ if(!(await root.locator('#priceValue').textContent()).includes('1,700'))throw Error('fuel switch did not read HA price');
+ await root.locator('#economy').fill('20');await root.locator('#economy').dispatchEvent('input');
+ if(!(await root.locator('#saving').textContent()).includes('38,000'))throw Error('economy slider calculation');
+ await root.locator('#compareDistance').fill('600');await root.locator('#compareDistance').dispatchEvent('input');
+ await root.locator('#recordedDistance').click();
+ if(await root.locator('#compareDistance').inputValue()!=='1200')throw Error('recorded distance reset');
+ await root.locator('[data-compare-fuel=premium]').click();
+ if(!(await root.locator('#saving').textContent()).includes('확인'))throw Error('missing price treated as zero');
  // Ledger filters must not mutate the briefing or its totals.
  await root.locator('#tab3').click();
  await page.evaluate(()=>{

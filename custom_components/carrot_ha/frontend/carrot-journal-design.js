@@ -990,6 +990,17 @@ export const journalDesign = `:host {
     .ledger-table .btn-table-action{margin-bottom:4px}
     #ledgerSort{padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;text-align:left;cursor:pointer}
     #ledgerSort:focus-visible{outline:2px solid var(--j-accent);outline-offset:4px}
+    .savings-hero{display:flex;flex-direction:column;justify-content:space-between;gap:28px}
+    .savings-hero h2,.savings-hero .compare-value{margin:0}.savings-hero .compare-value{padding-block:16px}
+    .savings-controls{display:flex;align-items:center}.controls-content{width:100%;min-width:0}
+    .savings-controls input[type=range]{width:100%;padding:0;margin:18px 0;accent-color:var(--j-accent)}
+    .slider-title{font-weight:750;font-size:calc(1em + 1px);color:var(--j-text)}
+    .savings-controls hr{border:0;border-top:1px solid var(--j-line);margin:24px 0}
+    .savings-controls button.compact{padding:5px 7px;font-size:12px;line-height:1.3;min-height:0}
+    .fuel-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.fuel-topline label{font-size:12px}
+    .fuel-switch{display:flex;gap:4px;margin-left:auto}.fuel-switch .active{background:var(--j-accent);color:#102c24}
+    .savings-controls .settings{margin-top:20px}.savings-controls summary{cursor:pointer;color:var(--j-accent)}
+    .cost-bar{height:14px;background:#263844;border-radius:5px;overflow:hidden;margin:10px 0 24px}.cost-bar:last-child{margin-bottom:0}.cost-bar span{display:block;height:100%;background:#81e6c5}.cost-bar.orange span{background:#ffb76b}.savings-bars .mint{color:#81e6c5}.savings-bars .orange{color:#ffb76b}
     .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:16px 0 20px}
     .ledger-dropdown{position:relative;max-width:100%}
     .ledger-dropdown summary{cursor:pointer;min-height:34px;box-sizing:border-box;padding:4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650}
