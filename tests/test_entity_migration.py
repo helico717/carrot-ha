@@ -32,6 +32,20 @@ class Registry:
 
 
 class MigrationTest(unittest.TestCase):
+    def test_temperature_compaction_after_existing_migration_and_manual_enable(self):
+        registry = Registry({key: 'sensor.custom_' + key for key in
+                             migration.BATTERY_TEMPERATURE_DETAILS | {'battery_temperature_c'}})
+        registry.async_get('sensor.custom_battery_min_temperature_c').disabled_by = 'user'
+        entry = types.SimpleNamespace(entry_id='entry', data={'device_id':'car', migration.COMPACTION_DATA_KEY:1}, options={})
+        self.migrate(registry, entry)
+        self.assertEqual(registry.async_get('sensor.custom_battery_min_temperature_c').disabled_by, 'user')
+        maximum = registry.async_get('sensor.custom_battery_max_temperature_c')
+        self.assertEqual(maximum.disabled_by, 'integration')
+        self.assertIsNone(registry.async_get('sensor.custom_battery_temperature_c').disabled_by)
+        maximum.disabled_by = None
+        self.migrate(registry, entry)
+        self.assertIsNone(maximum.disabled_by)
+
     def migrate(self, registry, entry=None):
         helpers = types.ModuleType('homeassistant.helpers')
         helpers.entity_registry = types.SimpleNamespace(

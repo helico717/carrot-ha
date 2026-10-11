@@ -8,6 +8,7 @@ BINARY_FIELDS = {
     'doors_locked': ('차량 잠김 상태', None),
 }
 SENSOR_FIELDS = {
+    'battery_temperature_c': ('배터리 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'battery_charge_temperature_status': ('충전 온도 상태', None, 'mdi:thermometer-check', None, None),
     'battery_min_temperature_c': ('배터리 최저 온도', '°C', 'mdi:thermometer-low', 'temperature', 1),
     'battery_max_temperature_c': ('배터리 최고 온도', '°C', 'mdi:thermometer-high', 'temperature', 1),
@@ -93,10 +94,21 @@ def battery_monitor_attributes(key, data):
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(measured.replace('Z', '+00:00'))).total_seconds()
     except (TypeError, ValueError, AttributeError):
         age = None
-    return {'source': 'passive_can',
-            'can_id': '0x1A5555B2' if key == 'battery_charge_temperature_status' else '0x16A954A6',
+    attrs = {'source': 'passive_can',
+            'can_id': ('0x1A555551' if key == 'battery_temperature_c' else
+                       '0x1A5555B2' if key == 'battery_charge_temperature_status' else '0x16A954A6'),
             'measurement_basis': 'vehicle_report_at_can_receipt',
             'validation': 'dbc_and_one_dc_capture; independent_measurement_pending',
             'measured_at': measured, 'measurement_age_s': round(age, 1) if age is not None else None,
             'stale': age is None or not 0 <= age <= FRESHNESS_SECONDS,
             'freshness_limit_s': FRESHNESS_SECONDS}
+    if key == 'battery_temperature_c':
+        attrs.update(can_bus=1, measurement_basis='bms_reported_representative_temperature',
+                     validation='retained_can_audit_2026-10-11; independent_measurement_pending')
+        for label, field in (('min', 'battery_min_temperature_c'), ('max', 'battery_max_temperature_c')):
+            details = battery_monitor_attributes(field, data)
+            attrs[f'{label}_temperature_c'] = data.get(field) if not details['stale'] else None
+            attrs[f'{label}_temperature_measured_at'] = details['measured_at']
+            attrs[f'{label}_temperature_stale'] = details['stale']
+        attrs['extrema_can_id'] = '0x16A954A6'
+    return attrs

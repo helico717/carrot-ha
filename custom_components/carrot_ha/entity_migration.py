@@ -10,6 +10,8 @@ COMPACT_SENSORS = {
     'trip_count', 'recorded_distance_km',
 }
 COMPACTION_DATA_KEY = 'vehicle_entity_compaction_version'
+BATTERY_TEMPERATURE_DETAILS = {'battery_min_temperature_c', 'battery_max_temperature_c'}
+BATTERY_TEMPERATURE_COMPACTION_KEY = 'battery_temperature_compaction_version'
 REMOVED_SENSORS = {
     'charge_power_w', 'charge_connection_evidence', 'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
     'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
@@ -48,6 +50,7 @@ def migrate_entities(hass, entry):
         config_entry_id=entry.entry_id, **comma_device_info(entry))
     prefix = entry.data['device_id'] + '_'
     compact = entry.data.get(COMPACTION_DATA_KEY, 0) < 1
+    compact_temperature = entry.data.get(BATTERY_TEMPERATURE_COMPACTION_KEY, 0) < 1
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if entity.platform != DOMAIN or not entity.unique_id.startswith(prefix):
             continue
@@ -60,6 +63,8 @@ def migrate_entities(hass, entry):
             continue
         updates = {}
         if compact and entity.domain == 'sensor' and key in COMPACT_SENSORS and entity.disabled_by is None:
+            updates['disabled_by'] = er.RegistryEntryDisabler.INTEGRATION
+        if compact_temperature and entity.domain == 'sensor' and key in BATTERY_TEMPERATURE_DETAILS and entity.disabled_by is None:
             updates['disabled_by'] = er.RegistryEntryDisabler.INTEGRATION
         if key.startswith('comma_'):
             updates['device_id'] = comma.id
@@ -80,9 +85,10 @@ def migrate_entities(hass, entry):
                     logging.getLogger(__name__).warning('Cannot rename %s: %s already exists', entity.entity_id, candidate)
         if updates:
             registry.async_update_entity(entity.entity_id, **updates)
-    if compact:
+    if compact or compact_temperature:
         # Persist only after registry updates succeed. Do not disable a sensor
         # again after the user explicitly re-enables it on a later restart.
         # Entry data survives options-form replacement (which only keeps its
         # declared fields). An options save must not re-run this migration.
-        hass.config_entries.async_update_entry(entry, data={**entry.data, COMPACTION_DATA_KEY: 1})
+        hass.config_entries.async_update_entry(entry, data={**entry.data, COMPACTION_DATA_KEY: 1,
+                                                          BATTERY_TEMPERATURE_COMPACTION_KEY: 1})

@@ -49,7 +49,7 @@ class TestNewSensors(unittest.TestCase):
     def test_battery_monitoring_entities_freshness_and_attributes(self):
         from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
         from custom_components.carrot_ha.telemetry import BATTERY_MONITOR_FIELDS
-        self.assertEqual(len(BATTERY_MONITOR_FIELDS), 6)
+        self.assertEqual(len(BATTERY_MONITOR_FIELDS), 7)
         now = datetime.now(timezone.utc)
         for key in BATTERY_MONITOR_FIELDS:
             value = 'optimal' if key == 'battery_charge_temperature_status' else 13
@@ -66,6 +66,30 @@ class TestNewSensors(unittest.TestCase):
             self.assertIsNone(sensor.native_value)
             self.assertTrue(sensor.extra_state_attributes['stale'])
             self.assertNotEqual(sensor.extra_state_attributes['measured_at'], now.isoformat())
+
+    def test_representative_temperature_and_independent_extrema_freshness(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
+        now = datetime.now(timezone.utc)
+        key = 'battery_temperature_c'
+        data = {key: 30.5, 'battery_min_temperature_c': 29, 'battery_max_temperature_c': 32,
+                'field_measured_at': {key: now.isoformat(), 'battery_min_temperature_c': now.isoformat(),
+                                     'battery_max_temperature_c': (now-timedelta(seconds=181)).isoformat()}}
+        runtime = self._make_runtime(data); runtime['entry'].entry_id = 'temperature-test'
+        sensor = VehicleSensor(runtime['entry'], key, *FIELDS[key])
+        sensor.hass = types.SimpleNamespace(data={'carrot_ha': {'temperature-test': runtime}})
+        self.assertEqual(sensor.native_value, 30.5)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs['can_id'], '0x1A555551')
+        self.assertEqual(attrs['min_temperature_c'], 29)
+        self.assertIsNone(attrs['max_temperature_c'])
+        self.assertTrue(attrs['max_temperature_stale'])
+        self.assertEqual(attrs['max_temperature_measured_at'], data['field_measured_at']['battery_max_temperature_c'])
+        data['field_measured_at'][key] = (now-timedelta(seconds=181)).isoformat()
+        self.assertIsNone(sensor.native_value)
+        self.assertEqual(sensor.extra_state_attributes['min_temperature_c'], 29)
+        for field in ('battery_min_temperature_c', 'battery_max_temperature_c'):
+            self.assertFalse(VehicleSensor(runtime['entry'], field, *FIELDS[field])._attr_entity_registry_enabled_default)
+        self.assertTrue(sensor._attr_entity_registry_enabled_default)
 
     def test_wheel_speed_conversion(self):
         # 25 m/s = 90.0 km/h
@@ -181,7 +205,8 @@ class TestNewSensors(unittest.TestCase):
             return sensor
         for key in FIELDS:
             sensor=VehicleSensor(entry,key,*FIELDS[key])
-            self.assertEqual(sensor._attr_entity_registry_enabled_default, key not in COMPACT_SENSORS)
+            self.assertEqual(sensor._attr_entity_registry_enabled_default,
+                             key not in COMPACT_SENSORS | {'battery_min_temperature_c', 'battery_max_temperature_c'})
         charge=attach(VehicleSensor(entry,'month_charge_kwh',*FIELDS['month_charge_kwh']))
         self.assertEqual(charge.extra_state_attributes['slow_kwh'],12)
         self.assertEqual(charge.extra_state_attributes['fast_kwh'],8)

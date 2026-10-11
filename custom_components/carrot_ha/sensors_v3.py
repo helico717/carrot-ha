@@ -4,7 +4,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import SENSOR_FIELDS, CHARGE_TEMPERATURE_DISPLAY, battery_monitor_attributes
-from .entity_migration import COMPACT_SENSORS
+from .entity_migration import COMPACT_SENSORS, BATTERY_TEMPERATURE_DETAILS
 
 GEAR_DISPLAY = {
     'park': 'P',
@@ -88,7 +88,7 @@ ID4_DIAGNOSTIC_KEYS = {
 class VehicleSensor(VehicleEntity,SensorEntity):
     def __init__(self,entry,key,name,unit,icon,device_class,precision=None):
         self.configure(entry,key,name,icon)
-        self._attr_entity_registry_enabled_default = key not in COMPACT_SENSORS
+        self._attr_entity_registry_enabled_default = key not in COMPACT_SENSORS | BATTERY_TEMPERATURE_DETAILS
         self._attr_native_unit_of_measurement=unit
         self._attr_device_class=device_class
         if precision is not None:
