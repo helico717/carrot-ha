@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-11 — 0.8.14-beta.2 누적 pre-release 준비
+
+- 커밋 제목: `vehicle-journal: prepare 0.8.14-beta.2 prerelease`.
+- 사용자 발행 요청으로 manifest 버전을 `0.8.14-beta.2`로 갱신. `v0.8.14-beta.1..da9dfe7` 전체 55개 커밋/31개 파일 diff를 대조하고 사진·브리핑·로더·센서·CAN10GB·추세·금액·날짜·상세지출·절약비교·유가연결 및 지침 변경을 `.github/release-notes/v0.8.14-beta.2.md`에 누적 작성. 로더 테스트는 JOURNAL_CHROME 환경변수 지원을 추가하여 Windows에서도 실행.
+- 이번 검증: Chromium 차계부·사진압축·사진취소·로더/업데이트/스크롤 통과, Python 원장/권한14개(Windows GC 정리 보조)와 스키마9개 통과. 별도 dashboard Node --test 묶음은 이 환경에서 출력 없이 대기하여 중단했으며 이번 실행 통과로 계산하지 않음. 기존 개발 과정 검증/운영 확인과 이번 실행을 구분.
+- 발행: main 준비 커밋/태그 푸시와 GitHub pre-release 및 Actions 성공 확인 예정. Python 지출 필터/정렬과 유종 매핑 보존 저장의 재시작 후 운영 확인은 대기. 사용자는 HACS 베타 설치/HA 재시작 수행. Worker/Comma 변경 없음.
+
 ## 2026-10-11 — 모든 유종의 연결 상태와 개별 수정
 
 - 커밋 제목: `vehicle-journal: show and edit all fuel sensor connections`.

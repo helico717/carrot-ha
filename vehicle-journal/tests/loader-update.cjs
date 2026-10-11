@@ -12,7 +12,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),assert=require(
   </script><script type="module" src="/carrot_ha_static/carrot-journal-panel.js?v=old-startup-hash"></script>`);
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({headless:true,executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
+ const browser=await chromium.launch({headless:true,executablePath:process.env.JOURNAL_CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'});
  try{
  const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`http://127.0.0.1:${server.address().port}/carrot-journal`);
