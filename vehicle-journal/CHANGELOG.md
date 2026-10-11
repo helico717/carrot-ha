@@ -5,7 +5,7 @@
 - 커밋 제목: `vehicle-journal: match savings comparison to approved prototype`.
 - 원인: 기존 HA 제목 20px/금액34px 보통 굵기, 8:4 열 비율과 range 최소높이44px가 남아 로컬 25px/42px 굵기760, 1.4:1 비율·작은 슬라이더와 달랐음.
 - 변경: 절약 비교 범위에 로컬 제목/금액 글자·자간·행간·카드 비율·22px 패딩·17px 곡률·그래프16px·범위입력16px·버튼/설정 박스/간격을 일치. 다른 탭 CSS 유지. 좁은 화면 단일 열과34px 금액 유지.
-- 검증·배포: 합성 Chromium 및 운영 화면 비교 후 main 푸시/HA 화면 두 모듈 백업 직접 반영 예정. Python/DB/Worker/Comma 변경 없음.
+- 검증·배포: 합성 Chromium 전체 회귀 통과. `ae660d7a2807fa19c27f22bc4686a95bf26deeae` main 푸시, HA 화면 두 모듈 백업 직접 반영·설치/HTTP SHA 일치. 백업 `/config/carrot_ha/deployment-backups/ae660d7a2807fa19c27f22bc4686a95bf26deeae/`. 실제 접속 Chrome 새로고침 후 computed style 제목25px/금액42px·굵기760·자간−1px/패딩22px 확인 및 스크린샷으로 카드 비율·범위입력·버튼·설정 박스 검토. 기존 586px가량 카드가 현재444.5px로 내용에 맞게 축소됨(운영 viewport). Python/DB/Worker/Comma 변경 없음, 재시작 불필요.
 
 ## 2026-10-11 — 확정한 슬라이더 절약 비교 HA 구현
 
