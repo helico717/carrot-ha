@@ -1,3 +1,12 @@
+## 2026-10-12 — vehicle-journal: support same-day multiple odometers in distance calculation
+
+- 원인: 정비 후 주유나 당일 주행 등 하루에 누적거리가 여러 번 기록된 정상 운행(예: 2026-03-07 주유 79,838km/주행 79,977km, 2026-08-14 정비 93,022km/주유 93,025km)에서 len(points[d])!=1 검사로 인해 상충 오류로 판단하여 전체 연간 거리 계산이 중단되고 —km로 표시됨.
+- 변경: 동일 날짜 내 여러 누적거리 기록을 정상적인 당일 주행 진행으로 수용. 일자별 마감 누적거리는 당일 최대값(max(points[d]))으로 취합하고, 당일 내 기록이 직전 일자 마감값보다 작거나 일자 간 마감값이 역전되는 실제 누적거리 감소만 검출하여 안전하게 계산.
+- 결과: 아테온 2026년 주행거리가 2025-12-27 기준(75,531km)부터 2026-10-05(99,172km)까지 정상 계산되어 23,641 km로 복원됨.
+- 관련 파일: custom_components/carrot_ha/vehicle_journal/fuel_metrics.py, vehicle-journal/tests/test_vehicle_import.py, vehicle-journal/CHANGELOG.md.
+- 검증: test_vehicle_import.py 18개 전체 통과(당일 다중 누적거리 정상 계산 및 실제 역전 검출 포함), schema 검증 9개, 권한/스케줄/저장소 회귀 통과. HA 실제 운영 DB에서 23,641 km 정상 산출 확인.
+- 배포: main 커밋·푸시 및 HA deployment-backups 코드 백업 후 SSH 직접 반영. Python 변경 적용을 위한 사용자 HA 재시작 필요. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: fix combustion comparison annual distance and chart labels
 
 - 원인: 절약 비교는 EV 전비/충전비만 검사하고 거리 슬라이더도 기존 distance_km만 사용. 내연기관은 합의한 주유 지출÷관측 거리의 원/km 기준으로 비교 차량 연비/유가와 추정 비교. 실제 연비가 아니며 기간 차이 오차를 명시. 기록 거리 버튼·슬라이더에 관측 거리 연결.

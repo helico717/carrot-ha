@@ -43,11 +43,12 @@ def odometer(db,vehicle,start,end):
     if not baseline or not inside:
         result['warning']='이전 기간 기준 누적거리 또는 선택 기간 누적거리 기록이 없어요.';return result
     dates=[baseline]+inside
-    if any(len(points[d])!=1 for d in dates):
-        result['warning']='같은 날짜의 누적거리가 서로 달라 계산하지 않았어요.';return result
-    values=[next(iter(points[d])) for d in dates]
+    values=[max(points[d]) for d in dates]
     if any(b<a for a,b in zip(values,values[1:])):
         result['warning']='누적거리 감소가 있어 계산하지 않았어요.';return result
+    for prev_val,d in zip(values[:-1],inside):
+        if any(v<prev_val for v in points[d]):
+            result['warning']='누적거리 감소가 있어 계산하지 않았어요.';return result
     result['distance_km']=values[-1]-values[0]
     result['daily']=[{'day':d,'distance_km':b-a} for d,a,b in zip(inside,values,values[1:])]
     return result

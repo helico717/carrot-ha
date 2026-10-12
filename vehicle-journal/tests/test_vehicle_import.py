@@ -67,10 +67,17 @@ class StorageTests(unittest.TestCase):
         key=str(uuid4());self.j.save_manual(key,0,{'kind':'trip','date':'2025-10-01','odometer_km':1000})
         self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
         self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-09-30','odometer_km':900})
-        conflict=str(uuid4());self.j.save_manual(conflict,0,{'kind':'trip','date':'2025-10-01','odometer_km':1100})
+        conflict=str(uuid4());self.j.save_manual(conflict,0,{'kind':'trip','date':'2025-10-01','odometer_km':850})
         self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
         self.j.change_status(conflict,1,'deleted')
         self.assertEqual(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'],100)
+    def test_odometer_same_day_multiple_readings(self):
+        self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-09-30','odometer_km':900})
+        self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-10-01','odometer_km':1000})
+        self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-10-01','odometer_km':1050})
+        facts=self.j.query('2025-10-01','2025-10-31')['odometer_facts']
+        self.assertEqual(facts['distance_km'],150)
+        self.assertIsNone(facts['warning'])
     def test_import_transaction_rollback(self):
         rows=michael_preview(sample_xlsx(),'diesel')['records'];rows[1]['payload']['category']='invalid'
         with self.assertRaises(sqlite3.IntegrityError):self.j.import_michael(rows)
