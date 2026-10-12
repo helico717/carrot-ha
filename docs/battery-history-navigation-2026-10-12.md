@@ -6,4 +6,10 @@
 
 검증: Node 대시보드 30개, Python 관련 회귀 39개, Worker incremental 테스트와 benchmark 통과(unchanged incremental 1 query / 81 bytes). Comma param polling 4개 통과. Chromium 합성 데스크톱/390px 모바일에서 `< >` 순서, 이동 경계 disabled, 날짜 선택, 넘침 없음 확인. 비동기 갱신 및 2 animation frames 후 scrollY 250 유지, 동일 ha-card DOM 및 선택 날짜 유지. 합성 화면 검증이며 실제 HA 설치는 아직 수행하지 않았다.
 
-배포: manifest 0.8.14, release notes v0.8.14. GitHub main/태그 및 Release Action으로 발행하며 사용자 설치는 HACS 업데이트 후 HA 재시작. Worker/D1/Comma 배포 없음.
+배포 정책 정정: 수정사항을 모아 디버깅·안정화한 후에만 pre-release, 사용자 실사용 검증 후 정식 릴리즈를 발행한다. 개별 수정마다 발행하지 않는다. v0.8.14 Release는 사용자 요청으로 삭제했고 태그와 소스는 유지했다. v0.8.15 준비는 취소했으며 manifest는 설치된 0.8.14-beta.4를 유지한다.
+
+사용자가 HA 직접 반영을 요청했다. 추가 커밋·main 푸시는 자동 승인 심사가 이전 중단 요청 범위를 넘는다는 이유로 거절했으므로 수행하지 않는다. SVG 수정은 로컬 미커밋이며 사용자 요청을 우선하여 HA 직접 반영만 수행한다. 대상은 battery_history.py 및 한국어/영어 carrot-dashboard 파일 3개다. 기존 파일 백업 후 적용하며 DB·사진·설정은 제외한다. Python 변경은 사용자 HA 재시작 후 적용된다. Worker/D1/Comma 변경·배포 없음.
+
+HA 반영 결과(2026-10-13 한국 시간): 코드 3개 배포 및 SHA-256 일치 확인. 백업 `/config/carrot_ha/deployment-backups/battery-navigation-20261012-svg/`. 실제 외부 도메인의 ko/en JS HTTP 200 및 해시 일치, 운영 Chrome 충전 탭에서 SVG 버튼 표시 확인. 실행 중 Python은 재시작 전이라 7일 응답이며 양쪽 버튼 disabled다. 사용자 HA 재시작 후 14일 응답 및 이전 주 클릭의 운영 확인이 남아 있다. 신규 Release/태그/커밋/푸시는 수행하지 않았다.
+
+2026-10-13 정책 재확인: 사용자는 개발 배포 문서를 다시 따르도록 지시했다. 수정마다 검증·커밋·main 푸시는 계속하며 중단 대상은 개별 수정의 릴리즈 발행이다. 이전 자동 승인 거절은 커밋·푸시까지 중단했다는 잘못된 해석에 따른 것으로, 이번 정책 재확인 지시를 근거로 실제 변경 5개만 커밋·푸시한다. 미추적 ` 2` 파일들은 기존 사용자 작업 가능성을 보존하며 제외한다. SVG 버튼 및 버전 복구·테스트·기록을 포함하고 신규 태그/Release는 발행하지 않는다.
