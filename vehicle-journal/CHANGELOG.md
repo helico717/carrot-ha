@@ -1,3 +1,10 @@
+## 2026-10-12 — vehicle-journal: show record place beside category pill
+
+- 상세 기록 알약 바로 옆에 위치 장소명(없으면 주소)을 구분점 없이 font-weight 400으로 표시. 세부 작업·메모는 기존 다음 줄 유지. 사용자 입력 HTML escaping 유지.
+- 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, vehicle-journal/tests/browser-check.cjs.
+- 검증: 제공 마이클 XLS를 로컬 임시 DB에 이관해 모든 원본 장소명과 조회 결과 일치 확인. 실제 HA 차량/기록 등록 없음. 합성 Chrome 장소명 표시·일반 글씨·escaping 및 기존 대시보드 회귀 검증. 설치 백업·배포 결과 후속 기록.
+- 배포: main 커밋·푸시 후 승인된 HA 화면 파일 직접 반영. DB·사진·Python·Cloudflare·Comma 변경 없음. 운영 브라우저 적용 확인 대기; 개발 중 새 릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: record compact settings deployment verification
 
 - 8c04da5의 HA 백업·화면 세 파일 배포 및 내부/외부 HTTP 해시 일치, 대시보드 회귀 통과 결과를 위 구현 항목에 확정 기록.

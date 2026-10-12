@@ -13,7 +13,7 @@ const path=require('path');
  await page.evaluate(()=>{
    const daily=[{day:'2026-10-01',distance_km:42,energy_distance_km:42,drive_energy_kwh:8,battery_charge_kwh:20,charge_effective_krw:6000,drive_soc_used_pp:10}];
    const totals={distance_km:42,drive_energy_kwh:8,battery_charge_kwh:20,charge_effective_krw:6000,efficiency_km_kwh:5.25,energy_coverage_percent:100,total_cost_krw:51000,slow_count:1,fast_count:0,unknown_count:0,drive_soc_used_pp:10,categories:{charging:{actual_krw:6000,estimated_krw:6000,effective_krw:6000},maintenance:{actual_krw:45000,estimated_krw:0,effective_krw:45000}}};
-   const records=[{id:'manual',version:1,origin:'manual',status:'active',kind:'expense',accounting_date:'2026-10-01',category:'maintenance',actual_krw:45000,memo:'<img src=x onerror=alert(1)>',input:{kind:'expense',date:'2026-10-01',category:'maintenance',actual_krw:45000}}];
+   const records=[{id:'manual',version:1,origin:'manual',status:'active',kind:'expense',accounting_date:'2026-10-01',category:'maintenance',location:{name:'시험 <장소>',address:'시험 주소'},actual_krw:45000,memo:'<img src=x onerror=alert(1)>',input:{kind:'expense',date:'2026-10-01',category:'maintenance',actual_krw:45000}}];
    const card=document.createElement('carrot-vehicle-journal');document.getElementById('mount').append(card);card.setConfig({});
    window.saved=[];card.hass={callWS:async msg=>{
     if(msg.type.endsWith('/entries'))return [{entry_id:'entry',title:'내 차'}];
@@ -23,6 +23,8 @@ const path=require('path');
  });
  const root=page.locator('carrot-vehicle-journal');
  await root.locator('#headline').filter({hasText:'42km'}).waitFor();
+ if(await root.locator('#records .ledger-place-name').textContent()!=='시험 <장소>')throw Error('place name missing or escaped incorrectly');
+ if(await root.locator('#records .ledger-place-name').evaluate(el=>getComputedStyle(el).fontWeight)!=='400')throw Error('place name bold');
  if(await root.locator('#records img').count())throw Error('memo HTML executed');
  await root.locator('#tab1').click();
  if(await root.locator('.trend-card').count()!==13)throw Error('six trend metrics did not render');

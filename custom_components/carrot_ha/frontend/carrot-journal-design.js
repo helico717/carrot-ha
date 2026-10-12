@@ -1348,4 +1348,5 @@ export const journalDesign = `:host {
 #vehicleManageDialog input,#vehicleManageDialog select{padding:8px 10px;min-height:40px;box-sizing:border-box}
 .settings-key-help{display:block;color:var(--j-sub);font-size:12px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
 @media(max-width:600px){.card-settings-top h2{font-size:21.5px}#vehicleManageDialog{max-width:calc(100vw - 32px)}.settings-layout{height:auto;grid-template-columns:80px minmax(0,1fr)}#vehicleManageDialog .settings-nav button{font-size:12px;padding:8px 4px}#vehicleManageDialog input,#vehicleManageDialog select{font-size:16px}.settings-dialog-header{padding:14px 12px}.settings-dialog-header p{line-height:1.5}.settings-content{padding:14px 10px}.settings-section{padding:10px}.settings-key-field input{flex-basis:100%}}
+.ledger-category-location{display:flex;align-items:center;gap:8px;min-width:0}.ledger-place-name{font-weight:400;overflow-wrap:anywhere;min-width:0;line-height:1.5}.ledger-category-location .cat-highlight-pill{flex-shrink:0}
 `;
