@@ -79,6 +79,7 @@ const fs=require('fs');
  if(!(await root.locator('#locationHint').textContent()).includes('장소명만'))throw Error('name-only hint missing');
  await root.locator('#locationPin').click();if(await root.locator('#locationMap').isHidden())throw Error('manual picker unavailable');
  await root.locator('#close').click();
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.entries[0].fuel='hybrid';c.openRecord(null,'refueling');});if(await root.locator('[name=fuel_type]').inputValue()!=='')throw Error('hybrid guessed fuel');await root.locator('[name=fuel_type]').selectOption('diesel');await root.locator('#close').click();await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').entries[0].fuel='diesel');
  await root.locator('#add').click();await root.locator('[data-record-type=refueling]').click();
  await root.locator('#actualKrw').fill('50000');await root.locator('[name=unit_price_krw]').fill('2000');
  if(Number(await root.locator('[name=fuel_liters]').inputValue())!==25)throw Error('fuel liters estimate');

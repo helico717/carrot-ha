@@ -1,3 +1,9 @@
+## 2026-10-12 — vehicle-journal: verify entry deployment and require hybrid fuel choice
+
+- c606962 main 푸시·HA deployment-backups/c6069628fea3d799db4acd8fc30f9ef7ecebe22c/ 코드 백업·7개 파일 반영 완료. 설치 및 화면 내부/외부 HTTP SHA-256 일치. 9440a1b 통계 수정 함께 반영. 사용자 HA 재시작·스키마 적용·실제 화면 확인 대기. 운영 DB 직접 수정 없음.
+- 하이브리드 유종은 휘발유/경유를 임의 추정하지 않고 주유 입력에서 실제 유종을 선택하도록 보완. 기존 휘발유/경유 차량은 해당 선택 유지. 관련 파일: frontend/carrot-vehicle-journal.js, vehicle-journal/tests/vehicle-management.cjs. 구문·합성 Chrome 검증 후 카드 부분 반영 대상.
+- 사고 사진 10장 스냅샷 복원 포함 Python 36개·스키마 9개 및 사진/로더/대시보드 회귀 통과. OCR·자동 주유소/단가/연비는 후속. 새 릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: redesign record entry by category
 
 - 기록 남기기 → 종류 선택 메뉴: 주유 영수증 촬영, 세차, 사고, 주행, 정비/기타, 차량 유종별 주유/충전. 정비/기타는 기존 날짜/분류/세부 작업/금액/메모/위치/사진 구성 유지. 나머지는 종류별 세로 입력과 상단 저장 버튼. 촬영/앨범 사진 타일·수량 표시.
