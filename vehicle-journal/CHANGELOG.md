@@ -1,3 +1,23 @@
+## 2026-10-13 — 차계부 설정 'Synology · HA 백업 상태' 탭 UI 개편 및 고도화
+
+- 커밋 제목: vehicle-journal: modernize HA backup status tab with cards and guide banner
+- 변경·이유:
+  - 차계부 설정 내 '백업 상태' 탭이 HA Core의 `backup` 통합 엔티티들을 단순 텍스트 줄바꿈으로 노출하던 방식을 현대식 카드 및 배너 레이아웃으로 전면 개편.
+  - 상단 요약 배너: 백업 관리자 상태(`blocked`, `idle` 등)를 한국어(`차단됨 (대기 중)`, `대기 중 (정상)` 등) 및 상태별 컬러 뱃지(Warning 앰버, Success 민트 등)로 시각화하고 설명 제공.
+  - 타임스탬프 현지화 & 상대 시간: UTC ISO 8601 문자열(`2026-10-12T20:44:39+00:00`)을 현지 일시(`YYYY. MM. DD. HH:mm:ss`)와 상대 시간 뱃지(`약 5시간 후`, `약 19시간 전`)로 변환.
+  - 2열 반응형 그리드: 중복 `Backup ` 접두어를 정제하고 아이콘, 제목, 값, 뱃지, 엔티티 ID를 정돈된 카드로 배치.
+  - Synology NAS 연계 안내 카드: 하단 단순 텍스트를 세련된 콜아웃 카드로 개선하고, 클릭 시 즉시 '백업 · 복구' 탭으로 전환되는 바로가기 버튼(`data-jump-settings="backup"`) 연동.
+  - 빈 상태(Empty State) 예외 처리 추가.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: 백업 상태 전용 CSS 클래스 및 모바일 반응형 스타일 추가.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `renderBackupStatus()` 신규 구현 및 `loadJournalSettings()` 호출 연동.
+  - `vehicle-journal/vehicle-management.md`: 설정 화면의 HA 백업 상태 안내 보완.
+  - `vehicle-journal/tests/test_backup_status_ui.cjs`: 신규 단위 테스트 추가 (정상 렌더링, vehicle-management.cjs 호환성, 빈 상태, 탭 전환 검증).
+- 검증:
+  - `node --check` 구문 검사 통과.
+  - `test_backup_status_ui.cjs` 자동화 테스트 전체(4개 케이스) 통과.
+- 배포: 프론트엔드 변경 작업.
+
 ## 2026-10-13 — Antigravity 규칙에 최신 차계부 작업 지침 동기화
 
 - 커밋 제목: vehicle-journal: sync shared category colors to antigravity rule
