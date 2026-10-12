@@ -75,3 +75,17 @@ class ChargeGraphCorrectionTests(ChargePaymentsTest):
                     confirmed_duration_s=300, unknown_duration_s=300,
                     signal_gaps=[{'started_at':'2026-01-01T00:02:00Z','ended_at':'2026-01-01T00:07:00Z'}])
         self.assertEqual(self.graph()['charge_s'],300)
+
+    def test_fourteen_local_days_include_older_samples_and_empty_days(self):
+        stamp='2025-12-20T00:02:00Z'
+        self.archive.put(dict(schema=1, device_id='car', event_id='older', kind='state', observed_at=stamp,
+            data=dict(battery_wh=32000, measured_at=stamp, field_measured_at={'battery_wh':stamp})))
+        rows=history(self.archive,'car',64,'UTC',datetime(2026,1,1,1,tzinfo=timezone.utc))
+        self.assertEqual(len(rows),14)
+        self.assertEqual(rows[0]['date'],'2025-12-19')
+        self.assertEqual(rows[-1]['date'],'2026-01-01')
+        older=next(d for d in rows if d['date']=='2025-12-20')
+        self.assertEqual(older['valid_samples'],1)
+        self.assertEqual(older['hours'][0]['soc'],50)
+        self.assertIsNone(rows[0]['used'])
+        self.assertTrue(all(h is None for h in rows[0]['hours']))

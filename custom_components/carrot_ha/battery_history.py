@@ -1,4 +1,4 @@
-"""Seven local days, measured samples only; gaps are never interpolated."""
+"""Fourteen local days, measured samples only; gaps are never interpolated."""
 import json
 from . import archive_codec
 import math
@@ -9,7 +9,7 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
     tz=ZoneInfo(zone)
     now=now or datetime.now(timezone.utc)
     today=now.astimezone(tz).date()
-    dates=[today-timedelta(days=i) for i in range(6,-1,-1)]
+    dates=[today-timedelta(days=i) for i in range(13,-1,-1)]
     days={str(d):dict(date=str(d),used=None,drive_s=0,charge_s=0,covered_s=0,received_samples=0,valid_samples=0,stale_samples=0,hours=[None]*24,charge_hours=[False]*24) for d in dates}
     start=datetime.combine(dates[0],datetime.min.time(),tzinfo=tz).timestamp()
     previous=None
