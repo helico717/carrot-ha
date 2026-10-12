@@ -526,7 +526,7 @@ export class VehicleJournal extends HTMLElement {
   renderData(){
     const d=this.data,t=d.totals,latest=d.latest||{},ice=this.isCombustion(),fuel=d.fuel_facts?.totals||{},odo=d.odometer_facts;this.renderPlaceStatistics();
     const displayDistance=ice?(odo?.distance_km??t.distance_km):t.distance_km;
-    const energyLegend=this.$('legendRow').querySelector('[data-cat="charging"],[data-cat="refueling"]');if(energyLegend){energyLegend.dataset.cat=ice?'refueling':'charging';energyLegend.innerHTML=`<span class="legend-dot" style="background:var(--cat-charging)"></span>${ice?'주유비':'충전비'}`;}
+    const energyLegend=this.$('legendRow').querySelector('[data-cat="charging"],[data-cat="refueling"]');if(energyLegend){energyLegend.dataset.cat=ice?'refueling':'charging';energyLegend.innerHTML=`<span class="legend-dot" style="background:${this.categoryColor(ice?'refueling':'charging')}"></span>${ice?'주유비':'충전비'}`;}
     this.$('footer').textContent=`${ice?`누적거리 기준 관측 거리 · ${odo?.from||'기준 없음'} ~ ${odo?.to||'기록 없음'} · ${odo?.warning||'월 전체의 정확한 주행거리와 다를 수 있어요.'} · `:''}집계 시간대 ${d.timezone} · HA 로컬 DB에 보관해요. 누락 데이터는 0으로 채우지 않아요.`;
     this.$('message').classList.remove('error');this.$('message').textContent=d.sync_error||`HA에 ${numeric(d.record_count,0)}개의 원장을 보관하고 있어요. ${d.status.phase==='complete'?'기존 기록을 연결했어요.':'기존 기록을 가져오고 있어요.'}`;
     const monthVal=this.$('month')?.value||new Date().toLocaleDateString('sv-SE').slice(0,7);
@@ -577,7 +577,17 @@ export class VehicleJournal extends HTMLElement {
     const donutLabel=this.scope==='year'?(isThisYear?'올해 지출':`${yearNum}년 지출`):(isThisMonth?'이번 달 지출':`${monthNum}월 지출`);
     const manwonVal=Math.round(total/10000);
     const manwonText=`${numeric(manwonVal,0)}만원`;
-    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)} (${manwonText})</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="${Math.min(19,82/(manwonText.length*0.7)).toFixed(1)}" font-weight="850" letter-spacing="-0.5">${manwonText}</text>`;
+    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)} (${manwonText})</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+[...amounts].sort((a,b)=>a[1].effective_krw-b[1].effective_krw).map(([key,value])=>{
+      const color=this.categoryColor(key);
+      const fraction=value.effective_krw/total;
+      const start=offset;offset+=fraction;
+      // Filled annular sectors have radial boundaries; dashed thick circles overlap at joins.
+      const point=(radius,turn)=>{const angle=turn*2*Math.PI-Math.PI/2;return `${80+radius*Math.cos(angle)} ${80+radius*Math.sin(angle)}`;};
+      const title=`<title>${esc(categories[key])} ${money(value.effective_krw)}</title>`;
+      if(fraction>=1)return `<circle cx="80" cy="80" r="59" fill="none" stroke="${color}" stroke-width="19">${title}</circle>`;
+      const large=fraction>0.5?1:0,outer=68.5,inner=49.5;
+      return `<path fill="${color}" d="M ${point(outer,start)} A ${outer} ${outer} 0 ${large} 1 ${point(outer,offset)} L ${point(inner,offset)} A ${inner} ${inner} 0 ${large} 0 ${point(inner,start)} Z">${title}</path>`;
+    }).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="${Math.min(19,82/(manwonText.length*0.7)).toFixed(1)}" font-weight="850" letter-spacing="-0.5">${manwonText}</text>`;
     this.renderRecentExpenses();
     this.renderSpendingComparison();
     this.updateLedgerFilters();
