@@ -4,7 +4,7 @@
 - 변경·이유: 내연기관 비교 범례가 충전비 CSS 색상을 고정 참조해 민트색으로 표시되던 오류 수정. 주유비의 기존 주황색을 배지·차트·범례에 동일하게 사용한다. 도넛의 두꺼운 원형 점선 겹침을 채워진 환형 부채꼴로 교체해 파인 경계를 없애고, 12시부터 시계 방향으로 금액 오름차순 배치한다. 지출 목록 순서는 유지한다.
 - 관련 파일: custom_components/carrot_ha/frontend/carrot-vehicle-journal.js, vehicle-journal/tests/browser-check.cjs. 기존 지도 변경 이후 합성 브라우저 검사에서 누락된 assetBase도 보완했다.
 - 검증: JS 구문 검사 및 실제 Chrome browser-check 통과. 합성 3분류·단일 분류 도넛, 12시 시작·오름차순, 내연기관 범례/목록 색상 일치, 기존 탭·추이·수동 저장·HTML escaping·데스크톱/모바일 회귀 확인.
-- 배포: main 커밋·푸시 및 HA 백업·직접 반영 예정. 운영 브라우저 적용은 미확인. 개발 직접 배포 정책에 따라 버전/릴리즈 변경 없음. Cloudflare/Comma 변경 없음.
+- 배포: 수정 커밋 `6d1676c` main 푸시·원격 해시 확인 완료. HA deployment-backups/6d1676c0312de11a91013f652b781e1528d3c605/ 백업 후 화면 파일 한 개 직접 반영. 로컬·설치·HA HTTP 응답 SHA-256 `86a1d8d0adca6aa4edf7f55075ed2820b0939f19bb85f9072ed93d3fed1b7582` 일치. 운영 브라우저 모듈 URL·화면 적용은 미확인이며 사용자 새로고침 후 확인 필요. 개발 직접 배포 정책에 따라 버전/릴리즈 변경 없음. Cloudflare/Comma 변경 없음.
 
 ## 2026-10-12 — vehicle-journal: switch trends map from kakao maps to openstreetmap via leaflet
 
