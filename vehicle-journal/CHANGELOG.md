@@ -1,3 +1,9 @@
+## 2026-10-12 — vehicle-journal: record final category-entry deployment
+
+- b1816df main 푸시·합성 Chrome 종류별 입력/하이브리드 유종 명시 검증 통과. HA deployment-backups/b1816df9c3359e269fdd77b3b65619c61db5f8c0/ 화면 모듈 백업·반영, 설치 및 내부/외부 HTTP 해시 일치.
+- 서버/스키마는 c606962 기준 설치 완료. HA 재시작 이후 스키마 백업/이관·API 적용 및 실제 사용자 브라우저 확인 대기. 실제 운영 원장 저장·삭제나 HA 재시작을 대신 실행하지 않음.
+- 관련 파일: vehicle-journal/CHANGELOG.md. 문서만 변경; 추가 실행 코드 배포·릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: verify entry deployment and require hybrid fuel choice
 
 - c606962 main 푸시·HA deployment-backups/c6069628fea3d799db4acd8fc30f9ef7ecebe22c/ 코드 백업·7개 파일 반영 완료. 설치 및 화면 내부/외부 HTTP SHA-256 일치. 9440a1b 통계 수정 함께 반영. 사용자 HA 재시작·스키마 적용·실제 화면 확인 대기. 운영 DB 직접 수정 없음.
