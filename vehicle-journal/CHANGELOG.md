@@ -1307,3 +1307,11 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 실제 화면: 아테온 79건, 선택 구간 19.06km/L·전체 가중 평균 16.82km/L 및 장소별 주유량/단가 표시. ID.4 310건 유지 및 실제 자동 충전 장소 통계 표시. 위치 값은 비공개이며 공개 이력에는 구체적 장소·좌표를 기록하지 않는다.
 - 배포: b4979c6 main·HA 파일 일치. 이번 추가 보완은 커밋·푸시·백업 후 부분 배포 대상이며 마지막 Python 적용을 위한 사용자 재시작 필요. NAS 예약 03:00 실제 시각 도달 및 장기 세대 축적은 아직 관측하지 않았고 로컬 예약/GFS 회귀와 즉시 백업만 검증했다. 새 Release/Comma/Cloudflare 변경 없음.
 - 관련 파일: vehicle_journal/automatic_locations.py, frontend/carrot-vehicle-journal.js, tests/test_station_backup.py.
+
+## 2026-10-12 — NAS 설정 체크박스와 백업 목록 줄바꿈
+
+- 커밋 제목: `vehicle-journal: compact NAS toggles and wrap snapshot metadata`.
+- 실제 화면에서 공통 입력 높이가 체크박스에도 적용돼 크게 표시되고 라벨과 다음 경로 제목이 붙는 것을 확인했다. 체크박스만 18px로 고정하고 라벨을 가로 정렬, 백업 목록의 날짜/검증 상태를 별도 줄로 표시한다. 글꼴과 다른 입력 크기는 유지한다.
+- 관련 파일: frontend/{carrot-journal-design,carrot-vehicle-journal}.js.
+- 검증: 실제 Chromium vehicle-management 데스크톱·320/360px 모바일 통과.
+- 배포: 화면 파일 백업·부분 반영 및 사용자 주소 HTTP 해시 확인 대상. 이 UI 보완 자체는 HA 재시작이 필요 없으며 기존 Python 보완의 사용자 재시작 대기 중이다. 새 Release/DB/Comma/Worker 변경 없음.
