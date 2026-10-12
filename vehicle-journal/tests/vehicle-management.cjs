@@ -10,7 +10,7 @@ const fs=require('fs');
  await page.evaluate(()=>{
   window.calls=[];window.vehicles=[];
   const card=document.createElement('carrot-vehicle-journal');document.getElementById('mount').append(card);card.setConfig({});
-  card.hass={states:{},callWS:async msg=>{window.calls.push(msg);
+  card.hass={states:{},callWS:async msg=>{window.calls.push(msg);if(['/settings','/map/config','/location/search'].some(t=>msg.type.endsWith(t))&&'entry_id' in msg)throw Error("unexpected entry_id in global request");
    if(msg.type.endsWith('/entries'))return window.vehicles.filter(v=>msg.include_deleted||!v.deleted);
    if(msg.type.endsWith('/vehicle/create')){const vehicle={entry_id:'manual',title:msg.title,fuel:msg.fuel,linked:false};window.vehicles.push(vehicle);return {entry_id:'manual',imported:msg.preview_token?2:0};}
    if(msg.type.endsWith('/vehicle/update')){Object.assign(window.vehicles.find(v=>v.entry_id===msg.entry_id),msg);return {};}
@@ -30,6 +30,7 @@ const fs=require('fs');
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===true);
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===false);
  await root.locator('[data-settings-nav=api]').click();
+ if(!(await root.locator('.settings-key-help').allTextContents()).join(' ').includes('Default Rest API Key'))throw Error('key instructions missing');
  if(await root.locator('#opinetKey').inputValue()!=='TESTKEY')throw Error('saved key not prefilled');
  await root.locator('[data-key-toggle=opinetKey]').click();if(await root.locator('#opinetKey').getAttribute('type')!=='text')throw Error('saved key reveal');
  await root.locator('#opinetKey').fill('CHANGED');
@@ -59,7 +60,7 @@ const fs=require('fs');
  if(await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').draftLocation.latitude)!==35)throw Error('manual pin not applied');
  await root.locator('#removeLocation').click();if(!await root.locator('#locationEditor').isHidden())throw Error('removed location still maps');
  await root.locator('#close').click();
- for(const width of [1280,360,320]){await page.setViewportSize({width,height:900});await root.locator('#journalSettings').click();if(await root.locator('.settings-nav').boundingBox().then(nav=>root.locator('.settings-content').boundingBox().then(content=>nav.x+nav.width>content.x+1)))throw Error('settings nav not left of content '+width);if(await root.locator('#vehicleManageDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('settings overflow '+width);await root.locator('#closeVehicleManage').click();await root.locator('#entry').selectOption('__add__');if(await root.locator('#vehicleDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('vehicle dialog overflow '+width);await root.locator('#closeVehicle').click();}
+ for(const width of [1280,360,320]){await page.setViewportSize({width,height:900});await root.locator('#journalSettings').click();if(await root.locator('.settings-nav').boundingBox().then(nav=>root.locator('.settings-content').boundingBox().then(content=>nav.x+nav.width>content.x+1)))throw Error('settings nav not left of content '+width);const box=await root.locator('#vehicleManageDialog').boundingBox();if(box.y<24||box.y+box.height>900-24)throw Error('dialog viewport margins '+width);if(await root.locator('[data-settings-nav=vehicles]').evaluate(el=>getComputedStyle(el).textAlign)!=='center')throw Error('nav alignment');if(await root.locator('#vehicleManageDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('settings overflow '+width);await root.locator('#closeVehicleManage').click();await root.locator('#entry').selectOption('__add__');if(await root.locator('#vehicleDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('vehicle dialog overflow '+width);await root.locator('#closeVehicle').click();}
  fs.mkdirSync('.preview/journal',{recursive:true});await root.locator('#entry').selectOption('__add__');await page.screenshot({path:'.preview/journal/vehicle-dialog-mobile.png',fullPage:true});await root.locator('#closeVehicle').click();await root.locator('#journalSettings').click();await page.screenshot({path:'.preview/journal/settings-mobile.png',fullPage:true});
  if(await root.locator('#message').evaluate(el=>el.classList.contains('error')))throw Error('journal render error: '+await root.locator('#message').textContent());
  if(errors.length)throw Error(errors.join('\n'));
