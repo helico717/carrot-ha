@@ -1,3 +1,14 @@
+## 2026-10-12 — vehicle-journal: redesign record entry by category
+
+- 기록 남기기 → 종류 선택 메뉴: 주유 영수증 촬영, 세차, 사고, 주행, 정비/기타, 차량 유종별 주유/충전. 정비/기타는 기존 날짜/분류/세부 작업/금액/메모/위치/사진 구성 유지. 나머지는 종류별 세로 입력과 상단 저장 버튼. 촬영/앨범 사진 타일·수량 표시.
+- 주유: 위치, 누적거리, 금액, 유종, 단가, 실제/추정 리터, 가득/부분 여부, 세차비, 사진·메모. 금액÷단가로 리터 추정 후 사용자가 수정 가능. 세차비는 같은 DB 트랜잭션의 별도 세차 기록으로 저장·수정·삭제/복원. 충전은 청구량을 보존하고 배터리 실충전량으로 간주하지 않음.
+- 주행: 누적/구간 선택, 메모·사진. 누적거리 관측 계산과 연결하며 구간 합계는 별도 지표로 표시, 두 거리를 중복 합산하지 않음. 세차: 비용/누적거리/위치/사진/메모. 사고: 위치/사진/선택 금액/메모.
+- 사용자 선택: 사고는 별도 accident 분류 및 사진 최대 10장, 나머지는 5장. DB 스키마 3으로 이전 버전 1/2를 백업 후 이관, FK 보존. 사진 한도 trigger 서버 검증·10장 사고 스냅샷 복원, 기존 schema2 스냅샷 읽기 유지.
+- OCR·자동 주변 주유소·오피넷 자동 단가·가득 주유 연비 자동 계산은 합의대로 후속. 영수증은 촬영/첨부 및 수동 입력만 제공. 현재 영수증 촬영은 브라우저 카메라 지원 기기에서 동작.
+- 관련 파일: frontend/{carrot-vehicle-journal,carrot-journal-design}.js, vehicle_journal/{store,fuel_metrics,schema.sql,snapshots,vehicles}, vehicle-journal/schema/{001_initial.sql,validate_schema.py}, tests/{browser-check,vehicle-management}.cjs, tests/{test_journal,test_vehicle_import}.py.
+- 검증: Python 원장/이관/권한/차량 36개, 스키마 9개, 합성 Chrome 종류별 모바일 폼·주유 추정/수정/저장·누적거리 payload·사고 한도·기존 EV 탭/추세·사진 압축/취소·모듈 로딩/입력 보호 통과. HA 운영 DB 두 개를 읽기 전용으로 복사한 로컬 임시 공간에서 이관 후 전체 데이터 테이블 digest 동일 및 FK 검사 통과. 운영 데이터 쓰기/실제 기록 저장 없음.
+- 배포: 검증 후 main 커밋·푸시·승인된 HA 코드 백업/부분 반영. 9440a1b 내연기관 통계 수정도 함께 반영 대상. Python/스키마 적용은 사용자 HA 재시작 필요. 실제 브라우저 확인 대기. 새 릴리즈/Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: adapt combustion statistics and imported locations
 
 - 내연기관/하이브리드 선택 시 주유비 범례, 충전비와 동일 mint 색상, 주유량·횟수·평균 금액/L 대시보드 및 관측거리/주유량/주유금액/L/횟수/지출 추세로 전환. EV 추세 유지. 연비 자동 계산은 후속.

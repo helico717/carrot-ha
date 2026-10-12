@@ -227,6 +227,28 @@ class JournalTests(unittest.TestCase):
         directory=Path(self.journal.path).with_suffix('')/'attachments'
         self.assertEqual(len(list(directory.iterdir())),5)
 
+    def test_accident_ten_photos_and_snapshot(self):
+        ns,Image,BytesIO=self.photo_functions();key=str(uuid4())
+        self.journal.save_manual(key,0,{'kind':'expense','date':'2026-09-02','category':'accident'})
+        for index in range(11):
+            output=BytesIO();Image.new('RGB',(20,20),(index*20,0,0)).save(output,format='PNG')
+            if index<10:ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
+            else:
+                with self.assertRaises(sqlite3.IntegrityError):ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
+        with self.assertRaises(ValueError):self.journal.save_manual(key,1,{'kind':'expense','date':'2026-09-02','category':'maintenance'})
+        self.assertEqual(len(self.journal.query('2026-09-01','2026-09-30')['records'][0]['attachments']),10)
+        from custom_components.carrot_ha.vehicle_journal.snapshots import export_snapshot,snapshot_preview,restore_snapshot
+        plan=snapshot_preview(export_snapshot(self.journal,{'vehicle_id':self.journal.vehicle,'device_id':'car','timezone':'Asia/Seoul'}))
+        restored=Journal(Path(self.tmp.name)/'restored.sqlite3','restored','car','Asia/Seoul');restore_snapshot(restored,plan,'restored','car')
+        self.assertEqual(len(restored.query('2026-09-01','2026-09-30')['records'][0]['attachments']),10)
+
+    def test_fuel_manual_fields_and_wash_are_atomic(self):
+        key=str(uuid4());data={'kind':'expense','date':'2026-09-02','category':'refueling','actual_krw':50000,'fuel_liters':25,'unit_price_krw':2000,'fuel_type':'diesel','full_tank':True,'wash_cost_krw':5000}
+        self.journal.save_manual(key,0,data);q=self.journal.query('2026-09-01','2026-09-30')
+        self.assertEqual(q['totals']['total_cost_krw'],55000);self.assertEqual(q['fuel_facts']['totals']['fuel_liters'],25)
+        self.journal.change_status(key,1,'deleted');self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],0)
+        self.journal.change_status(key,2,'active');self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],55000)
+        data['wash_cost_krw']=0;self.journal.save_manual(key,3,data);self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],50000)
     def test_schema_packaging_identity(self):
         self.assertEqual(Path('vehicle-journal/schema/001_initial.sql').read_bytes(),
                          Path('custom_components/carrot_ha/vehicle_journal/schema.sql').read_bytes())

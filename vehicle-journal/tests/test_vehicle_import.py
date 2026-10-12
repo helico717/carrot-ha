@@ -97,7 +97,7 @@ class StorageTests(unittest.TestCase):
         with fresh.connect() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM charge_summaries').fetchone()[0],1)
     def test_v1_upgrade_preserves_expenses(self):
         self.path.unlink()
-        schema=Path('custom_components/carrot_ha/vehicle_journal/schema.sql').read_text().replace("'charging','refueling'","'charging'").replace('VALUES(2)','VALUES(1)')
+        schema=Path('custom_components/carrot_ha/vehicle_journal/schema.sql').read_text().replace("'charging','refueling'","'charging'").replace("'accident',",'').replace('VALUES(3)','VALUES(1)')
         with sqlite3.connect(self.path) as db:
             db.executescript(schema)
             vehicle=str(uuid4());record=str(uuid4())
@@ -109,7 +109,7 @@ class StorageTests(unittest.TestCase):
             db.execute('INSERT INTO mobility(vehicle_id,record_id,started_at,ended_at) VALUES (?,?,?,?)',(vehicle,charge,'2025-10-01T00:00:00Z','2025-10-01T01:00:00Z'))
             db.execute('INSERT INTO expense_members VALUES (?,?,?)',(vehicle,record,charge))
         upgraded=Journal(self.path,'entry','car','Asia/Seoul')
-        self.assertTrue(Path(str(self.path)+'.before-schema2.sqlite3').exists())
+        self.assertTrue(Path(str(self.path)+'.before-schema3.sqlite3').exists())
         with upgraded.connect() as db:
             self.assertEqual(db.execute('SELECT * FROM expense_members').fetchall(),[(vehicle,record,charge)])
             self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(),[])

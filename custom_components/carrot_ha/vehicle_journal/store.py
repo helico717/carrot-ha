@@ -11,7 +11,7 @@ import sqlite3
 import threading
 
 UTC = timezone.utc
-CATEGORIES = {'charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','other'}
+CATEGORIES = {'charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','accident','other'}
 METRICS = ('distance_km','energy_distance_km','drive_energy_kwh','drive_soc_used_pp',
            'parked_soc_used_pp','battery_charge_kwh','billed_charge_kwh')
 
@@ -53,9 +53,9 @@ class Journal:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='journal_schema'").fetchone()
-            if exists and db.execute('SELECT version FROM journal_schema').fetchall() == [(1,)]:
+            if exists and db.execute('SELECT version FROM journal_schema').fetchall() in ([(1,)],[(2,)]):
                 self._migrate_v1(db)
-            if exists and db.execute('SELECT version FROM journal_schema').fetchall() != [(2,)]:
+            if exists and db.execute('SELECT version FROM journal_schema').fetchall() != [(3,)]:
                 raise ValueError('Unsupported journal schema')
         # SQL is copied into the integration package for HACS distributions.
         with self.connect() as db:
@@ -75,7 +75,7 @@ class Journal:
     def _migrate_v1(self, db):
         """Back up and atomically expand the expense category constraint."""
         import re
-        backup=Path(self.path+'.before-schema2.sqlite3')
+        backup=Path(self.path+'.before-schema3.sqlite3')
         if not backup.exists():
             temporary=Path(str(backup)+'.partial')
             target=sqlite3.connect(str(temporary))
@@ -89,6 +89,8 @@ class Journal:
         schema=Path(__file__).with_name('schema.sql').read_text()
         sql=re.search(r'CREATE TABLE IF NOT EXISTS expenses \(.*?\);',schema,re.S).group(0)
         db.execute('BEGIN IMMEDIATE')
+        db.execute('DROP TRIGGER IF EXISTS attachments_limit_insert')
+        db.execute('DROP TRIGGER IF EXISTS attachments_limit_update')
         db.execute(sql.replace('expenses (','expenses_new (',1))
         db.execute('INSERT INTO expenses_new SELECT * FROM expenses')
         members=db.execute('SELECT * FROM expense_members').fetchall()
@@ -98,7 +100,7 @@ class Journal:
         db.executemany('INSERT INTO expense_members VALUES (?,?,?)',members)
         if db.execute('PRAGMA foreign_key_check').fetchall():raise ValueError('지출 연결 검증에 실패했어요.')
         db.execute('DELETE FROM journal_schema')
-        db.execute('INSERT INTO journal_schema(version) VALUES(2)')
+        db.execute('INSERT INTO journal_schema(version) VALUES(3)')
         db.commit()
 
     def import_michael(self, rows):
@@ -392,7 +394,7 @@ class Journal:
         if type(expected) is not int or expected<0 or not isinstance(payload,dict):raise ValueError('잘못된 기록이에요.')
         allowed={'kind','date','ended_date','started_at','ended_at','distance_km','drive_energy_kwh',
                  'battery_charge_kwh','billed_charge_kwh','charge_mode','category','subcategory','actual_krw',
-                 'memo','odometer_km','soc_start_percent','soc_end_percent','location'}
+                 'memo','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location'}
         if set(payload)-allowed:raise ValueError('지원하지 않는 기록 항목이에요.')
         data=dict(payload);kind=data.get('kind')
         if 'location' in data:self.validate_location(data['location'])
@@ -400,12 +402,15 @@ class Journal:
         value=day(data['date']).isoformat()
         if day(value)>datetime.now(self.tz).date():raise ValueError('미래 날짜는 기록할 수 없어요.')
         if len(data.get('memo',''))>4000 or len(data.get('subcategory',''))>100:raise ValueError('메모가 너무 길어요.')
-        for field in METRICS+('odometer_km','soc_start_percent','soc_end_percent'):
+        for field in METRICS+('fuel_liters','unit_price_krw','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent'):
             if data.get(field) is not None and (number(data[field]) is None or data[field]>100000000):raise ValueError('측정값을 확인해 주세요.')
         for field in ('soc_start_percent','soc_end_percent'):
             if data.get(field) is not None and data[field]>100:raise ValueError('SOC는 0~100%예요.')
         if data.get('actual_krw') is not None and (type(data['actual_krw']) is not int or not 0<=data['actual_krw']<=1000000000):raise ValueError('금액은 0 이상의 정수로 입력해 주세요.')
         if data.get('charge_mode','unknown') not in ('slow','fast','unknown'):raise ValueError('충전 종류를 확인해 주세요.')
+        if 'fuel_type' in data and data['fuel_type'] not in ('gasoline','diesel','premium'):raise ValueError('유종을 확인해 주세요.')
+        if 'full_tank' in data and type(data['full_tank']) is not bool:raise ValueError('가득 주유 여부를 확인해 주세요.')
+        if data.get('wash_cost_krw') is not None and type(data['wash_cost_krw']) is not int:raise ValueError('세차 금액은 정수로 입력해 주세요.')
         if kind=='expense' and data.get('category') not in CATEGORIES:raise ValueError('비용 분류를 확인해 주세요.')
         if kind=='trip' and data.get('distance_km') is None and data.get('odometer_km') is None:raise ValueError('주행거리를 입력해 주세요.')
         if kind=='charge' and data.get('battery_charge_kwh') is None:raise ValueError('충전량을 입력해 주세요.')
@@ -430,7 +435,18 @@ class Journal:
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
             if 'location' in payload:extra['location']=payload['location']
             db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
-            if kind=='expense':self._expense(db,key,data)
+            if kind=='expense':
+                count=db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]
+                if data.get('category')!='accident' and count>5:raise ValueError('사진이 5장을 초과하는 사고 기록의 분류는 바꿀 수 없어요.')
+                self._expense(db,key,data)
+                if data.get('category')=='refueling' or old:
+                    wash_id=self.identity('refueling_wash_cost',key)
+                    old_wash=db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,wash_id)).fetchall()
+                    self._dirty(db,[r[0] for r in old_wash])
+                    if data.get('category')=='refueling' and data.get('wash_cost_krw',0)>0:
+                        wash=dict(kind='expense',date=data['date'],category='washing',subcategory='주유와 함께 세차',memo='',actual_krw=data['wash_cost_krw'])
+                        self._record(db,wash_id,'expense','manual',wash,quality=quality);self._expense(db,wash_id,wash)
+                    else:db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=?",(self.vehicle,wash_id))
             else:
                 self._mobility(db,key,data);self._parts(db,key,data,quality)
                 if kind=='charge':
@@ -482,6 +498,10 @@ class Journal:
                        (status,now(),self.vehicle,key))
             dates=[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))]
             dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))]
+            wash_id=self.identity('refueling_wash_cost',key)
+            wash_status=status if status=='deleted' or (json.loads(row[3]).get('input') or {}).get('wash_cost_krw',0)>0 else 'deleted'
+            db.execute('UPDATE records SET status=? WHERE vehicle_id=? AND id=?',(wash_status,self.vehicle,wash_id))
+            dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,wash_id))]
             associated=self.identity('manual_charge_cost',key)
             db.execute('UPDATE records SET status=? WHERE vehicle_id=? AND id=?',(status,self.vehicle,associated))
             dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,associated))]

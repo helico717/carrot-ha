@@ -115,7 +115,7 @@ const path=require('path');
  if(await root.locator('#month').inputValue()!==today.slice(0,4))throw Error('future year not corrected');
  await root.locator('[data-scope=month]').click();await loaded();
  await root.locator('#month').fill('2026-10');await root.locator('#month').dispatchEvent('change');await loaded();
- await root.locator('#add').click();
+ await root.locator('#add').click();await root.locator('[data-record-type=maintenance]').click();
  await root.locator('input[name="date"]').fill('2026-09-02');await root.locator('#actualKrw').fill('123');
  await root.locator('#save').click();
  if((await page.evaluate(()=>window.saved[0]?.payload.actual_krw))!==123)throw Error('manual record not saved');
@@ -142,7 +142,7 @@ const path=require('path');
  await root.locator('#legendRow [data-cat=maintenance]').click();
  if(await root.locator('#legendRow [data-cat=maintenance]').getAttribute('aria-pressed')!=='true')throw Error('comparison filter failed');
  await root.locator('#legendRow [data-cat=maintenance]').click();
- if(await root.locator('#recordForm select[name=category] option').count()!==10)throw Error('expense modal categories incorrect');
+ if(await root.locator('#recordForm select[name=category] option').count()!==11)throw Error('expense modal categories incorrect');
  // Approved savings sliders use the selected vehicle and local HA fuel sensors.
  await root.locator('#tab2').click();
  await page.evaluate(()=>{

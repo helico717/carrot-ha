@@ -79,6 +79,18 @@ const fs=require('fs');
  if(!(await root.locator('#locationHint').textContent()).includes('장소명만'))throw Error('name-only hint missing');
  await root.locator('#locationPin').click();if(await root.locator('#locationMap').isHidden())throw Error('manual picker unavailable');
  await root.locator('#close').click();
+ await root.locator('#add').click();await root.locator('[data-record-type=refueling]').click();
+ await root.locator('#actualKrw').fill('50000');await root.locator('[name=unit_price_krw]').fill('2000');
+ if(Number(await root.locator('[name=fuel_liters]').inputValue())!==25)throw Error('fuel liters estimate');
+ await root.locator('[name=fuel_liters]').fill('24');await root.locator('#actualKrw').fill('48000');
+ if(Number(await root.locator('[name=fuel_liters]').inputValue())!==24)throw Error('manual liters overwritten');
+ await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+ const savedFuel=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
+ if(savedFuel.category!=='refueling'||savedFuel.fuel_liters!==24||savedFuel.actual_krw!==48000||savedFuel.unit_price_krw!==2000)throw Error('fuel payload');
+ await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openRecord(null,'trip'));await root.locator('[name=odometer_km]').fill('100000');await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+ const savedTrip=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);if(savedTrip.odometer_km!==100000||'distance_km' in savedTrip)throw Error('cumulative trip payload');
+ for(const mode of ['washing','accident','maintenance','charging']){await page.evaluate(mode=>document.querySelector('carrot-vehicle-journal').openRecord(null,mode),mode);if(await root.locator('#recordDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('entry overflow '+mode);if(mode==='accident'&&await root.locator('#photoCount').textContent()!=='0/10')throw Error('accident photo count');await root.locator('#close').click();}
+ await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openRecord(null,'refueling'));await page.screenshot({path:'.preview/journal/refueling-mobile.png',fullPage:true});await root.locator('#close').click();
  if(await root.locator('#message').evaluate(el=>el.classList.contains('error')))throw Error('journal render error: '+await root.locator('#message').textContent());
  if(errors.length)throw Error(errors.join('\n'));
  await browser.close();console.log('Vehicle management: empty onboarding, create, trash/restore, preview, settings, mocked Kakao search/pin/remove, mobile OK');

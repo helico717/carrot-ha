@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   record_id TEXT NOT NULL,
   accounting_date TEXT NOT NULL,
   paid_date TEXT,
-  category TEXT NOT NULL CHECK(category IN ('charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','other')),
+  category TEXT NOT NULL CHECK(category IN ('charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','accident','other')),
   subcategory TEXT,
   actual_krw INTEGER CHECK(actual_krw IS NULL OR (typeof(actual_krw) = 'integer' AND actual_krw >= 0)),
   estimated_krw INTEGER CHECK(estimated_krw IS NULL OR (typeof(estimated_krw) = 'integer' AND estimated_krw >= 0)),
@@ -144,12 +144,14 @@ CREATE TABLE IF NOT EXISTS attachments (
   CHECK(relative_path NOT LIKE '/%' AND instr(relative_path,'..') = 0 AND instr(relative_path,char(92)) = 0)
 );
 CREATE INDEX IF NOT EXISTS attachments_record ON attachments(vehicle_id,record_id,status);
-CREATE TRIGGER IF NOT EXISTS attachments_limit_insert BEFORE INSERT ON attachments
-WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active') >= 5
-BEGIN SELECT RAISE(ABORT,'maximum five active attachments'); END;
-CREATE TRIGGER IF NOT EXISTS attachments_limit_update BEFORE UPDATE OF status,vehicle_id,record_id ON attachments
-WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active' AND NOT (vehicle_id=OLD.vehicle_id AND id=OLD.id)) >= 5
-BEGIN SELECT RAISE(ABORT,'maximum five active attachments'); END;
+DROP TRIGGER IF EXISTS attachments_limit_insert;
+CREATE TRIGGER attachments_limit_insert BEFORE INSERT ON attachments
+WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active') >= CASE WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
+BEGIN SELECT RAISE(ABORT,'maximum active attachments exceeded'); END;
+DROP TRIGGER IF EXISTS attachments_limit_update;
+CREATE TRIGGER attachments_limit_update BEFORE UPDATE OF status,vehicle_id,record_id ON attachments
+WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active' AND NOT (vehicle_id=OLD.vehicle_id AND id=OLD.id)) >= CASE WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
+BEGIN SELECT RAISE(ABORT,'maximum active attachments exceeded'); END;
 -- Daily contributions retain allocation evidence after raw telemetry is purged.
 CREATE TABLE IF NOT EXISTS day_parts (
   vehicle_id TEXT NOT NULL,
@@ -226,5 +228,5 @@ CREATE TABLE IF NOT EXISTS dirty_days (
   updated_at TEXT NOT NULL,
   PRIMARY KEY(vehicle_id,day,accounting_timezone)
 );
-INSERT OR IGNORE INTO journal_schema(version) VALUES(2);
+INSERT OR IGNORE INTO journal_schema(version) VALUES(3);
 COMMIT;

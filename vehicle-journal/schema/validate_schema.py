@@ -44,7 +44,7 @@ class SchemaTests(unittest.TestCase):
 
     def test_reexecution_and_structure(self):
         self.db.executescript(SQL)
-        self.assertEqual(self.db.execute('SELECT version FROM journal_schema').fetchall(), [(2,)])
+        self.assertEqual(self.db.execute('SELECT version FROM journal_schema').fetchall(), [(3,)])
         tables = {r[0] for r in self.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({'records', 'day_parts', 'daily_summaries', 'dirty_days',
                          'fuel_observations', 'expenses', 'attachments'} <= tables)

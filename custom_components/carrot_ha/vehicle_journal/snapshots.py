@@ -37,7 +37,7 @@ def export_snapshot(journal,metadata,archive=None,source=None):
                     source[table]={'columns':[d[0] for d in cursor.description],'rows':cursor.fetchall()}
         payloads={'journal.json':journal_json,'source.json':json.dumps(source,ensure_ascii=False,separators=(',',':')).encode(),**photos}
         for name,content in payloads.items():files[name]={'bytes':len(content),'sha256':sha256(content).hexdigest()}
-        manifest={'format':'carrot-journal','version':1,'schema_version':2,'created_at':now(),'vehicle':metadata,'files':files}
+        manifest={'format':'carrot-journal','version':1,'schema_version':3,'created_at':now(),'vehicle':metadata,'files':files}
         stream=BytesIO()
         with ZipFile(stream,'w',ZIP_DEFLATED) as zipfile:
             zipfile.writestr('manifest.json',json.dumps(manifest,ensure_ascii=False))
@@ -55,7 +55,7 @@ def snapshot_preview(content):
             if any(i.flag_bits&1 for i in infos):raise ValueError('지원하지 않는 스냅샷 암호 형식이에요.')
             if any(n not in ('manifest.json','journal.json','source.json') and not re.fullmatch(r'photos/[0-9a-f-]+\.(jpg|png|webp)',n) for n in names):raise ValueError('스냅샷 경로를 확인해 주세요.')
             manifest=json.loads(z.read('manifest.json'))
-            if manifest.get('format')!='carrot-journal' or manifest.get('version')!=1 or manifest.get('schema_version')!=2:raise ValueError('지원하지 않는 스냅샷 버전이에요.')
+            if manifest.get('format')!='carrot-journal' or manifest.get('version')!=1 or manifest.get('schema_version') not in (2,3):raise ValueError('지원하지 않는 스냅샷 버전이에요.')
             if set(manifest['files'])!=set(names)-{'manifest.json'}:raise ValueError('스냅샷 파일 목록이 달라요.')
             payloads={}
             for name,check in manifest['files'].items():

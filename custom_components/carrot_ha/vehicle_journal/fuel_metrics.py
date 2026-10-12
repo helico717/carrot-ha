@@ -11,7 +11,7 @@ def facts(db,vehicle,start,end):
     for extra_text,date,category,amount in rows:
         if category!='refueling':continue
         extra=json.loads(extra_text);fields=extra.get('import_source',{}).get('fields',{})
-        try:liters=numeric(fields.get('주유량'))
+        try:liters=numeric((extra.get('input') or {}).get('fuel_liters',fields.get('주유량')))
         except ValueError:liters=None
         row=daily.setdefault(date,{'day':date,'fuel_liters':None,'fuel_count':0,'fuel_cost_krw':0,'priced_liters':0,'priced_cost_krw':0})
         row['fuel_count']+=1

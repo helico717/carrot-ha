@@ -78,7 +78,7 @@ class Vehicles:
         path=Path(self.hass.config.path('carrot_ha','vehicle_journal',key+'.sqlite3'))
         def remove():
             if journal:journal.permanently_deleted=True
-            for suffix in ('','-wal','-shm','-journal','.before-schema2.sqlite3'):
+            for suffix in ('','-wal','-shm','-journal','.before-schema2.sqlite3','.before-schema3.sqlite3'):
                 Path(str(path)+suffix).unlink(missing_ok=True)
             directory=path.with_suffix('')
             if directory.exists():shutil.rmtree(directory)
