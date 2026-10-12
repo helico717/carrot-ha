@@ -45,6 +45,27 @@ class StorageTests(unittest.TestCase):
         record=result['records'][1]
         self.j.change_location(record['id'],record['version'],None)
         self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['records'][1]['location'])
+    def test_odometer_distance_and_fuel_facts(self):
+        for d,km in [('2025-09-28',98000),('2025-10-05',98500),('2025-10-20',99000)]:
+            self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':d,'odometer_km':km})
+        self.j.import_michael(michael_preview(sample_xlsx(),'diesel')['records'])
+        q=self.j.query('2025-10-01','2025-10-31')
+        self.assertEqual(q['odometer_facts']['distance_km'],1000)
+        self.assertEqual(q['odometer_facts']['from'],'2025-09-28')
+        self.assertEqual(q['fuel_facts']['totals']['fuel_liters'],25)
+        self.assertEqual(q['fuel_facts']['totals']['fuel_price_krw_l'],1680)
+        self.j.save_manual(str(uuid4()),0,{'kind':'expense','date':'2025-10-20','category':'maintenance','actual_krw':1000,'odometer_km':99000})
+        self.assertEqual(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'],1000)
+        self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-10-21','odometer_km':90000})
+        self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
+    def test_odometer_missing_baseline_conflict_and_deleted(self):
+        key=str(uuid4());self.j.save_manual(key,0,{'kind':'trip','date':'2025-10-01','odometer_km':1000})
+        self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
+        self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-09-30','odometer_km':900})
+        conflict=str(uuid4());self.j.save_manual(conflict,0,{'kind':'trip','date':'2025-10-01','odometer_km':1100})
+        self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
+        self.j.change_status(conflict,1,'deleted')
+        self.assertEqual(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'],100)
     def test_import_transaction_rollback(self):
         rows=michael_preview(sample_xlsx(),'diesel')['records'];rows[1]['payload']['category']='invalid'
         with self.assertRaises(sqlite3.IntegrityError):self.j.import_michael(rows)

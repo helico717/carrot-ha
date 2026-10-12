@@ -69,6 +69,16 @@ const fs=require('fs');
  await root.locator('#close').click();
  for(const width of [1280,360,320]){await page.setViewportSize({width,height:900});await root.locator('#journalSettings').click();if(await root.locator('.settings-nav').boundingBox().then(nav=>root.locator('.settings-content').boundingBox().then(content=>nav.x+nav.width>content.x+1)))throw Error('settings nav not left of content '+width);const box=await root.locator('#vehicleManageDialog').boundingBox();if(box.y<24||box.y+box.height>900-24)throw Error('dialog viewport margins '+width);if(await root.locator('[data-settings-nav=vehicles]').evaluate(el=>getComputedStyle(el).textAlign)!=='center')throw Error('nav alignment');if(await root.locator('#vehicleManageDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('settings overflow '+width);await root.locator('#closeVehicleManage').click();await root.locator('#entry').selectOption('__add__');if(await root.locator('#vehicleDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('vehicle dialog overflow '+width);await root.locator('#closeVehicle').click();}
  fs.mkdirSync('.preview/journal',{recursive:true});await root.locator('#entry').selectOption('__add__');await page.screenshot({path:'.preview/journal/vehicle-dialog-mobile.png',fullPage:true});await root.locator('#closeVehicle').click();await root.locator('#journalSettings').click();await page.screenshot({path:'.preview/journal/settings-mobile.png',fullPage:true});
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.$('vehicleManageDialog').close();c.entries=[{entry_id:c.entry,fuel:'diesel',linked:false}];c.data.fuel_facts={totals:{fuel_liters:25,fuel_count:1,fuel_price_krw_l:1680},daily:[]};c.data.odometer_facts={distance_km:1000,from:'2026-09-28',to:'2026-10-20',daily:[]};c.renderData();c.selectTab(1);});
+ if((await root.locator('#briefStats').textContent()).includes('충전'))throw Error('ICE charging stats');
+ if(!(await root.locator('#headline').textContent()).includes('1,000'))throw Error('ICE odometer headline');
+ if(!(await root.locator('#legendRow').textContent()).includes('주유비'))throw Error('ICE legend');
+ if((await root.locator('#page1').textContent()).match(/배터리|전비|급속|km\/kWh/))throw Error('ICE EV trends');
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.openRecord();c.draftLocation={name:'좌표 없는 시험 장소',latitude:null,longitude:null};c.renderLocation();});
+ await page.waitForTimeout(100);if(!await root.locator('#locationMap').isHidden())throw Error('name-only location shows default map');
+ if(!(await root.locator('#locationHint').textContent()).includes('장소명만'))throw Error('name-only hint missing');
+ await root.locator('#locationPin').click();if(await root.locator('#locationMap').isHidden())throw Error('manual picker unavailable');
+ await root.locator('#close').click();
  if(await root.locator('#message').evaluate(el=>el.classList.contains('error')))throw Error('journal render error: '+await root.locator('#message').textContent());
  if(errors.length)throw Error(errors.join('\n'));
  await browser.close();console.log('Vehicle management: empty onboarding, create, trash/restore, preview, settings, mocked Kakao search/pin/remove, mobile OK');

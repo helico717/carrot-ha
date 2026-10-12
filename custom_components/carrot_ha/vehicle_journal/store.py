@@ -364,12 +364,15 @@ class Journal:
             setting=db.execute('SELECT * FROM comparison_settings WHERE vehicle_id=?',(self.vehicle,)).fetchone()
             phase=db.execute('SELECT phase,updated_at FROM sync_state WHERE vehicle_id=? AND source_kind=?',
                              (self.vehicle,'archive')).fetchone()
+            from .fuel_metrics import facts,odometer
+            fuel_facts=facts(db,self.vehicle,start,end)
+            odometer_facts=odometer(db,self.vehicle,start,end)
             total=db.execute('SELECT COUNT(*) FROM records WHERE vehicle_id=? AND status=?',(self.vehicle,'active')).fetchone()[0]
         for row in daily:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
             row['quality']=json.loads(row.pop('quality_json'))
         for row in records+recent_records:
-            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
+            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km');row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         totals={key:sum(r[key] for r in daily if r[key] is not None) if any(r[key] is not None for r in daily) else None
                 for key in (*METRICS,'charge_actual_krw','charge_estimated_krw','charge_effective_krw','slow_count','fast_count','unknown_count')}
         totals['efficiency_km_kwh']=totals['energy_distance_km']/totals['drive_energy_kwh'] if totals['drive_energy_kwh'] else None
@@ -380,7 +383,7 @@ class Journal:
                 target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})
                 for key in target:target[key]+=cost[key]
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 

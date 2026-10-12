@@ -1,3 +1,12 @@
+## 2026-10-12 — vehicle-journal: adapt combustion statistics and imported locations
+
+- 내연기관/하이브리드 선택 시 주유비 범례, 충전비와 동일 mint 색상, 주유량·횟수·평균 금액/L 대시보드 및 관측거리/주유량/주유금액/L/횟수/지출 추세로 전환. EV 추세 유지. 연비 자동 계산은 후속.
+- 사용자 확인 기준: 이전 기간 마지막 누적거리부터 선택 기간 마지막 누적거리까지 차이와 실제 관측 구간 표시. 주유·정비 이관 원본 및 수동 입력 누적거리 통합, 동일 날짜 동일 값 중복 제거. 기준 없음·감소·상충 값은 미확인 처리. 일별 차트 값은 관측 종료 날짜 기준이며 실제 일별 주행거리가 아님.
+- 좌표 없는 이관 장소는 기본 서울 지도를 숨기고 장소명만 보존됐다는 안내 표시. 검색 결과 사용자 선택/저장 또는 직접 핀 지정. 임의 첫 결과 확정 없음.
+- 관련 파일: vehicle_journal/{fuel_metrics,store}.py, frontend/carrot-vehicle-journal.js, vehicle-journal/tests/{test_vehicle_import.py,vehicle-management.cjs}.
+- 검증: Python 34개, 합성 Chrome 내연기관 통계/범례/추세·장소명-only 안내/직접지도·기존 EV 대시보드/월연도 추세 회귀 통과. 제공 XLS 로컬 임시 DB에서 선택 월 유량·누적거리 계산 확인; 실제 HA 데이터 수정 없음.
+- 배포: main 커밋·푸시 후 입력 화면 개편과 함께 승인된 HA 백업/반영 예정. Python 적용은 사용자 재시작 필요. 개발 중 릴리즈 없음; Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: record manual vehicle purge deployment
 
 - ad7508f main 푸시 완료. HA deployment-backups/ad7508f41f3d914d8c1edd6bcc03c51f9fb297f0/ 기존 5개 코드 파일 백업 후 반영·SHA-256 일치. 화면 JS 내부/외부 HTTP 해시 일치.
