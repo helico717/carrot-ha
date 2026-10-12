@@ -2,6 +2,14 @@ const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
+const assetBase=new URL('./carrot-assets/',import.meta.url).href;
+function leaflet(){
+  if(!window.__carrotLeaflet)window.__carrotLeaflet=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src=assetBase+'leaflet.js';
+    script.onload=()=>resolve(window.L.noConflict());script.onerror=()=>{window.__carrotLeaflet=null;reject(Error('지도 라이브러리를 읽을 수 없습니다. carrot-assets 폴더를 확인하세요.'));};document.head.append(script);
+  });
+  return window.__carrotLeaflet;
+}
 // HA-local EV journal. No remote polling, browser token or localStorage records.
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{maximumFractionDigits:digits}):'—';
@@ -60,7 +68,7 @@ export class VehicleJournal extends HTMLElement {
   $(id){return this.shadowRoot.getElementById(id);}
   build(){
     this.ready=true;
-    this.shadowRoot.innerHTML=`<style>${styles}${journalDesign}</style><div class="shell">
+    this.shadowRoot.innerHTML=`<link rel="stylesheet" href="${assetBase}leaflet.css"><style>${styles}${journalDesign}</style><div class="shell">
     <div class="card-settings-top" id="cardSettingsTop"><h2>차계부</h2><button type="button" id="journalSettings" class="compact">설정</button></div><header class="mast"><div class="mast-left"><div class="title-controls-row"><select class="select-pill" id="entry" aria-label="차량"></select><button id="pinDefault" type="button" class="btn-pin-default" title="내 기본 차량으로 지정" aria-label="기본 차량 지정">★</button><div class="date-navigation" role="group" aria-label="기록 기간 이동"><button class="date-step" id="periodPrev" type="button" aria-label="이전 달" title="이전 달">‹</button><input class="date-pill" id="month" type="month" aria-label="기록 기간"><button class="date-step" id="periodNext" type="button" aria-label="다음 달" title="다음 달">›</button><button class="date-current" id="periodCurrent" type="button" title="현재 기간으로 돌아가기">이번 달</button></div></div></div><div class="mast-right"><button id="add" class="btn-record-primary">＋ 기록 남기기</button><div class="period-segmented" role="group" aria-label="집계 기간 선택">${[['month','월별'],['year','연도별']].map(([key,label])=>`<button class="period-tab-btn ${key==='month'?'active':''}" data-scope="${key}" aria-pressed="${key==='month'}">${label}</button>`).join('')}</div></div></header>
     <nav class="tabs" role="tablist" aria-label="차계부 메뉴">${['대시보드','추세','절약 비교','상세 기록'].map((n,i)=>`<button type="button" role="tab" id="tab${i}" aria-controls="page${i}" aria-selected="${i===0}">${n}</button>`).join('')}</nav>
     <section id="page0" role="tabpanel" aria-labelledby="tab0">
@@ -1152,10 +1160,7 @@ export class VehicleJournal extends HTMLElement {
   }
   resetTrendsMap(){
     if(!this.trendsMapInstance)return;
-    const maps=window.kakao?.maps;
-    if(!maps)return;
-    this.trendsMapInstance.setLevel(13);
-    this.trendsMapInstance.panTo(new maps.LatLng(36.2683,127.6358));
+    this.trendsMapInstance.setView([36.2683,127.6358],7);
   }
   showTrendsPlaceCard(p,placeName,totalKrw,visits,color){
     const card=this.$('trendsPlaceCard');
@@ -1167,9 +1172,9 @@ export class VehicleJournal extends HTMLElement {
     if(closeBtn)closeBtn.onclick=e=>{
       e.stopPropagation();
       card.hidden=true;
-      if(this.trendsMapOverlays){
-        for(const ov of this.trendsMapOverlays){
-          ov.getContent()?.classList?.remove('active');
+      if(this.$('trendsMap')){
+        for(const wrap of this.$('trendsMap').querySelectorAll('.trends-map-dot-wrap')){
+          wrap.classList.remove('active');
         }
       }
     };
@@ -1179,29 +1184,35 @@ export class VehicleJournal extends HTMLElement {
     if(!mapBox||!this.data)return;
     if(this.tab!==1)return;
     try{
-      const maps=await this.kakaoMaps();
+      const L=await leaflet();
       if(this.$('trendsMapNotice'))this.$('trendsMapNotice').hidden=true;
-      const centerPos=new maps.LatLng(36.2683,127.6358);
+      const centerPos=[36.2683,127.6358];
       if(!this.trendsMapInstance){
         mapBox.replaceChildren();
-        this.trendsMapInstance=new maps.Map(mapBox,{center:centerPos,level:13});
-        const zoomControl=new maps.ZoomControl();
-        this.trendsMapInstance.addControl(zoomControl,maps.ControlPosition.RIGHT);
-        maps.event.addListener(this.trendsMapInstance,'click',()=>{
+        this.trendsMapInstance=L.map(mapBox,{
+          center:centerPos,
+          zoom:7,
+          scrollWheelZoom:false,
+          zoomControl:true
+        });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+          maxZoom:19,
+          referrerPolicy:'strict-origin-when-cross-origin',
+          attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+        }).addTo(this.trendsMapInstance);
+        this.trendsMapInstance.on('click',()=>{
           if(this.$('trendsPlaceCard'))this.$('trendsPlaceCard').hidden=true;
-          if(this.trendsMapOverlays){
-            for(const ov of this.trendsMapOverlays){
-              ov.getContent()?.classList?.remove('active');
-            }
+          for(const wrap of mapBox.querySelectorAll('.trends-map-dot-wrap')){
+            wrap.classList.remove('active');
           }
         });
       }else{
-        this.trendsMapInstance.relayout();
+        setTimeout(()=>{if(this.trendsMapInstance)this.trendsMapInstance.invalidateSize();},60);
       }
-      if(this.trendsMapOverlays){
-        for(const ov of this.trendsMapOverlays)ov.setMap(null);
+      if(this.trendsMapMarkers){
+        for(const m of this.trendsMapMarkers)m.remove();
       }
-      this.trendsMapOverlays=[];
+      this.trendsMapMarkers=[];
       const places=this.data?.station_stats?.places||[];
       const locatedPlaces=places.filter(p=>p.location?.latitude!=null&&p.location?.longitude!=null);
       if(this.$('placeStatisticsBasis')){
@@ -1214,32 +1225,29 @@ export class VehicleJournal extends HTMLElement {
         const placeName=p.location.name||p.location.address||(p.kind==='refueling'?'주유소':'충전소');
         const totalKrw=(p.actual_krw!=null&&p.actual_krw>0)?p.actual_krw:(p.estimated_krw??0);
         const visits=p.visits||1;
-        const dotWrap=document.createElement('div');
-        dotWrap.className='trends-map-dot-wrap';
-        dotWrap.innerHTML=`<div class="trends-map-dot" style="background:${color}" title="${esc(placeName)}"></div>`;
-        const overlay=new maps.CustomOverlay({
-          position:new maps.LatLng(lat,lon),
-          content:dotWrap,
-          xAnchor:0.5,
-          yAnchor:0.5,
-          zIndex:10
+        const icon=L.divIcon({
+          className:'trends-map-leaflet-marker',
+          html:`<div class="trends-map-dot-wrap"><div class="trends-map-dot" style="background:${color}" title="${esc(placeName)}"></div></div>`,
+          iconSize:[30,30],
+          iconAnchor:[15,15]
         });
-        overlay.setMap(this.trendsMapInstance);
-        this.trendsMapOverlays.push(overlay);
-        dotWrap.onclick=e=>{
-          e.stopPropagation();
+        const marker=L.marker([lat,lon],{icon}).addTo(this.trendsMapInstance);
+        this.trendsMapMarkers.push(marker);
+        marker.on('click',e=>{
+          if(e?.originalEvent)e.originalEvent.stopPropagation();
           for(const wrap of mapBox.querySelectorAll('.trends-map-dot-wrap')){
             wrap.classList.remove('active');
           }
-          dotWrap.classList.add('active');
+          const wrap=marker.getElement()?.querySelector('.trends-map-dot-wrap');
+          if(wrap)wrap.classList.add('active');
           this.showTrendsPlaceCard(p,placeName,totalKrw,visits,color);
-          this.trendsMapInstance.panTo(new maps.LatLng(lat,lon));
-        };
+          this.trendsMapInstance.panTo([lat,lon]);
+        });
       }
     }catch(e){
       if(this.$('trendsMapNotice')){
         this.$('trendsMapNotice').hidden=false;
-        this.$('trendsMapNotice').textContent=e.message||'지도를 불러오지 못했어요. 지도 API 설정을 확인해 주세요.';
+        this.$('trendsMapNotice').textContent=e.message||'지도를 불러오지 못했어요. 라이브러리 설정을 확인해 주세요.';
       }
     }
   }

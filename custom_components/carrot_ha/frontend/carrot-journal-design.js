@@ -1422,17 +1422,23 @@ export const journalDesign = `:host {
 .btn-pin-default:hover{border-color:#f6c445;color:#f6c445}
 .btn-pin-default.active{background:rgba(246,196,69,0.15);border-color:rgba(246,196,69,0.4);color:#f6c445}
 
-/* 추세 탭: 방문한 충전소·주유소 한반도 지도 & 장소 정보 카드 */
+/* 추세 탭: 방문한 충전소·주유소 OpenStreetMap 한반도 지도 & 장소 정보 카드 */
 .trends-map-panel{display:flex;flex-direction:column;gap:14px}
 .trends-map-header{display:flex;flex-direction:column;gap:4px}
 .trends-map-wrapper{position:relative;width:100%;height:420px;border-radius:18px;overflow:hidden;border:1px solid var(--j-border);background:#141c23}
 .trends-map-canvas{width:100%;height:100%}
-.trends-map-reset-btn{position:absolute;top:14px;right:14px;z-index:15;background:rgba(22,30,37,0.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.18);border-radius:8px;color:var(--j-ink);font-size:12.5px;font-weight:600;padding:6px 11px;min-height:auto;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.35);transition:all 0.15s ease}
+.trends-map-canvas .leaflet-container{background:#141c23;font-family:inherit}
+.trends-map-canvas .leaflet-control-zoom a{background:rgba(22,30,37,0.92) !important;color:var(--j-ink) !important;border-color:var(--j-border) !important}
+.trends-map-canvas .leaflet-control-zoom a:hover{background:var(--j-raised) !important;color:var(--j-accent) !important}
+.trends-map-canvas .leaflet-control-attribution{background:rgba(11,16,20,0.75) !important;color:var(--j-sub) !important;font-size:10px !important;padding:2px 6px !important}
+.trends-map-canvas .leaflet-control-attribution a{color:var(--j-sub) !important}
+.trends-map-leaflet-marker,.leaflet-div-icon.trends-map-leaflet-marker{background:transparent !important;border:none !important}
+.trends-map-reset-btn{position:absolute;top:14px;right:14px;z-index:1001;background:rgba(22,30,37,0.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.18);border-radius:8px;color:var(--j-ink);font-size:12.5px;font-weight:600;padding:6px 11px;min-height:auto;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.35);transition:all 0.15s ease}
 .trends-map-reset-btn:hover{background:var(--j-surface);border-color:var(--j-accent);color:var(--j-accent)}
-.trends-map-dot-wrap{transform:translate(-50%,-50%);cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center}
+.trends-map-dot-wrap{display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer}
 .trends-map-dot{width:14px;height:14px;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.5);transition:transform 0.18s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.18s ease}
 .trends-map-dot-wrap:hover .trends-map-dot,.trends-map-dot-wrap.active .trends-map-dot{transform:scale(1.45);box-shadow:0 0 0 4px rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.6)}
-.trends-place-card{position:absolute;bottom:14px;left:14px;right:14px;max-width:380px;z-index:20;background:rgba(17,24,30,0.94);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,0.55);animation:trendsCardFadeIn 0.2s ease-out}
+.trends-place-card{position:absolute;bottom:14px;left:14px;right:14px;max-width:380px;z-index:1002;background:rgba(17,24,30,0.94);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,0.55);animation:trendsCardFadeIn 0.2s ease-out}
 @keyframes trendsCardFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .trends-place-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)}
 .trends-place-title-wrap{display:flex;align-items:center;gap:8px;min-width:0}

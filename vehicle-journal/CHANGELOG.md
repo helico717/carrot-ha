@@ -1,3 +1,20 @@
+## 2026-10-12 — vehicle-journal: switch trends map from kakao maps to openstreetmap via leaflet
+
+- 요청 및 배경: 카카오 지도 API 키/도메인 화이트리스트 제약 없이 어디서든 즉시 동작하도록, 추세 탭의 '방문한 충전소·주유소' 지도를 카카오 지도 대신 OpenStreetMap(OSM) 기반 Leaflet 맵으로 전환.
+- 변경:
+  - `carrot-vehicle-journal.js`:
+    - HA 통합에 내장된 `carrot-assets/leaflet.js` 및 `leaflet.css`를 비동기 로드(`leaflet()`)하여 외부 CDN/API 키 의존성 없이 동작하도록 구현.
+    - `resetTrendsMap` 및 `initTrendsMap`을 Leaflet API로 전면 교체.
+    - OpenStreetMap 타일(`https://tile.openstreetmap.org/{z}/{x}/{y}.png`) 적용 (남한 중심 `36.2683, 127.6358`, 줌 레벨 `7`).
+    - `L.divIcon`을 통해 기존 카테고리별 마커 닷(`.trends-map-dot`) 스타일링 유지 및 마커 클릭 시 플로팅 카드(장소명, 누적금액, 방문횟수) 표시와 `panTo` 연동.
+    - 탭 전환 시 Leaflet 타일 렌더링 정상화를 위한 `invalidateSize()` 호출 추가.
+  - `carrot-journal-design.js`:
+    - Leaflet 컨테이너, 줌 컨트롤, 저작권 표기 dark theme 일체화 스타일 적용.
+    - `.trends-map-leaflet-marker` 배경 투명화 및 리셋 버튼/상세 카드의 Leaflet 컨트롤 대비 상위 z-index(1001, 1002) 보장.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-vehicle-journal.js,carrot-journal-design.js}, vehicle-journal/CHANGELOG.md.
+- 검증: `node --check` 구문 검사 통과, HA 서버 HTTP 자산 제공 검증.
+- 배포: main 커밋·푸시 및 HA deployment-backups 백업 후 SSH 직접 반영. 프론트엔드 변경으로 브라우저 새로고침(또는 패널 재진입) 시 즉시 적용. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: enhance trends map, mobile date picker, localStorage favorite vehicle, and UI dividers
 
 - 요청 및 배경:
