@@ -5,8 +5,8 @@
 - 커밋 제목: `vehicle-journal: keep ledger category pills compact`.
 - 변경·이유: 직전 배지 변경이 세로 flex 부모의 기본 stretch를 따라 열 전체로 늘어난 문제 수정. 최근 기록과 동일한 제목 행으로 분류/부가 설명을 묶고 배지에 fit-content 및 flex 축소 방지 적용. 메모는 별도 줄 유지.
 - 관련 파일: 화면 카드/디자인, 브라우저 회귀 테스트, 이 변경 이력.
-- 검증: JS 구문 및 diff 검사 통과. Chrome 회귀에 850/520/360/320px 배지 너비가 글자+패딩 이내인지 검사 추가.
-- 배포: main 푸시 후 기존 사용자 승인 범위에서 화면 2개 백업·직접 반영 예정. Python/DB/Worker/Comma 변경 없음. 화면 새로고침 후 실제 사용자 확인 대기. 기존 beta.4 유지.
+- 검증: JS 구문 및 diff 검사 통과. Chrome 전체 회귀 통과, 850/520/360/320px 배지 너비가 글자+패딩 이내인지 검사 통과. 360px 모바일 스크린샷 시각 확인.
+- 배포: 실행 커밋 `ed16e61` main 푸시 완료. 기존 사용자 승인 범위에서 화면 2개를 `/config/carrot_ha/deployment-backups/ed16e6147a4b5c39c8683e0c95634216daf621ad/`에 백업·직접 반영하고 설치 및 HA 내부 HTTP SHA-256 일치 확인. Python/DB/Worker/Comma 변경 없음. 화면 새로고침 후 실제 사용자 확인 대기. 기존 beta.4 유지.
 
 
 ## 2026-10-12 — 직접 배포 결과 기록
