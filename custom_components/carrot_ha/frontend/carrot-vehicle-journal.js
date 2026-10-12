@@ -349,7 +349,7 @@ export class VehicleJournal extends HTMLElement {
   }
   recordedDistance(){return this.isCombustion()?(this.data?.odometer_facts?.distance_km??this.data?.totals?.distance_km??null):this.data?.totals?.distance_km??null;}
   isCombustion(){return ['gasoline','diesel','hybrid'].includes(this.entries.find(e=>e.entry_id===this.entry)?.fuel);}
-  categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#ff922b',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
+  categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#81e6c5',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
   costCategories(totals){
     const result={};for(const [category,cost] of Object.entries(totals?.categories||{})){
       const key=['charging','refueling','maintenance','washing','tuning'].includes(category)?category:'other';

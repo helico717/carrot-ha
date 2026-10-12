@@ -1,3 +1,11 @@
+## 2026-10-12 — 주유비를 요청한 민트색으로 수정
+
+- 커밋 제목: vehicle-journal: use mint for refueling across journal views
+- 변경·이유: 이전 수정은 사용자 의도를 반대로 해석해 범례를 주황색으로 맞췄다. 주유비 공통 categoryColor를 충전비와 같은 민트색 #81e6c5로 변경해 최근 기록·상세 기록 배지, 도넛·분류 목록, 비교 차트·범례, 추이·지도 표시를 통일한다. 도넛 12시 시작·금액 오름차순은 유지한다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-vehicle-journal.js, vehicle-journal/tests/browser-check.cjs, vehicle-journal/CHANGELOG.md.
+- 검증: Chrome 회귀 검사에서 주유비 범례의 민트색을 명시적으로 검사하도록 보강. 실행 결과는 배포 기록에 추가한다.
+- 배포: main 커밋·푸시 및 HA 백업 후 직접 반영 예정. 개발 배포 정책 유지, 새 릴리즈 없음. Cloudflare/Comma 변경 없음. 실제 사용자 브라우저 적용은 확인 전.
+
 ## 2026-10-12 — 주유비 범례 색상과 도넛 경계·정렬 수정
 
 - 커밋 제목: vehicle-journal: align fuel legend and render sorted annular sectors

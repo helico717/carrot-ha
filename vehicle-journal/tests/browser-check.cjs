@@ -40,7 +40,7 @@ const path=require('path');
   card.data={...original,totals:{...original.totals,categories:{refueling:{effective_krw:6000}}}};
   card.renderData();
   const legend=card.$('legendRow').querySelector('[data-cat="refueling"] .legend-dot');
-  if(!legend||legend.style.background!==card.$('costs').querySelector('.cost-dot').style.background)throw Error('refueling legend and expense color disagree');
+  if(!legend||getComputedStyle(legend).backgroundColor!=='rgb(129, 230, 197)'||legend.style.background!==card.$('costs').querySelector('.cost-dot').style.background)throw Error('refueling legend and expense color disagree');
   if(card.$('donut').querySelectorAll('circle').length!==2)throw Error('single category must render a complete ring');
   delete card.entries[0].fuel;card.data=original;card.renderData();
  });
