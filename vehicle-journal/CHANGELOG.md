@@ -1,11 +1,16 @@
+## 2026-10-12 — vehicle-journal: record compact settings deployment verification
+
+- 8c04da5의 HA 백업·화면 세 파일 배포 및 내부/외부 HTTP 해시 일치, 대시보드 회귀 통과 결과를 위 구현 항목에 확정 기록.
+- 관련 파일: vehicle-journal/CHANGELOG.md. 문서만 변경; 추가 실행 코드 배포·릴리즈 없음. 실제 사용자 화면 확인 대기.
+
 ## 2026-10-12 — vehicle-journal: clarify API keys and fit settings to mobile viewport
 
 - 변경·이유: 카카오 콘솔의 Default JS Key / Default Rest API Key 이름과 입력칸 하단 안내를 추가. Native AppKey 미사용 안내, 설정 분류 중앙 정렬, 설정 버튼 축소. 차량 선택기 옆 중복 제목을 제거하고 기존 제목 크기를 최상단에 보존.
 - 모바일: safe-area와 위아래 여백을 반영하고 설정창을 헤더·스크롤 내용·메시지 grid로 구성. 긴 오류 메시지 줄바꿈/스크롤로 하단 가림 방지.
 - 오류: 전역 settings/map/config/location/search 요청에 불필요한 entry_id가 포함되어 HA 검증에서 거부되던 문제 수정. 차량별 원장 요청에는 entry_id 유지.
 - 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, carrot-journal-panel-runtime.js, vehicle-journal/tests/vehicle-management.cjs.
-- 검증: JS 구문 검사, 합성 Chrome 차량 등록·휴지통/복원·키 확인/저장 확인·지도 핀·320/360/1280px 여백/중앙 정렬 통과. 전역 요청 entry_id 거부 회귀 및 최신 모듈 로딩/입력 보호/스크롤 복원 통과. 모바일 이미지 확인. 대시보드 회귀 결과·배포는 후속 기록.
-- 배포 상태: main 커밋/푸시 후 승인된 HA 코드 백업·부분 반영 예정. 실제 운영 브라우저 확인은 별도. DB·사진·키 저장값·Python·Cloudflare·Comma 변경 없음. 개발 중 새 릴리즈 없음.
+- 검증: JS 구문 검사, 합성 Chrome 차량 등록·휴지통/복원·키 확인/저장 확인·지도 핀·320/360/1280px 여백/중앙 정렬 통과. 전역 요청 entry_id 거부 회귀 및 최신 모듈 로딩/입력 보호/스크롤 복원 통과. 모바일 이미지 확인. 기존 대시보드 탭·차트·수기 저장·escaping·데스크톱/모바일 회귀도 통과.
+- 배포 상태: 8c04da5 main 푸시 완료. HA deployment-backups/8c04da5098999b1c1be09d2d247db7c2fda54c31/에 기존 코드 백업 후 화면 JS 세 파일 반영. 설치·내부/외부 HTTP SHA-256 모두 일치. 고정 로더 모듈 회귀 통과; 사용자는 새로고침 또는 새 화면 버전 적용. 실제 운영 브라우저 클릭 검증은 아직 대기. DB·사진·키 저장값·Python·Cloudflare·Comma 변경 없음. 개발 중 새 릴리즈 없음.
 
 # 차계부 변경 이력
 
