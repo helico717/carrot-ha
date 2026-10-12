@@ -1,3 +1,28 @@
+## 2026-10-12 — vehicle-journal: enhance trends map, mobile date picker, localStorage favorite vehicle, and UI dividers
+
+- 요청 및 배경:
+  1. 모바일 환경에서 날짜 선택기 좌우 변경 버튼(‹, ›)이 날짜 입력칸과 겹치는(overlap) UI 충돌 버그 수정.
+  2. 기본 차량 설정 방식 변경: 서버 고정 강제가 아닌 브라우저 `localStorage` 기반으로 즐겨찾기 별표(★)를 저장하여 각 브라우저/기기별로 선호하는 기본 차량이 자동 표시되도록 개선. 드롭다운으로 다른 차량도 상시 전환 가능.
+  3. 추세 화면 대폭 개편: '방문한 충전소·주유소'를 텍스트 목록 대신 한반도(남한) 전체가 한눈에 보이는 카카오 지도 기반 인터랙티브 맵으로 전환. 카테고리별(주유: 오렌지, 충전: 민트그린 등) 점 색상 구분, 줌/패닝 조작 및 전체 보기 리셋 지원. 지도 위의 점 클릭 시 장소 이름(볼드), 선택 기간 누적 사용금액, 누적 방문횟수를 담은 플로팅 카드 표시.
+  4. 내연기관 '가득 주유 구간 연비' 카드 제거.
+  5. 패널 좌측 최상단 햄버거 메뉴 버튼(☰)이 타원형 알약으로 찌그러져 보이는 스타일 버그 수정 (정사각형 44x44 아이콘 버튼으로 교정).
+  6. '어디에 썼을까요?' 지출 분류 목록 하단 '전체' 구분선이 2줄로 겹쳐 보이던 현상 수정 (직전 항목 하단 테두리 제거 및 2px 단일 굵은 구분선으로 스타일 통일).
+- 변경:
+  - `carrot-journal-panel-runtime.js`: `#menu` 버튼에 명시적인 `width: 44px; height: 44px; padding: 0; display: inline-flex; justify-content: center; align-items: center;` 스타일 부여.
+  - `carrot-journal-design.js`:
+    - `.title-controls-row`를 모바일에서 `flex-wrap: wrap; width: 100%;`로 변경.
+    - `.date-navigation`을 CSS Grid에서 Flexbox로 전환하고 `.date-step`에 36x38 정사각 버튼 및 `flex-shrink: 0`을 적용하여 모바일 화면에서도 좌우 화살표와 날짜 텍스트가 절대 겹치지 않도록 방지.
+    - `.cost-list .list-row.cost-row-last`, `:has(+ .cost-total-row)`의 `border-bottom: 0` 처리 및 `.cost-total-row`에 `border-top: 2px solid rgba(255, 255, 255, 0.28)` 적용하여 단일 두꺼운 구분선 구현.
+    - `#trendsMap`, `.trends-map-panel`, `.trends-map-wrapper`, `.trends-map-dot`, `.trends-place-card` 등 지도 및 POI 상세 정보 카드 스타일링 추가.
+  - `carrot-vehicle-journal.js`:
+    - `getFavoriteVehicle()`, `setFavoriteVehicle()`을 통해 `localStorage('carrot_journal_favorite_vehicle')` 기반 기본 차량 지정 및 UI(★/☆) 즉시 토글 구현.
+    - 추세 탭(#page1)에서 `#fuelEfficiencySummary` 카드 제거.
+    - `#stationStatistics` 텍스트 목록을 `#trendsMap` 인터랙티브 지도로 전면 교체. 남한 중심(36.2683, 127.6358, 줌 레벨 13) 초기화, 줌 컨트롤러 배치, 카테고리별 마커 닷 렌더링, 닷 클릭 시 장소명(볼드)·누적금액(천단위 쉼표 원화)·방문횟수를 보여주는 카드 팝업 및 panTo 애니메이션 연동.
+    - 지출 분류 목록 마지막 행에 `cost-row-last` 클래스 부여.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-journal-panel-runtime.js,carrot-journal-design.js,carrot-vehicle-journal.js}, vehicle-journal/CHANGELOG.md.
+- 검증: `node --check` 3개 파일 전체 구문 검사 통과.
+- 배포: main 커밋·푸시 및 HA deployment-backups 백업 후 SSH 직접 반영. 프론트엔드 변경으로 브라우저 새로고침(또는 패널 재진입) 시 즉시 적용. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: support per-user default vehicle assignment
 
 - 요청 및 배경: 이용자가 2명(person.david, person.james)이고 차량이 2대(ID.4, 아테온)인 환경에서, 각 사용자가 차계부 진입 시 본인 차량을 기본으로 보되, 드롭다운을 통해 상대방 차량도 자유롭게 조회할 수 있도록 개선.

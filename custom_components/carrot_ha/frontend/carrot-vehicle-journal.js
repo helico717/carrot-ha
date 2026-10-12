@@ -146,7 +146,7 @@ export class VehicleJournal extends HTMLElement {
 
           </div>
         </section>
-    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><section id="fuelEfficiencySummary" class="panel" hidden></section><section class="panel"><h3>방문한 충전소 · 주유소</h3><p id="placeStatisticsBasis" class="note"></p><div id="stationStatistics"></div></section><div class="trends-section" id="changingTrendsSection"><h3 class="trends-section-title">변동 있는 추세</h3><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
+    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><section class="panel trends-map-panel" id="trendsMapSection"><div class="trends-map-header"><h3>방문한 충전소 · 주유소</h3><p id="placeStatisticsBasis" class="note"></p></div><div class="trends-map-wrapper"><div id="trendsMap" class="trends-map-canvas"></div><button type="button" id="trendsMapReset" class="trends-map-reset-btn" title="한반도 전체 지도 보기">전체 보기</button><div id="trendsMapNotice" class="note" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:16px;background:rgba(20,28,35,0.9);border-radius:12px;z-index:5;" hidden></div><div id="trendsPlaceCard" class="trends-place-card" hidden></div></div></section><div class="trends-section" id="changingTrendsSection"><h3 class="trends-section-title">변동 있는 추세</h3><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
     <section id="page2" role="tabpanel" aria-labelledby="tab2" hidden><p id="compareBasis" class="note"></p><div class="grid savings-layout"><article class="panel wide hero savings-hero"><h2>같은 거리를 다른 차로 달렸다면요.</h2><div class="compare-value" id="saving"></div><div id="compareDetail" class="savings-bars"></div></article><article class="panel narrow savings-controls"><div class="controls-content"><div class="row spaced"><label><strong class="slider-title">주행거리</strong> <b id="distanceValue"></b></label><button id="recordedDistance" class="compact">기록된 거리</button></div><input id="compareDistance" aria-label="주행거리" type="range" min="0" max="5000" step="0.1"><small id="distanceStatus"></small><hr><div class="fuel-topline"><label><strong class="slider-title">비교 유종</strong> · <span id="priceValue"></span></label><div class="fuel-switch">${[['gasoline','휘발유'],['premium','고급유'],['diesel','경유']].map(([key,label])=>`<button class="compact" data-compare-fuel="${key}">${label}</button>`).join('')}</div></div><input id="comparePrice" aria-label="유가" type="range" min="1" max="5000" step="1"><div class="row spaced"><small id="priceStatus"></small><button id="averagePrice" class="compact">전국 평균으로 돌아가기</button></div><hr><label><strong class="slider-title">비교 차량 연비</strong> <b id="economyValue"></b></label><input id="economy" aria-label="비교 차량 연비" type="range" min="1" max="50" step="0.1" value="15"><details class="settings"><summary>유가 연결 기준</summary><input id="fuel" type="hidden" value="gasoline"><div id="fuelConnections"></div><form id="compareForm" hidden><input id="editFuel" type="hidden"><label>HA 유가 센서<input id="fuelEntity" placeholder="sensor.average_gasoline" required></label><div class="row"><button class="compact" type="submit">저장</button><button class="compact" id="cancelFuelEdit" type="button">취소</button></div><p id="compareMessage" class="note" role="status"></p></form></details></div></article></div><p class="note">같은 거리의 에너지 비용 비교예요. 충전 단가와 전비로 계산하며 전체 차량 유지비는 포함하지 않아요.</p></section>
     <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="row spaced"><h2>차량 지출 내역이에요.</h2><button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button></div><p class="note">자동 충전 결제와 직접 남긴 차량 지출을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="ledger-filters" id="ledgerFilters"><details class="ledger-dropdown" id="ledgerDropdown"><summary>분류 선택 <span id="ledgerFilterSummary">전체</span></summary><div class="ledger-category-filters" role="group" aria-label="기록 분류 선택 (복수 선택)"><label class="ledger-filter-option"><input type="checkbox" id="ledgerAll" checked>전체</label>${Object.entries(categories).filter(([key])=>['charging','refueling','maintenance','washing','tuning','other'].includes(key)).map(([key,label])=>`<label class="ledger-filter-option" style="--category-color:${this.categoryColor(key)}"><input type="checkbox" data-ledger-category="${key}">${esc(label)}</label>`).join('')}</div></details></div><div class="table-wrap"><table class="table ledger-table"><colgroup><col class="ledger-date-col"><col class="ledger-memo-col"><col class="ledger-value-col"><col class="ledger-actions-col"></colgroup><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th id="ledgerAmountHeader" aria-sort="none"><button id="ledgerSort" type="button" aria-label="금액 정렬 변경">금액 · 시간순</button></th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
     <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
@@ -192,7 +192,8 @@ export class VehicleJournal extends HTMLElement {
     this.$('placeSearch').onclick=()=>this.searchLocation();
     this.$('placeQuery').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();this.searchLocation();}};
     if(this.$('entry'))this.$('entry').onchange=()=>{const key=this.$('entry').value;if(key==='__add__'||key==='__manage__'){this.$('entry').value=this.entry||'';key==='__add__'?this.openVehicle():this.openVehicleManagement();return;}this.entry=key;this.offset=0;this.updateDefaultVehicleButton();this.load(true);};
-    if(this.$('pinDefault'))this.$('pinDefault').onclick=async()=>{if(!this.entry||this.entry==='__add__'||this.entry==='__manage__')return;try{await this._hass.callWS({type:'carrot_ha/journal/user_default/set',entry_id:this.entry});await this.refreshVehicles(this.entry);}catch(e){if(this.$('message'))this.$('message').textContent=e.message||'기본 차량 설정 실패';}};
+    if(this.$('pinDefault'))this.$('pinDefault').onclick=()=>{if(!this.entry||this.entry==='__add__'||this.entry==='__manage__')return;const cur=this.getFavoriteVehicle();if(cur===this.entry){this.setFavoriteVehicle(null);}else{this.setFavoriteVehicle(this.entry);}this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry;this.updateDefaultVehicleButton();this._hass?.callWS({type:'carrot_ha/journal/user_default/set',entry_id:this.entry}).catch(()=>{});};
+    if(this.$('trendsMapReset'))this.$('trendsMapReset').onclick=()=>this.resetTrendsMap();
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
     this.$('periodPrev').onclick=()=>this.stepPeriod(-1);
     this.$('periodNext').onclick=()=>this.stepPeriod(1);
@@ -242,7 +243,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('clearPhotos').onclick=e=>{e.preventDefault();this.selectedPhotos=[];this.$('photos').value='';this.renderSelectedPhotos();};
     if(this.$('fuel'))this.$('fuel').onchange=()=>{const entity=this.data?.fuel_sensors?.[this.$('fuel').value];if(entity)this.$('fuelEntity').value=entity;};
   }
-  selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1)this.renderTrendsDashboard();}
+  selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1){this.renderTrendsDashboard();this.initTrendsMap();}}
   hasPendingInput(){return !!(this.$('recordTypeDialog')?.open||this.$('vehicleDialog')?.open||this.$('vehicleManageDialog')?.open||this.$('recordDialog')?.open||this.$('save')?.disabled||this.draftDirty||this.comparisonDirty||this.pendingWrites||this.selectedPhotos?.length);}
   async call(type,params={}){const write=['record/save','record/status','record/location','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,...(['query','record/save','record/status','record/location','comparison/save'].includes(type)?{entry_id:this.entry}:{}),...params});}finally{if(write)this.pendingWrites--;}}
   async load(force=false){
@@ -340,7 +341,7 @@ export class VehicleJournal extends HTMLElement {
   }
   recordedDistance(){return this.isCombustion()?(this.data?.odometer_facts?.distance_km??this.data?.totals?.distance_km??null):this.data?.totals?.distance_km??null;}
   isCombustion(){return ['gasoline','diesel','hybrid'].includes(this.entries.find(e=>e.entry_id===this.entry)?.fuel);}
-  categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#81e6c5',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
+  categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#ff922b',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
   costCategories(totals){
     const result={};for(const [category,cost] of Object.entries(totals?.categories||{})){
       const key=['charging','refueling','maintenance','washing','tuning'].includes(category)?category:'other';
@@ -560,7 +561,8 @@ export class VehicleJournal extends HTMLElement {
     const total=amounts.reduce((sum,[,v])=>sum+v.effective_krw,0);let offset=0;
     const catRows=amounts.map(([k,v],i)=>{
       const count=v.count||(this.data.records||[]).filter(r=>r.kind==='expense'&&r.status==='active'&&this.recordCategory(r)===k).length;
-      return `<div class="list-row cost-row"><div class="cost-cat-wrap"><span class="cost-cat-name"><span class="cost-dot" style="background:${colors[i]}"></span>${esc(categories[k]||k)}</span><span class="cost-cat-count">${count}건</span></div><strong class="cost-amount">${money(v.effective_krw)}</strong></div>`;
+      const isLast=i===amounts.length-1;
+      return `<div class="list-row cost-row${isLast?' cost-row-last':''}"><div class="cost-cat-wrap"><span class="cost-cat-name"><span class="cost-dot" style="background:${colors[i]}"></span>${esc(categories[k]||k)}</span><span class="cost-cat-count">${count}건</span></div><strong class="cost-amount">${money(v.effective_krw)}</strong></div>`;
     }).join('');
     const totalRow=amounts.length?`<div class="list-row cost-total-row"><div class="cost-cat-wrap"><span class="cost-total-name">전체</span></div><strong class="cost-total-amount">${money(total)}</strong></div>`:'';
     this.$('costs').innerHTML=(catRows+totalRow)||'<p class="note">이 기간의 지출 기록이 아직 없어요.</p>';
@@ -1033,9 +1035,11 @@ export class VehicleJournal extends HTMLElement {
   showPhotos(record){
     this.openPhotoViewer(record);
   }
-  vehicleOptions(){return this.entries.map(e=>`<option value="${esc(e.entry_id)}">${esc(e.title)}${e.is_default?' ★':''}</option>`).join('')+'<option value="__add__">＋ 새 차량 추가</option>';}
-  updateDefaultVehicleButton(){const btn=this.$('pinDefault');if(!btn)return;const isDef=!!this.entries.find(e=>e.entry_id===this.entry)?.is_default;btn.classList.toggle('active',isDef);btn.textContent=isDef?'★':'☆';btn.title=isDef?'내 기본 차량으로 설정되어 있어요':'현재 차량을 내 기본 차량으로 지정';btn.setAttribute('aria-label',btn.title);}
-  async refreshVehicles(selected){this.entries=await this._hass.callWS({type:'carrot_ha/journal/entries'});const userDefault=this.entries.find(e=>e.is_default)?.entry_id;this.entry=selected||this.entries.find(e=>e.entry_id===this.entry)?.entry_id||userDefault||this.entries[0]?.entry_id;this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry||'__add__';this.updateDefaultVehicleButton();this.offset=0;await this.load(true);}
+  getFavoriteVehicle(){try{return localStorage.getItem('carrot_journal_favorite_vehicle');}catch{return null;}}
+  setFavoriteVehicle(entryId){try{if(entryId)localStorage.setItem('carrot_journal_favorite_vehicle',entryId);else localStorage.removeItem('carrot_journal_favorite_vehicle');}catch{}}
+  vehicleOptions(){const fav=this.getFavoriteVehicle();return this.entries.map(e=>`<option value="${esc(e.entry_id)}">${esc(e.title)}${e.entry_id===fav?' ★':''}</option>`).join('')+'<option value="__add__">＋ 새 차량 추가</option>';}
+  updateDefaultVehicleButton(){const btn=this.$('pinDefault');if(!btn)return;const fav=this.getFavoriteVehicle();const isFav=!!(this.entry&&this.entry===fav);btn.classList.toggle('active',isFav);btn.textContent=isFav?'★':'☆';btn.title=isFav?'즐겨찾기 기본 차량으로 설정되어 있어요':'현재 차량을 즐겨찾기 기본 차량으로 지정';btn.setAttribute('aria-label',btn.title);}
+  async refreshVehicles(selected){this.entries=await this._hass.callWS({type:'carrot_ha/journal/entries'});const fav=this.getFavoriteVehicle();const favExists=fav&&this.entries.some(e=>e.entry_id===fav);this.entry=selected||this.entries.find(e=>e.entry_id===this.entry)?.entry_id||(favExists?fav:null)||this.entries.find(e=>e.is_default)?.entry_id||this.entries[0]?.entry_id;this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry||'__add__';this.updateDefaultVehicleButton();this.offset=0;await this.load(true);}
   resetVehiclePreview(){this.vehiclePreview=null;this.$('importPreview').hidden=true;this.$('importPreview').replaceChildren();this.$('createVehicle').textContent='지금부터 기록할게요';this.$('vehicleImportFile').value='';}
   openVehicle(){this.$('vehicleForm').reset();this.resetVehiclePreview();this.$('vehicleError').textContent='';this.$('vehicleDialog').showModal();}
   chooseVehicleFile(kind){this.importKind=kind;this.$('vehicleImportFile').accept=kind==='michael'?'.xlsx,.xls':'.zip';this.$('vehicleImportFile').value='';this.$('vehicleImportFile').click();}
@@ -1144,15 +1148,100 @@ export class VehicleJournal extends HTMLElement {
   applyStationPrice(selected){if(this.recordMode!=='refueling'||this.unitPriceEdited||!(selected?.unit_price_krw>0))return;this.$('recordForm').elements.unit_price_krw.value=Number(selected.unit_price_krw).toLocaleString('ko-KR');this.unitPriceSource='opinet';this.unitPriceObserved=selected.price_observed_at;this.estimateFuelLiters();}
   async refreshStationPrice(){const p=this.draftLocation,f=this.$('recordForm').elements,generation=this.locationGeneration,date=f.date.value,fuel=f.fuel_type.value;if(this.editing||this.recordMode!=='refueling'||date!==this.todayKst()||p?.latitude==null||!fuel)return;try{const result=await this.call('stations/lookup',{kind:'refueling',latitude:p.latitude,longitude:p.longitude,date,fuel,price_only:true});if(generation!==this.locationGeneration||date!==f.date.value||fuel!==f.fuel_type.value||!this.$('recordDialog').open)return;this.applyStationPrice(result.selected);this.$('locationHint').textContent=result.message;}catch(e){this.$('locationHint').textContent=e.message;}}
   renderPlaceStatistics(){
-    this.$('placeStatisticsBasis').textContent=this.isCombustion()?'선택 기간의 주유소별 방문·주유량·L당 평균 단가예요.':'선택 기간의 장소별 기록 · 청구량과 배터리 추정량은 분리해요.';const places=this.data?.station_stats?.places||[];
-    this.$('stationStatistics').innerHTML=places.map(p=>{
-      const fuel=p.kind==='refueling',rate=(avg,unit)=>avg==null?'단가 계산 불가':money(avg)+' / '+unit;
-      const quantities=fuel?`${p.fuel_liters>0?numeric(p.fuel_liters)+' L':'주유량 기록 없음'}<small>${rate(p.fuel_average_krw,'L')}</small>`:[p.billed_kwh>0?`${numeric(p.billed_kwh)} kWh (청구량)<small>${rate(p.billed_average_krw,'kWh')}</small>`:'',p.battery_kwh>0?`${numeric(p.battery_kwh)} kWh (배터리 추정량)<small>${rate(p.battery_average_krw,'kWh')}</small>`:''].filter(Boolean).join('<br>')||'충전량 기록 없음';
-      return `<div class="list-row"><span>${esc(p.location.name||p.location.address||'직접 지정한 위치')} · ${numeric(p.visits,0)}회<small>${p.resolved?'장소 확정':'장소명만 보존 · 위치 확인 필요'}</small></span><span>${quantities}</span></div>`;
-    }).join('')||'<p class="note">이 기간에 위치가 지정된 주유·충전 기록이 없어요.</p>';
-    const e=this.data?.efficiency_facts,box=this.$('fuelEfficiencySummary');box.hidden=!this.isCombustion();if(box.hidden)return;
-    const describe=x=>x?.efficiency_km_l==null?'계산 가능한 가득 주유 구간 없음':`${numeric(x.efficiency_km_l,2)} km/L${x.estimated?' · 추정 주유량 포함':''}`;
-    box.innerHTML=`<h3>가득 주유 구간 연비</h3><p>선택 기간: ${describe(e?.selected)}</p><p>전체 가중 평균: ${describe(e?.overall)}</p><small>${esc(e?.basis||'부분 주유를 포함해 총거리 ÷ 총주유량으로 계산해요.')}</small>${(e?.intervals||[]).map(i=>`<div class="list-row"><span>${esc(i.from)} ~ ${esc(i.to)}<small>부분 주유 ${i.partial_count}회 · ${numeric(i.distance_km)} km / ${numeric(i.fuel_liters)} L</small></span><b>${numeric(i.efficiency_km_l,2)} km/L${i.estimated?' (추정)':''}</b></div>`).join('')}${(e?.warnings||[]).map(w=>`<p class="note">${esc(w.date)}: ${esc(w.reason)}</p>`).join('')}`;
+    this.initTrendsMap();
+  }
+  resetTrendsMap(){
+    if(!this.trendsMapInstance)return;
+    const maps=window.kakao?.maps;
+    if(!maps)return;
+    this.trendsMapInstance.setLevel(13);
+    this.trendsMapInstance.panTo(new maps.LatLng(36.2683,127.6358));
+  }
+  showTrendsPlaceCard(p,placeName,totalKrw,visits,color){
+    const card=this.$('trendsPlaceCard');
+    if(!card)return;
+    card.hidden=false;
+    const kindLabel=p.kind==='refueling'?'주유소':p.kind==='charging'?'충전소':(categories[p.kind]||'방문 장소');
+    card.innerHTML=`<div class="trends-place-card-inner"><div class="trends-place-card-head"><div class="trends-place-title-wrap"><span class="trends-place-dot" style="background:${color}"></span><strong class="trends-place-title">${esc(placeName)}</strong><small class="muted" style="font-size:12px;margin-left:4px;">${kindLabel}</small></div><button type="button" class="trends-place-close-btn" aria-label="닫기">×</button></div><div class="trends-place-stats-grid"><div class="trends-place-stat-item"><span class="trends-place-stat-label">누적 사용금액</span><strong class="trends-place-stat-val">${money(totalKrw)}</strong></div><div class="trends-place-stat-item"><span class="trends-place-stat-label">누적 방문횟수</span><strong class="trends-place-stat-val">${numeric(visits,0)}회</strong></div></div></div>`;
+    const closeBtn=card.querySelector('.trends-place-close-btn');
+    if(closeBtn)closeBtn.onclick=e=>{
+      e.stopPropagation();
+      card.hidden=true;
+      if(this.trendsMapOverlays){
+        for(const ov of this.trendsMapOverlays){
+          ov.getContent()?.classList?.remove('active');
+        }
+      }
+    };
+  }
+  async initTrendsMap(){
+    const mapBox=this.$('trendsMap');
+    if(!mapBox||!this.data)return;
+    if(this.tab!==1)return;
+    try{
+      const maps=await this.kakaoMaps();
+      if(this.$('trendsMapNotice'))this.$('trendsMapNotice').hidden=true;
+      const centerPos=new maps.LatLng(36.2683,127.6358);
+      if(!this.trendsMapInstance){
+        mapBox.replaceChildren();
+        this.trendsMapInstance=new maps.Map(mapBox,{center:centerPos,level:13});
+        const zoomControl=new maps.ZoomControl();
+        this.trendsMapInstance.addControl(zoomControl,maps.ControlPosition.RIGHT);
+        maps.event.addListener(this.trendsMapInstance,'click',()=>{
+          if(this.$('trendsPlaceCard'))this.$('trendsPlaceCard').hidden=true;
+          if(this.trendsMapOverlays){
+            for(const ov of this.trendsMapOverlays){
+              ov.getContent()?.classList?.remove('active');
+            }
+          }
+        });
+      }else{
+        this.trendsMapInstance.relayout();
+      }
+      if(this.trendsMapOverlays){
+        for(const ov of this.trendsMapOverlays)ov.setMap(null);
+      }
+      this.trendsMapOverlays=[];
+      const places=this.data?.station_stats?.places||[];
+      const locatedPlaces=places.filter(p=>p.location?.latitude!=null&&p.location?.longitude!=null);
+      if(this.$('placeStatisticsBasis')){
+        this.$('placeStatisticsBasis').textContent=locatedPlaces.length?`선택 기간 방문한 장소 ${locatedPlaces.length}곳 · 점을 누르면 누적 금액과 방문횟수를 확인할 수 있어요.`:'선택한 기간 동안 좌표가 기록된 방문 장소가 없어요.';
+      }
+      for(const p of locatedPlaces){
+        const lat=p.location.latitude;
+        const lon=p.location.longitude;
+        const color=this.categoryColor(p.kind||'charging');
+        const placeName=p.location.name||p.location.address||(p.kind==='refueling'?'주유소':'충전소');
+        const totalKrw=(p.actual_krw!=null&&p.actual_krw>0)?p.actual_krw:(p.estimated_krw??0);
+        const visits=p.visits||1;
+        const dotWrap=document.createElement('div');
+        dotWrap.className='trends-map-dot-wrap';
+        dotWrap.innerHTML=`<div class="trends-map-dot" style="background:${color}" title="${esc(placeName)}"></div>`;
+        const overlay=new maps.CustomOverlay({
+          position:new maps.LatLng(lat,lon),
+          content:dotWrap,
+          xAnchor:0.5,
+          yAnchor:0.5,
+          zIndex:10
+        });
+        overlay.setMap(this.trendsMapInstance);
+        this.trendsMapOverlays.push(overlay);
+        dotWrap.onclick=e=>{
+          e.stopPropagation();
+          for(const wrap of mapBox.querySelectorAll('.trends-map-dot-wrap')){
+            wrap.classList.remove('active');
+          }
+          dotWrap.classList.add('active');
+          this.showTrendsPlaceCard(p,placeName,totalKrw,visits,color);
+          this.trendsMapInstance.panTo(new maps.LatLng(lat,lon));
+        };
+      }
+    }catch(e){
+      if(this.$('trendsMapNotice')){
+        this.$('trendsMapNotice').hidden=false;
+        this.$('trendsMapNotice').textContent=e.message||'지도를 불러오지 못했어요. 지도 API 설정을 확인해 주세요.';
+      }
+    }
   }
   renderNasStatus(state){this.$('nasStatus').textContent=state?.phase==='complete'?`복원 검증 완료 · ${state.last_success} · 차량 ${state.vehicles}대`:state?.phase==='failed'?'백업 실패: '+state.message:state?.phase==='running'?'백업 및 복원 검증 중이에요.':'아직 전용 NAS 백업을 실행하지 않았어요.';}
   async saveNasSettings(){if(!confirm('백업·자동 위치 설정을 저장하시겠습니까?'))return;try{await this.call('nas/config',{enabled:this.$('nasEnabled').checked,path:this.$('nasPath').value.trim(),automatic_locations:this.$('automaticLocations').checked});await this.loadJournalSettings();}catch(e){this.$('nasStatus').textContent=e.message;}}

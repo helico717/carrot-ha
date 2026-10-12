@@ -184,16 +184,21 @@ export const journalDesign = `:host {
       }
       .title-controls-row {
         gap: 8px;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
+        width: 100%;
       }
       .title-controls-row h2 {
         font-size: 21.5px;
         flex-shrink: 0;
       }
+      .title-controls-row .select-pill {
+        flex: 1;
+        min-width: 120px;
+        max-width: 100%;
+      }
       .select-pill, .date-pill {
         font-size: 13.5px;
         padding: 6px 8px;
-        flex: 1;
         min-width: 0;
       }
       .mast-right {
@@ -712,11 +717,10 @@ export const journalDesign = `:host {
       border-bottom: 1px solid var(--j-border);
       font-size: 16.5px;
     }
-    .cost-list .list-row:last-child {
-      border-bottom: 0;
-    }
-    .cost-list .list-row.cost-row:last-of-type {
-      border-bottom: 0;
+    .cost-list .list-row:last-child,
+    .cost-list .list-row.cost-row-last,
+    .cost-list .list-row:has(+ .cost-total-row) {
+      border-bottom: 0 !important;
     }
     .cost-cat-wrap {
       display: flex;
@@ -753,10 +757,10 @@ export const journalDesign = `:host {
       white-space: nowrap;
     }
     .cost-list .list-row.cost-total-row {
-      margin-top: 4px;
-      padding-top: 10px !important;
-      padding-bottom: 2px !important;
-      border-top: 1px solid var(--j-border);
+      margin-top: 8px;
+      padding-top: 14px !important;
+      padding-bottom: 4px !important;
+      border-top: 2px solid rgba(255, 255, 255, 0.28) !important;
       border-bottom: 0 !important;
     }
     .cost-total-name {
@@ -1327,16 +1331,16 @@ export const journalDesign = `:host {
   .donut{width:115px;height:115px}
   .h-phrase{white-space:normal}
 }
-.title-controls-row .select-pill,.title-controls-row .date-pill{width:auto;max-width:180px}
-.date-navigation{display:grid;grid-template-columns:36px minmax(0,180px) 36px auto;align-items:center;gap:6px;max-width:100%;min-width:0}
-.date-navigation .date-pill{box-sizing:border-box;min-width:0;width:100%;max-width:180px}
-.date-step,.date-current{box-sizing:border-box;min-height:38px;border:1px solid var(--j-border);border-radius:10px;background:var(--j-surface);color:var(--j-ink);cursor:pointer}
-.date-step{padding:0;font-size:25px;line-height:1}
-.date-current{padding:6px 10px;font-size:14px;white-space:nowrap;color:var(--j-accent);font-weight:750}
+.title-controls-row .select-pill{width:auto;max-width:240px}
+.date-navigation{display:flex;align-items:center;gap:6px;max-width:100%;min-width:0}
+.date-navigation .date-pill{box-sizing:border-box;min-width:115px;width:auto;max-width:160px;text-align:center}
+.date-step,.date-current{box-sizing:border-box;height:38px;min-height:38px;border:1px solid var(--j-border);border-radius:10px;background:var(--j-surface);color:var(--j-ink);cursor:pointer;flex-shrink:0}
+.date-step{width:36px;min-width:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:22px;line-height:1}
+.date-current{padding:6px 10px;font-size:14px;white-space:nowrap;color:var(--j-accent);font-weight:750;display:inline-flex;align-items:center}
 .date-step:hover,.date-current:hover{border-color:var(--j-accent)}
 .date-step:disabled{opacity:.35;cursor:not-allowed;transform:none;border-color:var(--j-border)}
 .date-step:focus-visible,.date-current:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
-@media(max-width:600px){.date-navigation{grid-template-columns:30px minmax(0,145px) 30px auto;gap:4px}.date-navigation .date-pill{padding:7px 5px}.date-current{padding:6px;font-size:13px}}
+@media(max-width:600px){.date-navigation{gap:5px}.date-step{width:34px;min-width:34px;height:36px;min-height:36px;font-size:20px}.date-navigation .date-pill{min-width:105px;max-width:140px;padding:6px 6px;font-size:13.5px}.date-current{height:36px;min-height:36px;padding:6px 8px;font-size:13px}}
 .legend-item{background:transparent;border:0;padding:2px 6px;min-height:20px;font-size: 12.5px}
 .trend-badge{white-space:nowrap;flex-shrink:0}
 
@@ -1417,4 +1421,31 @@ export const journalDesign = `:host {
 .btn-pin-default{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;min-height:34px;padding:0;border-radius:10px;border:1px solid var(--j-border);background:var(--j-surface);color:var(--j-sub);font-size:15px;cursor:pointer;transition:all 0.15s ease}
 .btn-pin-default:hover{border-color:#f6c445;color:#f6c445}
 .btn-pin-default.active{background:rgba(246,196,69,0.15);border-color:rgba(246,196,69,0.4);color:#f6c445}
+
+/* 추세 탭: 방문한 충전소·주유소 한반도 지도 & 장소 정보 카드 */
+.trends-map-panel{display:flex;flex-direction:column;gap:14px}
+.trends-map-header{display:flex;flex-direction:column;gap:4px}
+.trends-map-wrapper{position:relative;width:100%;height:420px;border-radius:18px;overflow:hidden;border:1px solid var(--j-border);background:#141c23}
+.trends-map-canvas{width:100%;height:100%}
+.trends-map-reset-btn{position:absolute;top:14px;right:14px;z-index:15;background:rgba(22,30,37,0.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.18);border-radius:8px;color:var(--j-ink);font-size:12.5px;font-weight:600;padding:6px 11px;min-height:auto;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.35);transition:all 0.15s ease}
+.trends-map-reset-btn:hover{background:var(--j-surface);border-color:var(--j-accent);color:var(--j-accent)}
+.trends-map-dot-wrap{transform:translate(-50%,-50%);cursor:pointer;padding:8px;display:flex;align-items:center;justify-content:center}
+.trends-map-dot{width:14px;height:14px;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.5);transition:transform 0.18s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.18s ease}
+.trends-map-dot-wrap:hover .trends-map-dot,.trends-map-dot-wrap.active .trends-map-dot{transform:scale(1.45);box-shadow:0 0 0 4px rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.6)}
+.trends-place-card{position:absolute;bottom:14px;left:14px;right:14px;max-width:380px;z-index:20;background:rgba(17,24,30,0.94);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,0.55);animation:trendsCardFadeIn 0.2s ease-out}
+@keyframes trendsCardFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.trends-place-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.trends-place-title-wrap{display:flex;align-items:center;gap:8px;min-width:0}
+.trends-place-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.trends-place-title{font-size:16px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trends-place-close-btn{background:transparent;border:0;color:var(--j-sub);font-size:20px;line-height:1;padding:2px 6px;min-height:auto;cursor:pointer;border-radius:6px}
+.trends-place-close-btn:hover{color:#ffffff;background:rgba(255,255,255,0.1)}
+.trends-place-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.trends-place-stat-item{display:flex;flex-direction:column;gap:2px}
+.trends-place-stat-label{font-size:12px;color:var(--j-sub);font-weight:500}
+.trends-place-stat-val{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:#ffffff}
+@media(max-width:600px){
+  .trends-map-wrapper{height:350px}
+  .trends-place-card{bottom:10px;left:10px;right:10px;padding:12px 14px}
+}
 `;
