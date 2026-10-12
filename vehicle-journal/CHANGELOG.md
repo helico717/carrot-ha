@@ -1,6 +1,6 @@
 ## 2026-10-13 — 차계부 설정 'Synology · HA 백업 상태' 탭 UI 개편 및 고도화
 
-- 커밋 제목: vehicle-journal: modernize HA backup status tab with cards and guide banner
+- 커밋 제목: vehicle-journal: modernize HA backup status tab with cards and guide banner (`bc09f1a`)
 - 변경·이유:
   - 차계부 설정 내 '백업 상태' 탭이 HA Core의 `backup` 통합 엔티티들을 단순 텍스트 줄바꿈으로 노출하던 방식을 현대식 카드 및 배너 레이아웃으로 전면 개편.
   - 상단 요약 배너: 백업 관리자 상태(`blocked`, `idle` 등)를 한국어(`차단됨 (대기 중)`, `대기 중 (정상)` 등) 및 상태별 컬러 뱃지(Warning 앰버, Success 민트 등)로 시각화하고 설명 제공.
