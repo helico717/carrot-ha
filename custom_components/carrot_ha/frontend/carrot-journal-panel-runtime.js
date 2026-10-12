@@ -6,12 +6,12 @@ const {VehicleJournal}=await import(moduleURL('./carrot-vehicle-journal.js'));
 const viewKey='carrot-journal-update-view';
 function ancestors(card){const nodes=[];for(let node=card;node;node=node.assignedSlot||node.parentNode||node.host)if(node.nodeType===1)nodes.push(node);return nodes;}
 export async function mountJournalPanel(panel,loadedVersion){
-  panel.shadowRoot.innerHTML='<style>:host{display:block;min-height:100%;background:#0b1014;color:#f1f6fa;font-family:system-ui}header{display:flex;align-items:center;gap:16px;padding:12px 24px;border-bottom:1px solid #2a3945}button{font:inherit;color:inherit;background:#202c36;border:1px solid #2a3945;border-radius:10px;min-height:44px;cursor:pointer}button:focus-visible{outline:3px solid #7bb6ff;outline-offset:2px}[hidden]{display:none!important}#update{padding:12px 24px;position:sticky;top:0;z-index:10;background:#161e25}main{max-width:1320px;margin:auto;padding:16px 12px}</style><header><button id="menu" type="button" aria-label="HA 메뉴 열기">☰</button><span>차계부</span></header><div id="update" hidden role="status"><span>새 화면 버전이 있어요. </span><button id="apply" type="button">새 화면 버전 적용</button><span id="updateMessage"></span></div><main></main>';
+  panel.shadowRoot.innerHTML='<style>:host{display:block;min-height:100%;background:#0b1014;color:#f1f6fa;font-family:system-ui}header{display:flex;align-items:center;gap:16px;padding:12px 24px;border-bottom:1px solid #2a3945}button{font:inherit;color:inherit;background:#202c36;border:1px solid #2a3945;border-radius:10px;min-height:44px;cursor:pointer}button:focus-visible{outline:3px solid #7bb6ff;outline-offset:2px}[hidden]{display:none!important}#update{padding:12px 24px;position:sticky;top:0;z-index:10;background:#161e25}#settings{margin-left:auto;padding:8px 16px}main{max-width:1320px;margin:auto;padding:16px 12px}</style><header><button id="menu" type="button" aria-label="HA 메뉴 열기">☰</button><span>차계부</span><button id="settings" type="button">설정</button></header><div id="update" hidden role="status"><span>새 화면 버전이 있어요. </span><button id="apply" type="button">새 화면 버전 적용</button><span id="updateMessage"></span></div><main></main>';
   // A distinct class/tag prevents a previously loaded Lovelace card definition
   // from winning registration of this version in the current document.
   const tag='carrot-journal-screen-'+loadedVersion.replace(/[^a-z0-9]/gi,'-').toLowerCase();
   if(!customElements.get(tag))customElements.define(tag,class extends VehicleJournal{});
-  const card=panel.card=document.createElement(tag);card.setConfig({});
+  const card=panel.card=document.createElement(tag);card.setConfig({panel:true});
   let saved;
   try{saved=JSON.parse(sessionStorage.getItem(viewKey)||'null');sessionStorage.removeItem(viewKey);}catch{}
   if(saved&&Date.now()-saved.time<120000&&saved.path===location.pathname){
@@ -29,6 +29,7 @@ export async function mountJournalPanel(panel,loadedVersion){
     }));};card.addEventListener('journal-rendered',restore);
   }
   panel.shadowRoot.querySelector('main').append(card);if(panel._hass)card.hass=panel._hass;
+  panel.shadowRoot.getElementById('settings').onclick=()=>card.openVehicleManagement();
   panel.shadowRoot.getElementById('menu').onclick=()=>panel.dispatchEvent(new CustomEvent('hass-toggle-menu',{bubbles:true,composed:true}));
   panel.shadowRoot.getElementById('apply').onclick=()=>{
     // Closing a dialog does not necessarily discard the entered draft or photos.

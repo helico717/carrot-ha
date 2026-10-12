@@ -43,7 +43,12 @@ class Vehicles:
     def entries(self,include_deleted=False):
         entries=[];seen=set()
         for key,runtime in {**self.manual,**self.hass.data.get('carrot_ha',{})}.items():
-            if not isinstance(runtime,dict) or 'journal' not in runtime:continue
+            if not isinstance(runtime,dict) or 'entry' not in runtime:continue
+            if 'journal' not in runtime:
+                if runtime.get('journal_error'):
+                    meta=self.metadata.get(key,{})
+                    if include_deleted or not meta.get('deleted'):entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':True,'unavailable':True,'error':runtime['journal_error']})
+                continue
             if runtime['journal'].vehicle in seen:continue
             seen.add(runtime['journal'].vehicle)
             meta=self.metadata.get(key,{})
@@ -96,7 +101,7 @@ class Vehicles:
             metadata=plan.get('metadata',{}) if plan else {}
             if plan and plan['format']=='snapshot':
                 vehicle_id=str(UUID(metadata['vehicle_id']))
-                if any(e['vehicle_id']==vehicle_id or (metadata.get('linked') and self.get(e['entry_id'],True)['journal'].device==metadata.get('device_id')) for e in self.entries(True)):raise ValueError('같은 차량이 이미 있어요. 휴지통도 확인해 주세요. 덮어쓰지 않았어요.')
+                if any(e.get('vehicle_id')==vehicle_id or (metadata.get('linked') and (self.get(e['entry_id'],True).get('journal').device if self.get(e['entry_id'],True).get('journal') else getattr(self.get(e['entry_id'],True).get('entry'),'data',{}).get('device_id'))==metadata.get('device_id')) for e in self.entries(True)):raise ValueError('같은 차량이 이미 있어요. 휴지통도 확인해 주세요. 덮어쓰지 않았어요.')
             key='journal-'+str(uuid4());device=metadata.get('device_id') or 'manual-'+str(uuid4());timezone=metadata.get('timezone') or self.hass.config.time_zone
             path=self.hass.config.path('carrot_ha','vehicle_journal',key+'.sqlite3')
             def prepare():

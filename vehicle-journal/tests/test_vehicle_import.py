@@ -83,8 +83,15 @@ class StorageTests(unittest.TestCase):
             db.execute('INSERT INTO vehicles VALUES (?,?,?,?,?,?)',(vehicle,'entry','car','Asia/Seoul','KRW','2025-10-01'))
             db.execute("INSERT INTO records(vehicle_id,id,kind,origin,created_at,updated_at) VALUES (?,?,'expense','manual',?,?)",(vehicle,record,'2025-10-01','2025-10-01'))
             db.execute("INSERT INTO expenses(vehicle_id,record_id,accounting_date,category,actual_krw,payment_owner) VALUES (?,?,?,'maintenance',9000,'journal')",(vehicle,record,'2025-10-01'))
+            charge=str(uuid4())
+            db.execute("INSERT INTO records(vehicle_id,id,kind,origin,created_at,updated_at) VALUES (?,?,'charge','manual',?,?)",(vehicle,charge,'2025-10-01','2025-10-01'))
+            db.execute('INSERT INTO mobility(vehicle_id,record_id,started_at,ended_at) VALUES (?,?,?,?)',(vehicle,charge,'2025-10-01T00:00:00Z','2025-10-01T01:00:00Z'))
+            db.execute('INSERT INTO expense_members VALUES (?,?,?)',(vehicle,record,charge))
         upgraded=Journal(self.path,'entry','car','Asia/Seoul')
         self.assertTrue(Path(str(self.path)+'.before-schema2.sqlite3').exists())
+        with upgraded.connect() as db:
+            self.assertEqual(db.execute('SELECT * FROM expense_members').fetchall(),[(vehicle,record,charge)])
+            self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(),[])
         upgraded.save_manual(str(uuid4()),0,{'kind':'expense','date':'2025-10-01','category':'refueling','actual_krw':100})
         self.assertEqual(upgraded.query('2025-10-01','2025-10-31')['totals']['total_cost_krw'],9100)
     def test_location_validation_and_conflict(self):
@@ -127,3 +134,12 @@ class VehicleTests(unittest.IsolatedAsyncioTestCase):
         await self.m.change('linked','이름 변경','electric',True)
         self.assertIs(self.hass.data['carrot_ha']['linked']['archive'],archive)
         self.assertEqual(self.m.entries(),[])
+
+class FailedVehicleVisibilityTests(unittest.TestCase):
+    def test_failed_device_is_listed_instead_of_disappearing(self):
+        hass=SimpleNamespace(data={'carrot_ha':{'entry':{'entry':SimpleNamespace(title='기존 차량'),'journal_error':'초기화 실패'}}})
+        m=Vehicles(hass,None)
+        entries=m.entries()
+        self.assertEqual(len(entries),1)
+        self.assertEqual(entries[0]['title'],'기존 차량')
+        self.assertTrue(entries[0]['unavailable'])

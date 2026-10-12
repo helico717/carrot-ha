@@ -28,7 +28,7 @@ def runtime(hass, connection, msg):
     m=hass.data.get('carrot_ha_journal_manager')
     result=m.get(msg['entry_id']) if m else hass.data.get('carrot_ha',{}).get(msg['entry_id'])
     if not isinstance(result,dict) or 'journal' not in result:
-        connection.send_error(msg['id'],'not_found','차계부 통합을 찾을 수 없어요.')
+        connection.send_error(msg['id'],'not_found',result.get('journal_error','차계부 통합을 찾을 수 없어요.') if isinstance(result,dict) else '차계부 통합을 찾을 수 없어요.')
         return None
     return result
 
@@ -206,7 +206,7 @@ async def settings(hass,connection,msg):
         if entity.platform!='backup':continue
         state=hass.states.get(entity.entity_id)
         if state:backup.append({'name':state.name,'state':state.state,'entity_id':entity.entity_id})
-    connection.send_result(msg['id'],{'map_key':m.map_key,'opinet_configured':bool(m.opinet_key),'kakao_rest_configured':bool(m.kakao_rest_key),'backup_entities':backup,'nas_transfer_verified':False})
+    connection.send_result(msg['id'],{'map_key':m.map_key,'opinet_configured':bool(m.opinet_key),'kakao_rest_configured':bool(m.kakao_rest_key),'kakao_rest_key':m.kakao_rest_key,'opinet_key':m.opinet_key,'backup_entities':backup,'nas_transfer_verified':False})
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/location/search',vol.Required('query'):str})

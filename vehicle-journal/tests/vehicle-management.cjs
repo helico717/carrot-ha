@@ -14,7 +14,7 @@ const fs=require('fs');
    if(msg.type.endsWith('/entries'))return window.vehicles.filter(v=>msg.include_deleted||!v.deleted);
    if(msg.type.endsWith('/vehicle/create')){const vehicle={entry_id:'manual',title:msg.title,fuel:msg.fuel,linked:false};window.vehicles.push(vehicle);return {entry_id:'manual',imported:msg.preview_token?2:0};}
    if(msg.type.endsWith('/vehicle/update')){Object.assign(window.vehicles.find(v=>v.entry_id===msg.entry_id),msg);return {};}
-   if(msg.type.endsWith('/settings'))return {map_key:'',opinet_configured:true,backup_entities:[{name:'마지막 백업',state:'2026-10-12'}]};
+   if(msg.type.endsWith('/settings'))return {map_key:'0123456789abcdef0123456789abcdef',kakao_rest_key:'abcdef0123456789abcdef0123456789',opinet_key:'TESTKEY',opinet_configured:true,backup_entities:[{name:'마지막 백업',state:'2026-10-12'}]};
    if(msg.type.endsWith('/map/config'))return {key:'0123456789abcdef0123456789abcdef'};
    if(msg.type.endsWith('/query'))return {totals:{categories:{}},daily:[],records:[],recent_records:[],record_count:0,has_more:false,status:{phase:'complete'},timezone:'Asia/Seoul',record_filters_supported:true};
    return {id:msg.record_id,version:2};
@@ -29,6 +29,16 @@ const fs=require('fs');
  if(!await root.locator('#backupStatus').textContent().then(t=>t.includes('마지막 백업')))throw Error('backup status absent');
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===true);
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===false);
+ await root.locator('[data-settings-nav=api]').click();
+ if(await root.locator('#opinetKey').inputValue()!=='TESTKEY')throw Error('saved key not prefilled');
+ await root.locator('[data-key-toggle=opinetKey]').click();if(await root.locator('#opinetKey').getAttribute('type')!=='text')throw Error('saved key reveal');
+ await root.locator('#opinetKey').fill('CHANGED');
+ const before=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/settings')&&c.opinet_key!==undefined).length);
+ page.once('dialog',dialog=>dialog.dismiss());await root.locator('#saveOpinetKey').click();
+ if(await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/settings')&&c.opinet_key!==undefined).length)!==before)throw Error('cancelled key save wrote settings');
+ page.once('dialog',dialog=>dialog.accept());await root.locator('#saveOpinetKey').click();
+ if(await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/settings')&&c.opinet_key!==undefined).length)!==before+1)throw Error('confirmed key save missing');
+ await root.locator('[data-settings-nav=vehicles]').click();
  await root.locator('#closeVehicleManage').click();
  await root.locator('#entry').selectOption('__add__');await root.locator('#newVehicleTitle').fill('이관 차량');
  await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').importKind='michael');
@@ -49,7 +59,7 @@ const fs=require('fs');
  if(await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').draftLocation.latitude)!==35)throw Error('manual pin not applied');
  await root.locator('#removeLocation').click();if(!await root.locator('#locationEditor').isHidden())throw Error('removed location still maps');
  await root.locator('#close').click();
- for(const width of [360,320]){await page.setViewportSize({width,height:900});await root.locator('#journalSettings').click();if(await root.locator('#vehicleManageDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('settings overflow '+width);await root.locator('#closeVehicleManage').click();await root.locator('#entry').selectOption('__add__');if(await root.locator('#vehicleDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('vehicle dialog overflow '+width);await root.locator('#closeVehicle').click();}
+ for(const width of [1280,360,320]){await page.setViewportSize({width,height:900});await root.locator('#journalSettings').click();if(await root.locator('.settings-nav').boundingBox().then(nav=>root.locator('.settings-content').boundingBox().then(content=>nav.x+nav.width>content.x+1)))throw Error('settings nav not left of content '+width);if(await root.locator('#vehicleManageDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('settings overflow '+width);await root.locator('#closeVehicleManage').click();await root.locator('#entry').selectOption('__add__');if(await root.locator('#vehicleDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('vehicle dialog overflow '+width);await root.locator('#closeVehicle').click();}
  fs.mkdirSync('.preview/journal',{recursive:true});await root.locator('#entry').selectOption('__add__');await page.screenshot({path:'.preview/journal/vehicle-dialog-mobile.png',fullPage:true});await root.locator('#closeVehicle').click();await root.locator('#journalSettings').click();await page.screenshot({path:'.preview/journal/settings-mobile.png',fullPage:true});
  if(await root.locator('#message').evaluate(el=>el.classList.contains('error')))throw Error('journal render error: '+await root.locator('#message').textContent());
  if(errors.length)throw Error(errors.join('\n'));
