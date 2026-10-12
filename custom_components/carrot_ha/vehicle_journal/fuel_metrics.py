@@ -36,7 +36,10 @@ def odometer(db,vehicle,start,end):
         points.setdefault(data['date'],set()).add(value)
     previous=[d for d in points if d<start];baseline=max(previous) if previous else None
     inside=sorted(d for d in points if start<=d<=end)
-    result={'distance_km':None,'from':baseline,'to':inside[-1] if inside else None,'daily':[],'warning':None}
+    fallback=False
+    if not baseline and start.endswith('-01-01') and end.startswith(start[:4]) and len(inside)>=2:
+        baseline=inside.pop(0);fallback=True
+    result={'distance_km':None,'from':baseline,'to':inside[-1] if inside else None,'daily':[],'warning':'연초 기준 기록이 없어 해당 연도 첫 기록부터 계산했어요.' if fallback else None}
     if not baseline or not inside:
         result['warning']='이전 기간 기준 누적거리 또는 선택 기간 누적거리 기록이 없어요.';return result
     dates=[baseline]+inside

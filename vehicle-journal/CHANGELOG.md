@@ -1,3 +1,12 @@
+## 2026-10-12 — vehicle-journal: fix combustion comparison annual distance and chart labels
+
+- 원인: 절약 비교는 EV 전비/충전비만 검사하고 거리 슬라이더도 기존 distance_km만 사용. 내연기관은 합의한 주유 지출÷관측 거리의 원/km 기준으로 비교 차량 연비/유가와 추정 비교. 실제 연비가 아니며 기간 차이 오차를 명시. 기록 거리 버튼·슬라이더에 관측 거리 연결.
+- 연간은 이전 연도 기준이 없을 때 합의대로 해당 연도 첫/마지막 누적거리로 관측 구간 계산. 연초 누락 안내 표시. 월간 기존 기준 유지; 감소/상충 제외. 대시보드 제목 바로 아래 계산 구간 표시.
+- 도넛 중심 금액은 전체 원화/천 단위 구분을 유지하며 SVG textLength/문자수별 크기로 내부 폭 82로 제한. 설정 버튼 글자 크기·분류 텍스트 복원, 줄인 padding/높이 유지.
+- 관련 파일: vehicle_journal/fuel_metrics.py, frontend/{carrot-vehicle-journal,carrot-journal-design}.js, tests/{test_vehicle_import.py,vehicle-management.cjs}.
+- 검증: Python 37개, 합성 Chrome 연간 내연기관 비교/관측 거리·큰 금액 SVG 경계·설정 글꼴 및 기존 EV 탭/차트/월연도/수기 저장 회귀 통과. 구문·diff 검사 통과.
+- 배포: main 커밋·푸시 후 승인된 HA 코드 백업·반영. 서버 계산 적용은 사용자 재시작 필요. DB/사진 직접 변경 없음; 실제 브라우저 확인 대기. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: record final category-entry deployment
 
 - b1816df main 푸시·합성 Chrome 종류별 입력/하이브리드 유종 명시 검증 통과. HA deployment-backups/b1816df9c3359e269fdd77b3b65619c61db5f8c0/ 화면 모듈 백업·반영, 설치 및 내부/외부 HTTP 해시 일치.

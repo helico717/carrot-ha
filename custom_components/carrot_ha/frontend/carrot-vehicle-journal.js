@@ -68,7 +68,7 @@ export class VehicleJournal extends HTMLElement {
 
             <!-- 1. 영웅 카드 (클린 3단 큼직한 타이포그래피 문장형) -->
             <article class="panel wide hero" id="heroCard">
-              <h1 id="headline">기록을 불러오고 있어요.</h1>
+              <h1 id="headline">기록을 불러오고 있어요.</h1><p id="odometerBasis" class="note" hidden></p>
               <div class="stats" id="briefStats"></div>
               <div class="hero-btn-wrap">
                 <button id="gotoCompare" class="btn-hero-action" type="button">상세 기록보기 →</button>
@@ -224,7 +224,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('driveModeField').onchange=()=>{this.draftDirty=true;this.formFields();};
     this.$('recordForm').addEventListener('input' ,()=>{this.draftDirty=true;});
     for(const id of ['compareDistance','comparePrice','economy'])this.$(id).oninput=()=>{this.compareAdjusted=true;this.renderSavings();};
-    this.$('recordedDistance').onclick=()=>{this.$('compareDistance').value=this.data?.totals?.distance_km??0;this.renderSavings();};
+    this.$('recordedDistance').onclick=()=>{this.$('compareDistance').value=this.recordedDistance()??0;this.renderSavings();};
     this.$('averagePrice').onclick=()=>{this.useAveragePrice();this.renderSavings();};
     for(const button of this.shadowRoot.querySelectorAll('[data-compare-fuel]'))button.onclick=()=>{this.$('fuel').value=button.dataset.compareFuel;this.compareAdjusted=true;this.useAveragePrice();this.renderSavings();};
     this.$('cancelFuelEdit').onclick=()=>{this.comparisonDirty=false;this.$('compareForm').hidden=true;};
@@ -331,6 +331,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('ledgerFilterSummary').textContent=this.recordCategories.size?`${this.recordCategories.size}개 선택`:'전체';
     for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.checked=this.recordCategories.has(button.dataset.ledgerCategory);
   }
+  recordedDistance(){return this.isCombustion()?(this.data?.odometer_facts?.distance_km??this.data?.totals?.distance_km??null):this.data?.totals?.distance_km??null;}
   isCombustion(){return ['gasoline','diesel','hybrid'].includes(this.entries.find(e=>e.entry_id===this.entry)?.fuel);}
   categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#81e6c5',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
   costCategories(totals){
@@ -521,6 +522,7 @@ export class VehicleJournal extends HTMLElement {
     const periodHeadline=this.scope==='year'?`${yearNum}년 에는`:`${monthNum}월 달에는`;
     this.$('headline').innerHTML=`<span class="h-phrase">${periodHeadline}</span><br><span class="h-phrase">${numeric(displayDistance)}km를 달리고,</span><br><span class="h-phrase"><span class="accent">${money(t.total_cost_krw)}</span>을 소비했어요.</span>`;
 
+    this.$('odometerBasis').hidden=!ice;this.$('odometerBasis').textContent=ice?`누적거리 기준 관측 구간 ${odo?.from||'기준 없음'} ~ ${odo?.to||'기록 없음'} · ${odo?.warning||'월·연도 전체의 정확한 주행거리와 다를 수 있어요.'}`:'';
     const effLabel=this.scope==='year'?(isThisYear?'올해 전비':`${yearNum}년 전비`):(isThisMonth?'이번달 전비':`${monthNum}월 전비`);
     const chargeLabel=this.scope==='year'?(isThisYear?'올해 충전량':`${yearNum}년 충전량`):(isThisMonth?'이번달 충전량':`${monthNum}월 충전량`);
 
@@ -551,7 +553,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('costs').innerHTML=amounts.map(([k,v],i)=>`<div class="list-row"><span style="display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:var(--j-ink)"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:9px;flex-shrink:0;background:${colors[i]}"></span>${esc(categories[k]||k)}</span><strong style="font-size:16px;font-weight:750;font-variant-numeric:tabular-nums;color:#ffffff">${money(v.effective_krw)}</strong></div>`).join('')||'<p class="note">이 기간의 지출 기록이 아직 없어요.</p>';
     const total=amounts.reduce((sum,[,v])=>sum+v.effective_krw,0);let offset=0;
     const donutLabel=this.scope==='year'?(isThisYear?'올해 지출':`${yearNum}년 지출`):(isThisMonth?'이번 달 지출':`${monthNum}월 지출`);
-    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="18.5" font-weight="850" letter-spacing="-0.5">${money(total)}</text>`;
+    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="${Math.min(18.5,82/(money(total).length*0.66)).toFixed(1)}" textLength="${Math.min(82,money(total).length*18.5*0.66).toFixed(1)}" lengthAdjust="spacingAndGlyphs" font-weight="850" letter-spacing="-0.5">${money(total)}</text>`;
     this.renderRecentExpenses();
     this.renderSpendingComparison();
     this.updateLedgerFilters();
@@ -580,8 +582,8 @@ export class VehicleJournal extends HTMLElement {
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=visibleRecords.length?`${this.offset+1}~${this.offset+visibleRecords.length}번째 기록`:'표시할 기록이 없어요.';
     if(!this.recordFiltersSupported)this.$('pageLabel').textContent+=' · 전체 기간 필터 적용을 위해 HA 재시작이 필요해요.';
     const comparisonKey=JSON.stringify([this.entry,this.$('month').value,this.scope]);
-    if(this.savingsKey!==comparisonKey){this.savingsKey=comparisonKey;this.compareAdjusted=false;this.$('fuel').value=d.comparison?.fuel||'gasoline';this.$('economy').value=d.comparison?.economy_km_l||15;this.$('compareDistance').max=Math.max(5000,t.distance_km||0);this.$('compareDistance').value=t.distance_km??0;this.useAveragePrice();}
-    if(!this.compareAdjusted){this.$('compareDistance').value=t.distance_km??0;this.useAveragePrice();}
+    if(this.savingsKey!==comparisonKey){this.savingsKey=comparisonKey;this.compareAdjusted=false;this.$('fuel').value=d.comparison?.fuel||'gasoline';this.$('economy').value=d.comparison?.economy_km_l||15;this.$('compareDistance').max=Math.max(5000,this.recordedDistance()||0);this.$('compareDistance').value=this.recordedDistance()??0;this.useAveragePrice();}
+    if(!this.compareAdjusted){this.$('compareDistance').value=this.recordedDistance()??0;this.useAveragePrice();}
     this.renderSavings();
     this.renderTrendsDashboard();
     this.loadThumbnails();
@@ -602,11 +604,18 @@ export class VehicleJournal extends HTMLElement {
     if(this.shadowRoot.activeElement===this.$('comparePrice')){this.averageMissing=false;this.priceManual=true;}
     const title=this.entries.find(e=>e.entry_id===this.entry)?.title||'선택 차량';
     this.$('compareBasis').textContent=`${this.$('month').value} · ${title} · ${numeric(distance)}km 기준`;
-    this.$('distanceValue').textContent=numeric(distance)+'km';this.$('distanceStatus').textContent=distance===t.distance_km?'선택 기간에 기록된 주행거리':'직접 조정한 거리';
+    this.$('distanceValue').textContent=numeric(distance)+'km';this.$('distanceStatus').textContent=distance===this.recordedDistance()?'선택 기간에 기록된 주행거리':'직접 조정한 거리';
     this.$('priceValue').textContent=labels[fuel]+' 유가 '+(priceKnown?money(price)+'/L':'미확인');this.$('priceStatus').textContent=this.averageMissing?'전국 평균 유가 센서를 확인해 주세요.':this.priceManual?'직접 조정한 유가':'전국 평균 기준';
     this.$('fuelConnections').innerHTML=Object.entries(labels).map(([key,label])=>{const item=this.selectedFuelPrice(key);return `<div class="fuel-connection-row"><div><b>${label}</b><small>${item.price!=null?'연결됨 · '+money(item.price)+'/L':'연결 확인 필요'}</small></div><button class="compact" type="button" data-edit-fuel="${key}">수정</button></div>`;}).join('');
     this.$('averagePrice').disabled=average.price==null;this.$('economyValue').textContent=numeric(economy)+'km/L';
     for(const b of this.shadowRoot.querySelectorAll('[data-compare-fuel]')){b.classList.toggle('active',b.dataset.compareFuel===fuel);b.setAttribute('aria-pressed',String(b.dataset.compareFuel===fuel));}
+    if(this.isCombustion()){
+      const basisDistance=this.recordedDistance(),cost=this.data.fuel_facts?.totals?.fuel_cost_krw;
+      if(!priceKnown||!(economy>0)||!(basisDistance>0)||cost==null||!(this.data.fuel_facts?.totals?.fuel_count>0)){this.$('saving').textContent='비교에 필요한 관측 거리·주유 지출·비교 차량 연비·유가를 확인해 주세요.';this.$('compareDetail').textContent='';return;}
+      const current=distance*cost/basisDistance,other=distance/economy*price,diff=other-current,max=Math.max(1,current,other);
+      this.$('saving').textContent=money(Math.abs(diff))+(diff>=0?' 덜 들어요':' 더 들어요');
+      this.$('compareDetail').innerHTML='<p class="note">주유 지출 기준 추정 · 실제 연비 계산이 아니며 주유·주행 기간 차이로 오차가 있어요.</p>'+[[title,current,'mint'],['비교 차량',other,'orange']].map(([label,value,color])=>`<div class="row spaced"><span>${esc(label)}</span><b class="${color}">${money(value)}</b></div><div class="cost-bar ${color}"><span style="width:${value/max*100}%"></span></div>`).join('');return;
+    }
     const kwh=t.billed_charge_kwh||t.battery_charge_kwh,rate=kwh>0&&t.charge_effective_krw!=null?t.charge_effective_krw/kwh:null,eff=t.efficiency_km_kwh;
     if(!priceKnown||rate==null||!(eff>0)||t.distance_km==null){this.$('saving').textContent='비교에 필요한 거리·전비·충전비·유가를 확인해 주세요.';this.$('compareDetail').textContent='';return;}
     const ev=distance/eff*rate,ice=distance/economy*price,diff=ice-ev,max=Math.max(1,ev,ice);

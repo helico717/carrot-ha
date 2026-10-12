@@ -58,6 +58,11 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'],1000)
         self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':'2025-10-21','odometer_km':90000})
         self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
+    def test_annual_missing_baseline_uses_observed_interval(self):
+        for d,km in [('2025-02-01',1000),('2025-10-20',5000)]:self.j.save_manual(str(uuid4()),0,{'kind':'trip','date':d,'odometer_km':km})
+        facts=self.j.query('2025-01-01','2025-12-31')['odometer_facts']
+        self.assertEqual(facts['distance_km'],4000);self.assertEqual(facts['from'],'2025-02-01');self.assertIn('연초',facts['warning'])
+        self.assertIsNone(self.j.query('2025-02-01','2025-02-28')['odometer_facts']['distance_km'])
     def test_odometer_missing_baseline_conflict_and_deleted(self):
         key=str(uuid4());self.j.save_manual(key,0,{'kind':'trip','date':'2025-10-01','odometer_km':1000})
         self.assertIsNone(self.j.query('2025-10-01','2025-10-31')['odometer_facts']['distance_km'])
