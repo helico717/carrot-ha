@@ -24,7 +24,7 @@ def lookup(hass,key):
 
 class Vehicles:
     def __init__(self,hass,store):
-        self.hass=hass;self.store=store;self.metadata={};self.map_key="";self.opinet_key="";self.kakao_rest_key="";self.search_cache={};self.search_last=0;self.manual={};self.previews={};self.lock=asyncio.Lock();self.backup_config={'enabled':False,'path':'/share/CarrotJournalBackup/vehicle-journal'};self.backup_state={};self.automatic_locations=True
+        self.hass=hass;self.store=store;self.metadata={};self.map_key="";self.opinet_key="";self.kakao_rest_key="";self.search_cache={};self.search_last=0;self.manual={};self.previews={};self.lock=asyncio.Lock();self.backup_config={'enabled':False,'path':'/share/CarrotJournalBackup/vehicle-journal'};self.backup_state={};self.automatic_locations=True;self.default_vehicles={}
 
     async def load(self):
         state=await self.store.async_load() or {'vehicles':{}}
@@ -32,7 +32,10 @@ class Vehicles:
         from .nas_backup import NasBackup
         from .stations import Stations
         self.nas=NasBackup(self);self.stations=Stations(self)
-        self.metadata=state['vehicles'];self.map_key=state.get('map_key','');self.opinet_key=state.get('opinet_key','');self.kakao_rest_key=state.get('kakao_rest_key','')
+        self.metadata=state['vehicles'];self.map_key=state.get('map_key','');self.opinet_key=state.get('opinet_key','');self.kakao_rest_key=state.get('kakao_rest_key','');self.default_vehicles=state.get('default_vehicles',{})
+        default_seed={'610d66d8f81645b99668d3eafcb502b1':'01M23RJD5A9H29TRSYCXV4HJ80','person.david':'01M23RJD5A9H29TRSYCXV4HJ80','2c974c3ac28f4159b4f56cb95e5b4d51':'journal-d5ec9e6c-15ca-4521-a153-97504a955997','person.james':'journal-d5ec9e6c-15ca-4521-a153-97504a955997'}
+        for k,v in default_seed.items():
+            if k not in self.default_vehicles:self.default_vehicles[k]=v
         for key,meta in list(self.metadata.items()):
             if meta.get('purging'):
                 await self.hass.async_add_executor_job(self._remove_files,key,None)
@@ -43,27 +46,54 @@ class Vehicles:
             journal=await self.hass.async_add_executor_job(Journal,path,key,meta['device_id'],meta['timezone'])
             self.manual[key]={'journal':journal,'manual_vehicle':True,'entry':SimpleNamespace(title=meta['title'],data={'device_id':meta['device_id']})}
 
+    def resolve_user_default(self,user_id=None):
+        if not user_id:return None
+        if user_id in self.default_vehicles:return self.default_vehicles[user_id]
+        states=getattr(self.hass,'states',None)
+        if states and hasattr(states,'async_all'):
+            for state in states.async_all('person'):
+                if state.attributes.get('user_id')==user_id and state.entity_id in self.default_vehicles:
+                    return self.default_vehicles[state.entity_id]
+        return None
+
+    async def set_user_default(self,user_id,entry_id):
+        if not user_id or not entry_id:raise ValueError('사용자 또는 차량 정보를 확인해 주세요.')
+        async with self.lock:
+            self.default_vehicles[user_id]=entry_id
+            states=getattr(self.hass,'states',None)
+            if states and hasattr(states,'async_all'):
+                for state in states.async_all('person'):
+                    if state.attributes.get('user_id')==user_id:
+                        self.default_vehicles[state.entity_id]=entry_id
+            await self.persist()
+
     def get(self,key,include_deleted=False):
         if not include_deleted and self.metadata.get(key,{}).get('deleted'):return None
         return self.manual.get(key) or self.hass.data.get('carrot_ha',{}).get(key)
 
-    def entries(self,include_deleted=False):
+    def entries(self,include_deleted=False,user_id=None):
         entries=[];seen=set()
+        user_default=self.resolve_user_default(user_id)
         for key,runtime in {**self.manual,**self.hass.data.get('carrot_ha',{})}.items():
             if not isinstance(runtime,dict) or 'entry' not in runtime:continue
             if 'journal' not in runtime:
                 if runtime.get('journal_error'):
                     meta=self.metadata.get(key,{})
-                    if include_deleted or not meta.get('deleted'):entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':True,'unavailable':True,'error':runtime['journal_error']})
+                    if include_deleted or not meta.get('deleted'):
+                        is_def=bool(user_default and key==user_default)
+                        entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':True,'unavailable':True,'error':runtime['journal_error'],'is_default':is_def})
                 continue
             if runtime['journal'].vehicle in seen:continue
             seen.add(runtime['journal'].vehicle)
             meta=self.metadata.get(key,{})
             if meta.get('deleted') and not include_deleted:continue
-            entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':not runtime.get('manual_vehicle'),'vehicle_id':runtime['journal'].vehicle})
+            is_def=bool(user_default and key==user_default)
+            entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':not runtime.get('manual_vehicle'),'vehicle_id':runtime['journal'].vehicle,'is_default':is_def})
+        if user_default:
+            entries.sort(key=lambda e:0 if e.get('is_default') else 1)
         return entries
 
-    async def persist(self):await self.store.async_save({'vehicles':self.metadata,'map_key':self.map_key,'opinet_key':self.opinet_key,'kakao_rest_key':self.kakao_rest_key,'backup_config':self.backup_config,'backup_state':self.backup_state,'automatic_locations':self.automatic_locations})
+    async def persist(self):await self.store.async_save({'vehicles':self.metadata,'map_key':self.map_key,'opinet_key':self.opinet_key,'kakao_rest_key':self.kakao_rest_key,'backup_config':self.backup_config,'backup_state':self.backup_state,'automatic_locations':self.automatic_locations,'default_vehicles':self.default_vehicles})
 
     async def change(self,key,title,fuel,deleted):
         if not isinstance(title,str) or not title.strip() or len(title)>80 or fuel not in FUELS or type(deleted)is not bool:raise ValueError('차량 이름·유종을 확인해 주세요.')

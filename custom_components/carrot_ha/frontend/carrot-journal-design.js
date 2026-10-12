@@ -1414,4 +1414,7 @@ export const journalDesign = `:host {
 #vehicleManageDialog .settings-toggle input[type=checkbox]{width:18px;height:18px;min-height:18px;padding:0;margin:0;flex:none;accent-color:var(--j-accent)}
 #vehicleManageDialog .settings-backup-row span{min-width:0;overflow-wrap:anywhere}
 #vehicleManageDialog .settings-backup-row small{display:block;line-height:1.5;margin-top:4px}
+.btn-pin-default{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;min-height:34px;padding:0;border-radius:10px;border:1px solid var(--j-border);background:var(--j-surface);color:var(--j-sub);font-size:15px;cursor:pointer;transition:all 0.15s ease}
+.btn-pin-default:hover{border-color:#f6c445;color:#f6c445}
+.btn-pin-default.active{background:rgba(246,196,69,0.15);border-color:rgba(246,196,69,0.4);color:#f6c445}
 `;

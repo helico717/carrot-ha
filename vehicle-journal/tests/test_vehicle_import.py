@@ -188,6 +188,18 @@ class VehicleTests(unittest.IsolatedAsyncioTestCase):
         await self.m.change('linked','이름 변경','electric',True)
         self.assertIs(self.hass.data['carrot_ha']['linked']['archive'],archive)
         self.assertEqual(self.m.entries(),[])
+    async def test_user_default_vehicle_resolution_and_sort(self):
+        car1=await self.m.create('아테온','diesel','','admin');car2=await self.m.create('ID.4','electric','','admin')
+        key1,key2=car1['entry_id'],car2['entry_id']
+        await self.m.set_user_default('user_david',key2)
+        await self.m.set_user_default('user_james',key1)
+        entries_david=self.m.entries(user_id='user_david')
+        self.assertEqual(entries_david[0]['entry_id'],key2);self.assertTrue(entries_david[0]['is_default']);self.assertFalse(entries_david[1]['is_default'])
+        entries_james=self.m.entries(user_id='user_james')
+        self.assertEqual(entries_james[0]['entry_id'],key1);self.assertTrue(entries_james[0]['is_default']);self.assertFalse(entries_james[1]['is_default'])
+        next_m=Vehicles(self.hass,self.store);await next_m.load()
+        self.assertEqual(next_m.entries(user_id='user_david')[0]['entry_id'],key2)
+        self.assertEqual(next_m.entries(user_id='user_james')[0]['entry_id'],key1)
 
 class FailedVehicleVisibilityTests(unittest.TestCase):
     def test_failed_device_is_listed_instead_of_disappearing(self):

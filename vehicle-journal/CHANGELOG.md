@@ -1,3 +1,20 @@
+## 2026-10-12 — vehicle-journal: support per-user default vehicle assignment
+
+- 요청 및 배경: 이용자가 2명(person.david, person.james)이고 차량이 2대(ID.4, 아테온)인 환경에서, 각 사용자가 차계부 진입 시 본인 차량을 기본으로 보되, 드롭다운을 통해 상대방 차량도 자유롭게 조회할 수 있도록 개선.
+- 변경:
+  1. 백엔드 사용자별 기본 차량 관리 (`vehicles.py`, `api.py`):
+     - `default_vehicles` 영구 매핑 저장 및 초기 배정(person.david/임도균 → ID.4, person.james/임재균 → 아테온).
+     - `entries` 조회 시 현재 로그인한 `user_id`를 기반으로 기본 차량(`is_default: true`)을 식별하고 목록 1순위로 자동 정렬.
+     - 사용자 기본 차량 설정 WebSocket 명령(`carrot_ha/journal/user_default/set`) 추가 및 관리자 인증 적용.
+  2. 프론트엔드 연동 및 UI (`carrot-vehicle-journal.js`, `carrot-journal-design.js`):
+     - 차계부 진입 시 로그인 사용자의 기본 차량을 우선 선택(미지정 시 첫 번째 차량).
+     - 상단 masthead 차량 선택 드롭다운 바로 옆에 기본 차량 핀 버튼(`[★]`/`[☆]`) 추가하여 현재 차량을 내 기본 차량으로 원클릭 지정/확인 가능.
+     - 차량 드롭다운 옵션에 기본 차량 식별 표시(`★`) 추가.
+     - 차량 관리 모달의 각 차량 패널에 `[기본 차량으로 지정]` 액션 버튼 연동.
+- 관련 파일: custom_components/carrot_ha/vehicle_journal/{vehicles.py,api.py}, custom_components/carrot_ha/frontend/{carrot-vehicle-journal.js,carrot-journal-design.js}, vehicle-journal/tests/test_vehicle_import.py, vehicle-journal/CHANGELOG.md.
+- 검증: test_user_default_vehicle_resolution_and_sort 포함 Python unittest 28개 전체 통과, node --check 구문 검사 통과.
+- 배포: main 커밋·푸시 및 HA deployment-backups 백업 후 SSH 직접 반영. Python 백엔드 및 프론트엔드 변경 적용을 위한 1회 HA Core 재시작 안내. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — preceding comparison deployment and next phase
 
 - e6c26fd main 푸시·HA deployment-backups/e6c26fd3c86c27981b12f62fe211e48076193f30/ 코드 백업·7개 파일 반영 완료. 설치·화면 내부/외부 HTTP 해시 일치. Python 37개 및 Chrome 내연기관 비교/도넛/설정 글꼴·EV 회귀 통과. 사용자 HA 재시작·실제 화면 확인 대기.
