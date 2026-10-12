@@ -16,7 +16,7 @@
 - 검증:
   - `node --check` 구문 검사 통과.
   - `test_backup_status_ui.cjs` 자동화 테스트 전체(4개 케이스) 통과.
-- 배포: 프론트엔드 변경 작업.
+- 배포: 수정 커밋 `bc09f1a` main 푸시 완료. HA `/config/carrot_ha/deployment-backups/607a2278fd0e227fc69bb5cb904ef2b3780374e2/`에 백업 후 SSH 직접 반영 완료. 로컬 및 HA 설치 파일 SHA-256 일치 (`carrot-journal-design.js`: `32513cba...`, `carrot-vehicle-journal.js`: `17877add...`). frontend-version API `0.8.14-beta.4-5164283166ed` 갱신 확인. 브라우저 새로고침(또는 패널 재진입/업데이트 버튼)으로 즉시 적용 가능.
 
 ## 2026-10-13 — Antigravity 규칙에 최신 차계부 작업 지침 동기화
 
