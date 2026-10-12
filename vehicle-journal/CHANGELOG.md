@@ -1,3 +1,9 @@
+## 2026-10-12 — vehicle-journal: record place-label deployment verification
+
+- 2a6afa1 main 푸시 및 HA deployment-backups/2a6afa108e31f66f579c053358f805cde1f64d5f/ 코드 백업 완료. 화면 세 모듈 배포·설치 SHA-256·내부/외부 HTTP 해시 일치.
+- 장소명 표시/일반 글씨/escaping·기존 대시보드 데스크톱/모바일 Chrome 회귀 통과. 실제 사용자 화면 확인 대기. 아테온 자료는 임시 로컬 DB에서만 검증; 실제 이관하지 않음.
+- 관련 파일: vehicle-journal/CHANGELOG.md. 문서만 변경; 추가 실행 코드 배포·릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: show record place beside category pill
 
 - 상세 기록 알약 바로 옆에 위치 장소명(없으면 주소)을 구분점 없이 font-weight 400으로 표시. 세부 작업·메모는 기존 다음 줄 유지. 사용자 입력 HTML escaping 유지.
