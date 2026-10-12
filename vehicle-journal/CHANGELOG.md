@@ -1,3 +1,8 @@
+## 2026-10-12 — vehicle-journal: mark vehicle name placeholder as example
+
+- 신규 차량 이름 입력 안내를 ‘예시) 아테온’으로 변경하여 실제 입력값과 예시를 구별.
+- 관련 파일: frontend/carrot-vehicle-journal.js. 문구 확인 및 JS 구문 검사 통과. 승인된 HA 직접 백업·반영 대상; 운영 화면 확인 대기. DB·Python·Cloudflare·Comma 변경 및 새 릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: record place-label deployment verification
 
 - 2a6afa1 main 푸시 및 HA deployment-backups/2a6afa108e31f66f579c053358f805cde1f64d5f/ 코드 백업 완료. 화면 세 모듈 배포·설치 SHA-256·내부/외부 HTTP 해시 일치.
