@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-12 — 직접 배포 결과 기록
+
+- 커밋 제목: `vehicle-journal: record verified HA deployment`.
+- 변경·이유/관련 파일: 이 변경 이력에 실행 코드 `dcd9093`의 실제 푸시·HA 백업·설치 해시 확인 결과를 연결. 코드는 추가 변경하지 않음.
+- 검증·배포: 코드 3개 설치 해시 일치 재확인. 운영 브라우저 접근 도구가 승인 대기 상태에서 응답하지 않아 사용자가 중단했으며 실제 UI 적용 확인은 미완료. Python 처리는 사용자 HA 재시작 대기. 서버 파일 반영과 런타임 적용을 구분.
+- 제한: 신규 릴리즈 미발행, 기존 0.8.14-beta.4 유지. Worker/D1/Comma 변경 없음.
+
 ## 2026-10-12 — 모든 지출 관리와 월 전체 최근 기록
 
 - 커밋 제목: `vehicle-journal: allow editing all expenses and show full period`.
@@ -7,7 +14,7 @@
 - 최근 목록이 5건 제한 때문에 월 초 기록을 표시하지 못했던 원인 수정: 선택 기간의 활성 지출 전체를 원장 페이지/필터와 독립적으로 반환. 기록/메모 분류는 최근 목록과 동일한 색상 배지 사용, 부가 설명은 배지 밖에 표시. 데스크톱 지출/최근 카드 높이 250→350px, 모바일 기존 높이 유지.
 - 관련 파일: `frontend/carrot-vehicle-journal.js`, `frontend/carrot-journal-design.js`, `vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: 번들 Python 원장/권한/런타임 17개, 스키마 9개, 실제 Chrome 데스크톱/모바일 회귀 통과. 자동 지출 수정/삭제/복원·재동기화·오래된 버전 거절 및 12건 전체 조회/원장 2건 페이지 독립성 확인. 최초 시스템 Python의 Pillow 누락은 번들 Python으로 해결. 브라우저 테스트의 기존 분류 선택자를 새 배지에 맞춤.
-- 배포: main 커밋/푸시 및 HA 백업·직접 반영 예정. 사용자가 이번 HA SSH 직접 반영을 명시적으로 승인. Python 반영 후 사용자 HA 재시작 및 운영 브라우저 확인 대기. 디버깅 정책에 따라 기존 beta.4 유지; 실제 적용 검증 전 릴리즈 완료로 보고하지 않는다. Worker/D1/Comma 변경·배포 없음.
+- 배포: 실행 코드 커밋 `dcd9093a3ce8d3f2a4b5dd6266ae8a3585914cae` main 푸시·원격 SHA 일치 확인. 변경 코드 3개를 `/config/carrot_ha/deployment-backups/dcd9093a3ce8d3f2a4b5dd6266ae8a3585914cae/`에 백업 후 직접 반영·설치 SHA-256 일치 확인(중단 후 재확인 포함). 사용자가 이번 HA SSH 직접 반영을 명시적으로 승인. Python 반영 후 사용자 HA 재시작 및 운영 브라우저 확인 대기. 디버깅 정책에 따라 기존 beta.4 유지; 실제 적용 검증 전 릴리즈 완료로 보고하지 않는다. Worker/D1/Comma 변경·배포 없음.
 - 제한: 차계부 수정은 차계부 내부 보정이며 차량 대시보드 충전 결제 값에는 전파하지 않는다. 운영 데이터·사진을 테스트하거나 변경하지 않음.
 
 
