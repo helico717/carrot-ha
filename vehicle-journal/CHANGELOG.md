@@ -1,5 +1,13 @@
 # 차계부 변경 이력
 
+## 2026-10-12 — 상세 기록을 분류·세부작업·메모 세 줄로 배치
+
+- 커밋 제목: `vehicle-journal: stack category details and memo`.
+- 변경·이유: 사용자 요청에 따라 상세 기록에서 카테고리 배지, 세부 작업, 메모를 각각 다음 줄에 표시. 세부 작업 앞 가운데 점 제거, 없는 항목은 빈 줄을 만들지 않음. 배지의 글자 너비 유지.
+- 관련 파일: `frontend/carrot-vehicle-journal.js`, 이 변경 이력.
+- 검증·배포: JS 구문/diff 및 Chrome 데스크톱·모바일 회귀 검사 후 main 푸시·HA 화면 파일 백업/직접 반영 진행. Python/DB/Worker/Comma 변경 없음, 재시작 불필요. 사용자 새로고침 후 운영 확인 대기, 기존 beta.4 유지.
+
+
 ## 2026-10-12 — 상세 기록 분류 배지 너비 수정
 
 - 커밋 제목: `vehicle-journal: keep ledger category pills compact`.
