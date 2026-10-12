@@ -1288,3 +1288,12 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 관련 파일: vehicle_journal/{stations,automatic_locations,efficiency,station_stats,nas_backup,api,store,runtime,vehicles,transfer}.py, __init__.py, frontend/carrot-vehicle-journal.js, tests/{test_station_backup,test_api_authorization}.py, tests/vehicle-management.cjs.
 - 검증: Python 45건·schema 9건 및 실제 Chromium vehicle-management/browser-check/loader-update 통과. 합성 자료로 부분주유/가중 평균/누락 제외, 장소 통계, 기존 충전 요금 유지, 사용자 위치 삭제 보호, GFS 세대 한도, 실패 시 기존 인덱스 유지, 손상 체크섬 거부 및 기존 HA 파일 미삭제 확인. 자동 GPS·가격·수동 가격 보호·추정량 출처·연비/장소 통계·NAS 상태 UI 통과. 공식 API 공공 좌표로 오피넷 주유소 48개·카카오 충전소 15개 및 좌표 변환 검증(이전 작업에서 수행).
 - 배포: 검증 후 커밋·main 푸시·기존 코드 백업·HA 부분 반영 대상. 실제 NAS 저장 검증 및 사용자 재시작/설정 활성화 결과는 후속 기록한다. 개발 정책상 새 Release 없음. Comma/Cloudflare 변경 없음.
+
+## 2026-10-12 — NAS 실저장 검증 및 여러 장소의 충전 세션 통계 보완
+
+- 90b9d6e main 푸시 및 12개 실행 파일 HA 백업·반영·해시 일치. 운영 DB를 변경하지 않고 일관 복사본으로 차량 2대 스냅샷을 실제 NAS에 저장했다. 총 1,444,889 bytes, 일/주/월 각 1세대. NAS 재읽기·체크섬·임시 DB 및 결제 원본 복원 검증 모두 통과.
+- 커밋 제목: `vehicle-journal: preserve per-session place quantities for grouped payments`.
+- 변경·이유: 결제 그룹에 여러 충전소가 있으면 전체 금액을 임의 분배하지 않는다. 장소가 확정된 개별 충전 세션의 방문·충전량은 집계하되, 안전하게 귀속할 수 없는 단가는 미확인으로 남긴다. 같은 장소의 그룹은 방문 횟수를 실제 세션 수로 집계한다.
+- 관련 파일: vehicle_journal/station_stats.py. 기존 충전 금액·원장·사진 변경 없음.
+- 검증: Python 45건 통과. 사용자 HA 재시작 완료 응답을 받았으며 실제 Core 설정·백업 상태 및 UI 검증은 진행 중.
+- 배포: main 푸시·해당 모듈 백업·직접 반영 후 상태 확인 대상. 개발 정책상 새 Release/Comma/Worker 변경 없음.
