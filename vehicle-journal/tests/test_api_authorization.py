@@ -49,7 +49,7 @@ class FuelUnitsTests(unittest.TestCase):
 class NewWriteAuthorizationTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_apis_reject_before_imports_or_access(self):
         tree=ast.parse(Path('custom_components/carrot_ha/vehicle_journal/api.py').read_text())
-        methods={'vehicle_create','vehicle_update','settings','map_config','record_location','location_search'}
+        methods={'vehicle_delete','vehicle_create','vehicle_update','settings','map_config','record_location','location_search'}
         functions=[n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name in methods]
         for function in functions:function.decorator_list=[]
         namespace={}

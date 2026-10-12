@@ -127,14 +127,16 @@ class Journal:
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.path, timeout=15)
-        db.execute('PRAGMA foreign_keys=ON')
-        db.row_factory = None
-        try:
-            with db:
-                yield db
-        finally:
-            db.close()
+        with self.lock:
+            if getattr(self,'permanently_deleted',False):raise ValueError('영구 삭제된 차량이에요.')
+            db = sqlite3.connect(self.path, timeout=15)
+            db.execute('PRAGMA foreign_keys=ON')
+            db.row_factory = None
+            try:
+                with db:
+                    yield db
+            finally:
+                db.close()
 
     def identity(self, kind, source):
         return str(uuid5(NAMESPACE_URL, encode([self.vehicle,kind,source])))

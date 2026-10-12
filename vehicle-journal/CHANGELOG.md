@@ -1,3 +1,13 @@
+## 2026-10-12 — vehicle-journal: permanently delete trashed manual vehicles
+
+- 사용자 선택: 영구 삭제는 휴지통의 수동 등록 차량에만 제공. 연동 차량은 기기 연결·휴지통/복원 유지. 휴지통 이름·유종·상태 빨간색, 영구 삭제 버튼 빨간색. 차량·기록·사진 삭제 및 복원 불가 확인 팝업; 취소 시 요청 없음.
+- 관리자 전용 vehicle/delete API, 휴지통/수동 차량 서버 검증. 차량 DB·SQLite 보조 파일·마이그레이션 사본·사진 디렉터리 삭제. HA 보관 메타데이터의 삭제 진행 표식으로 중단 시 다음 시작에 정리 재개. 이전 스냅샷·HA/NAS 백업 사본은 자동 삭제하지 않음.
+- Journal 연결을 동일 RLock으로 보호하고 삭제 완료 객체의 재접속 차단. 남은 이관 미리보기 재실행으로 삭제된 차량 ID가 반환되지 않도록 정리.
+- 설정창 버튼 최소 높이 38→27px, padding 8/12→5/8px로 약 30% 축소; 분류 버튼도 축소.
+- 관련 파일: vehicle_journal/{vehicles,store,api}.py, frontend/{carrot-vehicle-journal,carrot-journal-design}.js, vehicle-journal/tests/{test_vehicle_import,test_api_authorization}.py, vehicle-management.cjs.
+- 검증: 임시 DB 삭제/사진·사본 삭제, 활성 차량·연동 차량 차단, 삭제 객체 재접속 차단, 재시작 중단 복구 테스트 통과. 기존 원장 테스트 13개와 이관/차량 테스트 14개 통과. 합성 Chrome 확인/취소·빨간 버튼·모바일 검증 통과. API 권한 검사 후속 기록.
+- 배포: 검증 후 main 커밋·푸시·승인된 HA 코드 백업/부분 반영. Python 변경으로 사용자 HA 재시작 필요. 실제 차량 삭제 실행은 하지 않음. 개발 중 새 릴리즈 없음. Cloudflare·Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: record example placeholder deployment
 
 - ca03b63 main 푸시, HA deployment-backups/ca03b63b2bacd943fd275306493692d02306e3a2/ 기존 코드 백업·화면 모듈 반영 완료. 설치 및 내부/외부 HTTP 해시 일치. 실제 사용자 화면 확인 대기.

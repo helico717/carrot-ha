@@ -155,6 +155,17 @@ async def vehicle_update(hass,connection,msg):
     except Exception:connection.send_error(msg['id'],'storage_failed','차량을 변경하지 못했어요.')
 
 
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/vehicle/delete',vol.Required('entry_id'):str,vol.Required('confirm'):vol.In([True])})
+@websocket_api.async_response
+async def vehicle_delete(hass,connection,msg):
+    if not connection.user or not connection.user.is_admin:
+        connection.send_error(msg['id'],'unauthorized','관리자 계정이 필요해요.');return
+    from .vehicles import manager
+    try:connection.send_result(msg['id'],await manager(hass).purge(msg['entry_id']))
+    except ValueError as error:connection.send_error(msg['id'],'invalid_input',str(error))
+    except Exception:connection.send_error(msg['id'],'storage_failed','삭제 처리를 완료하지 못했어요. 다시 확인해 주세요.')
+
+
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/map/config',vol.Optional('key'):str})
 @websocket_api.async_response
 async def map_config(hass,connection,msg):
@@ -242,4 +253,4 @@ async def location_search(hass,connection,msg):
 
 
 def register(hass):
-    for method in (entries,query,save,status,comparison_save,vehicle_create,vehicle_update,map_config,record_location,settings,location_search):websocket_api.async_register_command(hass,method)
+    for method in (entries,query,save,status,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,settings,location_search):websocket_api.async_register_command(hass,method)

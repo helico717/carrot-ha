@@ -120,6 +120,27 @@ class VehicleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(next_manager.entries(),[])
         await next_manager.change(key,'복원','diesel',False)
         self.assertEqual(next_manager.entries()[0]['title'],'복원')
+    async def test_permanent_delete_files_and_guard(self):
+        result=await self.m.create('시험','diesel','','admin');key=result['entry_id'];j=self.m.manual[key]['journal'];path=Path(j.path)
+        with self.assertRaises(ValueError):await self.m.purge(key)
+        photos=path.with_suffix('')/'attachments';photos.mkdir(parents=True);(photos/'test.jpg').write_bytes(b'test')
+        backup=Path(j.path+'.before-schema2.sqlite3');backup.write_bytes(b'backup')
+        await self.m.change(key,'시험','diesel',True);await self.m.purge(key)
+        self.assertFalse(path.exists());self.assertFalse(photos.exists());self.assertFalse(backup.exists());self.assertEqual(self.m.entries(True),[])
+        with self.assertRaises(ValueError):
+            with j.connect():pass
+        restarted=Vehicles(self.hass,self.store);await restarted.load();self.assertEqual(restarted.entries(True),[])
+    async def test_delete_linked_rejected(self):
+        j=Journal(Path(self.tmp.name)/'linked.sqlite3','linked','car','Asia/Seoul')
+        self.hass.data['carrot_ha']['linked']={'entry':SimpleNamespace(title='연동'),'journal':j}
+        await self.m.change('linked','연동','electric',True)
+        with self.assertRaises(ValueError):await self.m.purge('linked')
+        self.assertTrue(Path(j.path).exists())
+    async def test_interrupted_delete_resumes_on_load(self):
+        result=await self.m.create('시험','diesel','','admin');key=result['entry_id'];path=Path(self.m.manual[key]['journal'].path)
+        self.m.metadata[key].update(deleted=True,purging=True);await self.m.persist()
+        restarted=Vehicles(self.hass,self.store);await restarted.load()
+        self.assertFalse(path.exists());self.assertNotIn(key,restarted.metadata)
     async def test_preview_owner_replay_and_duplicate_snapshot(self):
         preview=await self.m.preview(sample_xlsx(),'michael','diesel','admin')
         with self.assertRaises(ValueError):await self.m.create('차','diesel',preview['token'],'other')

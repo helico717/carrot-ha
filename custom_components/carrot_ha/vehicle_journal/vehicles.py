@@ -29,7 +29,10 @@ class Vehicles:
     async def load(self):
         state=await self.store.async_load() or {'vehicles':{}}
         self.metadata=state['vehicles'];self.map_key=state.get('map_key','');self.opinet_key=state.get('opinet_key','');self.kakao_rest_key=state.get('kakao_rest_key','')
-        for key,meta in self.metadata.items():
+        for key,meta in list(self.metadata.items()):
+            if meta.get('purging'):
+                await self.hass.async_add_executor_job(self._remove_files,key,None)
+                self.metadata.pop(key);await self.persist();continue
             if meta.get('kind')!='manual':continue
             path=self.hass.config.path('carrot_ha','vehicle_journal',key+'.sqlite3')
             if not Path(path).exists():raise ValueError('수동 차량 DB가 없어 복구가 필요해요.')
@@ -69,6 +72,38 @@ class Vehicles:
             try:await self.persist()
             except Exception:self.metadata=old;raise
         return {'entry_id':key}
+
+    def _remove_files(self,key,journal):
+        # Never accept uploaded paths or touch a device-linked archive.
+        path=Path(self.hass.config.path('carrot_ha','vehicle_journal',key+'.sqlite3'))
+        def remove():
+            if journal:journal.permanently_deleted=True
+            for suffix in ('','-wal','-shm','-journal','.before-schema2.sqlite3'):
+                Path(str(path)+suffix).unlink(missing_ok=True)
+            directory=path.with_suffix('')
+            if directory.exists():shutil.rmtree(directory)
+        if journal:
+            with journal.lock:remove()
+        else:remove()
+
+    async def purge(self,key):
+        async with self.lock:
+            meta=self.metadata.get(key)
+            runtime=self.manual.get(key)
+            if not meta or meta.get('kind')!='manual' or (not meta.get('purging') and (not runtime or not runtime.get('manual_vehicle'))):
+                raise ValueError('수동 등록 차량만 영구 삭제할 수 있어요.')
+            if not meta.get('deleted'):raise ValueError('휴지통으로 이동한 차량만 영구 삭제할 수 있어요.')
+            old=deepcopy(meta);meta['purging']=True
+            try:await self.persist()
+            except Exception:self.metadata[key]=old;raise
+            # Durable marker resumes interrupted deletion before loading any DB.
+            self.manual.pop(key,None)
+            await self.hass.async_add_executor_job(self._remove_files,key,runtime['journal'] if runtime else None)
+            self.metadata.pop(key,None)
+            try:await self.persist()
+            except Exception:self.metadata[key]=meta;raise
+            self.previews={token:p for token,p in self.previews.items() if p.get('result',{}).get('entry_id')!=key}
+            return {'entry_id':key,'deleted':True}
 
     async def preview(self,content,kind,fuel,user_id):
         if fuel not in FUELS:raise ValueError('유종을 선택해 주세요.')

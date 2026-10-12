@@ -13,6 +13,7 @@ const fs=require('fs');
   card.hass={states:{},callWS:async msg=>{window.calls.push(msg);if(['/settings','/map/config','/location/search'].some(t=>msg.type.endsWith(t))&&'entry_id' in msg)throw Error("unexpected entry_id in global request");
    if(msg.type.endsWith('/entries'))return window.vehicles.filter(v=>msg.include_deleted||!v.deleted);
    if(msg.type.endsWith('/vehicle/create')){const vehicle={entry_id:'manual',title:msg.title,fuel:msg.fuel,linked:false};window.vehicles.push(vehicle);return {entry_id:'manual',imported:msg.preview_token?2:0};}
+   if(msg.type.endsWith('/vehicle/delete')){window.vehicles=window.vehicles.filter(v=>v.entry_id!==msg.entry_id);return {};}
    if(msg.type.endsWith('/vehicle/update')){Object.assign(window.vehicles.find(v=>v.entry_id===msg.entry_id),msg);return {};}
    if(msg.type.endsWith('/settings'))return {map_key:'0123456789abcdef0123456789abcdef',kakao_rest_key:'abcdef0123456789abcdef0123456789',opinet_key:'TESTKEY',opinet_configured:true,backup_entities:[{name:'마지막 백업',state:'2026-10-12'}]};
    if(msg.type.endsWith('/map/config'))return {key:'0123456789abcdef0123456789abcdef'};
@@ -29,6 +30,12 @@ const fs=require('fs');
  if(!await root.locator('#backupStatus').textContent().then(t=>t.includes('마지막 백업')))throw Error('backup status absent');
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===true);
  await root.locator('[data-vehicle-action=status]').click();await page.waitForFunction(()=>window.vehicles[0].deleted===false);
+ await root.locator('[data-vehicle-action=status]').click();await root.locator('.vehicle-delete').waitFor();
+ if(await root.locator('.vehicle-delete').evaluate(el=>getComputedStyle(el).color)!=='rgb(255, 133, 133)')throw Error('delete button not red');
+ page.once('dialog',dialog=>dialog.dismiss());await root.locator('.vehicle-delete').click();if(await page.evaluate(()=>window.calls.some(c=>c.type.endsWith('/vehicle/delete'))))throw Error('cancelled deletion sent request');
+ page.once('dialog',dialog=>{if(!dialog.message().includes('복원은 불가능합니다'))throw Error('missing irreversible warning');dialog.accept();});await root.locator('.vehicle-delete').click();await page.waitForFunction(()=>window.vehicles.length===0);
+ await page.evaluate(()=>window.vehicles.push({entry_id:'manual',title:'시험 차량',fuel:'diesel',linked:false,deleted:false}));await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openVehicleManagement());
+
  await root.locator('[data-settings-nav=api]').click();
  if(!(await root.locator('.settings-key-help').allTextContents()).join(' ').includes('Default Rest API Key'))throw Error('key instructions missing');
  if(await root.locator('#opinetKey').inputValue()!=='TESTKEY')throw Error('saved key not prefilled');
