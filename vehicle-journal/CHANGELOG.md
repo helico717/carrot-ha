@@ -1,3 +1,9 @@
+## 2026-10-12 — vehicle-journal: record manual vehicle purge deployment
+
+- ad7508f main 푸시 완료. HA deployment-backups/ad7508f41f3d914d8c1edd6bcc03c51f9fb297f0/ 기존 5개 코드 파일 백업 후 반영·SHA-256 일치. 화면 JS 내부/외부 HTTP 해시 일치.
+- Python 원장/이관/차량/권한 전체 32개 통과, Chrome 확인·취소·빨간 버튼·모바일 검증 통과. 실제 차량 삭제 실행 없음. 사용자 HA 재시작 후 API 활성화 및 실제 화면 검증 대기.
+- 관련 파일: vehicle-journal/CHANGELOG.md. 문서만 변경; 추가 실행 코드 배포·릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: permanently delete trashed manual vehicles
 
 - 사용자 선택: 영구 삭제는 휴지통의 수동 등록 차량에만 제공. 연동 차량은 기기 연결·휴지통/복원 유지. 휴지통 이름·유종·상태 빨간색, 영구 삭제 버튼 빨간색. 차량·기록·사진 삭제 및 복원 불가 확인 팝업; 취소 시 요청 없음.
