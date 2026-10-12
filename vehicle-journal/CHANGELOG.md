@@ -1,5 +1,14 @@
 # 차계부 변경 이력
 
+## 2026-10-12 — 저장공간 실측 및 두 차량·NAS 복구 구상 분석
+
+- 커밋 제목: `vehicle-journal: record storage and recovery analysis`.
+- 변경·이유: 사용자 요청으로 HA 저장공간·DB 테이블별 건수·페이지·사진·진단 파일을 읽기 전용 집계하고 현재 차량 및 수동 내연기관 차량의 장기 증가 시나리오, 기존 Synology HA 백업과 차계부 전용 스냅샷 복구 경계 분석. 개인정보가 포함될 수 있는 실측 상세 보고서는 Git 밖의 로컬 산출물로 보관하고 공개 변경 이력에는 분석 사실만 기록.
+- 관련 파일: 이 변경 이력. 분석 대상은 storage/vehicle_journal/can_capture/config_flow 실행 코드이며 변경하지 않음.
+- 검증: SQLite mode=ro·query_only 조회, 파일 크기·디스크 여유·CAN 파일 날짜 집계. NAS 포함 범위와 복구 실험은 미실시. 자동 CAN 상한 회전, HA 등록 ID 재연결, DB 간 일관성, 사진 참조 및 충전 결제 원본 포함 필요 확인.
+- 배포·제한: 문서 기록만 main 커밋·푸시. 실행 코드 변경·DB 삭제·압축·NAS 전송·재시작·릴리즈·Worker/Comma 배포 없음. 사용자의 향후 CAN 수집 중단·삭제 구상은 보관본 검증 후 삭제하는 별도 작업이며 이번에 실행하지 않음.
+
+
 ## 2026-10-12 — 상세 기록을 분류·세부작업·메모 세 줄로 배치
 
 - 커밋 제목: `vehicle-journal: stack category details and memo`.
