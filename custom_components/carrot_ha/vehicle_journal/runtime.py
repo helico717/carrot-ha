@@ -24,6 +24,9 @@ async def setup(hass, entry, runtime):
         try:
             await hass.async_add_executor_job(sync,runtime['archive'],journal)
             runtime.pop('journal_error',None)
+            from .automatic_locations import enrich
+            try:await enrich(hass,manager(hass),runtime['archive'],journal)
+            except Exception:runtime['journal_location_error']='충전소 위치 조회를 다시 시도하고 있어요.'
         except Exception:
             runtime['journal_error']='차계부 동기화를 다시 시도하고 있어요.'
             _LOGGER.exception('Local vehicle journal synchronization failed')

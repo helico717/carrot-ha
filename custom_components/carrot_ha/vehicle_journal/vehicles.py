@@ -24,10 +24,14 @@ def lookup(hass,key):
 
 class Vehicles:
     def __init__(self,hass,store):
-        self.hass=hass;self.store=store;self.metadata={};self.map_key="";self.opinet_key="";self.kakao_rest_key="";self.search_cache={};self.search_last=0;self.manual={};self.previews={};self.lock=asyncio.Lock()
+        self.hass=hass;self.store=store;self.metadata={};self.map_key="";self.opinet_key="";self.kakao_rest_key="";self.search_cache={};self.search_last=0;self.manual={};self.previews={};self.lock=asyncio.Lock();self.backup_config={'enabled':False,'path':'/share/CarrotJournalBackup/vehicle-journal'};self.backup_state={};self.automatic_locations=True
 
     async def load(self):
         state=await self.store.async_load() or {'vehicles':{}}
+        self.backup_config.update(state.get('backup_config',{}));self.backup_state=state.get('backup_state',{});self.automatic_locations=state.get('automatic_locations',True)
+        from .nas_backup import NasBackup
+        from .stations import Stations
+        self.nas=NasBackup(self);self.stations=Stations(self)
         self.metadata=state['vehicles'];self.map_key=state.get('map_key','');self.opinet_key=state.get('opinet_key','');self.kakao_rest_key=state.get('kakao_rest_key','')
         for key,meta in list(self.metadata.items()):
             if meta.get('purging'):
@@ -59,7 +63,7 @@ class Vehicles:
             entries.append({'entry_id':key,'title':meta.get('title',runtime['entry'].title),'fuel':meta.get('fuel','electric'),'deleted':bool(meta.get('deleted')),'linked':not runtime.get('manual_vehicle'),'vehicle_id':runtime['journal'].vehicle})
         return entries
 
-    async def persist(self):await self.store.async_save({'vehicles':self.metadata,'map_key':self.map_key,'opinet_key':self.opinet_key,'kakao_rest_key':self.kakao_rest_key})
+    async def persist(self):await self.store.async_save({'vehicles':self.metadata,'map_key':self.map_key,'opinet_key':self.opinet_key,'kakao_rest_key':self.kakao_rest_key,'backup_config':self.backup_config,'backup_state':self.backup_state,'automatic_locations':self.automatic_locations})
 
     async def change(self,key,title,fuel,deleted):
         if not isinstance(title,str) or not title.strip() or len(title)>80 or fuel not in FUELS or type(deleted)is not bool:raise ValueError('차량 이름·유종을 확인해 주세요.')
@@ -187,3 +191,19 @@ async def setup(hass):
     from homeassistant.helpers.storage import Store
     instance=Vehicles(hass,Store(hass,1,'carrot_ha.journal_vehicles'))
     await instance.load();hass.data['carrot_ha_journal_manager']=instance
+    from datetime import timedelta
+    from homeassistant.helpers.event import async_track_time_interval, async_track_utc_time_change
+    from homeassistant.core import callback
+    from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+    task=None
+    @callback
+    def schedule(_=None):
+        nonlocal task
+        if not task or task.done():task=hass.async_create_background_task(instance.nas.schedule(),'carrot journal NAS backup')
+    unsubscribe=async_track_time_interval(hass,schedule,timedelta(minutes=5))
+    exact=async_track_utc_time_change(hass,schedule,hour=18,minute=0,second=0)  # 03:00 KST
+    def stop(_):
+        unsubscribe();exact()
+        if task and not task.done():task.cancel()
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP,stop)
+    schedule()

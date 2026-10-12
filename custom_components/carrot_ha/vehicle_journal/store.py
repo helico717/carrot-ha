@@ -369,6 +369,10 @@ class Journal:
             from .fuel_metrics import facts,odometer
             fuel_facts=facts(db,self.vehicle,start,end)
             odometer_facts=odometer(db,self.vehicle,start,end)
+            from .efficiency import calculate
+            efficiency_facts=calculate(db,self.vehicle,start,end)
+            from .station_stats import facts as place_facts
+            station_stats=place_facts(db,self.vehicle,start,end)
             counts=dict(db.execute('''SELECT e.category, count(*) FROM expenses e
                 JOIN records r ON r.vehicle_id=e.vehicle_id AND r.id=e.record_id
                 WHERE e.vehicle_id=? AND r.status='active' AND e.accounting_date BETWEEN ? AND ?
@@ -391,7 +395,7 @@ class Journal:
         for category,count in counts.items():
             cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})['count']=count
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'station_stats':station_stats,'efficiency_facts':efficiency_facts,'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 
@@ -400,7 +404,7 @@ class Journal:
         if type(expected) is not int or expected<0 or not isinstance(payload,dict):raise ValueError('잘못된 기록이에요.')
         allowed={'kind','date','ended_date','started_at','ended_at','distance_km','drive_energy_kwh',
                  'battery_charge_kwh','billed_charge_kwh','charge_mode','category','subcategory','actual_krw',
-                 'memo','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location'}
+                 'memo','unit_price_source','unit_price_observed_at','fuel_quantity_source','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location'}
         if set(payload)-allowed:raise ValueError('지원하지 않는 기록 항목이에요.')
         data=dict(payload);kind=data.get('kind')
         if 'location' in data:self.validate_location(data['location'])
@@ -414,6 +418,9 @@ class Journal:
             if data.get(field) is not None and data[field]>100:raise ValueError('SOC는 0~100%예요.')
         if data.get('actual_krw') is not None and (type(data['actual_krw']) is not int or not 0<=data['actual_krw']<=1000000000):raise ValueError('금액은 0 이상의 정수로 입력해 주세요.')
         if data.get('charge_mode','unknown') not in ('slow','fast','unknown'):raise ValueError('충전 종류를 확인해 주세요.')
+        if 'unit_price_source' in data and data['unit_price_source'] not in ('manual','opinet'):raise ValueError('단가 출처를 확인해 주세요.')
+        if 'unit_price_observed_at' in data:stamp(data['unit_price_observed_at'])
+        if data.get('fuel_quantity_source','reported') not in ('reported','estimated'):raise ValueError('주유량 출처를 확인해 주세요.')
         if 'fuel_type' in data and data['fuel_type'] not in ('gasoline','diesel','premium'):raise ValueError('유종을 확인해 주세요.')
         if 'full_tank' in data and type(data['full_tank']) is not bool:raise ValueError('가득 주유 여부를 확인해 주세요.')
         if data.get('wash_cost_krw') is not None and type(data['wash_cost_krw']) is not int:raise ValueError('세차 금액은 정수로 입력해 주세요.')
@@ -475,9 +482,13 @@ class Journal:
     def validate_location(location):
         import math
         if location is None:return
-        if not isinstance(location,dict) or set(location)-{'name','address','latitude','longitude'}:raise ValueError('위치 항목을 확인해 주세요.')
+        if not isinstance(location,dict) or set(location)-{'name','address','latitude','longitude','provider','station_id','station_type','selection_source'}:raise ValueError('위치 항목을 확인해 주세요.')
         for key,limit in [('name',200),('address',300)]:
             if not isinstance(location.get(key,''),str) or len(location.get(key,''))>limit:raise ValueError('위치 이름이 너무 길어요.')
+        if 'provider' in location and location['provider'] not in ('kakao','opinet','manual'):raise ValueError('장소 제공사를 확인해 주세요.')
+        if 'station_id' in location and (not isinstance(location['station_id'],str) or not 1<=len(location['station_id'])<=100):raise ValueError('장소 ID를 확인해 주세요.')
+        if 'station_type' in location and location['station_type'] not in ('charging','refueling'):raise ValueError('장소 종류를 확인해 주세요.')
+        if 'selection_source' in location and location['selection_source'] not in ('automatic','manual'):raise ValueError('장소 선택 출처를 확인해 주세요.')
         lat,lon=location.get('latitude'),location.get('longitude')
         if (lat is None)!=(lon is None):raise ValueError('위도와 경도를 함께 입력해 주세요.')
         if lat is not None and (type(lat) not in (float,int) or type(lon) not in (float,int) or not math.isfinite(lat) or not math.isfinite(lon) or not -90<=lat<=90 or not -180<=lon<=180):raise ValueError('좌표 범위를 확인해 주세요.')
@@ -487,7 +498,7 @@ class Journal:
         with self.lock,self.connect() as db:
             row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
             if not row or row[0]!=expected:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
-            extra=json.loads(row[1]);extra['location']=location
+            extra=json.loads(row[1]);extra['location']=location;extra['location_user_override']=True
             db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),self.vehicle,key))
             db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',(self.vehicle,key,'administrator','location',encode(location),now()))
         return {'id':key,'version':expected+1}

@@ -206,7 +206,7 @@ async def settings(hass,connection,msg):
     if 'map_key' in msg or 'opinet_key' in msg or 'kakao_rest_key' in msg:
         async with m.lock:
             old=(m.map_key,m.opinet_key,m.kakao_rest_key)
-            m.map_key=msg.get('map_key',m.map_key);m.opinet_key=msg.get('opinet_key',m.opinet_key);m.kakao_rest_key=msg.get('kakao_rest_key',m.kakao_rest_key);m.search_cache.clear()
+            m.map_key=msg.get('map_key',m.map_key);m.opinet_key=msg.get('opinet_key',m.opinet_key);m.kakao_rest_key=msg.get('kakao_rest_key',m.kakao_rest_key);m.search_cache.clear();m.stations.cache.clear()
             try:await m.persist()
             except Exception:
                 m.map_key,m.opinet_key,m.kakao_rest_key=old;connection.send_error(msg['id'],'storage_failed','설정을 저장하지 못했어요.');return
@@ -217,7 +217,7 @@ async def settings(hass,connection,msg):
         if entity.platform!='backup':continue
         state=hass.states.get(entity.entity_id)
         if state:backup.append({'name':state.name,'state':state.state,'entity_id':entity.entity_id})
-    connection.send_result(msg['id'],{'map_key':m.map_key,'opinet_configured':bool(m.opinet_key),'kakao_rest_configured':bool(m.kakao_rest_key),'kakao_rest_key':m.kakao_rest_key,'opinet_key':m.opinet_key,'backup_entities':backup,'nas_transfer_verified':False})
+    connection.send_result(msg['id'],{'map_key':m.map_key,'opinet_configured':bool(m.opinet_key),'kakao_rest_configured':bool(m.kakao_rest_key),'kakao_rest_key':m.kakao_rest_key,'opinet_key':m.opinet_key,'backup_entities':backup,'nas_transfer_verified':bool(m.backup_state.get('restore_verified')),'backup_config':m.backup_config,'backup_state':m.nas.status or m.backup_state,'automatic_locations':m.automatic_locations})
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/location/search',vol.Required('query'):str})
@@ -246,11 +246,59 @@ async def location_search(hass,connection,msg):
                 if response.status!=200:
                     connection.send_error(msg['id'],'provider_error','카카오 API 활성화·키·쿼터 설정을 확인해 주세요.');return
                 result=await response.json()
-        places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x'])} for p in result.get('documents',[])[:10]]
-        if len(m.search_cache)>=100:m.search_cache.clear()
+        places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x']),'provider':'kakao','station_id':str(p['id']),'selection_source':'manual'} for p in result.get('documents',[])[:10]]
+        if len(m.search_cache)>=100:m.search_cache.clear();m.stations.cache.clear()
         m.search_cache[query]=(now,places);connection.send_result(msg['id'],places)
     except Exception:connection.send_error(msg['id'],'provider_error','장소 검색에 실패했어요. 잠시 후 다시 시도해 주세요.')
 
 
 def register(hass):
-    for method in (entries,query,save,status,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,settings,location_search):websocket_api.async_register_command(hass,method)
+    for method in (entries,query,save,status,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,settings,location_search,station_lookup,nas_config,nas_action):websocket_api.async_register_command(hass,method)
+
+
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/stations/lookup',vol.Required('kind'):vol.In(['charging','refueling']),vol.Required('latitude'):vol.Coerce(float),vol.Required('longitude'):vol.Coerce(float),vol.Required('date'):str,vol.Optional('fuel',default='gasoline'):str,vol.Optional('price_only',default=False):bool})
+@websocket_api.async_response
+async def station_lookup(hass,connection,msg):
+    if not connection.user or not connection.user.is_admin:
+        connection.send_error(msg['id'],'unauthorized','관리자 계정이 필요해요.');return
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from .vehicles import manager
+    if msg['date']!=datetime.now(ZoneInfo('Asia/Seoul')).date().isoformat():
+        connection.send_error(msg['id'],'historical_date','과거 기록에는 현재 위치·현재 단가를 적용하지 않아요.');return
+    m=manager(hass)
+    try:
+        result=await (m.stations.price_at(msg['latitude'],msg['longitude'],msg['fuel']) if msg['price_only'] else m.stations.nearby(msg['kind'],msg['latitude'],msg['longitude'],msg['fuel']))
+        connection.send_result(msg['id'],result)
+    except ValueError as error:connection.send_error(msg['id'],'provider_error',str(error))
+
+
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/nas/config',vol.Required('enabled'):bool,vol.Required('path'):str,vol.Required('automatic_locations'):bool})
+@websocket_api.async_response
+async def nas_config(hass,connection,msg):
+    if not connection.user or not connection.user.is_admin:
+        connection.send_error(msg['id'],'unauthorized','관리자 계정이 필요해요.');return
+    from .vehicles import manager
+    from .nas_backup import network_path
+    m=manager(hass)
+    try:
+        if msg['enabled']:await hass.async_add_executor_job(network_path,msg['path'])
+        async with m.lock:
+            previous=m.backup_config,m.automatic_locations
+            m.backup_config={'enabled':msg['enabled'],'path':msg['path']};m.automatic_locations=msg['automatic_locations']
+            try:await m.persist()
+            except Exception:m.backup_config,m.automatic_locations=previous;raise
+        connection.send_result(msg['id'],{'saved':True})
+    except Exception as error:connection.send_error(msg['id'],'storage_failed',str(error) if isinstance(error,ValueError) else '설정을 저장하지 못했어요.')
+
+
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/nas/action',vol.Required('action'):vol.In(['run','list'])})
+@websocket_api.async_response
+async def nas_action(hass,connection,msg):
+    if not connection.user or not connection.user.is_admin:
+        connection.send_error(msg['id'],'unauthorized','관리자 계정이 필요해요.');return
+    from .vehicles import manager
+    try:
+        nas=manager(hass).nas
+        connection.send_result(msg['id'],await (nas.run() if msg['action']=='run' else nas.listing()))
+    except Exception as error:connection.send_error(msg['id'],'storage_failed',str(error) if isinstance(error,ValueError) else 'NAS 연결·백업을 확인해 주세요.')

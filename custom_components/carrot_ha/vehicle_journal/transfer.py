@@ -54,3 +54,18 @@ class SnapshotDownload(HomeAssistantView):
         try:content=await manager(self.hass).export(entry_id)
         except (ValueError,OSError):return web.json_response({'error':'스냅샷을 만들지 못했어요.'},status=400)
         return web.Response(body=content,content_type='application/zip',headers={'Content-Disposition':'attachment; filename="carrot-journal-snapshot.zip"','Cache-Control':'no-store'})
+
+
+class NasDownload(HomeAssistantView):
+    url='/api/carrot_ha/v1/journal/nas/{filename}'
+    name='api:carrot_ha:journal:nas_snapshot'
+    requires_auth=True
+    def __init__(self,hass):self.hass=hass
+    async def get(self,request,filename):
+        user=request.get('hass_user')
+        if not user or not user.is_admin:raise web.HTTPForbidden()
+        try:
+            m=manager(self.hass)
+            content=await self.hass.async_add_executor_job(m.nas.io,'read',filename)
+            return web.Response(body=content,content_type='application/zip',headers={'Content-Disposition':'attachment; filename="carrot-journal-snapshot.zip"','Cache-Control':'no-store'})
+        except (ValueError,OSError):return web.json_response({'error':'NAS 스냅샷 검증 또는 다운로드에 실패했어요.'},status=400)

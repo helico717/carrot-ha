@@ -1,0 +1,32 @@
+"""Rebuildable per-place statistics from immutable quantities and location overlays."""
+import json
+from .efficiency import value
+
+
+def facts(db,vehicle,start,end):
+    groups={};unlocated=0
+    rows=db.execute("SELECT r.id,r.extra_json,e.category,e.actual_krw,e.estimated_krw FROM records r JOIN expenses e ON e.vehicle_id=r.vehicle_id AND e.record_id=r.id WHERE r.vehicle_id=? AND r.status='active' AND e.category IN ('charging','refueling') AND e.accounting_date BETWEEN ? AND ?",(vehicle,start,end))
+    for rid,text,kind,actual,estimated in rows:
+        extra=json.loads(text);data=extra.get('input') or {};location=extra.get('location',data.get('location'));fields=extra.get('import_source',{}).get('fields',{})
+        if not location or not (location.get('name') or location.get('latitude') is not None):unlocated+=1;continue
+        # Name-only imports remain separate until the user identifies an actual place.
+        if location.get('provider') and location.get('station_id'):identity=location['provider']+':'+location['station_id']
+        elif location.get('latitude') is not None:identity=f"coordinate:{location['latitude']:.5f}:{location['longitude']:.5f}"
+        else:identity='unresolved:'+rid
+        group=groups.setdefault((kind,identity),{'id':identity,'kind':kind,'location':location,'resolved':not identity.startswith('unresolved:'),'visits':0,'actual_krw':0,'estimated_krw':0,'fuel_liters':0,'billed_kwh':0,'battery_kwh':0,'fuel_priced_liters':0,'fuel_priced_cost':0,'billed_priced_kwh':0,'billed_priced_cost':0,'battery_priced_kwh':0,'battery_priced_cost':0,'unknown_quantity_count':0})
+        group['visits']+=1;group['actual_krw']+=actual or 0;group['estimated_krw']+=estimated or 0;cost=actual if actual is not None else estimated
+        if kind=='refueling':
+            qty=value(data,fields,'fuel_liters','주유량');basis='fuel'
+        else:
+            qty=value(data,fields,'billed_charge_kwh','충전량');basis='billed'
+            if qty is None:
+                members=db.execute("SELECT m.battery_charge_kwh FROM expense_members x JOIN mobility m ON m.vehicle_id=x.vehicle_id AND m.record_id=x.charge_id JOIN records r ON r.vehicle_id=m.vehicle_id AND r.id=m.record_id WHERE x.vehicle_id=? AND x.expense_id=? AND r.status='active'",(vehicle,rid)).fetchall()
+                qty=sum(r[0] for r in members) if members and all(r[0] is not None for r in members) else None;basis='battery'
+        if qty is None or qty<=0:group['unknown_quantity_count']+=1;continue
+        group[{'fuel':'fuel_liters','billed':'billed_kwh','battery':'battery_kwh'}[basis]]+=qty
+        if cost is not None:group[basis+'_priced_cost']+=cost;group[basis+('_priced_liters' if basis=='fuel' else '_priced_kwh')]+=qty
+    for g in groups.values():
+        for basis in ('fuel','billed','battery'):
+            divisor=g[basis+('_priced_liters' if basis=='fuel' else '_priced_kwh')]
+            g[basis+'_average_krw']=g[basis+'_priced_cost']/divisor if divisor else None
+    return {'from':start,'to':end,'places':list(groups.values()),'unlocated_records':unlocated,'basis':'금액과 수량이 함께 있는 기록의 합계로 가중 평균 · 청구 kWh와 배터리 추정 kWh 분리'}

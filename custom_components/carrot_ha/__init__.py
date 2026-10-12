@@ -42,9 +42,10 @@ async def async_setup(hass, config):
     register_can_capture(hass)
     from .vehicle_journal.vehicles import setup as setup_journal_vehicles
     await setup_journal_vehicles(hass)
-    from .vehicle_journal.transfer import ImportPreview, SnapshotDownload
+    from .vehicle_journal.transfer import ImportPreview, SnapshotDownload, NasDownload
     hass.http.register_view(ImportPreview(hass))
     hass.http.register_view(SnapshotDownload(hass))
+    hass.http.register_view(NasDownload(hass))
     from .vehicle_journal.api import register as register_journal
     register_journal(hass)
     from .vehicle_journal.photos import PhotoUpload, PhotoDownload

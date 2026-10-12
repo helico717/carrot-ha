@@ -1,3 +1,8 @@
+## 2026-10-12 — preceding comparison deployment and next phase
+
+- e6c26fd main 푸시·HA deployment-backups/e6c26fd3c86c27981b12f62fe211e48076193f30/ 코드 백업·7개 파일 반영 완료. 설치·화면 내부/외부 HTTP 해시 일치. Python 37개 및 Chrome 내연기관 비교/도넛/설정 글꼴·EV 회귀 통과. 사용자 HA 재시작·실제 화면 확인 대기.
+- 새 사용자 요청: 자동 충전소/주유소, 주유 단가, 가득 주유 사이 부분 주유 포함 연비 및 NAS 전용 스냅샷/GFS/복원 검증 구현. EV 장소 보정은 기존 대시보드 완속/급속 추정 요금을 변경하지 않음. HA 네트워크 저장소 접근 상태 확인 중; 기존 /backup/nas 경로 없음, mount API 인증 실패. 자동 선택 기준·백업 시간·실제 NAS 경로 검토 요청.
+
 ## 2026-10-12 — vehicle-journal: improve location search UX and fix long address text clipping
 
 - 원인:
@@ -1271,3 +1276,15 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   운영 설치 hash가 수정 전 커밋과 일치함을 확인하고, 서버/HTTP/실제 브라우저 적용
   결과는 후속 기록한다. 현재 개발 정책에 따라 새 릴리즈 없음. Python/DB/사진/
   Cloudflare/Comma 변경 없음.
+
+## 2026-10-12 — 자동 장소·연비·장소 통계·검증된 NAS 전용 백업
+
+- 커밋 제목: `vehicle-journal: add station enrichment fuel efficiency and verified NAS snapshots`.
+- 변경·이유: 오늘 신규 수동 주유/충전은 사용자 GPS에서 가장 가까운 후보를 선택한다. 주유 단가는 실제 유종별 오피넷 현재 단가이며 수정한 단가를 덮어쓰지 않는다. 과거 날짜에는 현재 위치/단가를 적용하지 않는다. 자동 충전은 충전 시작 ±10분 안의 HA 로컬 GPS를 사용하고 정확도 100m 초과는 제외한다. 장소 조회는 한 번에 3건, 실패는 다음날 재시도하며 최신 상태 경로와 독립적이다. 기존 완속/급속 추정 요금·charge_payment 원본은 변경하지 않는다.
+- 가득 주유 구간의 시작 주유량은 제외하고 부분 주유와 종료 주유량을 합산한다. 전체 가중 평균은 총거리/총량이다. 주유량 누락·거리 감소·당일 가득 주유 순서 불명·유종 혼합은 제외 및 안내한다. 금액/단가로 계산한 주유량은 추정으로 표시한다.
+- 장소별 방문 횟수·주유 L·청구 kWh·배터리 추정 kWh·각 가중 평균 단가 조회와 추세 목록을 추가한다. 제공사 ID/좌표/단가 출처를 기록과 스냅샷에 보존한다. 이름만 있는 이관 장소는 다른 지점을 합치지 않고 위치 미확정으로 구분한다. 전국 지도는 후속 표시 기능이다.
+- NAS 전용 스냅샷은 기존 HA 백업 폴더 안 전용 vehicle-journal 하위 폴더에만 보관한다. KST 03:00 예약과 시작/실패 재시도, 일7/주4/월12, 임시 DB·원본 결제 복원, 체크섬 및 NAS 읽기 복원 검증을 제공한다. 실제 NFS/CIFS 마운트가 아니면 로컬 대체 저장을 거부하고 전체 검증 성공 후 자기 인덱스 파일만 정리한다. 설정·수동 백업·목록·검증 다운로드와 기존 업로드 복구를 연결한다. API 키는 스냅샷에 포함하지 않는다.
+- 환경: 사용자가 기존 HA 백업 폴더 연결과 HA 단일 IP에 Vault NFS 읽기/쓰기를 승인했다. HA 공유 용도 마운트가 연결됨을 UI 및 SSH에서 확인했다. 기존 Frigate 미디어 마운트는 백업에 사용하지 않는다. HA Core 직접 mountinfo 확인은 SSH 앱 보호 모드로 Docker 접근이 제한되어 미실시이며 보호 모드는 변경하지 않았다. Core 내부 백업 API 실제 검증은 사용자 재시작 후 확인한다.
+- 관련 파일: vehicle_journal/{stations,automatic_locations,efficiency,station_stats,nas_backup,api,store,runtime,vehicles,transfer}.py, __init__.py, frontend/carrot-vehicle-journal.js, tests/{test_station_backup,test_api_authorization}.py, tests/vehicle-management.cjs.
+- 검증: Python 45건·schema 9건 및 실제 Chromium vehicle-management/browser-check/loader-update 통과. 합성 자료로 부분주유/가중 평균/누락 제외, 장소 통계, 기존 충전 요금 유지, 사용자 위치 삭제 보호, GFS 세대 한도, 실패 시 기존 인덱스 유지, 손상 체크섬 거부 및 기존 HA 파일 미삭제 확인. 자동 GPS·가격·수동 가격 보호·추정량 출처·연비/장소 통계·NAS 상태 UI 통과. 공식 API 공공 좌표로 오피넷 주유소 48개·카카오 충전소 15개 및 좌표 변환 검증(이전 작업에서 수행).
+- 배포: 검증 후 커밋·main 푸시·기존 코드 백업·HA 부분 반영 대상. 실제 NAS 저장 검증 및 사용자 재시작/설정 활성화 결과는 후속 기록한다. 개발 정책상 새 Release 없음. Comma/Cloudflare 변경 없음.
