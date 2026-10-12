@@ -1,3 +1,11 @@
+## 2026-10-13 — Antigravity 규칙에 최신 차계부 작업 지침 동기화
+
+- 커밋 제목: vehicle-journal: sync shared category colors to antigravity rule
+- 변경·이유: vehicle-journal/AGENTS.md에 추가된 차량 공통 기본 카테고리 색상(주유·충전 민트 #81e6c5, 정비 앰버 #f59e0b 등) 정책이 Antigravity 워크스페이스 규칙 경로인 .agents/rules/vehicle-journal.md에 누락되어 있던 것을 동기화.
+- 관련 파일: .agents/rules/vehicle-journal.md, vehicle-journal/CHANGELOG.md.
+- 검증: diff 확인으로 vehicle-journal/AGENTS.md와 .agents/rules/vehicle-journal.md 내용 일치 확인.
+- 배포: 문서 커밋·main 푸시. 실행 코드 변경 및 새 릴리즈 없음.
+
 ## 2026-10-12 — 모든 차량의 기본 카테고리 색상 정책 확정
 
 - 커밋 제목: vehicle-journal: document shared default category colors and mint deployment
