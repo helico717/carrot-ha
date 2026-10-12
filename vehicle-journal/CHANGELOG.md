@@ -1,5 +1,12 @@
 # 차계부 변경 이력
 
+## 2026-10-12 — 차량 관리 구현의 직접 배포 검증 기록
+
+- 커밋 제목: `vehicle-journal: record onboarding deployment verification`.
+- 변경·이유/관련 파일: 이 변경 이력에 실행 커밋 ef75d00의 원격 반영·코드13개 백업/배포/해시·승인된 내부 키 설정 결과를 확정 기록. 코드 추가 변경 없음.
+- 검증·배포: 화면 HTTP 일치 및 설치 Python 구문 확인. 카카오 REST200/JS SDK 합성 HA origin 정상. 실제 HA 새 API/의존성/DB 업그레이드 및 사용자 이관은 재시작 후 대기, 실제 차량 기록은 이번 검증에서 등록하지 않음.
+- 제한: 디버깅 정책상 기존 beta.4 유지. NAS 자동전송·주유 자동 입력/OCR은 후속. Worker/Comma 배포 없음.
+
 ## 2026-10-12 — 독립 차량·마이클 이관·스냅샷·설정·위치 관리
 
 - 커밋 제목: `vehicle-journal: add vehicle onboarding imports snapshots and settings`.
@@ -11,7 +18,7 @@
 - 관련 파일: __init__/manifest, vehicle_journal api/runtime/store/schema/photos와 신규 vehicles/importers/snapshots/transfer, frontend 카드/디자인, 설계 스키마·검증, 원장/권한/타이머/신규 이관·차량관리 테스트, vehicle-management.md, 이 변경 이력.
 - 검증: 차계부 Python28개·스키마9개, Chrome 기존 데스크톱/모바일·로더·새 차량/설정/휴지통/미리보기/합성 카카오 검색/핀/제거 통과. 대시보드 로딩/스크롤 Node10개, 카메라/충전/주행 Node20개, cloud live6개·incremental5개·history1개·charge payments11개, Worker incremental/benchmark 및 Comma param polling4개 통과. 테스트 경로 오지정은 올바른 하위 경로에서 재실행.
 - 외부 검증: 사용자 승인 후 비개인 검색으로 카카오 REST200 확인. 실제 SDK와 공개 좌표로 합성 HA origin에서 JS 지도 생성 성공. 키는 공개 코드/로그/릴리즈/스냅샷에 넣지 않음.
-- 배포·제한: main 푸시·HA 코드 백업/직접 반영·승인한 키 등록 예정. Python/스키마/의존성 적용은 사용자 HA 재시작 필요, 운영 UI 확인 대기. 기존 beta.4 유지·신규 릴리즈 미발행. Worker/D1/Comma 변경·배포 없음. XLS/XLSX20MiB·ZIP128MiB/해제256MiB 제한, NAS 보관본 검증 미실시.
+- 배포·제한: 실행 커밋 `ef75d00204fcd78d1617205f0a81858dcf24bf73` main 푸시·원격 일치 확인. 변경 코드13개를 `/config/carrot_ha/deployment-backups/ef75d00204fcd78d1617205f0a81858dcf24bf73/`에 백업/신규 파일 표시 후 직접 반영, 설치 SHA-256 및 화면2개 HTTP SHA-256 일치. 사용자 명시 승인한 API 키3개는 새 HA 내부 Store에 제한 권한으로 등록하고 값은 출력하지 않음. Python/스키마/의존성 적용은 사용자 HA 재시작 필요, 운영 UI 확인 대기. HA 컨테이너 검사는 SSH 앱 보호 모드로 실행 불가하여 보호 모드를 유지하고 설치 파일 구문 검사로 대체; HA 내부 의존성 설치/새 API 구동은 사용자 재시작 후 확인 필요. 기존 beta.4 유지·신규 릴리즈 미발행. Worker/D1/Comma 변경·배포 없음. XLS/XLSX20MiB·ZIP128MiB/해제256MiB 제한, NAS 보관본 검증 미실시.
 
 
 ## 2026-10-12 — 저장공간 실측 및 두 차량·NAS 복구 구상 분석
