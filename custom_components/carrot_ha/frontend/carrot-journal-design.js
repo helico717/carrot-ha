@@ -1399,18 +1399,67 @@ export const journalDesign = `:host {
 
 .vehicle-import-actions{display:grid;align-items:stretch;grid-template-columns:1fr 1fr;margin:18px 0;gap:12px}.vehicle-import-actions button{white-space:normal}.journal-location{margin:8px 0;display:flex;flex-direction:column;gap:8px}.loc-header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.loc-header-title-wrap{display:flex;align-items:center;gap:8px;min-width:0}.loc-header-title-wrap h3{margin:0;font-size:16px;font-weight:700;white-space:nowrap}.loc-summary-pill{font-size:12px;font-weight:500;color:var(--j-mint,#81e6c5);background:rgba(129,230,197,0.12);padding:3px 8px;border-radius:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}.loc-summary-pill[hidden]{display:none}.btn-loc-remove{background:transparent !important;color:#ff8585 !important;border:1px solid rgba(255,133,133,0.3) !important;font-size:12px !important;padding:4px 10px !important;min-height:28px !important;height:auto !important;border-radius:8px !important;cursor:pointer;flex-shrink:0}.btn-loc-remove:hover{background:rgba(255,133,133,0.1) !important;border-color:#ff8585 !important}.btn-loc-remove[hidden]{display:none !important}.btn-loc-add{width:100%;padding:12px;border-radius:12px;border:1px dashed var(--j-border);background:var(--j-surface);color:var(--j-ink);font-size:14px;font-weight:600;cursor:pointer;text-align:center}.btn-loc-add:hover{border-color:var(--j-mint,#81e6c5);background:var(--j-raised)}.btn-loc-add[hidden]{display:none}#locationEditor{display:flex;flex-direction:column;gap:14px;padding:14px;border-radius:14px;background:var(--j-raised,rgba(255,255,255,0.03));border:1px solid var(--j-border)}#locationEditor[hidden]{display:none}.loc-search-box{display:flex;flex-direction:column;gap:8px}.loc-box-title{font-size:13.5px;font-weight:700;color:var(--j-ink)}.loc-search-row{display:flex;gap:8px;align-items:center;width:100%}.loc-search-row #placeQuery{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--j-border);background:var(--j-surface);font-size:14px}.btn-loc-search{flex-shrink:0;padding:10px 16px;border-radius:10px;font-weight:600;font-size:13.5px;min-height:40px;height:auto}.btn-loc-pin{flex-shrink:0;padding:10px 12px;border-radius:10px;font-size:13px;min-height:40px;height:auto}#placeResults{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;margin-top:4px;padding:2px}#placeResults:empty{display:none}.place-result-item{display:flex !important;flex-direction:column !important;align-items:flex-start !important;text-align:left !important;width:100% !important;box-sizing:border-box !important;height:auto !important;min-height:52px !important;padding:10px 14px !important;border-radius:10px !important;border:1px solid var(--j-border) !important;background:var(--j-surface) !important;color:var(--j-ink) !important;white-space:normal !important;overflow:visible !important;cursor:pointer;transition:background 0.15s ease,border-color 0.15s ease}.place-result-item:hover,.place-result-item:focus-visible{background:var(--j-raised,rgba(255,255,255,0.08)) !important;border-color:var(--j-mint,#81e6c5) !important}.place-result-name{font-size:14.5px !important;font-weight:700 !important;color:var(--j-ink) !important;line-height:1.35 !important;word-break:keep-all;overflow-wrap:break-word}.place-result-addr{font-size:12.5px !important;font-weight:400 !important;color:var(--j-sub) !important;line-height:1.4 !important;margin-top:3px !important;word-break:break-all;overflow-wrap:anywhere}.selected-loc-section{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:12px;background:rgba(129,230,197,0.06);border:1px solid rgba(129,230,197,0.25)}.selected-loc-badge{font-size:11.5px;font-weight:700;color:var(--j-mint,#81e6c5);letter-spacing:-0.2px;text-transform:uppercase}.selected-loc-addr-text{font-size:13.5px;font-weight:600;color:var(--j-ink);line-height:1.4;word-break:break-all;overflow-wrap:anywhere}.selected-loc-addr-text.empty{font-size:12.5px;font-weight:400;color:var(--j-sub)}.selected-loc-name-field{display:flex;flex-direction:column;gap:6px;margin-top:2px}.selected-loc-name-title{font-size:13px;font-weight:700;color:var(--j-ink)}.selected-loc-name-field #locationName{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid var(--j-border);background:var(--j-surface);font-size:14px}.selected-loc-hint{font-size:12px;color:var(--j-sub);line-height:1.4}.loc-map-container{display:flex;flex-direction:column;gap:6px}#vehicleManageList .panel{padding:16px;margin:12px 0}#vehicleManageList input,#vehicleManageList select{width:100%}#vehicleDialog h2{font-size:26px}#importPreview{max-height:340px;overflow:auto;margin:12px 0}@media(max-width:600px){.vehicle-import-actions button{font-size:13px}.loc-search-row{flex-wrap:wrap}.loc-search-row #placeQuery{flex-basis:100%}.btn-loc-search,.btn-loc-pin{flex:1}.loc-summary-pill{max-width:160px}#vehicleDialog h2{font-size:23px}}
 
-.card-settings-top{display:flex;justify-content:flex-end;margin-bottom:12px}.card-settings-top[hidden]{display:none}#vehicleManageDialog{width:980px;max-width:calc(100vw - 32px);height:min(760px,calc(100dvh - 40px));max-height:calc(100dvh - 40px);padding:0;overflow:hidden}.settings-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:24px 28px 18px;border-bottom:1px solid var(--j-border)}.settings-dialog-header h2{margin:0}.settings-dialog-header p{margin:6px 0 0}.settings-layout{display:grid;grid-template-columns:180px minmax(0,1fr);height:calc(100% - 150px);min-height:0}.settings-nav{display:flex;flex-direction:column;gap:8px;padding:20px 12px;border-right:1px solid var(--j-border);overflow:auto;background:var(--j-raised)}.settings-nav button{text-align:left;padding:12px;white-space:normal;line-height:1.45;border-color:transparent;background:transparent}.settings-nav button.active{color:var(--j-mint,#81e6c5);background:#81e6c514;border-color:#81e6c544}.settings-content{min-width:0;overflow:auto;padding:24px}.settings-content h3{margin:0 0 12px;font-size:20px}.settings-section{border:1px solid var(--j-border);border-radius:14px;padding:18px;margin:16px 0}.settings-section h4{margin:0 0 12px;font-size:17px}.settings-key-field{display:flex;align-items:center;gap:8px;margin-top:8px}.settings-key-field input{min-width:0;width:100%;font-family:monospace}.settings-key-field button{flex-shrink:0}.settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.settings-backup-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--j-border)}.settings-backup-row span{min-width:0;overflow-wrap:anywhere}.settings-message{min-height:32px;padding:8px 24px;margin:0;border-top:1px solid var(--j-border);color:var(--j-sub);font-size:14px}#vehicleManageList .row{flex-wrap:wrap}#vehicleManageList small{display:block;margin:10px 0}@media(max-width:600px){#vehicleManageDialog{max-width:calc(100vw - 16px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px)}.settings-dialog-header{padding:16px}.settings-dialog-header h2{font-size:21px}.settings-dialog-header p{font-size:12px}.settings-layout{grid-template-columns:84px minmax(0,1fr);height:calc(100% - 142px)}.settings-nav{padding:12px 6px;gap:6px}.settings-nav button{padding:10px 6px;font-size:12px}.settings-content{padding:14px 10px}.settings-content h3{font-size:17px}.settings-section{padding:12px}.settings-backup-row{flex-direction:column;align-items:flex-start}.settings-message{padding:8px 16px}.settings-key-field{flex-wrap:wrap}.settings-key-field input{flex-basis:100%}}
-
-.card-settings-top{align-items:center;justify-content:space-between}.card-settings-top h2{font-size:25.5px;margin:0;white-space:nowrap;letter-spacing:-0.5px}
+.card-settings-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.card-settings-top[hidden]{display:none}.card-settings-top h2{font-size:25.5px;margin:0;white-space:nowrap;letter-spacing:-0.5px}
+#vehicleManageDialog{box-sizing:border-box;margin:auto;width:980px;max-width:calc(100vw - 32px);height:min(760px,calc(100dvh - 48px));max-height:calc(100dvh - 48px);padding:0;overflow:hidden;border:1px solid var(--j-border);border-radius:18px;background:var(--j-surface);color:var(--j-ink)}
 #vehicleManageDialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}
-#vehicleManageDialog{box-sizing:border-box;margin:auto;width:980px;max-width:calc(100vw - 40px);height:min(760px,calc(100dvh - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));max-height:calc(100dvh - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
-.settings-layout{height:auto;overflow:hidden}.settings-nav button{text-align:center}.settings-message{overflow-wrap:anywhere;max-height:90px;overflow:auto;box-sizing:border-box}
-#vehicleManageDialog button{min-height:38px;font-size:13px;padding:8px 12px;border-radius:10px}
-#vehicleManageDialog input,#vehicleManageDialog select{padding:8px 10px;min-height:40px;box-sizing:border-box}
+.settings-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:22px 26px 18px;border-bottom:1px solid var(--j-border);background:var(--j-surface)}
+.settings-dialog-header h2{margin:0;font-size:22px;font-weight:750;color:var(--j-ink)}
+.settings-dialog-header p{margin:6px 0 0;font-size:13px;color:var(--j-sub)}
+.settings-layout{display:grid;grid-template-columns:180px minmax(0,1fr);height:100%;min-height:0;overflow:hidden}
+.settings-nav{display:flex;flex-direction:column;gap:8px;padding:18px 12px;border-right:1px solid var(--j-border);overflow:auto;background:var(--j-raised)}
+.settings-nav button{text-align:left;padding:12px 14px;white-space:normal;line-height:1.45;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--j-ink);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s ease}
+.settings-nav button:hover{background:rgba(255,255,255,0.05);color:var(--j-ink)}
+.settings-nav button.active{color:var(--j-mint,#81e6c5);background:rgba(129,230,197,0.12);border-color:rgba(129,230,197,0.35)}
+.settings-content{min-width:0;width:100%;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;padding:24px}
+.settings-content h3{margin:0 0 12px;font-size:20px;font-weight:700;color:var(--j-ink)}
+.settings-section{border:1px solid var(--j-border);border-radius:14px;padding:18px;margin:16px 0;background:var(--j-surface);width:100%;box-sizing:border-box}
+.settings-section h4{margin:0 0 12px;font-size:16.5px;font-weight:700;color:var(--j-ink)}
+.settings-key-field{display:flex;align-items:center;gap:8px;margin-top:8px;width:100%;box-sizing:border-box}
+.settings-key-field input{flex:1;min-width:0;width:100%;font-family:monospace;padding:8px 10px;min-height:38px;box-sizing:border-box}
+.settings-key-field button{flex-shrink:0}
 .settings-key-help{display:block;color:var(--j-sub);font-size:12px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
-@media(max-width:600px){.card-settings-top h2{font-size:21.5px}#vehicleManageDialog{max-width:calc(100vw - 32px)}.settings-layout{height:auto;grid-template-columns:80px minmax(0,1fr)}#vehicleManageDialog .settings-nav button{font-size:12px;padding:8px 4px}#vehicleManageDialog input,#vehicleManageDialog select{font-size:16px}.settings-dialog-header{padding:14px 12px}.settings-dialog-header p{line-height:1.5}.settings-content{padding:14px 10px}.settings-section{padding:10px}.settings-key-field input{flex-basis:100%}}
+.settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.settings-backup-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--j-border);width:100%;box-sizing:border-box}
+.settings-backup-row span{min-width:0;overflow-wrap:anywhere}
+.settings-backup-row small{display:block;line-height:1.5;margin-top:4px;color:var(--j-sub)}
+.settings-message{min-height:32px;padding:8px 24px;margin:0;border-top:1px solid var(--j-border);color:var(--j-sub);font-size:13.5px;overflow-wrap:anywhere;max-height:90px;overflow:auto;box-sizing:border-box}
+#vehicleManageDialog button{min-height:36px;font-size:13px;padding:8px 12px;border-radius:10px}
+#vehicleManageDialog input,#vehicleManageDialog select{padding:8px 10px;min-height:38px;box-sizing:border-box}
+#vehicleManageList .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;width:100%;box-sizing:border-box}
+#vehicleManageList small{display:block;margin:10px 0;color:var(--j-sub)}
+#vehicleManageList .panel{padding:16px;margin:12px 0;border:1px solid var(--j-border);border-radius:14px;background:var(--j-surface);width:100%;box-sizing:border-box}
+#vehicleManageList input,#vehicleManageList select{width:100%;box-sizing:border-box}
+.vehicle-trashed label,.vehicle-trashed small,.vehicle-trashed.settings-backup-row span,.vehicle-trashed [data-title],.vehicle-trashed [data-fuel],#vehicleManageDialog .vehicle-delete{color:#ff8585}
+.vehicle-trashed{border-color:#ff858544}
+@media(max-width:600px){
+  .card-settings-top h2{font-size:21px}
+  #vehicleManageDialog{width:100vw;max-width:calc(100vw - 16px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);border-radius:14px}
+  .settings-dialog-header{padding:14px 14px 12px;gap:10px}
+  .settings-dialog-header h2{font-size:18px}
+  .settings-dialog-header p{font-size:12px;margin-top:3px}
+  .settings-layout{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+  .settings-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px 8px;border-right:none;border-bottom:1px solid var(--j-border);overflow:visible;background:var(--j-raised);flex-shrink:0}
+  .settings-nav button{text-align:center;padding:7px 2px;font-size:11.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:8px;min-height:32px}
+  .settings-content{flex:1;min-height:0;padding:14px 12px;overflow-y:auto;overflow-x:hidden;width:100%;box-sizing:border-box}
+  .settings-content h3{font-size:16.5px;margin-bottom:8px}
+  .settings-content .note{font-size:12px;line-height:1.45}
+  .settings-section{padding:12px;margin:10px 0;border-radius:12px}
+  .settings-section h4{font-size:15px;margin-bottom:8px}
+  #vehicleManageList .panel{padding:12px;margin:10px 0;border-radius:12px}
+  #vehicleManageList .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;width:100%;box-sizing:border-box;margin-top:10px}
+  #vehicleManageList .row button{width:100%;min-height:34px;padding:6px 4px;font-size:12px;text-align:center}
+  #vehicleManageDialog button{min-height:34px;font-size:12.5px;padding:6px 10px}
+  #vehicleManageDialog input,#vehicleManageDialog select{font-size:15px;min-height:38px}
+  .settings-key-field{flex-wrap:wrap;gap:6px}
+  .settings-key-field input{flex-basis:100%;width:100%}
+  .settings-key-field button{width:100%;text-align:center}
+  .settings-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+  .settings-actions button{width:100%;text-align:center}
+  .settings-backup-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 0}
+  .settings-backup-row button{width:100%;text-align:center}
+  .settings-message{padding:8px 14px;font-size:12px}
+}
 .ledger-category-location{display:flex;align-items:center;gap:8px;min-width:0}.ledger-place-name{font-weight:400;overflow-wrap:anywhere;min-width:0;line-height:1.5}.ledger-category-location .cat-highlight-pill{flex-shrink:0}
-#vehicleManageDialog button{min-height:27px;font-size:13px;padding:5px 8px;border-radius:7px}#vehicleManageDialog .settings-nav button{font-size:inherit;padding:6px 3px}.vehicle-trashed label,.vehicle-trashed small,.vehicle-trashed.settings-backup-row span,.vehicle-trashed [data-title],.vehicle-trashed [data-fuel],#vehicleManageDialog .vehicle-delete{color:#ff8585}.vehicle-trashed{border-color:#ff858544}
 #recordTypeDialog{width:400px;max-width:calc(100vw - 40px);padding:24px}.record-type-choices{display:flex;flex-direction:column;gap:8px}.record-type-choices button{display:flex;align-items:center;gap:16px;text-align:left;padding:14px 16px;font-size:17px}.record-type-choices button span{font-size:24px}#recordDialog[data-mode]:not([data-mode="maintenance"]) .fields{display:flex;flex-direction:column;gap:20px}#recordDialog #driveModeField,#recordDialog #tankModeField{display:flex;gap:16px;flex-wrap:wrap}#recordDialog #driveModeField label,#recordDialog #tankModeField label{display:flex;flex-direction:row;align-items:center;gap:6px}#recordDialog input[type=radio]{width:auto}#recordDialog #tankModeField small{flex-basis:100%}#recordDialog{max-height:calc(100dvh - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-width:calc(100vw - 32px)}
 .photo-pick-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:90px;height:90px;font-size:24px}.photo-pick-tile span{font-size:14px}#recordPhotoField{gap:10px}
 #recordDialog[data-mode]:not([data-mode="maintenance"]) #recordForm>.row.spaced{position:sticky;top:0;background:var(--j-surface);z-index:2;padding-bottom:12px}#recordDialog[data-mode]:not([data-mode="maintenance"]) #save{padding:8px 12px;min-height:38px}
@@ -1479,12 +1528,12 @@ export const journalDesign = `:host {
 .backup-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
 .backup-card{background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;transition:border-color 0.2s ease,box-shadow 0.2s ease}
 .backup-card:hover{border-color:rgba(129,230,197,0.35);box-shadow:0 3px 10px rgba(0,0,0,0.25)}
-.backup-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.backup-card-title-wrap{display:flex;align-items:center;gap:7px;min-width:0}
-.backup-card-icon{color:var(--j-accent);display:flex;align-items:center;flex-shrink:0}
-.backup-card-title{font-size:13px;font-weight:650;color:var(--j-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.backup-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.backup-card-title-wrap{display:flex;align-items:flex-start;gap:7px;min-width:0;flex:1}
+.backup-card-icon{color:var(--j-accent);display:flex;align-items:center;flex-shrink:0;margin-top:1px}
+.backup-card-title{font-size:13px;font-weight:650;color:var(--j-ink);word-break:keep-all;line-height:1.35}
 .backup-card-body{margin:2px 0}
-.backup-card-value{font-size:15px;font-weight:700;color:#ffffff;letter-spacing:-0.2px;font-variant-numeric:tabular-nums;word-break:break-all}
+.backup-card-value{font-size:15px;font-weight:700;color:#ffffff;letter-spacing:-0.2px;font-variant-numeric:tabular-nums;word-break:keep-all;line-height:1.35}
 .backup-card-footer{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:5px;border-top:1px dashed rgba(255,255,255,0.06)}
 .backup-card-entity{font-size:10.5px;font-family:monospace;color:var(--j-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -1503,13 +1552,13 @@ export const journalDesign = `:host {
 .backup-empty-card h4{margin:0;font-size:15px;color:var(--j-ink)}
 
 @media(max-width:600px){
-  .backup-overview-banner{flex-direction:column;align-items:stretch;gap:10px;padding:12px}
-  .backup-overview-quick{border-left:none;border-top:1px solid var(--j-border);padding-left:0;padding-top:8px;text-align:left}
-  .backup-quick-item{justify-content:flex-start}
-  .backup-grid{grid-template-columns:1fr;gap:8px}
-  .backup-card{padding:10px 12px}
+  .backup-overview-banner{flex-direction:column;align-items:stretch;gap:10px;padding:12px;width:100%;box-sizing:border-box}
+  .backup-overview-quick{border-left:none;border-top:1px solid var(--j-border);padding-left:0;padding-top:8px;text-align:left;width:100%;display:flex;flex-direction:column;gap:6px}
+  .backup-quick-item{display:flex;justify-content:space-between;align-items:center;width:100%;font-size:12px}
+  .backup-grid{grid-template-columns:1fr;gap:8px;width:100%}
+  .backup-card{padding:10px 12px;width:100%;box-sizing:border-box}
   .backup-card-value{font-size:14px}
-  .backup-guide-card{padding:12px}
+  .backup-guide-card{padding:12px;width:100%;box-sizing:border-box}
   .backup-guide-header{flex-direction:column;align-items:flex-start;gap:8px}
   .backup-guide-btn{width:100%;justify-content:center}
 }

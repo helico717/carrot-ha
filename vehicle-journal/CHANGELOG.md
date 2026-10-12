@@ -1,3 +1,27 @@
+## 2026-10-13 — 차계부 설정 모바일 최적화(상단 탭 전환·가로 스크롤 제거) 및 백업 일시 한국어 포맷(~월 ~일 ~시 ~분) 개편
+
+- 커밋 제목: vehicle-journal: optimize settings modal for mobile and format backup timestamps to Korean date
+- 변경·이유:
+  - 모바일 반응형 구조 개편:
+    - 기존 모바일 환경(`@media(max-width:600px)`)에서 좌측 80px 사이드바가 좁은 모바일 화면 너비를 잠식하여 우측 본문 요소(버튼, 입력 필드 등)가 넘쳐 발생하던 가로 스크롤 문제를 완전히 해결.
+    - 모바일에서는 사이드바를 상단 4분할 가로 탭 바(`grid-template-columns: repeat(4, 1fr)`)로 전환하여 콘텐츠 영역이 가로폭 100%를 온전히 사용하도록 개편.
+    - 콘텐츠 영역에 `overflow-y: auto; overflow-x: hidden;`을 적용하여 가로 스크롤 발생을 원천 차단.
+    - 차량 관리 목록의 버튼들(`.row`)을 모바일 그리드(`grid-template-columns: repeat(auto-fit, minmax(96px, 1fr))`)로 자동 배치하여 줄바꿈 및 모바일 터치 최적화.
+    - 중복·상충 선언되어 있던 `@media(max-width:600px)` 스타일 블록을 하나로 통합 및 정돈.
+  - 백업 일시 표시 형식 개편:
+    - 초 단위 타임스탬프(`2026. 10. 13 05:44:39`) 대신 사용자 요청에 맞춰 `~월 ~일 ~시 ~분`(예: `10월 13일 05시 44분`) 형태로 표시 변경. 비당해 연도일 경우 `2025년 ` 접두어 유지.
+    - 순수 날짜(`YYYY-MM-DD`)도 `10월 12일` 형태로 변환.
+    - 카드 타이틀 말줄임 방지: 중복된 긴 수식어(`마지막으로 성공적으로 완료된 자동 백업` → `마지막 성공 자동 백업`, `다음 예약된 자동 백업` → `다음 예약 자동 백업`)를 정제하고, `.backup-card-title`에 `word-break: keep-all; line-height: 1.35;`를 적용하여 좁은 화면에서도 말줄임표(`...`) 없이 깔끔하게 표시.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: 모바일 상단 4분할 탭 바 레이아웃, 가로 스크롤 제거, 버튼 그리드화, 백업 카드 타이틀 줄바꿈 지원.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `formatTimestamp` 한국어 일시 포맷 변환 및 `cleanName` 타이틀 간소화.
+  - `vehicle-journal/tests/test_backup_status_ui.cjs`: 신규 한국어 일시 포맷 및 간소화된 타이틀 검증 추가.
+  - `vehicle-journal/CHANGELOG.md`: 작업 내역 기록.
+- 검증:
+  - `node --check` 구문 검사 통과 (`carrot-vehicle-journal.js`, `carrot-journal-design.js`).
+  - `test_backup_status_ui.cjs` 자동화 테스트 전체(4개 케이스) 통과.
+- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+
 ## 2026-10-13 — 차계부 설정 'Synology · HA 백업 상태' 탭 UI 개편 및 고도화
 
 - 커밋 제목: vehicle-journal: modernize HA backup status tab with cards and guide banner (`bc09f1a`)

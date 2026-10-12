@@ -1291,15 +1291,20 @@ export class VehicleJournal extends HTMLElement {
     const formatTimestamp=val=>{
       if(!val)return{formatted:'—',relative:'',isDate:false};
       const str=String(val).trim();
+      const curY=(new Date()).getFullYear();
       if(!str.includes('T')&&!str.includes(':')&&/^\d{4}-\d{2}-\d{2}$/.test(str)){
-        return{formatted:str.replace(/-/g,'. '),relative:'',isDate:true};
+        const parts=str.split('-');
+        const y=Number(parts[0]),m=Number(parts[1]),day=Number(parts[2]);
+        const yPrefix=y!==curY?`${y}년 `:'';
+        return{formatted:`${yPrefix}${m}월 ${day}일`,relative:'',isDate:true};
       }
       if(/^\d{4}-\d{2}-\d{2}/.test(str)){
         const d=new Date(str);
         if(!isNaN(d.getTime())){
           const pad=n=>String(n).padStart(2,'0');
           const hasTime=str.includes('T')||str.includes(':');
-          const formatted=`${d.getFullYear()}. ${pad(d.getMonth()+1)}. ${pad(d.getDate())}`+(hasTime?` ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`:'');
+          const yPrefix=d.getFullYear()!==curY?`${d.getFullYear()}년 `:'';
+          const formatted=yPrefix+`${d.getMonth()+1}월 ${d.getDate()}일`+(hasTime?` ${pad(d.getHours())}시 ${pad(d.getMinutes())}분`:'');
           const diffSec=Math.round((d.getTime()-Date.now())/1000);
           const absSec=Math.abs(diffSec);
           const isFuture=diffSec>0;
@@ -1307,7 +1312,7 @@ export class VehicleJournal extends HTMLElement {
           if(absSec<90)relative=isFuture?'곧 실행':'방금 전';
           else if(absSec<3600)relative=isFuture?`약 ${Math.round(absSec/60)}분 후`:`${Math.round(absSec/60)}분 전`;
           else if(absSec<86400)relative=isFuture?`약 ${Math.round(absSec/3600)}시간 후`:`${Math.round(absSec/3600)}시간 전`;
-          else relative=isFuture?`약 ${Math.round(absSec/86400)}일 후`:`${Math.round(absSec/86400)}일 전`;
+          else relative=isFuture?`약 ${Math.round(absSec/86400)}일 후`:`약 ${Math.round(absSec/86400)}일 전`;
           return{formatted,relative,isDate:true};
         }
       }
@@ -1318,7 +1323,11 @@ export class VehicleJournal extends HTMLElement {
       const rawName=String(e.name||'');
       const id=String(e.entity_id||'').toLowerCase();
       const rawState=String(e.state||'');
-      const cleanName=rawName.replace(/^Backup\s+/i,'');
+      let cleanName=rawName.replace(/^Backup\s+/i,'').trim();
+      cleanName=cleanName
+        .replace(/마지막으로\s*성공적으로\s*완료된/g,'마지막 성공')
+        .replace(/마지막으로\s*성공한/g,'마지막 성공')
+        .replace(/다음\s*예약된/g,'다음 예약');
       let kind='generic',icon=icons.calendar;
       if(id.includes('manager_state')||id.includes('backup_state')||rawName.includes('관리자')||['blocked','idle','in_progress'].includes(rawState.toLowerCase())){
         kind='manager';icon=icons.shield;

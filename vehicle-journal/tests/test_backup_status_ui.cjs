@@ -95,8 +95,9 @@ assert(html.includes('pill-warning'), 'Missing warning pill for blocked state');
 assert(text.includes('백업 관리자 상태'), 'Cleaned manager title missing');
 
 // 2. Schedule & History cards exist
-assert(text.includes('다음 예약된 자동 백업'), 'Next backup card missing');
-assert(text.includes('마지막으로 성공적으로 완료된 자동 백업'), 'Last success card missing');
+assert(text.includes('다음 예약 자동 백업'), 'Next backup card missing');
+assert(text.includes('마지막 성공 자동 백업'), 'Last success card missing');
+assert(text.includes('시') && text.includes('분'), 'Korean time format (~시 ~분) missing');
 assert(html.includes('sensor.backup_manager_state'), 'Missing entity_id in card');
 
 // 3. Synology NAS guide card exists
@@ -112,7 +113,7 @@ console.log('Test 2: vehicle-management.cjs compatibility check');
 const testEntities = [{ name: '마지막 백업', state: '2026-10-12' }];
 journal.renderBackupStatus(testEntities);
 assert(mockContainer.textContent.includes('마지막 백업'), 'Compatibility error: textContent does not contain "마지막 백업"');
-assert(mockContainer.textContent.includes('2026. 10. 12'), 'Formatted date missing in test entity');
+assert(mockContainer.textContent.includes('10월 12일'), 'Formatted date missing in test entity');
 console.log('✓ Test 2 passed!');
 
 // Test 3: Empty entities array
