@@ -1,3 +1,18 @@
+## 2026-10-12 — vehicle-journal: improve location search UX and fix long address text clipping
+
+- 원인:
+  1. 장소 검색 결과에서 긴 도로명 주소(예: 현대오일뱅크 구리제일주유소)가 줄바꿈될 때, 버튼의 기본 고정 높이 및 줄높이 제약으로 인해 하단 주소 텍스트가 잘리는(clipping) UI 버그 발생.
+  2. 위치 편집 모달에서 상단 '장소명' 입력칸과 바로 아래 '상호 또는 주소' 검색창이 나란히 배치되어 있어 사용자가 어느 곳에 검색하고 어느 곳에 저장할 이름을 입력해야 하는지 명확히 구분되지 않고 혼동을 초래함.
+- 변경:
+  1. 긴 주소 텍스트 잘림 해결: `#placeResults` 검색 결과 버튼에 `.place-result-item` 클래스를 적용하고 `height: auto`, `min-height: 52px`, `white-space: normal`, `overflow: visible`, `word-break: break-all`로 스타일을 개선. 1행에 굵은 상호명(`.place-result-name`), 2행에 도로명 주소(`.place-result-addr`)의 2열 계층 카드로 분리하여 긴 주소도 줄바꿈 시 완벽하게 표시.
+  2. 위치 입력 UX 계층 분리:
+     - 상단: `🔍 장소 · 주소 검색` 카드 영역 (`#placeQuery`, `[검색]`, `[📍 지도 지정]`)으로 검색 역할을 명확히 한정.
+     - 중단: 선택된 위치 정보 표시 카드 (`#selectedLocSection`, `#selectedLocAddress`) 및 `🏷️ 저장할 장소 이름` (`#locationName`)을 분리하여 "선택된 상호명이 자동 입력되며, 차계부에 표시할 원하는 이름으로 수정할 수 있어요" 안내 문구 제공.
+     - 헤더: `[위치 제거]` 버튼을 검색 버튼 행에서 상단 헤더 우측으로 재배치하여 불필요한 시각적 간섭 제거.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-vehicle-journal,carrot-journal-design}.js, vehicle-journal/CHANGELOG.md.
+- 검증: node --check 구문 검사 통과, Python unittest 27개 통과. 기존 DOM 식별자(`#addLocation`, `#placeQuery`, `#placeSearch`, `#placeResults`, `#removeLocation`, `#locationEditor`, `#locationPin`, `#locationMap`, `#locationName`, `#locationSummary`, `#locationHint`) 100% 호환 보존.
+- 배포: main 커밋·푸시 및 HA deployment-backups 코드 백업 후 SSH 직접 반영. 프론트엔드 변경은 브라우저 새로고침으로 즉시 적용되며, 이전 Python 백엔드 변경(연간 주행거리 계산 및 카테고리 건수) 적용을 위해 1회 HA Core 재시작 안내. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: format donut center as manwon and add category counts and total row
 
 - 변경: '어디에 썼을까요?' 지출 카드 UI 개편.
