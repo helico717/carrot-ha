@@ -785,6 +785,9 @@ export const journalDesign = `:host {
     }
     /* 카테고리별 색상 하이라이트 뱃지 */
     .cat-highlight-pill {
+      flex: 0 0 auto;
+      width: fit-content;
+      align-self: flex-start;
       display: inline-flex;
       align-items: center;
       gap: 4px;

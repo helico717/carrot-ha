@@ -226,6 +226,8 @@ const path=require('path');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
   if(overflow)throw Error('page horizontal overflow at '+width);
   await root.locator('#tab3').click();
+  const compactPills=await root.locator('#records .cat-highlight-pill').evaluateAll(pills=>pills.every(pill=>{const range=document.createRange();range.selectNodeContents(pill);return pill.getBoundingClientRect().width<=range.getBoundingClientRect().width+20;}));
+  if(!compactPills)throw Error('ledger category pill stretches at '+width);
   if(width<=760){
    const fits=await root.locator('#records tr').evaluateAll(rows=>rows.every(row=>{const r=row.getBoundingClientRect();return [...row.querySelectorAll('td:nth-child(3),td:nth-child(4) button')].every(el=>{const b=el.getBoundingClientRect();return b.left>=r.left-1&&b.right<=r.right+1;});}));
    if(!fits)throw Error('mobile ledger amount/actions require horizontal scrolling at '+width);
