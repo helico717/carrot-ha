@@ -1,3 +1,8 @@
+## 2026-10-12 — vehicle-journal: record example placeholder deployment
+
+- ca03b63 main 푸시, HA deployment-backups/ca03b63b2bacd943fd275306493692d02306e3a2/ 기존 코드 백업·화면 모듈 반영 완료. 설치 및 내부/외부 HTTP 해시 일치. 실제 사용자 화면 확인 대기.
+- 관련 파일: vehicle-journal/CHANGELOG.md. 문서만 변경, 추가 코드 배포·릴리즈 없음.
+
 ## 2026-10-12 — vehicle-journal: mark vehicle name placeholder as example
 
 - 신규 차량 이름 입력 안내를 ‘예시) 아테온’으로 변경하여 실제 입력값과 예시를 구별.
