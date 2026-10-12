@@ -1,3 +1,20 @@
+## 2026-10-13 — 차계부 설정 창 모바일 상·하·좌·우 여백 및 Safe Area Inset 복원
+
+- 커밋 제목: vehicle-journal: restore safe area margins and padding for settings dialog on mobile
+- 변경·이유:
+  - 사용자 피드백 반영: 모바일에서 설정 창이 화면 상단(노치/Dynamic Island 및 상태 표시줄 `12:43`)에 지나치게 밀착되어 꽉 차 보이는 현상 해결.
+  - `#vehicleManageDialog`의 모바일 높이와 최대 높이에 안전 영역(`env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`) 및 64px 마진을 복원하여 화면 상·하단에 충분한 숨통(여백) 확보.
+  - 모바일 좌우 너비도 `calc(100vw - 32px)`로 좌우 16px의 균형 잡힌 마진 적용.
+  - 다이얼로그 배경 `::backdrop` 블러 및 음영(`backdrop-filter: blur(8px)`) 명시 적용.
+  - 헤더 패딩 및 닫기 버튼 크기 미세 조정으로 터치 편의성 확보.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: `#vehicleManageDialog` 높이 계산식 및 safe-area 복원, 모바일 마진 32px 적용.
+  - `vehicle-journal/CHANGELOG.md`: 작업 내역 기록.
+- 검증:
+  - `node --check` 구문 검사 통과.
+  - `test_backup_status_ui.cjs` 자동화 테스트 통과.
+- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+
 ## 2026-10-13 — 차계부 설정 모바일 최적화(상단 탭 전환·가로 스크롤 제거) 및 백업 일시 한국어 포맷(~월 ~일 ~시 ~분) 개편
 
 - 커밋 제목: vehicle-journal: optimize settings modal for mobile and format backup timestamps to Korean date
