@@ -11,7 +11,7 @@ import sqlite3
 import threading
 
 UTC = timezone.utc
-CATEGORIES = {'charging','maintenance','tuning','washing','insurance','tax','parking','toll','other'}
+CATEGORIES = {'charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','other'}
 METRICS = ('distance_km','energy_distance_km','drive_energy_kwh','drive_soc_used_pp',
            'parked_soc_used_pp','battery_charge_kwh','billed_charge_kwh')
 
@@ -53,7 +53,9 @@ class Journal:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             exists = db.execute("SELECT 1 FROM sqlite_master WHERE name='journal_schema'").fetchone()
-            if exists and db.execute('SELECT version FROM journal_schema').fetchall() != [(1,)]:
+            if exists and db.execute('SELECT version FROM journal_schema').fetchall() == [(1,)]:
+                self._migrate_v1(db)
+            if exists and db.execute('SELECT version FROM journal_schema').fetchall() != [(2,)]:
                 raise ValueError('Unsupported journal schema')
         # SQL is copied into the integration package for HACS distributions.
         with self.connect() as db:
@@ -69,6 +71,55 @@ class Journal:
                            (self.vehicle, entry_id, device_id, time_zone, 'KRW', now()))
         self.tz = ZoneInfo(self.time_zone)
         self.device = device_id
+
+    def _migrate_v1(self, db):
+        """Back up and atomically expand the expense category constraint."""
+        import re
+        backup=Path(self.path+'.before-schema2.sqlite3')
+        if not backup.exists():
+            temporary=Path(str(backup)+'.partial')
+            target=sqlite3.connect(str(temporary))
+            try:
+                db.backup(target)
+                if target.execute('PRAGMA quick_check').fetchone()!=('ok',):raise ValueError('스키마 변경 전 백업 검증에 실패했어요.')
+            finally:target.close()
+            temporary.replace(backup)
+        with sqlite3.connect(backup.resolve().as_uri()+'?mode=ro',uri=True) as check:
+            if check.execute('PRAGMA quick_check').fetchone()!=('ok',):raise ValueError('기존 스키마 백업을 확인해 주세요.')
+        schema=Path(__file__).with_name('schema.sql').read_text()
+        sql=re.search(r'CREATE TABLE IF NOT EXISTS expenses \(.*?\);',schema,re.S).group(0)
+        db.execute('BEGIN IMMEDIATE')
+        db.execute(sql.replace('expenses (','expenses_new (',1))
+        db.execute('INSERT INTO expenses_new SELECT * FROM expenses')
+        db.execute('DROP TABLE expenses')
+        db.execute('ALTER TABLE expenses_new RENAME TO expenses')
+        db.execute('DELETE FROM journal_schema')
+        db.execute('INSERT INTO journal_schema(version) VALUES(2)')
+        db.commit()
+
+    def import_michael(self, rows):
+        """Commit a previewed batch as one transaction, preserving source fields."""
+        from datetime import time
+        counts={'imported':0,'skipped':0}
+        with self.lock,self.connect() as db:
+            for row in rows:
+                key=self.identity('michael',row['source_key'])
+                if db.execute('SELECT 1 FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone():
+                    counts['skipped']+=1;continue
+                data=dict(row['payload']);kind=data['kind']
+                start=datetime.combine(day(data['date']),time(),self.tz).astimezone(UTC).isoformat()
+                if kind=='trip':data.update(started_at=start,ended_at=start)
+                quality={'origin':'manual','provider':'michael','distance':'unknown'}
+                self._record(db,key,kind,'manual',data,quality=quality)
+                db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',
+                           (encode({'input':data,'import_source':row['source']}),self.vehicle,key))
+                if kind=='expense':self._expense(db,key,data)
+                else:self._mobility(db,key,data);self._parts(db,key,data,quality)
+                db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',
+                           (self.vehicle,key,'administrator','import_michael',encode(data),now()))
+                counts['imported']+=1
+        self.aggregate()
+        return counts
 
     @contextmanager
     def connect(self):
@@ -253,7 +304,7 @@ class Journal:
                 db.execute('DELETE FROM dirty_days WHERE vehicle_id=? AND day=? AND accounting_timezone=?',
                            (self.vehicle,value,self.time_zone))
 
-    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None, expenses_only=False, record_sort='time'):
+    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None, expenses_only=False, record_sort='time',manual_records=False):
         a,b=day(start),day(end)
         if b<a or (b-a).days>365 or type(limit) is not int or not 1<=limit<=100 or type(offset) is not int or offset<0:
             raise ValueError('조회 기간과 페이지를 확인해 주세요.')
@@ -264,6 +315,7 @@ class Journal:
         record_categories=sorted(set(record_categories or []))
         record_filter=" AND r.kind!='trip'" if not include_trips else ''
         if expenses_only:record_filter=" AND r.kind='expense'"
+        elif manual_records:record_filter=" AND (r.kind='expense' OR (r.kind='trip' AND r.origin='manual'))"
         time_order='COALESCE(e.accounting_date,m.started_at) DESC,r.id'
         record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
@@ -272,7 +324,7 @@ class Journal:
             for key in record_categories:
                 if key=='trip':clauses.append("r.kind='trip'")
                 elif key=='charging':clauses.append("(r.kind='charge' OR e.category='charging')")
-                elif key=='other' and expenses_only:clauses.append("e.category NOT IN ('charging','maintenance','washing','tuning')")
+                elif key=='other' and expenses_only:clauses.append("e.category NOT IN ('charging','refueling','maintenance','washing','tuning')")
                 else:
                     clauses.append('e.category=?');filter_params.append(key)
             record_filter+=' AND ('+' OR '.join(clauses)+')'
@@ -311,7 +363,7 @@ class Journal:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
             row['quality']=json.loads(row.pop('quality_json'))
         for row in records+recent_records:
-            row['input']=json.loads(row.pop('extra_json')).get('input');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
+            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         totals={key:sum(r[key] for r in daily if r[key] is not None) if any(r[key] is not None for r in daily) else None
                 for key in (*METRICS,'charge_actual_krw','charge_estimated_krw','charge_effective_krw','slow_count','fast_count','unknown_count')}
         totals['efficiency_km_kwh']=totals['energy_distance_km']/totals['drive_energy_kwh'] if totals['drive_energy_kwh'] else None
@@ -331,9 +383,10 @@ class Journal:
         if type(expected) is not int or expected<0 or not isinstance(payload,dict):raise ValueError('잘못된 기록이에요.')
         allowed={'kind','date','ended_date','started_at','ended_at','distance_km','drive_energy_kwh',
                  'battery_charge_kwh','billed_charge_kwh','charge_mode','category','subcategory','actual_krw',
-                 'memo','odometer_km','soc_start_percent','soc_end_percent'}
+                 'memo','odometer_km','soc_start_percent','soc_end_percent','location'}
         if set(payload)-allowed:raise ValueError('지원하지 않는 기록 항목이에요.')
         data=dict(payload);kind=data.get('kind')
+        if 'location' in data:self.validate_location(data['location'])
         if kind not in ('trip','charge','expense'):raise ValueError('기록 종류를 확인해 주세요.')
         value=day(data['date']).isoformat()
         if day(value)>datetime.now(self.tz).date():raise ValueError('미래 날짜는 기록할 수 없어요.')
@@ -345,7 +398,7 @@ class Journal:
         if data.get('actual_krw') is not None and (type(data['actual_krw']) is not int or not 0<=data['actual_krw']<=1000000000):raise ValueError('금액은 0 이상의 정수로 입력해 주세요.')
         if data.get('charge_mode','unknown') not in ('slow','fast','unknown'):raise ValueError('충전 종류를 확인해 주세요.')
         if kind=='expense' and data.get('category') not in CATEGORIES:raise ValueError('비용 분류를 확인해 주세요.')
-        if kind=='trip' and data.get('distance_km') is None:raise ValueError('주행거리를 입력해 주세요.')
+        if kind=='trip' and data.get('distance_km') is None and data.get('odometer_km') is None:raise ValueError('주행거리를 입력해 주세요.')
         if kind=='charge' and data.get('battery_charge_kwh') is None:raise ValueError('충전량을 입력해 주세요.')
         if kind!='expense':
             start=stamp(data['started_at']) if data.get('started_at') else datetime.combine(day(value),datetime.min.time(),self.tz).astimezone(UTC)
@@ -366,6 +419,7 @@ class Journal:
             self._record(db,key,kind,'manual',data,quality=quality)
             extra=json.loads(old[2]) if old else {}
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
+            if 'location' in payload:extra['location']=payload['location']
             db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
             if kind=='expense':self._expense(db,key,data)
             else:
@@ -385,6 +439,27 @@ class Journal:
             version=db.execute('SELECT version FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()[0]
         self.aggregate()
         return {'id':key,'version':version}
+
+    @staticmethod
+    def validate_location(location):
+        import math
+        if location is None:return
+        if not isinstance(location,dict) or set(location)-{'name','address','latitude','longitude'}:raise ValueError('위치 항목을 확인해 주세요.')
+        for key,limit in [('name',200),('address',300)]:
+            if not isinstance(location.get(key,''),str) or len(location.get(key,''))>limit:raise ValueError('위치 이름이 너무 길어요.')
+        lat,lon=location.get('latitude'),location.get('longitude')
+        if (lat is None)!=(lon is None):raise ValueError('위도와 경도를 함께 입력해 주세요.')
+        if lat is not None and (type(lat) not in (float,int) or type(lon) not in (float,int) or not math.isfinite(lat) or not math.isfinite(lon) or not -90<=lat<=90 or not -180<=lon<=180):raise ValueError('좌표 범위를 확인해 주세요.')
+
+    def change_location(self,key,expected,location):
+        self.validate_location(location)
+        with self.lock,self.connect() as db:
+            row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
+            if not row or row[0]!=expected:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
+            extra=json.loads(row[1]);extra['location']=location
+            db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),self.vehicle,key))
+            db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',(self.vehicle,key,'administrator','location',encode(location),now()))
+        return {'id':key,'version':expected+1}
 
     def change_status(self, key, expected, status):
         if status not in ('active','deleted') or type(expected) is not int or expected<1:raise ValueError('잘못된 상태예요.')

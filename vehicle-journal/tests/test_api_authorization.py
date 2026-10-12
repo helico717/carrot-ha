@@ -44,3 +44,20 @@ class FuelUnitsTests(unittest.TestCase):
         self.assertFalse(supported(sensor('원'),None))
         self.assertTrue(supported(sensor('KRW/L'),None))
         self.assertFalse(supported(sensor('원/kWh'),'gas_station_korea'))
+
+
+class NewWriteAuthorizationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_new_apis_reject_before_imports_or_access(self):
+        tree=ast.parse(Path('custom_components/carrot_ha/vehicle_journal/api.py').read_text())
+        methods={'vehicle_create','vehicle_update','settings','map_config','record_location','location_search'}
+        functions=[n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name in methods]
+        for function in functions:function.decorator_list=[]
+        namespace={}
+        exec(compile(ast.Module(body=functions,type_ignores=[]),'api.py','exec'),namespace)
+        for name in methods:
+            errors=[]
+            for user in (None,SimpleNamespace(is_admin=False)):
+                connection=SimpleNamespace(user=user,send_error=lambda *args:errors.append(args))
+                if name=='record_location':namespace['runtime']=lambda *args:None
+                await namespace[name](SimpleNamespace(),connection,{'id':1})
+                if name!='record_location':self.assertEqual(errors[-1][1],'unauthorized')

@@ -63,7 +63,8 @@ class PhotoUpload(HomeAssistantView):
     def _runtime(self,request,entry_id):
         user=request.get('hass_user')
         if not user or not user.is_admin:raise web.HTTPForbidden()
-        runtime=self.hass.data.get('carrot_ha',{}).get(entry_id)
+        from .vehicles import lookup
+        runtime=lookup(self.hass,entry_id)
         if not isinstance(runtime,dict) or 'journal' not in runtime:raise web.HTTPNotFound()
         return runtime['journal']
 

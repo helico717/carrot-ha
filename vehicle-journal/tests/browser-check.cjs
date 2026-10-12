@@ -140,7 +140,7 @@ const path=require('path');
  await root.locator('#legendRow [data-cat=maintenance]').click();
  if(await root.locator('#legendRow [data-cat=maintenance]').getAttribute('aria-pressed')!=='true')throw Error('comparison filter failed');
  await root.locator('#legendRow [data-cat=maintenance]').click();
- if(await root.locator('#recordForm select[name=category] option').count()!==4)throw Error('expense modal categories incorrect');
+ if(await root.locator('#recordForm select[name=category] option').count()!==10)throw Error('expense modal categories incorrect');
  // Approved savings sliders use the selected vehicle and local HA fuel sensors.
  await root.locator('#tab2').click();
  await page.evaluate(()=>{
@@ -186,7 +186,7 @@ const path=require('path');
  const columns=()=>root.locator('.ledger-table th').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().width));
  const originalColumns=await columns();
  await root.locator('#ledgerDropdown summary').click();
- if(await root.locator('[data-ledger-category]').count()!==5||await root.locator('[data-ledger-category=tax],[data-ledger-category=parking],[data-ledger-category=toll],[data-ledger-category=insurance]').count())throw Error('unsupported ledger categories exposed');
+ if(await root.locator('[data-ledger-category]').count()!==6||await root.locator('[data-ledger-category=tax],[data-ledger-category=parking],[data-ledger-category=toll],[data-ledger-category=insurance]').count())throw Error('unsupported ledger categories exposed');
  await root.locator('[data-ledger-category=charging]').click();await loaded();
  if(await root.locator('#records tr').count()!==1)throw Error('charging filter includes charge quantity');
  await root.locator('[data-ledger-category=maintenance]').click();await loaded();

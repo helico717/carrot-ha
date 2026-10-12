@@ -37,7 +37,8 @@ class ScheduleTests(unittest.IsolatedAsyncioTestCase):
             tasks.append(task)
             return task
         from datetime import timedelta
-        namespace = dict(callback=callback, async_track_time_interval=track, timedelta=timedelta,
+        async def attach(entry,runtime,journal):return journal
+        namespace = dict(manager=lambda hass:SimpleNamespace(attach=attach),callback=callback, async_track_time_interval=track, timedelta=timedelta,
                          Journal=lambda *args: object(), sync=sync)
         exec(compile(tree, str(path), 'exec'), namespace)
         runtime = {'archive': SimpleNamespace(journal_guard=None)}

@@ -1335,4 +1335,6 @@ export const journalDesign = `:host {
 @media(max-width:600px){
   .trends-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.vehicle-import-actions{display:grid;align-items:stretch;grid-template-columns:1fr 1fr;margin:18px 0;gap:12px}.vehicle-import-actions button{white-space:normal}.journal-location{margin:6px 0}.journal-location h3{margin:0 0 8px}#placeResults{display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto}#placeResults button{text-align:left;white-space:normal}#locationEditor{display:flex;flex-direction:column;gap:10px}#locationEditor[hidden]{display:none}#placeQuery{min-width:0;flex:1}#vehicleManageList .panel{padding:16px;margin:12px 0}#vehicleManageList input,#vehicleManageList select{width:100%}#vehicleDialog h2{font-size:26px}#importPreview{max-height:340px;overflow:auto;margin:12px 0}@media(max-width:600px){.vehicle-import-actions button{font-size:13px}#locationEditor .row{flex-wrap:wrap}#vehicleDialog h2{font-size:23px}}
 `;

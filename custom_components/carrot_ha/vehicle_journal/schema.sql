@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS expenses (
   record_id TEXT NOT NULL,
   accounting_date TEXT NOT NULL,
   paid_date TEXT,
-  category TEXT NOT NULL CHECK(category IN ('charging','maintenance','tuning','washing','insurance','tax','parking','toll','other')),
+  category TEXT NOT NULL CHECK(category IN ('charging','refueling','maintenance','tuning','washing','insurance','tax','parking','toll','other')),
   subcategory TEXT,
   actual_krw INTEGER CHECK(actual_krw IS NULL OR (typeof(actual_krw) = 'integer' AND actual_krw >= 0)),
   estimated_krw INTEGER CHECK(estimated_krw IS NULL OR (typeof(estimated_krw) = 'integer' AND estimated_krw >= 0)),
@@ -226,5 +226,5 @@ CREATE TABLE IF NOT EXISTS dirty_days (
   updated_at TEXT NOT NULL,
   PRIMARY KEY(vehicle_id,day,accounting_timezone)
 );
-INSERT OR IGNORE INTO journal_schema(version) VALUES(1);
+INSERT OR IGNORE INTO journal_schema(version) VALUES(2);
 COMMIT;

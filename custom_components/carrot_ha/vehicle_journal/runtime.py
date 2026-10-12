@@ -13,6 +13,8 @@ async def setup(hass, entry, runtime):
     journal=await hass.async_add_executor_job(Journal,
         hass.config.path('carrot_ha','vehicle_journal',entry.entry_id+'.sqlite3'),
         entry.entry_id,entry.data['device_id'],hass.config.time_zone)
+    from .vehicles import manager
+    journal=await manager(hass).attach(entry,runtime,journal)
     runtime['journal']=journal
     runtime['archive'].journal_guard=lambda: sync(runtime['archive'],journal,True)
     from homeassistant.core import callback
