@@ -715,6 +715,63 @@ export const journalDesign = `:host {
     .cost-list .list-row:last-child {
       border-bottom: 0;
     }
+    .cost-list .list-row.cost-row:last-of-type {
+      border-bottom: 0;
+    }
+    .cost-cat-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .cost-cat-name {
+      display: inline-flex;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--j-ink);
+    }
+    .cost-dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 9px;
+      flex-shrink: 0;
+    }
+    .cost-cat-count {
+      font-size: 12px;
+      color: var(--j-sub);
+      font-weight: 500;
+      padding-left: 18px;
+    }
+    .cost-amount {
+      font-size: 16px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    .cost-list .list-row.cost-total-row {
+      margin-top: 4px;
+      padding-top: 10px !important;
+      padding-bottom: 2px !important;
+      border-top: 1px solid var(--j-border);
+      border-bottom: 0 !important;
+    }
+    .cost-total-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--j-ink);
+      padding-left: 18px;
+    }
+    .cost-total-amount {
+      font-size: 16.5px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: #ffffff;
+      white-space: nowrap;
+    }
     @media(max-width:600px){
       .cost-list .list-row {
         gap: 8px;

@@ -369,6 +369,10 @@ class Journal:
             from .fuel_metrics import facts,odometer
             fuel_facts=facts(db,self.vehicle,start,end)
             odometer_facts=odometer(db,self.vehicle,start,end)
+            counts=dict(db.execute('''SELECT e.category, count(*) FROM expenses e
+                JOIN records r ON r.vehicle_id=e.vehicle_id AND r.id=e.record_id
+                WHERE e.vehicle_id=? AND r.status='active' AND e.accounting_date BETWEEN ? AND ?
+                GROUP BY e.category''',(self.vehicle,start,end)).fetchall())
             total=db.execute('SELECT COUNT(*) FROM records WHERE vehicle_id=? AND status=?',(self.vehicle,'active')).fetchone()[0]
         for row in daily:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
@@ -382,8 +386,10 @@ class Journal:
         cats={}
         for row in daily:
             for category,cost in row['cost_categories'].items():
-                target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})
-                for key in target:target[key]+=cost[key]
+                target=cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0,'count':0})
+                for key in ('actual_krw','estimated_krw','effective_krw'):target[key]+=cost.get(key,0)
+        for category,count in counts.items():
+            cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})['count']=count
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
         return {'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},

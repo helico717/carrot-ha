@@ -1,3 +1,13 @@
+## 2026-10-12 — vehicle-journal: format donut center as manwon and add category counts and total row
+
+- 변경: '어디에 썼을까요?' 지출 카드 UI 개편.
+  1. 도넛 차트 중앙 지출 금액: 긴 원화 숫자 대신 반올림한 ~만원 단위(예: 335만원)로 표시하여 도넛 중심부 내 가독성 극대화. SVG title에 전체 원화 금액 및 만원 단위 병기.
+  2. 우측 카테고리별 지출 항목: 카테고리명 다음 줄에 기간 내 건수(예: 29건, 4건)를 표시. 백엔드 query 집계 및 프론트엔드 fallback 동시 지원.
+  3. 카테고리 목록 하단: 구분선 추가 후 '전체' 레이블과 정확한 전체 금액(예: 3,349,928원) 명시.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-vehicle-journal,carrot-journal-design}.js, custom_components/carrot_ha/vehicle_journal/store.py, vehicle-journal/CHANGELOG.md.
+- 검증: node --check 구문 검사 통과, Python unittest 23개 통과, HA 운영 DB 쿼리 건수/합계 일치 확인.
+- 배포: main 커밋·푸시 및 HA deployment-backups 코드 백업 후 SSH 직접 반영. Python 변경 적용을 위한 사용자 HA 재시작 필요. 개발 중 릴리즈 없음. Cloudflare/Comma 변경 없음.
+
 ## 2026-10-12 — vehicle-journal: support same-day multiple odometers in distance calculation
 
 - 원인: 정비 후 주유나 당일 주행 등 하루에 누적거리가 여러 번 기록된 정상 운행(예: 2026-03-07 주유 79,838km/주행 79,977km, 2026-08-14 정비 93,022km/주유 93,025km)에서 len(points[d])!=1 검사로 인해 상충 오류로 판단하여 전체 연간 거리 계산이 중단되고 —km로 표시됨.

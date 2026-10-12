@@ -337,8 +337,8 @@ export class VehicleJournal extends HTMLElement {
   costCategories(totals){
     const result={};for(const [category,cost] of Object.entries(totals?.categories||{})){
       const key=['charging','refueling','maintenance','washing','tuning'].includes(category)?category:'other';
-      const target=result[key]||(result[key]={actual_krw:0,estimated_krw:0,effective_krw:0});
-      for(const field of Object.keys(target))target[field]+=cost[field]||0;
+      const target=result[key]||(result[key]={actual_krw:0,estimated_krw:0,effective_krw:0,count:0});
+      for(const field of ['actual_krw','estimated_krw','effective_krw','count'])target[field]+=(cost[field]||0);
     }return result;
   }
   renderRecentExpenses(){
@@ -550,10 +550,17 @@ export class VehicleJournal extends HTMLElement {
     }
     const amounts=Object.entries(this.costCategories(t)).filter(([,v])=>v.effective_krw>0);
     const colors=amounts.map(([key])=>this.categoryColor(key));
-    this.$('costs').innerHTML=amounts.map(([k,v],i)=>`<div class="list-row"><span style="display:inline-flex;align-items:center;font-size:15px;font-weight:600;color:var(--j-ink)"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:9px;flex-shrink:0;background:${colors[i]}"></span>${esc(categories[k]||k)}</span><strong style="font-size:16px;font-weight:750;font-variant-numeric:tabular-nums;color:#ffffff">${money(v.effective_krw)}</strong></div>`).join('')||'<p class="note">이 기간의 지출 기록이 아직 없어요.</p>';
     const total=amounts.reduce((sum,[,v])=>sum+v.effective_krw,0);let offset=0;
+    const catRows=amounts.map(([k,v],i)=>{
+      const count=v.count||(this.data.records||[]).filter(r=>r.kind==='expense'&&r.status==='active'&&this.recordCategory(r)===k).length;
+      return `<div class="list-row cost-row"><div class="cost-cat-wrap"><span class="cost-cat-name"><span class="cost-dot" style="background:${colors[i]}"></span>${esc(categories[k]||k)}</span><span class="cost-cat-count">${count}건</span></div><strong class="cost-amount">${money(v.effective_krw)}</strong></div>`;
+    }).join('');
+    const totalRow=amounts.length?`<div class="list-row cost-total-row"><div class="cost-cat-wrap"><span class="cost-total-name">전체</span></div><strong class="cost-total-amount">${money(total)}</strong></div>`:'';
+    this.$('costs').innerHTML=(catRows+totalRow)||'<p class="note">이 기간의 지출 기록이 아직 없어요.</p>';
     const donutLabel=this.scope==='year'?(isThisYear?'올해 지출':`${yearNum}년 지출`):(isThisMonth?'이번 달 지출':`${monthNum}월 지출`);
-    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)}</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="${Math.min(18.5,82/(money(total).length*0.66)).toFixed(1)}" textLength="${Math.min(82,money(total).length*18.5*0.66).toFixed(1)}" lengthAdjust="spacingAndGlyphs" font-weight="850" letter-spacing="-0.5">${money(total)}</text>`;
+    const manwonVal=Math.round(total/10000);
+    const manwonText=`${numeric(manwonVal,0)}만원`;
+    this.$('donut').innerHTML=`<title>${donutLabel} ${money(total)} (${manwonText})</title><circle cx="80" cy="80" r="59" fill="none" stroke="var(--j-raised)" stroke-width="19"/>`+amounts.map(([key,value],i)=>{const length=value.effective_krw/total*370.708;const html=`<circle cx="80" cy="80" r="59" fill="none" stroke="${colors[i]}" stroke-width="19" stroke-dasharray="${length} ${370.708-length}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)"><title>${esc(categories[key])} ${money(value.effective_krw)}</title></circle>`;offset+=length;return html;}).join('')+`<text x="80" y="74" text-anchor="middle" fill="var(--j-sub)" font-size="13" font-weight="600" letter-spacing="-0.2">${donutLabel}</text><text x="80" y="96" text-anchor="middle" fill="#ffffff" font-size="${Math.min(19,82/(manwonText.length*0.7)).toFixed(1)}" font-weight="850" letter-spacing="-0.5">${manwonText}</text>`;
     this.renderRecentExpenses();
     this.renderSpendingComparison();
     this.updateLedgerFilters();
