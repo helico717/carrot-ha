@@ -177,6 +177,9 @@ class Journal:
                 for group in groups:
                     data = group['data']; source = group['event_id']; key = self.identity('expense',source)
                     live_group_ids.append(key)
+                    override = db.execute('SELECT extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
+                    if override and json.loads(override[0]).get('journal_override'):
+                        continue
                     value = dict(date=data['accounting_date'],category='charging',actual_krw=data['actual_cost_krw'],
                                  estimated_krw=data['estimated_cost_krw'])
                     self._record(db,key,'expense','automatic',value,source,
@@ -292,7 +295,7 @@ class Journal:
             rows=db.execute(record_sql.format(record_filter=record_filter,record_order=record_order),
                 (self.vehicle,self.time_zone,start,end,*filter_params,limit+1,offset)).fetchall()
             recent_records=[dict(row) for row in db.execute(record_sql.format(record_filter=" AND r.kind='expense' AND r.status='active'",record_order=time_order),
-                (self.vehicle,self.time_zone,start,end,5,0))]
+                (self.vehicle,self.time_zone,start,end,-1,0))]
             # SQL date offset is only a prefilter; exact timezone dates are persisted below.
             records=[dict(r) for r in rows[:limit]]
             for record in records:
@@ -358,10 +361,12 @@ class Journal:
             if old and old[3]!=kind:raise ValueError('기록 종류는 바꿀 수 없어요.')
             serialized=encode(payload)
             if old and expected==0 and old[1]=='manual' and json.loads(old[2]).get('input')==payload:return {'id':key,'version':old[0]}
-            if old and (old[1]!='manual' or old[0]!=expected) or not old and expected!=0:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
+            if old and ((old[1]!='manual' and kind!='expense') or old[0]!=expected) or not old and expected!=0:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
             quality={'origin':'manual','energy':'manual','soc':'manual'}
             self._record(db,key,kind,'manual',data,quality=quality)
-            db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode({'input':payload}),self.vehicle,key))
+            extra=json.loads(old[2]) if old else {}
+            extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
+            db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
             if kind=='expense':self._expense(db,key,data)
             else:
                 self._mobility(db,key,data);self._parts(db,key,data,quality)
@@ -384,8 +389,11 @@ class Journal:
     def change_status(self, key, expected, status):
         if status not in ('active','deleted') or type(expected) is not int or expected<1:raise ValueError('잘못된 상태예요.')
         with self.lock,self.connect() as db:
-            row=db.execute('SELECT origin,version FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
-            if row!=('manual',expected):raise Conflict('수동 기록만 변경할 수 있어요. 새로고침해 주세요.')
+            row=db.execute('SELECT origin,version,kind,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
+            if not row or row[1]!=expected or (row[0]!='manual' and row[2]!='expense'):raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
+            if row[0]=='automatic':
+                extra=json.loads(row[3]);extra['journal_override']=True
+                db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
             db.execute('UPDATE records SET status=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',
                        (status,now(),self.vehicle,key))
             dates=[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))]

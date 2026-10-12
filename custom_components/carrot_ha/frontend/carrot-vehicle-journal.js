@@ -523,7 +523,7 @@ export class VehicleJournal extends HTMLElement {
       const hasPhotos=r.attachments?.length>0;
       const photoBtn=hasPhotos?`<button class="btn-table-action btn-photo" data-record="${r.id}" data-action="photos">사진 ${r.attachments.length}장</button>`:'';
       let actionButtons='';
-      if(r.origin==='manual'&&r.input){
+      if(r.kind==='expense'){
         if(r.status==='deleted'){
           actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="restore">복원</button>`;
         }else{
@@ -533,7 +533,7 @@ export class VehicleJournal extends HTMLElement {
         actionButtons=hasPhotos?photoBtn:'<small>자동 원장</small>';
       }
 
-      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col"><span class="memo-cat-title" style="color:${this.categoryColor(this.recordCategory(r))}">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}${r.subcategory?' · '+esc(r.subcategory):''}</span>${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
+      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span>${r.subcategory?`<span class="recent-item-title"> · ${esc(r.subcategory)}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
 
       return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td>${money(r.actual_krw??r.estimated_krw)}</td><td>${actionButtons}</td></tr>`;
     }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
@@ -972,7 +972,8 @@ export class VehicleJournal extends HTMLElement {
   openRecord(record){
     this.$('save').hidden=false;this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.selectedPhotos=[];this.renderSelectedPhotos();
     const form=this.$('recordForm');form.elements.date.value=new Date().toLocaleDateString('sv-SE');
-    if(record?.input)for(const [key,value] of Object.entries(record.input))if(form.elements[key]){let text=value??'';if(value&&['started_at','ended_at'].includes(key)){const time=new Date(value);text=new Date(time.getTime()-time.getTimezoneOffset()*60000).toISOString().slice(0,16);}if(key==='actual_krw'&&value!=null){text=Number(value).toLocaleString('ko-KR');}form.elements[key].value=text;}
+    const input=record&&(record.input||{kind:record.kind,date:record.accounting_date,category:record.category,subcategory:record.subcategory,memo:record.memo,actual_krw:record.actual_krw??record.estimated_krw});
+    if(input)for(const [key,value] of Object.entries(input))if(form.elements[key]){let text=value??'';if(value&&['started_at','ended_at'].includes(key)){const time=new Date(value);text=new Date(time.getTime()-time.getTimezoneOffset()*60000).toISOString().slice(0,16);}if(key==='actual_krw'&&value!=null){text=Number(value).toLocaleString('ko-KR');}form.elements[key].value=text;}
     this.formFields();this.$('recordDialog').showModal();
   }
   async saveRecord(event){

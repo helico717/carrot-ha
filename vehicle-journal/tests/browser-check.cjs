@@ -202,7 +202,9 @@ const path=require('path');
  if(filteredColumns.some((width,i)=>Math.abs(width-originalColumns[i])>1))throw Error('ledger columns change with records');
  await page.evaluate(()=>{
   const card=document.querySelector('carrot-vehicle-journal');
-  for(const row of card.shadowRoot.querySelectorAll('#records tr'))if(getComputedStyle(row.querySelector('.memo-cat-title')).color==='rgb(241, 246, 250)')throw Error('missing ledger category color');
+  for(const row of card.shadowRoot.querySelectorAll('#records tr'))if(getComputedStyle(row.querySelector('.cat-highlight-pill')).color==='rgb(241, 246, 250)')throw Error('missing ledger category color');
+  if(card.shadowRoot.querySelectorAll('#records [data-action=edit]').length!==card.shadowRoot.querySelectorAll('#records tr').length)throw Error('missing automatic expense edit buttons');
+  if(card.shadowRoot.querySelectorAll('#records [data-action=delete]').length!==card.shadowRoot.querySelectorAll('#records tr').length)throw Error('missing automatic expense delete buttons');
   if(card.$('recent').querySelectorAll('.recent-expense-row').length!==2)throw Error('filters changed recent expenses');
   if(!window.ledgerQueries.some(q=>q.expenses_only===true&&q.record_categories?.includes('charging')))throw Error('ledger filter not sent to server');
   card._hass.callWS=window.ledgerCall;card.data=window.ledgerOriginal;card.recordCategories.clear();card.renderData();

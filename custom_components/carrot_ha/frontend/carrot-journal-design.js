@@ -666,7 +666,7 @@ export const journalDesign = `:host {
     /* [사용자 요청] 어디에 썼을까요? 카드 크기 고정 & 글자 시인성 강화 */
     /* ======================================================== */
     .donut-panel {
-      height: 250px;
+      height: 350px;
       display: flex;
       flex-direction: column;
     }
@@ -727,7 +727,7 @@ export const journalDesign = `:host {
     /* [사용자 요청] 최근 기록이에요 카드 (모바일 270px 고정 & 내부 스크롤) */
     /* ======================================================== */
     .recent-panel {
-      height: 250px;
+      height: 350px;
       display: flex;
       flex-direction: column;
     }

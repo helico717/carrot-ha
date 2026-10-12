@@ -32,6 +32,32 @@ class JournalTests(unittest.TestCase):
         return self.event('charge','charge1',{'started_at':'2026-09-01T14:30:00Z','ended_at':'2026-09-01T15:30:00Z',
                          'duration_s':3600,'energy_kwh':12,'cost_krw':3600,'can_mode':6})
 
+    def test_automatic_expense_edit_delete_survives_sync(self):
+        self.archive.put(self.charge())
+        sync(self.archive,self.journal)
+        record=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        payload={'kind':'expense','date':'2026-09-02','category':'charging','actual_krw':1234,'memo':'corrected'}
+        saved=self.journal.save_manual(record['id'],record['version'],payload)
+        sync(self.archive,self.journal,True)
+        result=self.journal.query('2026-09-01','2026-09-30')
+        self.assertEqual(result['totals']['charge_effective_krw'],1234)
+        self.assertEqual(result['recent_records'][0]['memo'],'corrected')
+        with self.assertRaises(Conflict):
+            self.journal.change_status(record['id'],record['version'],'deleted')
+        deleted=self.journal.change_status(record['id'],saved['version'],'deleted')
+        sync(self.archive,self.journal,True)
+        self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['recent_records'],[])
+        self.journal.change_status(record['id'],deleted['version'],'active')
+        self.assertEqual(len(self.journal.query('2026-09-01','2026-09-30')['recent_records']),1)
+
+    def test_recent_records_include_entire_period(self):
+        for index in range(12):
+            self.journal.save_manual(str(uuid4()),0,{'kind':'expense','date':f'2026-09-{index+1:02d}','category':'washing','actual_krw':1000})
+        result=self.journal.query('2026-09-01','2026-09-30',limit=2)
+        self.assertEqual(len(result['records']),2)
+        self.assertEqual(len(result['recent_records']),12)
+        self.assertEqual(result['recent_records'][-1]['accounting_date'],'2026-09-01')
+
     def test_backfill_replay_and_retention(self):
         self.archive.put(self.charge())
         self.archive.put(self.event('trip','trip1',{'started_at':'2026-09-01T14:30:00Z','ended_at':'2026-09-01T15:30:00Z','distance_m':60000}))
