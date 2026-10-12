@@ -54,7 +54,11 @@ def propagate(journal):
             if extra.get('location_user_override') or extra.get('journal_override'):continue
             locations=[json.loads(r[0]).get('location') for r in db.execute('SELECT r.extra_json FROM expense_members x JOIN records r ON r.vehicle_id=x.vehicle_id AND r.id=x.charge_id WHERE x.vehicle_id=? AND x.expense_id=?',(journal.vehicle,expense))]
             ids={(p.get('provider'),p.get('station_id')) for p in locations if p and p.get('station_id')}
-            if len(ids)!=1 or not locations or any(not p or not p.get('station_id') for p in locations):continue
+            if len(ids)!=1 or not locations or any(not p or not p.get('station_id') for p in locations):
+                if (extra.get('location') or {}).get('selection_source')=='automatic':
+                    extra.pop('location',None)
+                    db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),journal.vehicle,expense))
+                continue
             if extra.get('location')==locations[0]:continue
             extra['location']=locations[0]
             db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),journal.vehicle,expense))

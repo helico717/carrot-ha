@@ -68,6 +68,19 @@ class FactsTests(unittest.TestCase):
         after=self.j.query('2026-01-01','2026-01-31');self.assertEqual(after['totals']['charge_effective_krw'],before);self.assertEqual(after['recent_records'][0]['location']['name'],'Charger');self.assertEqual(after['station_stats']['places'][0]['battery_kwh'],10)
         rid,ver=item[:2];self.j.change_location(rid,ver+1,None);self.assertEqual(auto.pending(self.j),[])
 
+    def test_mixed_places_keep_session_volumes_without_invented_price(self):
+        charges=[]
+        for number,place in enumerate(('A','B')):
+            key=str(uuid4());self.j.save_manual(key,0,{'kind':'charge','date':'2026-01-01','battery_charge_kwh':10,'actual_krw':3000,'location':{'name':place,'latitude':37.5,'longitude':127,'provider':'kakao','station_id':place,'selection_source':'automatic'}});charges.append(key)
+        with self.j.connect() as db:
+            expenses=[r[0] for r in db.execute('SELECT record_id FROM expenses')];target=expenses[0]
+            db.execute('DELETE FROM expense_members');db.executemany('INSERT INTO expense_members VALUES (?,?,?)',[(self.j.vehicle,target,key) for key in charges]);db.execute('UPDATE expenses SET actual_krw=6000 WHERE record_id=?',(target,));db.execute("UPDATE records SET status='deleted' WHERE kind='expense' AND id<>?",(target,))
+            db.execute('UPDATE records SET extra_json=? WHERE id=?',(json.dumps({'location':{'name':'A','provider':'kakao','station_id':'A','selection_source':'automatic'}}),target))
+        auto.propagate(self.j)
+        from custom_components.carrot_ha.vehicle_journal.station_stats import facts
+        with self.j.connect() as db:result=facts(db,self.j.vehicle,'2026-01-01','2026-01-31')
+        self.assertEqual(len(result['places']),2);self.assertEqual(sum(p['battery_kwh'] for p in result['places']),20);self.assertTrue(all(p['battery_average_krw'] is None for p in result['places']))
+
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
     async def test_ev_nearest_and_no_station_tariff(self):
         station=Stations(types.SimpleNamespace())

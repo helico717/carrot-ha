@@ -1297,3 +1297,13 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 관련 파일: vehicle_journal/station_stats.py. 기존 충전 금액·원장·사진 변경 없음.
 - 검증: Python 45건 통과. 사용자 HA 재시작 완료 응답을 받았으며 실제 Core 설정·백업 상태 및 UI 검증은 진행 중.
 - 배포: main 푸시·해당 모듈 백업·직접 반영 후 상태 확인 대상. 개발 정책상 새 Release/Comma/Worker 변경 없음.
+
+## 2026-10-12 — HA Core 실제 NAS 검증·자동 백업 활성화 및 혼합 수량 표시
+
+- 커밋 제목: `vehicle-journal: keep grouped station attribution safe and show quantity bases separately`.
+- 변경: 결제 그룹에 여러 장소가 생기면 이전 자동 장소 보정을 제거해 잘못된 전체 금액 귀속을 막는다. 사용자 지정 장소는 유지한다. 장소별 청구 kWh와 배터리 추정 kWh가 함께 있을 때 각각 표시하고, 양이 없는 기록은 0 대신 기록 없음으로 표시한다.
+- 검증: Python 46건·Chrome vehicle-management 통과. 서로 다른 장소의 그룹 결제에서 세션별 20kWh 보존 및 단가 임의 생성 방지 회귀 포함.
+- 실기: 사용자 재시작 후 HA Core NAS 설정 저장·즉시 백업 성공. 2026-10-12 KST 16:01 백업은 차량 2대, 일/주/월 각 1세대, 저장 파일 재읽기·체크섬·실제 임시 DB 복원 검증 완료. 설정 enabled=true 및 자동 장소 활성화 영구 저장 확인. 기존 Frigate 연결·HA 전체 백업 유지. 실제 Chrome에서 NAS 복원 검증 상태와 두 차량 다운로드 목록 확인.
+- 실제 화면: 아테온 79건, 선택 구간 19.06km/L·전체 가중 평균 16.82km/L 및 장소별 주유량/단가 표시. ID.4 310건 유지 및 실제 자동 충전 장소 통계 표시. 위치 값은 비공개이며 공개 이력에는 구체적 장소·좌표를 기록하지 않는다.
+- 배포: b4979c6 main·HA 파일 일치. 이번 추가 보완은 커밋·푸시·백업 후 부분 배포 대상이며 마지막 Python 적용을 위한 사용자 재시작 필요. NAS 예약 03:00 실제 시각 도달 및 장기 세대 축적은 아직 관측하지 않았고 로컬 예약/GFS 회귀와 즉시 백업만 검증했다. 새 Release/Comma/Cloudflare 변경 없음.
+- 관련 파일: vehicle_journal/automatic_locations.py, frontend/carrot-vehicle-journal.js, tests/test_station_backup.py.
