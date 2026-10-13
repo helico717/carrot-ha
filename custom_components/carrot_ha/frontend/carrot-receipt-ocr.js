@@ -42,7 +42,8 @@ export function isValidCalendarDate(year, month, day) {
  */
 export function extractReceiptDate(text) {
   // Pattern 1: 2026년 05월 22일(금) or 2026-05-22 or 2026.05.22
-  const p1 = /(?:\[등록\]\s*)?(\d{4})[년./\s-]+(\d{1,2})[월./\s-]+(\d{1,2})[일\s]*/g;
+  // Tolerate OCR misreads for '년' (연, 넌, 변, 전) and '월' (월, 원)
+  const p1 = /(?:\[등록\]\s*)?(\d{4})[년연넌변전./\s-]+(\d{1,2})[월원./\s-]+(\d{1,2})[일\s]*/g;
   let match;
   while ((match = p1.exec(text)) !== null) {
     const y = Number(match[1]), m = Number(match[2]), d = Number(match[3]);
@@ -54,6 +55,14 @@ export function extractReceiptDate(text) {
   const p2 = /\b(2[0-9])[./-](\d{1,2})[./-](\d{1,2})\b/g;
   while ((match = p2.exec(text)) !== null) {
     const y = 2000 + Number(match[1]), m = Number(match[2]), d = Number(match[3]);
+    if (isValidCalendarDate(y, m, d)) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  // Pattern 3: Fallback 8-digit compact date starting with 20xx (e.g. 20260522 in transaction/barcode)
+  const p3 = /\b(20[2-3][0-9])(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\b/g;
+  while ((match = p3.exec(text)) !== null) {
+    const y = Number(match[1]), m = Number(match[2]), d = Number(match[3]);
     if (isValidCalendarDate(y, m, d)) {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
@@ -160,6 +169,23 @@ export function extractStationLocation(text) {
       stationAddress = addrMatch[0].trim();
     }
   }
+
+  // 2. Multiline Address Fallback: If address not found on a single line, check full normalized text
+  if (!stationAddress) {
+    const fullNormalized = text.replace(/([가-힣]+(?:로|길)\s*)[|lI](\s|$|\()/g, '$11$2');
+    // Pattern A: Province + City + Road name + Number across line breaks/spaces
+    const multiMatchA = /(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?[\s\n]+([가-힣]+[시군구])[\s\n]+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(fullNormalized);
+    if (multiMatchA) {
+      stationAddress = multiMatchA[0].replace(/\s+/g, ' ').trim();
+    } else {
+      // Pattern B: City/Gun/Gu + Road name + Number (e.g. 의왕시 민백길 1)
+      const multiMatchB = /([가-힣]{2,}[시군구])[\s\n]+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(fullNormalized);
+      if (multiMatchB) {
+        stationAddress = multiMatchB[0].replace(/\s+/g, ' ').trim();
+      }
+    }
+  }
+
   return { station_name: stationName || fallbackName, station_address: stationAddress };
 }
 
@@ -348,8 +374,8 @@ export async function prepareOcrImage(file, maxEdge = 2048) {
     // Fast single-pass grayscale + contrast enhancement
     for (let i = 0; i < len; i += 4) {
       const gray = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
-      // High contrast curve for thermal receipts
-      const enhanced = gray > 185 ? 255 : (gray < 70 ? 0 : ((gray - 70) * 255 / 115) | 0);
+      // Smooth dynamic contrast stretch preserving anti-aliasing for Tesseract LSTM
+      const enhanced = gray > 200 ? 255 : (gray < 55 ? 0 : (((gray - 55) * 255) / 145) | 0);
       data[i] = enhanced;
       data[i + 1] = enhanced;
       data[i + 2] = enhanced;

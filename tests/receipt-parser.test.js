@@ -217,4 +217,48 @@ GS칼텍스 삼거리주유소
   print('✓ Test 9 Passed: Station matching uniqueness and ambiguity rejection');
 }
 
+// 10. Test: Multiline address extraction
+{
+  const multilineText = `
+청계주유소
+경기도 의왕시
+민백길 1 (내손동)
+단가 1,700 수량 10 금액 17,000
+`;
+  const result = parseFuelReceipt(multilineText);
+  assertEquals(result.station_address, '경기도 의왕시 민백길 1', 'Multiline address correctly joined and extracted');
+  print('✓ Test 10 Passed: Multiline address extracted across line breaks');
+}
+
+// 11. Test: City/road address without province
+{
+  const noProvinceText = `
+삼거리주유소
+의왕시 민백길 1
+2026-05-22
+단가 1,700 수량 10 금액 17,000
+`;
+  const result = parseFuelReceipt(noProvinceText);
+  assertEquals(result.station_address, '의왕시 민백길 1', 'City and road address extracted without province');
+  print('✓ Test 11 Passed: City-level road address extracted');
+}
+
+// 12. Test: OCR date delimiter misreads and compact 8-digit date
+{
+  const misreadDateText = `
+[등록]2026연 05월 22일(금) 23:34
+단가 1,700 수량 10 금액 17,000
+`;
+  const r1 = parseFuelReceipt(misreadDateText);
+  assertEquals(r1.date, '2026-05-22', 'Date parsed with 연 misread');
+
+  const compactDateText = `
+거래일자: 20260522 23:34
+단가 1,700 수량 10 금액 17,000
+`;
+  const r2 = parseFuelReceipt(compactDateText);
+  assertEquals(r2.date, '2026-05-22', 'Compact 8-digit date parsed');
+  print('✓ Test 12 Passed: OCR date delimiter misreads and compact fallback');
+}
+
 print('\nALL RECEIPT PARSER TESTS PASSED SUCCESSFULLY!');

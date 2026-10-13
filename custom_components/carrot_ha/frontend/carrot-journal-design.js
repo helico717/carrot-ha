@@ -1851,17 +1851,22 @@ export const journalDesign = `:host {
   box-shadow: 0 0 0 1px rgba(129, 230, 197, 0.25) !important;
 }
 .auto-filled-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: fit-content;
+  box-sizing: border-box;
   font-size: 10px;
   font-weight: 700;
   color: #81e6c5;
   background: rgba(129, 230, 197, 0.15);
-  border: 1px solid rgba(129, 230, 197, 0.3);
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-left: 6px;
-  vertical-align: middle;
-  line-height: 1.3;
+  border: 1px solid rgba(129, 230, 197, 0.35);
+  border-radius: 9999px;
+  padding: 1.5px 7px;
+  margin-top: 3px;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
 }
 .loc-auto-filled {
   border-color: #81e6c5 !important;

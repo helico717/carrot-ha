@@ -1,3 +1,10 @@
+## 2026-10-13 — 자동입력 뱃지 알약 크기 조정 및 OCR 파서 유연성 강화
+
+- 커밋 제목: vehicle-journal: fit auto-fill badge pill and strengthen OCR regex parsing
+- 변경·이유: 입력 폼의 ‘자동입력’ 뱃지가 flex 컨테이너에서 가로 전체 폭으로 늘어나던 문제를 `align-self: flex-start; width: fit-content; border-radius: 9999px;`로 수정하여 글자 크기에 딱 맞는 컴팩트한 알약 형태로 조정했다. 또한 OCR 획 인식 편차로 인한 날짜·주소 누락을 완화하기 위해 년/월 오인식 문자(`[년연넌변전]`, `[월원]`) 허용, 8자리 컴팩트 날짜 백업 탐색, 줄바꿈 분리 다중 행 주소 탐색 및 시/군/구 도로명 폴백을 추가했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-receipt-ocr.js`, `tests/receipt-parser.test.js`, `vehicle-journal/tests/test_journal.py`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 12개 테스트(다중 행 주소, 시/군/구 주소, 일자 변형 테스트 추가) 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 주유 영수증 OCR 코어 에셋 보완 및 도로명 번호 정규화
 
 - 커밋 제목: vehicle-journal: bundle tesseract core glue assets and normalize address digits
