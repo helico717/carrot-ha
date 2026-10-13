@@ -252,13 +252,11 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('closeReceiptSource'))this.$('closeReceiptSource').onclick=()=>this.$('receiptSourceDialog').close();
     if(this.$('receiptSourceCamera'))this.$('receiptSourceCamera').onclick=()=>{
       this.$('receiptSourceDialog').close();
-      this.openRecord(null,'refueling',true);
       const input=this.$('receiptCameraInput');
       if(input){input.value='';input.click();}
     };
     if(this.$('receiptSourceAlbum'))this.$('receiptSourceAlbum').onclick=()=>{
       this.$('receiptSourceDialog').close();
-      this.openRecord(null,'refueling',true);
       const input=this.$('receiptAlbumInput');
       if(input){input.value='';input.click();}
     };
@@ -266,6 +264,7 @@ export class VehicleJournal extends HTMLElement {
       if(input.files?.length){
         const file=input.files[0];
         input.value='';
+        this.openRecord(null,'refueling',true);
         this.selectedPhotos=[file];
         this.setDraftDirty(true);
         this.renderSelectedPhotos();

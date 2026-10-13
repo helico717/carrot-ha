@@ -1,3 +1,17 @@
+## 2026-10-13 — 모바일 입력기 라벨 간격 정상화, 유일 주소 주유소 매칭 복원 및 사진 선택 전 폼 노출 방지
+
+- 커밋 제목: vehicle-journal: fix mobile field gap, restore unique station address match, and defer modal open
+- 변경·이유:
+  - 모바일 입력기 제목-입력창 간격 정상화:
+    - 모바일 미디어 쿼리(`@media(max-width:440px)`)에서 `#recordDialog .fields>label:not(.fullfield):not(#dateField)`에 지정되어 있던 `display: grid; grid-template-rows: minmax(38px, auto) auto;`로 인해, 입력기 제목 텍스트 아래에 불필요한 38px의 빈 공간이 강제 할당되어 제목과 입력창 사이가 붕 떠서 동떨어져 보이던 결함을 `display: flex; flex-direction: column; gap: 5px;`로 복원하여 제목 바로 아래에 입력창이 컴팩트하게 밀착되도록 수정했다.
+  - 영수증 도로명 주소 기반 주유소 자동 매칭 복원:
+    - 도로명 주소(도로명, 본번, 부번, 시군구, 시도)가 엄격하게 일치하는 가스스테이션 검색 결과가 유일하게 1개인 경우, 영수증 상호명의 미세한 OCR 오탈자(예: 'SK에너지 청계주유소'의 '청'이 '정'으로 인식)에도 불구하고 해당 건물번호에 다른 주유소가 없으므로 안전하게 채택하도록 복원했다. 기존에는 `rank: 3`으로 분류된 후 `rank <= 2` 검사에서 탈락하여 무조건 `null`로 반환되던 문제를 해결했다.
+    - 동일 주소에 복수의 주유소(경합)가 존재하는 경우에만 상호명으로 구별하며, 구별이 불가능하거나 모호한 경우 공란(`null`)을 유지하여 원칙을 보존했다.
+  - 앨범/촬영 선택 전 주유 기록 폼 노출 방지:
+    - ‘직접 촬영할게요’ 및 ‘앨범에서 선택할게요’ 클릭 시 즉시 `openRecord`를 호출하지 않고, 실제 파일 선택 이벤트(`onReceiptSelected`)가 발생한 시점에 비로소 주유 기록 팝업을 열고 OCR 진행 오버레이를 띄우도록 수정했다. 사용자가 사진 선택창에서 취소할 경우 주유 기록 화면이 전혀 열리지 않고 원래 화면을 유지한다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-receipt-ocr.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `tests/receipt-parser.test.js`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 20개 테스트(유일 주소 일치 매칭, 복수 주유소 경합 시 상호명 구별 및 모호 시 null 반환 테스트 추가) 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 주유 영수증 촬영·앨범 선택 팝업 추가 및 파일 입력 분리
 
 - 커밋 제목: vehicle-journal: add receipt source modal and separate camera and album inputs

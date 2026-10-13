@@ -454,40 +454,17 @@ export function matchStationFromReceipt(stationInfo, searchCandidates) {
     const isGasStation = candidateName.includes('주유소') || candidateName.includes('충전소') ||
       (item.category_name && (item.category_name.includes('주유소') || item.category_name.includes('충전소')));
 
-    // Candidate qualification:
-    // Case 1: Both address and name match
-    if (addrMatches && nameMatches) {
-      matches.push({ item, rank: 1 });
-    }
-    // Case 2: Address matches exactly to a gas station and receipt had no specific station name
-    else if (addrMatches && isGasStation && !normName) {
-      matches.push({ item, rank: 2 });
-    }
-    // Case 3: Address matches exactly to a gas station and name is present but not directly matched
-    else if (addrMatches && isGasStation) {
-      matches.push({ item, rank: 3 });
+    if (addrMatches && isGasStation) {
+      matches.push({ item, nameMatches });
     }
   }
 
   if (matches.length === 0) return null;
 
-  // Disambiguation:
-  // If exactly 1 candidate matched on both address and name, pick it
-  const rank1 = matches.filter(m => m.rank === 1);
-  if (rank1.length === 1) {
-    const selected = rank1[0].item;
-    return {
-      name: selected.name || selected.place_name,
-      address: selected.address || selected.road_address_name || selected.address_name,
-      latitude: Number(selected.latitude || selected.y),
-      longitude: Number(selected.longitude || selected.x),
-      station_id: selected.station_id || null
-    };
-  }
-
-  // If there are multiple rank 1 matches or competing gas stations at the same address,
-  // we cannot disambiguate. Return null (leave blank).
-  if (matches.length === 1 && matches[0].rank <= 2) {
+  // Case 1: Exactly 1 gas station matched the strict road address.
+  // There is no competing gas station at this building address, so adopt it safely
+  // even if minor OCR character variance exists in station name.
+  if (matches.length === 1) {
     const selected = matches[0].item;
     return {
       name: selected.name || selected.place_name,
@@ -498,7 +475,21 @@ export function matchStationFromReceipt(stationInfo, searchCandidates) {
     };
   }
 
-  // Ambiguous: return null
+  // Case 2: Multiple gas stations share the exact same address.
+  // Disambiguate by station name if exactly one candidate matches.
+  const withName = matches.filter(m => m.nameMatches);
+  if (withName.length === 1) {
+    const selected = withName[0].item;
+    return {
+      name: selected.name || selected.place_name,
+      address: selected.address || selected.road_address_name || selected.address_name,
+      latitude: Number(selected.latitude || selected.y),
+      longitude: Number(selected.longitude || selected.x),
+      station_id: selected.station_id || null
+    };
+  }
+
+  // Ambiguous (competing stations at same address and name cannot disambiguate): leave blank
   return null;
 }
 

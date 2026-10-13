@@ -341,4 +341,38 @@ GS칼텍스 삼거리주유소
   print('✓ Test 18 Passed: Regional mismatch rejected');
 }
 
-print('\nALL RECEIPT PARSER TESTS (18/18) PASSED SUCCESSFULLY!');
+// 19. Test: Unique address-matched gas station must be adopted even if station name has minor OCR typo
+{
+  const stationInfo = { station_name: '직영 Ske 정계주유소', station_address: '경기도 의왕시 민백길 1' };
+  const candidates = [
+    { place_name: 'SK에너지 청계주유소', road_address_name: '경기 의왕시 민백길 1', category_name: '주유,가스 > 주유소', latitude: 37.3871, longitude: 126.9842 }
+  ];
+  const matched = matchStationFromReceipt(stationInfo, candidates);
+  assert(matched !== null, 'Unique gas station at exact address must match despite minor name OCR variance');
+  assertEquals(matched.name, 'SK에너지 청계주유소', 'Matched station name');
+  assertEquals(matched.address, '경기 의왕시 민백길 1', 'Matched station address');
+  print('✓ Test 19 Passed: Unique address match with minor name OCR variance succeeds');
+}
+
+// 20. Test: Competing gas stations at same address must disambiguate by name or return null
+{
+  const stationInfo = { station_name: 'SK에너지 청계주유소', station_address: '경기 의왕시 민백길 1' };
+  const competingCandidates = [
+    { place_name: 'SK에너지 청계주유소', road_address_name: '경기 의왕시 민백길 1', category_name: '주유소', latitude: 37.3871, longitude: 126.9842 },
+    { place_name: '현대오일뱅크 의왕주유소', road_address_name: '경기 의왕시 민백길 1', category_name: '주유소', latitude: 37.3871, longitude: 126.9842 }
+  ];
+  const disambiguated = matchStationFromReceipt(stationInfo, competingCandidates);
+  assert(disambiguated !== null, 'Should disambiguate when one matches the station name');
+  assertEquals(disambiguated.name, 'SK에너지 청계주유소', 'Correct candidate selected by name');
+
+  // When neither or both match the name, return null
+  const ambiguousCandidates = [
+    { place_name: 'A주유소', road_address_name: '경기 의왕시 민백길 1', category_name: '주유소', latitude: 37.3871, longitude: 126.9842 },
+    { place_name: 'B주유소', road_address_name: '경기 의왕시 민백길 1', category_name: '주유소', latitude: 37.3871, longitude: 126.9842 }
+  ];
+  const ambiguous = matchStationFromReceipt(stationInfo, ambiguousCandidates);
+  assertEquals(ambiguous, null, 'Ambiguous competing stations at same address must return null');
+  print('✓ Test 20 Passed: Competing gas stations disambiguation behavior');
+}
+
+print('\nALL RECEIPT PARSER TESTS (20/20) PASSED SUCCESSFULLY!');
