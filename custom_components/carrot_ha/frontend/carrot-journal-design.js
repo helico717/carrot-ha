@@ -1701,7 +1701,7 @@ export const journalDesign = `:host {
 #recordDialog .place-result-name,#recordDialog .place-result-addr{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
 #recordDialog .loc-header-title-wrap{flex:1;min-width:0}
 #recordDialog .loc-summary-pill{min-width:0}
-@media(max-width:440px){#recordDialog .fields{grid-template-columns:minmax(0,1fr)}#recordDialog .modal-header-row{padding:14px 16px}#recordDialog .modal-scroll-body{padding:16px}#recordDialog .loc-header-title-wrap{flex-wrap:wrap}#recordDialog .loc-summary-pill{max-width:100%}}
+@media(max-width:440px){#recordDialog .fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px}#recordDialog #dateField{grid-column:1 / -1}#recordDialog .modal-header-row{padding:14px 16px}#recordDialog .modal-scroll-body{padding:16px}#recordDialog .loc-header-title-wrap{flex-wrap:wrap}#recordDialog .loc-summary-pill{max-width:100%}}
 
 .btn-record-purge{color:#ff8585!important;border-color:#704047!important}
 `;

@@ -1,3 +1,10 @@
+## 2026-10-13 — 모바일 기록 날짜 전체 폭·나머지 입력 2열 압축
+
+- 커밋 제목: vehicle-journal: compact mobile record fields into two columns
+- 변경·이유: 440px 이하의 1열 숫자 입력이 공간을 과도하게 차지했다. 모바일에서도 최소 폭 0의 2열 그리드를 유지하고 기록 날짜만 전체 폭으로 배치한다. 메모·사진·위치 등 기존 전체 폭 영역은 유지한다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `vehicle-journal/tests/record-edit-layout.cjs`.
+- 검증·배포: Chromium 320/360/390/430px 날짜 전체 폭과 누적거리·금액 같은 행 배치, 1280px 기존 배치, 저장·넘침·검색 결과·영구 삭제 확인 회귀 통과. 커밋·푸시·HA 직접 반영 진행 중. 화면 CSS 변경이며 버전·태그·릴리즈 발행 및 Python 재시작은 필요하지 않다. 실제 iPhone 실사용은 사용자 확인 대기다.
+
 ## 2026-10-13 — 영구 삭제된 파생 비용의 부모 수정·복원 재생성 방지
 
 - 실제 반영: `150a6b1` main 원격 확인, HA 커밋별 저장 모듈 백업·반영 및 SHA-256 일치 확인. 실행 중인 Python은 사용자 HA 재시작 대기다.
