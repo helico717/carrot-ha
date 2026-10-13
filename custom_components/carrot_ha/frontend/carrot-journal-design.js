@@ -1872,5 +1872,89 @@ export const journalDesign = `:host {
   border-color: #81e6c5 !important;
   background: rgba(129, 230, 197, 0.04) !important;
 }
+
+/* 영수증 업로드 대기 신규 팝업 */
+.receipt-waiting-dialog {
+  border: 1px solid var(--j-border);
+  border-radius: 24px;
+  background: rgba(14, 21, 27, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--j-ink);
+  padding: 0;
+  max-width: 340px;
+  width: 88%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
+}
+.receipt-waiting-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.receipt-waiting-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 24px 28px;
+  gap: 12px;
+  box-sizing: border-box;
+}
+.receipt-waiting-title {
+  font-size: 16.5px;
+  font-weight: 750;
+  color: #fff;
+  letter-spacing: -0.3px;
+  margin: 4px 0 0;
+}
+.receipt-waiting-desc {
+  font-size: 13.5px;
+  color: var(--j-sub);
+  margin: 0;
+  line-height: 1.45;
+}
+.receipt-waiting-actions {
+  margin-top: 14px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.btn-waiting-cancel {
+  width: 100%;
+  max-width: 160px;
+  min-height: 40px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--j-border);
+  color: var(--j-sub);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-waiting-cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.receipt-source-footer {
+  display: flex;
+  justify-content: center;
+  padding: 10px 20px 18px;
+}
+.btn-source-cancel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--j-border);
+  color: var(--j-sub);
+  border-radius: 10px;
+  padding: 8px 24px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-source-cancel:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
 `;
 

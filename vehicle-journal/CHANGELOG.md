@@ -1,3 +1,20 @@
+## 2026-10-13 — 사진 업로드 대기 전용 팝업 추가, 대시보드 복귀 취소 버튼 및 주유소 위치 자동 반영 보완
+
+- 커밋 제목: vehicle-journal: add receipt waiting modal with cancel button and fix auto station location apply
+- 변경·이유:
+  - 사진 업로드 대기 전용 팝업(`#receiptWaitingDialog`) 신설:
+    - 사용자가 영수증 촬영/앨범 선택을 눌렀을 때 빈 대시보드 화면에 시스템 파일 피커가 덩그러니 뜨는 마감 부족을 해결하기 위해, 사진이 실제로 선택·업로드될 때까지 화면을 유지하는 독립된 전용 대기 팝업 다이얼로그를 신설했다.
+    - 펄스 링 그래픽과 "사진 업로드를 기다리고 있어요...", "영수증 사진을 촬영하거나 앨범에서 선택해 주세요." 안내 및 하단 [취소] 버튼(`#cancelReceiptWaiting`)을 배치했다.
+    - 사진 선택창에서 취소했거나 화면을 잘못 눌러 메뉴가 닫혔을 때, [취소] 버튼을 누르면 대기 팝업이 닫히며 기록 전체가 취소되어 대시보드로 온전히 복귀한다. 사진이 정상 선택되면 대기 팝업이 닫히고 주유 기록 폼이 열리며 OCR 진행 오버레이로 매끄럽게 전환된다.
+  - 영수증 메뉴 대시보드 복귀 취소 버튼 보강:
+    - 영수증 입력 방식 선택 팝업(`#receiptSourceDialog`) 하단에 [취소] 버튼(`#cancelReceiptSource`)을 추가하여 상단 닫기 버튼 외에도 모바일에서 한 손으로 쉽게 대시보드로 돌아갈 수 있도록 개선했다.
+    - 주유 기록 폼의 OCR 취소 시에도 영수증 모드일 경우 다이얼로그를 닫고 대시보드로 복귀하도록 연결했다.
+  - 주유소 위치 자동 매칭 및 폼 반영 결함 보완:
+    - 영수증 OCR 완료 후 카카오맵 검색 결과(`SK에너지 청계주유소`)를 주유 폼에 자동 반영할 때, 지도가 아직 열리지 않은 상태(`locationMarker`가 null)에서 마커 이동을 시도하다 발생하던 `setPosition` 자바스크립트 널 참조 예외를 방지하기 위해 `setLocation`에 널 가드를 추가했다.
+    - 매칭된 주유소 정보를 `draftLocation`에 직접 대입하고 `renderLocation()`을 호출하여, 위치 요약 pill, 도로명 주소(`경기 의왕시 민백길 1`), 장소명, 카카오 지도 중심 및 핀 위치, 초록색 [자동입력] 뱃지가 화면에 즉시 정상 기입되도록 보완했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 20개 테스트 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 모바일 입력기 라벨 간격 정상화, 유일 주소 주유소 매칭 복원 및 사진 선택 전 폼 노출 방지
 
 - 커밋 제목: vehicle-journal: fix mobile field gap, restore unique station address match, and defer modal open
