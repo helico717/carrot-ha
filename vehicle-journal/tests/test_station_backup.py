@@ -10,7 +10,9 @@ from unittest.mock import patch
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 pkg=types.ModuleType('custom_components.carrot_ha');pkg.__path__=['custom_components/carrot_ha']
-sys.modules.setdefault('custom_components',types.ModuleType('custom_components'));sys.modules.setdefault('custom_components.carrot_ha',pkg)
+cc=sys.modules.setdefault('custom_components',types.ModuleType('custom_components'))
+pkg=sys.modules.setdefault('custom_components.carrot_ha',pkg)
+setattr(cc,'carrot_ha',pkg)
 from custom_components.carrot_ha.vehicle_journal.store import Journal
 from custom_components.carrot_ha.vehicle_journal.snapshots import export_snapshot
 from custom_components.carrot_ha.vehicle_journal.nas_backup import ManagedStore,verify,network_path

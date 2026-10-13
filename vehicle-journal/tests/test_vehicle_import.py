@@ -203,6 +203,7 @@ class VehicleTests(unittest.IsolatedAsyncioTestCase):
 
 class FailedVehicleVisibilityTests(unittest.TestCase):
     def test_failed_device_is_listed_instead_of_disappearing(self):
+        asyncio.set_event_loop(asyncio.new_event_loop())
         hass=SimpleNamespace(data={'carrot_ha':{'entry':{'entry':SimpleNamespace(title='기존 차량'),'journal_error':'초기화 실패'}}})
         m=Vehicles(hass,None)
         entries=m.entries()

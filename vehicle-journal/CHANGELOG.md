@@ -1,3 +1,30 @@
+## 2026-10-13 — 주유 영수증 촬영·OCR 인식 및 자동 입력 UI 구현
+
+- 커밋 제목: vehicle-journal: implement fuel receipt OCR and auto-fill UI
+- 변경·이유: 차계부 ‘주유 영수증 촬영’ 선택 시 모바일 카메라 직접 촬영 또는 데스크톱 파일 선택 후, 팝업창 전체 영역에 3단계 진행 애니메이션(OCR 인식 → 정보 자동 입력 → 자동 입력 완료)을 표시하고 영수증 정보를 해당 입력창에 자동 기입한다.
+- UI 및 사용자 흐름:
+  - 팝업창 전체를 덮는 블러 배경의 `#receiptOcrOverlay`와 스캔 빔/펄스 링 그래픽을 구현했다.
+  - OCR 진행 문구를 요체로 표시하며 단계별 인디케이터(dot)를 활성화한다.
+  - 인식이 끝나면 자동 입력된 항목에 전용 초록색 테두리 및 ‘자동입력’ 뱃지를 표시하여 사용자가 명확히 식별할 수 있게 한다.
+  - 사용자가 값을 수정하면 즉시 자동입력 표시가 해제되며 수동 입력 상태(`unit_price_source='manual'`)로 전환된다.
+  - 확실하지 않은 항목은 추측하거나 0으로 채우지 않고 공란으로 둔다. OCR 완료만으로 자동 저장하지 않고 사용자가 최종 확인·수정한 뒤 기존 저장 버튼으로 저장한다.
+- 안전성 및 상태 분리:
+  - 영수증 모드(`isReceiptMode`)를 분리하여 GPS 기반 자동 장소 선택(`autoSelectStation()`)과 폼 기본 날짜/차량 기본 유종이 자동 입력값처럼 채워지는 것을 차단했다.
+  - 오피넷 단가 실시간 조회(`applyStationPrice`, `refreshStationPrice`)가 영수증 단가를 덮어쓰지 못하도록 `unitPriceSource === 'receipt'` 가드를 추가했다.
+  - 주유량 추정(`estimateFuelLiters`)이 OCR 처리 중에 동작하지 않도록 억제 플래그(`suppressFuelEstimation`)를 적용했다.
+  - 사용자가 새 사진을 선택하거나 팝업을 닫을 때 이전 Web Worker 작업을 중단(`AbortController` 및 Worker 종료)하여 메모리 누수와 지연된 결과 덮어쓰기를 방지했다.
+- 파서 및 주유소 매칭:
+  - Tesseract.js (v5.1.1) WebAssembly 단일 Web Worker로 브라우저 내에서만 동작하며 외부 전송을 하지 않는다.
+  - 한국어 영수증 도메인 파서(`parseFuelReceipt`)로 날짜(달력 유효성), 유종(보통/고급휘발유/경유/주유기 번호 분리), 단가, 수량, 결제금액, 주유소명/주소를 추출한다.
+  - 승인번호, 사업자등록번호, 카드번호, 전표번호 등 8자리 이상의 노이즈 숫자를 금액이나 단가로 오인하지 않도록 철저히 배제한다.
+  - 금액 = 단가 × 주유량 삼각 교차 검증을 수행하며, 할인·포인트 차이 발생 시에도 비정상 수정 없이 원본 인식값을 유지한다.
+  - 주유소 위치는 영수증 상호/도로명 주소와 카카오 장소 검색 결과를 대조하여 유일하고 확실한 경우에만 자동 선택(`matchStationFromReceipt`)하며 모호할 경우 공란을 유지한다.
+- 에셋 및 백엔드:
+  - Tesseract JS/Worker/WASM 및 kor/eng 언어 모델 파일을 HA 로컬 정적 경로(`custom_components/carrot_ha/frontend/carrot-assets/tesseract/`)에 배치하여 외부 CDN 없이 오프라인 서빙한다.
+  - `custom_components/carrot_ha/vehicle_journal/store.py`에서 `unit_price_source` 허용값에 `'receipt'`를 추가하여 영수증 단가 저장 및 조회를 보장했다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `custom_components/carrot_ha/frontend/carrot-receipt-ocr.js`, `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `custom_components/carrot_ha/frontend/carrot-assets/tesseract/`, `vehicle-journal/tests/test_journal.py`, `vehicle-journal/tests/test_station_backup.py`, `vehicle-journal/tests/test_vehicle_import.py`, `tests/receipt-parser.test.js`, `vehicle-journal/CHANGELOG.md`.
+- 검증·배포: Python 55개 테스트, JavaScriptCore 파서 9개 단위 테스트, 스키마 9개 검증 통과. Tesseract/JS 문법 검증 완료. HA 직접 반영(백업 생성 및 파일 배포, SHA-256 일치 확인). 버전·태그·릴리즈 발행 없음. Python `store.py` 변경 적용에는 사용자 HA 재시작 필요.
+
 ## 2026-10-13 — 주행 전용 안내 및 운영 반영 확인
 
 - 커밋 제목: vehicle-journal: clarify odometer guidance and record trip deployment

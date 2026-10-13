@@ -322,9 +322,10 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(len(restored.query('2026-09-01','2026-09-30')['records'][0]['attachments']),10)
 
     def test_fuel_manual_fields_and_wash_are_atomic(self):
-        key=str(uuid4());data={'kind':'expense','date':'2026-09-02','category':'refueling','actual_krw':50000,'fuel_liters':25,'unit_price_krw':2000,'fuel_type':'diesel','full_tank':True,'wash_cost_krw':5000}
+        key=str(uuid4());data={'kind':'expense','date':'2026-09-02','category':'refueling','actual_krw':50000,'fuel_liters':25,'unit_price_krw':2000,'unit_price_source':'receipt','fuel_type':'diesel','full_tank':True,'wash_cost_krw':5000}
         self.journal.save_manual(key,0,data);q=self.journal.query('2026-09-01','2026-09-30')
         self.assertEqual(q['totals']['total_cost_krw'],55000);self.assertEqual(q['fuel_facts']['totals']['fuel_liters'],25)
+        self.assertEqual(q['records'][0]['input']['unit_price_source'],'receipt')
         self.journal.change_status(key,1,'deleted');self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],0)
         self.journal.change_status(key,2,'active');self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],55000)
         data['wash_cost_krw']=0;self.journal.save_manual(key,3,data);self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['total_cost_krw'],50000)

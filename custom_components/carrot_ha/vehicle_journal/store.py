@@ -425,7 +425,7 @@ class Journal:
             if data.get(field) is not None and data[field]>100:raise ValueError('SOC는 0~100%예요.')
         if data.get('actual_krw') is not None and (type(data['actual_krw']) is not int or not 0<=data['actual_krw']<=1000000000):raise ValueError('금액은 0 이상의 정수로 입력해 주세요.')
         if data.get('charge_mode','unknown') not in ('slow','fast','unknown'):raise ValueError('충전 종류를 확인해 주세요.')
-        if 'unit_price_source' in data and data['unit_price_source'] not in ('manual','opinet'):raise ValueError('단가 출처를 확인해 주세요.')
+        if 'unit_price_source' in data and data['unit_price_source'] not in ('manual','opinet','receipt'):raise ValueError('단가 출처를 확인해 주세요.')
         if 'unit_price_observed_at' in data:stamp(data['unit_price_observed_at'])
         if data.get('fuel_quantity_source','reported') not in ('reported','estimated'):raise ValueError('주유량 출처를 확인해 주세요.')
         if 'fuel_type' in data and data['fuel_type'] not in ('gasoline','diesel','premium'):raise ValueError('유종을 확인해 주세요.')

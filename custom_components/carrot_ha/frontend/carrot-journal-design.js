@@ -1706,5 +1706,166 @@ export const journalDesign = `:host {
 .btn-record-purge{color:#ff8585!important;border-color:#704047!important}
 
 #recordDialog[data-mode=trip] #dateField,#recordDialog[data-mode=trip] #odometerField{grid-column:1 / -1}
+
+/* Receipt OCR Loading Overlay & Auto-fill styles */
+.receipt-ocr-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(14, 21, 27, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+.receipt-ocr-overlay[hidden] {
+  display: none !important;
+}
+.ocr-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.ocr-graphic-wrap {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ocr-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.ocr-icon-box svg {
+  width: 32px;
+  height: 32px;
+}
+.ocr-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 22px;
+  border: 1.5px solid rgba(192, 132, 252, 0.4);
+  animation: ocrPulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+@keyframes ocrPulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  50% { transform: scale(1.18); opacity: 0; }
+  100% { transform: scale(0.9); opacity: 0; }
+}
+.ocr-scan-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #81e6c5, transparent);
+  box-shadow: 0 0 8px #81e6c5;
+  top: 0;
+  animation: ocrScan 1.6s ease-in-out infinite alternate;
+}
+@keyframes ocrScan {
+  0% { top: 4px; opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { top: 56px; opacity: 0.2; }
+}
+.ocr-step-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ocr-step-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transition: all 0.25s ease;
+}
+.ocr-step-dot.active {
+  background: #81e6c5;
+  box-shadow: 0 0 8px rgba(129, 230, 197, 0.6);
+  transform: scale(1.2);
+}
+.ocr-step-line {
+  width: 18px;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.ocr-status-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.2px;
+  margin: 0;
+  min-height: 22px;
+}
+.ocr-cancel-btn {
+  margin-top: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--j-border);
+  color: var(--j-sub);
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ocr-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.receipt-notice-banner {
+  background: rgba(129, 230, 197, 0.1);
+  border: 1px solid rgba(129, 230, 197, 0.3);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: #81e6c5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+.auto-filled {
+  border-color: #81e6c5 !important;
+  background: rgba(129, 230, 197, 0.06) !important;
+  box-shadow: 0 0 0 1px rgba(129, 230, 197, 0.25) !important;
+}
+.auto-filled-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #81e6c5;
+  background: rgba(129, 230, 197, 0.15);
+  border: 1px solid rgba(129, 230, 197, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.loc-auto-filled {
+  border-color: #81e6c5 !important;
+  background: rgba(129, 230, 197, 0.04) !important;
+}
 `;
 
