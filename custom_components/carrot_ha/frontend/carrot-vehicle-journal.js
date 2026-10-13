@@ -1116,6 +1116,7 @@ export class VehicleJournal extends HTMLElement {
     if(dedicated){const order=mode==='refueling'?['dateField','odometerField','fuelTypeField','unitPriceField','amountField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails']:['dateField','odometerField','amountField','billedField','unitPriceField','fuelTypeField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails'];for(const id of order){const node=this.$(id);if(node)container.append(node);}}
     if(mode==='trip'){container.append(this.$('memoField'),this.$('recordPhotoField'),this.$('recordLocationField'));}
     this.$('recordPhotoField').querySelector('small').textContent=`사진당 20MiB 이하, 최대 ${mode==='trip'?1:mode==='accident'?10:5}장. 저장할 때 축소·압축해요.`;
+    const note=this.$('recordDialog').querySelector('.modal-scroll-body>.note');if(note)note.textContent=mode==='trip'?'계기판에 표시된 누적 주행거리를 입력해 주세요.':'모르는 소비량·시각은 비워 주세요. 자동 기록과 겹치는 날짜는 저장 전에 확인해 주세요.';
     this.updateSaveButtonVisibility();
   }
   renderSelectedPhotos(){

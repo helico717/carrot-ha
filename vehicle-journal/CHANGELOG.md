@@ -1,3 +1,10 @@
+## 2026-10-13 — 주행 전용 안내 및 운영 반영 확인
+
+- 커밋 제목: vehicle-journal: clarify odometer guidance and record trip deployment
+- 변경·이유: 주행 폼에 남아 있던 소비량·시각 미입력 안내를 필수 누적거리 입력 안내로 바꾼다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, 본 변경 기록.
+- 검증·배포: `e8b8e67` main 푸시·HA 다섯 파일 백업/반영·SHA-256 일치 확인. 운영 Chrome에서 실제 주행 선택 클릭 후 정상 모달·날짜·누적거리·사진 0/1 노출 확인, 카드 모듈 `0.8.14-beta.4-9f45ff86d829`. 기존 전체 브라우저 탭·차트·수동 저장·모바일 회귀도 통과. 사용자 기록 생성·사진 업로드는 하지 않았다. Python 조회 및 DB 사진 제한은 사용자 HA 재시작 대기다. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 주행 기록 열기 오류 및 날짜·누적거리·사진 1장 전용 폼
 
 - 커밋 제목: vehicle-journal: fix trip entry and simplify odometer records
