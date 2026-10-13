@@ -1,3 +1,13 @@
+## 2026-10-13 — 삭제된 상세 기록에 영구 삭제 기능 추가
+
+- 커밋 제목: vehicle-journal: add confirmed permanent deletion for discarded records
+- 변경·이유: 상세 기록에서 삭제된 항목에 복원만 있어 완전히 정리할 수 없었다. 복원 옆에 붉은 영구 삭제 버튼과 복구 불가·사진 제거·기존 백업 잔존 확인을 추가한다. 관리자 API는 삭제 상태·명시 확인·버전을 검증한다.
+- 데이터 처리: 금액·메모·위치·사진 메타데이터·보정/변경 이력·일별 원장을 제거하고 집계를 갱신한다. 자동 기록 재유입 방지를 위해 내용 없는 최소 식별 마커만 보존한다. 자동 충전의 HA 원본·결제 및 기존 백업은 이 삭제 대상에 포함하지 않는다. 관련 수동 충전비·세차비도 함께 정리한다.
+- 사진 파일은 DB 트랜잭션에서 정리 대기 목록을 먼저 보존한 뒤 삭제하며 실패 시 다음 HA 시작/자동 동기화 때 재시도한다. 데이터 제거와 파일 정리를 원자적이라고 가정하지 않는다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `api.py`, `runtime.py`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/test_journal.py`, `test_api_authorization.py`, `test_runtime_schedule.py`, `record-edit-layout.cjs`.
+- 검증: Python 차계부 52개 테스트 통과. 확인 누락·활성 기록·버전 충돌 거부, 영구 삭제 후 복원/수정 차단, 자동 동기화 재유입 방지, 사진 삭제 실패 후 재시작 재시도 검증. Chromium 다섯 화면 너비의 폼 저장·레이아웃 및 영구 삭제 버튼·확인 취소/승인 요청 검증 통과.
+- 배포: 사용자의 실제 삭제된 기록은 영구 삭제하지 않았다. 커밋·HA 백업/반영 진행 중이며 Python API 사용에는 사용자 HA 재시작 필요. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 충전 기록 저장·모바일 입력 겹침 및 모호한 충전소 자동 확정 수정
 
 - 커밋 제목: vehicle-journal: fix record editing and reject ambiguous charging locations
@@ -6,7 +16,7 @@
 - 위치: 좌표에서 실제 거리를 계산하고 150m 밖 후보 또는 첫 두 후보의 거리 차이가 25m 미만이면 자동 확정하지 않는다. GPS는 충전 시작 2분 이내·측정과 수신 60초 이내·정차 표본을 사용한다. 이 조건에서 위치가 비는 경우가 늘 수 있으며 인접 장소의 정확한 판별은 사용자 선택이 필요하다. 실제 사례에서 효과가 없던 두 번째 검색을 제거해 기존 호출 수를 유지한다.
 - 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `carrot-journal-design.js`, `custom_components/carrot_ha/vehicle_journal/automatic_locations.py`, `stations.py`, `vehicle-journal/tests/test_station_backup.py`, `vehicle-management.cjs`, `browser-check.cjs`, `record-edit-layout.cjs`.
 - 검증: Python 차계부 49개 테스트 통과. 운영 DB 복사본에서 기존 빈 분류 요청의 거부를 재현하고 수정 요청의 금액·장소 저장 및 재조회·수동 override를 확인했다. 운영 DB는 변경하지 않았다. 합성 Chromium에서 320/360/390/430/1280px 충전 수정 저장·날짜 겹침·검색 결과 축소 검증 통과. 기존 browser-check의 전용 모드 분리 전 카테고리 개수 기대값을 갱신한 뒤 전체 탭·차트·수동 저장·escaping·모바일 검증 통과. 스키마 9개 검증 통과. 기존 vehicle-management 검증은 현재 설정 메뉴의 text-align 기대값 불일치로 실패해 관련 저장 검증을 전용 테스트에서 수행했다.
-- 배포 상태: 커밋·푸시·HA 백업 및 직접 반영 확인 진행 중. Python 반영에는 사용자 HA 재시작 필요. 릴리즈·버전·태그 변경 없음. 실제 iPhone과 다음 충전 실사용 검증은 미완료.
+- 배포 상태: `212d675` main 푸시 및 HA 네 파일 백업·직접 반영·해시 일치 확인. 실제 HA Chrome 충전 편집에서 상단 오류와 숨겨진 분류 비활성화, 390px 1열·가로 넘침 없음 확인. Python 반영에는 사용자 HA 재시작 필요. 릴리즈·버전·태그 변경 없음. 실제 iPhone과 다음 충전 실사용 검증은 미완료.
 
 ## 2026-10-13 — 사용자 승인 후 실제 제공사 후보 비교 (분석 완료, 구현 진행 중)
 

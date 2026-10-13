@@ -37,6 +37,11 @@ const fs=require('fs');
   const saved=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
   if(saved.category!=='charging'||saved.actual_krw!==5432||saved.location.name!=='Chosen Station')throw Error('edit not saved '+width);
  }
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.data={totals:{categories:{}},daily:[],records:[{id:'deleted-test',version:2,status:'deleted',kind:'expense',origin:'manual',category:'tuning',accounting_date:'2026-01-01',actual_krw:100}],recent_records:[],record_count:1,has_more:false,status:{phase:'complete'}};c.renderData();c.selectTab(3);});
+ const purge=root.locator('[data-action=purge]');if(!await purge.isVisible())throw Error('permanent delete missing from deleted record');
+ page.once('dialog',dialog=>dialog.dismiss());await purge.click();if(await page.evaluate(()=>window.calls.some(c=>c.type.endsWith('/record/purge'))))throw Error('cancelled permanent delete sent request');
+ page.once('dialog',dialog=>{if(!dialog.message().includes('복원할 수 없습니다'))throw Error('permanent delete warning missing');dialog.accept();});await purge.click();
+ const deletion=await page.evaluate(()=>window.calls.find(c=>c.type.endsWith('/record/purge')));if(deletion?.confirm!==true||deletion?.entry_id!=='manual'||deletion?.expected_version!==2)throw Error('permanent delete payload');
  if(errors.length)throw Error(errors.join('\n'));
- await browser.close();console.log('PASS charging edit payload, date layout and place results at 320/360/390/430/1280px');
+ await browser.close();console.log('PASS charging edit payload, date layout, place results and permanent deletion confirmation at 320/360/390/430/1280px');
 })().catch(e=>{console.error(e);process.exit(1);});

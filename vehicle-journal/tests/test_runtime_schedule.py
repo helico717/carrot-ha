@@ -39,7 +39,7 @@ class ScheduleTests(unittest.IsolatedAsyncioTestCase):
         from datetime import timedelta
         async def attach(entry,runtime,journal):return journal
         namespace = dict(manager=lambda hass:SimpleNamespace(attach=attach),callback=callback, async_track_time_interval=track, timedelta=timedelta,
-                         Journal=lambda *args: object(), sync=sync)
+                         Journal=lambda *args: SimpleNamespace(cleanup_purged_photos=lambda:0), sync=sync)
         exec(compile(tree, str(path), 'exec'), namespace)
         runtime = {'archive': SimpleNamespace(journal_guard=None)}
         hass = SimpleNamespace(async_add_executor_job=executor,

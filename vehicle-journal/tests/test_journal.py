@@ -23,6 +23,44 @@ class JournalTests(unittest.TestCase):
         self.archive=Archive(Path(self.tmp.name)/'archive.sqlite3')
         self.journal=Journal(Path(self.tmp.name)/'journal.sqlite3','entry','car','Asia/Seoul')
 
+    def test_purge_requires_deleted_version_confirmation_and_removes_content(self):
+        key=str(uuid4());payload={'kind':'expense','date':'2026-01-01','category':'tuning','actual_krw':100,'memo':'private memo','location':{'name':'private place'}}
+        self.journal.save_manual(key,0,payload)
+        with self.assertRaises(ValueError):self.journal.purge_record(key,1,True)
+        self.journal.change_status(key,1,'deleted')
+        with self.assertRaises(ValueError):self.journal.purge_record(key,2,False)
+        with self.assertRaises(Conflict):self.journal.purge_record(key,1,True)
+        result=self.journal.purge_record(key,2,True);self.assertTrue(result['purged'])
+        with self.journal.connect() as db:
+            row=db.execute('SELECT version,status,extra_json FROM records WHERE id=?',(key,)).fetchone()
+            self.assertEqual(row[1],'superseded');self.assertNotIn('private',row[2])
+            for table in ('expenses','attachments','change_log','day_parts'):
+                self.assertEqual(db.execute('SELECT count(*) FROM '+table+' WHERE record_id=?',(key,)).fetchone()[0],0)
+        with self.assertRaises(Conflict):self.journal.change_status(key,row[0],'active')
+        with self.assertRaises(Conflict):self.journal.save_manual(key,row[0],payload)
+        self.assertFalse(any(r['id']==key for r in self.journal.query('2026-01-01','2026-01-31')['records']))
+
+    def test_purged_automatic_payment_does_not_return_on_sync(self):
+        data={'started_at':'2026-09-01T15:00:00Z','ended_at':'2026-09-01T16:00:00Z','duration_s':3600,'energy_kwh':10,'cost_krw':3000,'can_mode':4}
+        self.archive.put(self.event('charge','purge-session',data));sync(self.archive,self.journal)
+        with self.journal.connect() as db:key,version=db.execute("SELECT id,version FROM records WHERE kind='expense'").fetchone()
+        self.journal.change_status(key,version,'deleted');self.journal.purge_record(key,version+1,True)
+        sync(self.archive,self.journal)
+        with self.journal.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM expenses WHERE record_id=?',(key,)).fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT source_fingerprint FROM records WHERE id=?',(key,)).fetchone()[0],'purged')
+
+    def test_photo_cleanup_queue_retries_after_restart(self):
+        from unittest.mock import patch
+        key=str(uuid4());self.journal.save_manual(key,0,{'kind':'expense','date':'2026-01-01','category':'other','actual_krw':100})
+        base=Path(self.journal.path).with_suffix('')/'attachments';base.mkdir(parents=True);photo=base/'synthetic.png';photo.write_bytes(b'synthetic')
+        with self.journal.connect() as db:
+            db.execute('INSERT INTO attachments VALUES (?,?,?,?,?,?,?,?,?,?)',(self.journal.vehicle,str(uuid4()),key,photo.name,'synthetic.png','image/png',9,'a'*64,'active','2026-01-01'))
+        self.journal.change_status(key,1,'deleted')
+        with patch.object(Path,'unlink',side_effect=OSError('locked')):result=self.journal.purge_record(key,2,True)
+        self.assertEqual(result['photo_cleanup_pending'],1);self.assertTrue(photo.exists())
+        Journal(Path(self.journal.path),'entry','car','Asia/Seoul');self.assertFalse(photo.exists())
+
     def tearDown(self):self.tmp.cleanup()
 
     def event(self,kind,key,data):

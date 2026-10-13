@@ -264,7 +264,7 @@ export class VehicleJournal extends HTMLElement {
   }
   selectTab(index){this.tab=index;for(let i=0;i<4;i++){const page=this.$('page'+i);if(page)page.hidden=i!==index;const tab=this.$('tab'+i);if(tab)tab.setAttribute('aria-selected',String(i===index));}if(index===1){this.renderTrendsDashboard();this.initTrendsMap();}}
   hasPendingInput(){return !!(this.$('recordTypeDialog')?.open||this.$('vehicleDialog')?.open||this.$('vehicleManageDialog')?.open||this.$('recordDialog')?.open||this.$('save')?.disabled||this.draftDirty||this.comparisonDirty||this.pendingWrites||this.selectedPhotos?.length);}
-  async call(type,params={}){const write=['record/save','record/status','record/location','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,...(['query','record/save','record/status','record/location','comparison/save'].includes(type)?{entry_id:this.entry}:{}),...params});}finally{if(write)this.pendingWrites--;}}
+  async call(type,params={}){const write=['record/save','record/status','record/purge','record/location','comparison/save'].includes(type);if(write)this.pendingWrites=(this.pendingWrites||0)+1;try{return await this._hass.callWS({type:'carrot_ha/journal/'+type,...(['query','record/save','record/status','record/purge','record/location','comparison/save'].includes(type)?{entry_id:this.entry}:{}),...params});}finally{if(write)this.pendingWrites--;}}
   async load(force=false){
     if(!this._hass?.callWS||!this.isConnected)return;
     this.updatePeriodNavigation();
@@ -611,7 +611,7 @@ export class VehicleJournal extends HTMLElement {
       let actionButtons='';
       if(r.kind==='expense'||r.origin==='manual'){
         if(r.status==='deleted'){
-          actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="restore">복원</button>`;
+          actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="restore">복원</button><button class="btn-table-action btn-record-purge" data-record="${r.id}" data-action="purge">영구 삭제</button>`;
         }else{
           actionButtons=`${photoBtn}<button class="btn-table-action" data-record="${r.id}" data-action="edit">수정</button><button class="btn-table-action" data-record="${r.id}" data-action="delete">삭제</button>`;
         }
@@ -1427,7 +1427,7 @@ export class VehicleJournal extends HTMLElement {
   async saveNasSettings(){if(!confirm('백업·자동 위치 설정을 저장하시겠습니까?'))return;try{await this.call('nas/config',{enabled:this.$('nasEnabled').checked,path:this.$('nasPath').value.trim(),automatic_locations:this.$('automaticLocations').checked});await this.loadJournalSettings();}catch(e){this.$('nasStatus').textContent=e.message;}}
   async nasAction(action){this.$('nasRun').disabled=true;this.$('nasList').disabled=true;this.$('nasStatus').textContent=action==='run'?'백업·복원 검증 중이에요.':'목록을 불러오고 있어요.';try{const result=await this.call('nas/action',{action});this.renderNasStatus(action==='run'?result:result.status);if(action==='list'){this.nasObjects=result.objects;this.$('nasFiles').innerHTML=result.objects.slice().sort((a,b)=>b.created_at.localeCompare(a.created_at)).map(p=>`<div class="settings-backup-row"><span>${esc(p.title)}<small>${esc(p.created_at)} · 복원 검증 완료</small></span><button type="button" data-nas-file="${esc(p.name)}">다운로드</button></div>`).join('');this.$('nasFiles').onclick=e=>{const b=e.target.closest('[data-nas-file]');if(b)this.downloadNas(b.dataset.nasFile);};}}catch(e){this.$('nasStatus').textContent=e.message;}finally{this.$('nasRun').disabled=false;this.$('nasList').disabled=false;}}
   async downloadNas(name){try{const response=await this._hass.fetchWithAuth('/api/carrot_ha/v1/journal/nas/'+encodeURIComponent(name));if(!response.ok)throw Error('백업 검증·다운로드에 실패했어요.');const url=URL.createObjectURL(await response.blob()),a=document.createElement('a');a.href=url;a.download='carrot-journal-snapshot.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(e){this.$('nasStatus').textContent=e.message;}}
-  async changeStatus(record,action){try{await this.call('record/status',{record_id:record.id,expected_version:record.version,status:action==='restore'?'active':'deleted'});await this.load(true);}catch(error){this.$('message').textContent=error.message||'기록을 변경하지 못했어요.';}}
+  async changeStatus(record,action){try{if(action==='purge'){if(record.status!=='deleted')throw Error('삭제된 기록만 영구 삭제할 수 있어요.');if(!window.confirm(`${record.accounting_date||record.started_at?.slice(0,10)||''} 기록을 영구 삭제할까요?\n금액·메모·위치·첨부 사진이 삭제되며 복원할 수 없습니다. 기존 백업에는 남아 있을 수 있습니다.`))return;const result=await this.call('record/purge',{record_id:record.id,expected_version:record.version,confirm:true});await this.load(true);if(result.photo_cleanup_pending)this.$('message').textContent='기록은 영구 삭제했어요. 사진 파일 정리는 재시도 중이에요.';return;}await this.call('record/status',{record_id:record.id,expected_version:record.version,status:action==='restore'?'active':'deleted'});await this.load(true);}catch(error){this.$('message').textContent=error.message||'기록을 변경하지 못했어요.';}}
 }
 if(!customElements.get('carrot-vehicle-journal'))customElements.define('carrot-vehicle-journal',VehicleJournal);
 window.customCards=window.customCards||[];

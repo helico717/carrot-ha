@@ -71,6 +71,7 @@ class Journal:
                            (self.vehicle, entry_id, device_id, time_zone, 'KRW', now()))
         self.tz = ZoneInfo(self.time_zone)
         self.device = device_id
+        self.cleanup_purged_photos()
 
     def _migrate_v1(self, db):
         """Back up and atomically expand the expense category constraint."""
@@ -147,6 +148,7 @@ class Journal:
         fingerprint = hashlib.sha256(encode(payload).encode()).hexdigest()
         old = db.execute('SELECT source_fingerprint,status FROM records WHERE vehicle_id=? AND id=?',
                          (self.vehicle,key)).fetchone()
+        if old and old[0]=='purged':return False
         if old == (fingerprint,status):
             return False
         db.execute('''INSERT INTO records
@@ -439,6 +441,7 @@ class Journal:
         with self.lock,self.connect() as db:
             old=db.execute('SELECT version,origin,extra_json,kind FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
             if old and old[3]!=kind:raise ValueError('기록 종류는 바꿀 수 없어요.')
+            if old and json.loads(old[2]).get('purged'):raise Conflict('영구 삭제된 기록이에요.')
             serialized=encode(payload)
             if old and expected==0 and old[1]=='manual' and json.loads(old[2]).get('input')==payload:return {'id':key,'version':old[0]}
             if old and ((old[1]!='manual' and kind!='expense') or old[0]!=expected) or not old and expected!=0:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
@@ -498,16 +501,59 @@ class Journal:
         with self.lock,self.connect() as db:
             row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
             if not row or row[0]!=expected:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
-            extra=json.loads(row[1]);extra['location']=location;extra['location_user_override']=True
+            extra=json.loads(row[1])
+            if extra.get('purged'):raise Conflict('영구 삭제된 기록이에요.')
+            extra['location']=location;extra['location_user_override']=True
             db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),self.vehicle,key))
             db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',(self.vehicle,key,'administrator','location',encode(location),now()))
         return {'id':key,'version':expected+1}
+
+    def cleanup_purged_photos(self):
+        base=(Path(self.path).with_suffix('')/'attachments').resolve()
+        with self.lock,self.connect() as db:
+            row=db.execute("SELECT cursor_json FROM sync_state WHERE vehicle_id=? AND source_kind='photo_cleanup'",(self.vehicle,)).fetchone()
+            if not row:return 0
+            remaining=[]
+            for name in json.loads(row[0]).get('paths',[]):
+                path=(base/name).resolve()
+                if path.parent!=base or path.name!=name:raise ValueError('Invalid photo cleanup path')
+                try:path.unlink(missing_ok=True)
+                except OSError:remaining.append(name)
+            db.execute("UPDATE sync_state SET cursor_json=?,phase=?,updated_at=? WHERE vehicle_id=? AND source_kind='photo_cleanup'",(encode({'paths':remaining}),'pending' if remaining else 'complete',now(),self.vehicle))
+        return len(remaining)
+
+    def purge_record(self,key,expected,confirm):
+        UUID(key)
+        if confirm is not True or type(expected) is not int or expected<1:raise ValueError('영구 삭제 확인이 필요해요.')
+        with self.lock,self.connect() as db:
+            row=db.execute('SELECT version,status,origin,kind,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
+            if not row or row[0]!=expected:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
+            if row[1]!='deleted' or (row[2]!='manual' and row[3]!='expense'):raise ValueError('삭제된 기록만 영구 삭제할 수 있어요.')
+            keys=[key]
+            for kind in ('refueling_wash_cost','manual_charge_cost'):
+                child=self.identity(kind,key)
+                if db.execute("SELECT 1 FROM records WHERE vehicle_id=? AND id=? AND status='deleted'",(self.vehicle,child)).fetchone():keys.append(child)
+            queued=db.execute("SELECT cursor_json FROM sync_state WHERE vehicle_id=? AND source_kind='photo_cleanup'",(self.vehicle,)).fetchone()
+            paths=json.loads(queued[0]).get('paths',[]) if queued else []
+            for rid in keys:
+                self._dirty(db,[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,rid))]+[r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,rid))])
+                paths.extend(r[0] for r in db.execute('SELECT relative_path FROM attachments WHERE vehicle_id=? AND record_id=?',(self.vehicle,rid)))
+                db.execute('DELETE FROM expense_members WHERE vehicle_id=? AND (expense_id=? OR charge_id=?)',(self.vehicle,rid,rid))
+                db.execute('DELETE FROM record_links WHERE vehicle_id=? AND (manual_id=? OR automatic_id=?)',(self.vehicle,rid,rid))
+                for table in ('attachments','corrections','change_log','day_parts','expenses','mobility'):
+                    db.execute('DELETE FROM '+table+' WHERE vehicle_id=? AND record_id=?',(self.vehicle,rid))
+                # Minimal tombstone prevents archive synchronization from resurrecting it.
+                db.execute("UPDATE records SET status='superseded',extra_json=?,quality_json='{}',source_revision=NULL,source_fingerprint='purged',version=version+1,updated_at=? WHERE vehicle_id=? AND id=?",(encode({'purged':True,'journal_override':True}),now(),self.vehicle,rid))
+            db.execute("INSERT INTO sync_state VALUES (?, 'photo_cleanup', ?, 'pending', NULL, ?) ON CONFLICT(vehicle_id,source_kind) DO UPDATE SET cursor_json=excluded.cursor_json,phase=excluded.phase,updated_at=excluded.updated_at",(self.vehicle,encode({'paths':sorted(set(paths))}),now()))
+        pending=self.cleanup_purged_photos();self.aggregate()
+        return {'id':key,'purged':True,'photo_cleanup_pending':pending}
 
     def change_status(self, key, expected, status):
         if status not in ('active','deleted') or type(expected) is not int or expected<1:raise ValueError('잘못된 상태예요.')
         with self.lock,self.connect() as db:
             row=db.execute('SELECT origin,version,kind,extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
             if not row or row[1]!=expected or (row[0]!='manual' and row[2]!='expense'):raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
+            if json.loads(row[3]).get('purged'):raise Conflict('영구 삭제된 기록이에요.')
             if row[0]=='automatic':
                 extra=json.loads(row[3]);extra['journal_override']=True
                 db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))

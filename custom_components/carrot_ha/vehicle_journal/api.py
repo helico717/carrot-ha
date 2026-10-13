@@ -120,6 +120,14 @@ async def status(hass,connection,msg):
     if r:await execute(hass,connection,msg,r['journal'].change_status,msg['record_id'],msg['expected_version'],msg['status'])
 
 
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/record/purge',vol.Required('entry_id'):str,
+    vol.Required('record_id'):str,vol.Required('expected_version'):int,vol.Required('confirm'):bool})
+@websocket_api.async_response
+async def purge(hass,connection,msg):
+    r=runtime(hass,connection,msg)
+    if r:await execute(hass,connection,msg,r['journal'].purge_record,msg['record_id'],msg['expected_version'],msg['confirm'])
+
+
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/comparison/save',vol.Required('entry_id'):str,
     vol.Required('fuel'):str,vol.Required('economy_km_l'):vol.Coerce(float),vol.Required('entity_id'):str})
 @websocket_api.async_response
@@ -267,7 +275,7 @@ async def location_search(hass,connection,msg):
 
 
 def register(hass):
-    for method in (entries,query,save,status,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,settings,location_search,station_lookup,nas_config,nas_action,user_default_set):websocket_api.async_register_command(hass,method)
+    for method in (entries,query,save,status,purge,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,settings,location_search,station_lookup,nas_config,nas_action,user_default_set):websocket_api.async_register_command(hass,method)
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/stations/lookup',vol.Required('kind'):vol.In(['charging','refueling']),vol.Required('latitude'):vol.Coerce(float),vol.Required('longitude'):vol.Coerce(float),vol.Required('date'):str,vol.Optional('fuel',default='gasoline'):str,vol.Optional('price_only',default=False):bool})

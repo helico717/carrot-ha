@@ -22,6 +22,7 @@ async def setup(hass, entry, runtime):
 
     async def run():
         try:
+            await hass.async_add_executor_job(journal.cleanup_purged_photos)
             await hass.async_add_executor_job(sync,runtime['archive'],journal)
             runtime.pop('journal_error',None)
             from .automatic_locations import enrich
