@@ -1118,10 +1118,23 @@ export class VehicleJournal extends HTMLElement {
   }
   renderSelectedPhotos(){
     for(const url of this.photoURLs||[])URL.revokeObjectURL(url);
-    this.photoURLs=[];this.$('photoPreview').replaceChildren();
-    this.$('photoCount').textContent=`${(this.selectedPhotos?.length||0)+(this.editing?.attachments?.length||0)}/${this.recordMode==='accident'?10:5}`;
+    this.photoURLs=[];this.$('photoPreview').replaceChildren();const generation=this.photoPreviewGeneration=(this.photoPreviewGeneration||0)+1;
+    const existing=(this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id));
+    this.$('photoCount').textContent=`${(this.selectedPhotos?.length||0)+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)}/${this.recordMode==='accident'?10:5}`;
     this.$('clearPhotos').hidden=!this.selectedPhotos?.length;
     this.$('recordError').textContent='';
+    for(const photo of existing){
+      const item=document.createElement('div'),img=document.createElement('img'),button=document.createElement('button');
+      item.className='photo-thumb-wrapper';img.alt=photo.name||'저장된 사진';
+      button.type='button';button.className='btn-thumb-remove';button.textContent='✕';button.setAttribute('aria-label',(photo.name||'저장된')+' 사진 삭제');
+      button.onclick=e=>{e.preventDefault();this.removedPhotoIds.add(photo.id);this.setDraftDirty(true);this.renderSelectedPhotos();};
+      item.append(img,button);this.$('photoPreview').append(item);
+      Promise.resolve().then(()=>this._hass.fetchWithAuth(`/api/carrot_ha/v1/journal/${encodeURIComponent(this.entry)}/attachments/${encodeURIComponent(photo.id)}`)).then(async response=>{
+        if(!response.ok)throw Error('사진을 불러오지 못했어요.');const blob=await response.blob();
+        if(generation!==this.photoPreviewGeneration||!this.$('recordDialog').open||!this.isConnected)return;
+        const url=URL.createObjectURL(blob);this.photoURLs.push(url);img.src=url;
+      }).catch(()=>{if(generation===this.photoPreviewGeneration)img.alt='불러오지 못한 사진 · '+(photo.name||'');});
+    }
     for(const [index,file] of (this.selectedPhotos||[]).entries()){
       const item=document.createElement('div'),img=document.createElement('img'),button=document.createElement('button');
       item.className='photo-thumb-wrapper';
@@ -1134,7 +1147,7 @@ export class VehicleJournal extends HTMLElement {
   chooseRecordType(){const ice=this.isCombustion();const choices=[[ice?'refueling':'charging',ice?'주유 기록':'충전 기록'],['maintenance','정비/기타 기록'],['washing','세차 기록'],['trip','주행 기록'],['accident','사고 기록'],...(ice?[['receipt','주유 영수증 촬영']]:[])];this.$('recordTypeChoices').innerHTML=choices.map(([key,label])=>`<button type="button" class="type-card" data-record-type="${key}"><div class="type-icon-box tint-${key==='refueling'?'energy':key}">${recordTypeIcons[key]||''}</div><div class="type-text-wrap"><span class="type-main-title">${esc(label)}</span><span class="type-sub-title">${esc(recordTypeDescs[key]||'')}</span></div><span class="type-chevron">›</span></button>`).join('');this.$('recordTypeDialog').showModal();}
   estimateFuelLiters(){if(this.recordMode!=='refueling'||this.fuelLitersEdited)return;const f=this.$('recordForm').elements,amount=Number(f.actual_krw.value.replaceAll(',','')),price=Number(f.unit_price_krw.value.replaceAll(',',''));if(amount>0&&price>0){f.fuel_liters.value=(amount/price).toFixed(3);this.fuelQuantitySource='estimated';}}
   openRecord(record,mode){
-    this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.recordMode=mode||(record?.kind==='trip'?'trip':['washing','accident','refueling','charging'].includes(record?.category)?record.category:'maintenance');this.fuelLitersEdited=!!record;this.fuelQuantitySource=record?.input?.fuel_quantity_source||'reported';this.unitPriceEdited=!!record;this.unitPriceSource=record?.input?.unit_price_source||'manual';this.unitPriceObserved=record?.input?.unit_price_observed_at;this.$('recordDialog').dataset.mode=this.recordMode;this.draftLocation=record?.location?{...record.location}:null;this.selectedPhotos=[];this.renderSelectedPhotos();this.setDraftDirty(false);
+    this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.recordMode=mode||(record?.kind==='trip'?'trip':['washing','accident','refueling','charging'].includes(record?.category)?record.category:'maintenance');this.fuelLitersEdited=!!record;this.fuelQuantitySource=record?.input?.fuel_quantity_source||'reported';this.unitPriceEdited=!!record;this.unitPriceSource=record?.input?.unit_price_source||'manual';this.unitPriceObserved=record?.input?.unit_price_observed_at;this.$('recordDialog').dataset.mode=this.recordMode;this.draftLocation=record?.location?{...record.location}:null;this.selectedPhotos=[];this.removedPhotoIds=new Set();this.renderSelectedPhotos();this.setDraftDirty(false);
     const form=this.$('recordForm');form.elements.date.value=new Date().toLocaleDateString('sv-SE');
     const input=record&&(record.input||{kind:record.kind,date:record.accounting_date,category:record.category,subcategory:record.subcategory,memo:record.memo,actual_krw:record.actual_krw??record.estimated_krw});
     if(input)for(const [key,value] of Object.entries(input))if(form.elements[key]){let text=value??'';if(value&&['started_at','ended_at'].includes(key)){const time=new Date(value);text=new Date(time.getTime()-time.getTimezoneOffset()*60000).toISOString().slice(0,16);}if(key==='actual_krw'&&value!=null){text=Number(value).toLocaleString('ko-KR');}form.elements[key].value=text;}
@@ -1156,7 +1169,8 @@ export class VehicleJournal extends HTMLElement {
     const rawAmt=form.elements.actual_krw?.value?.replace(/[^\d]/g,'');
     if(rawAmt)payload.actual_krw=Number(rawAmt);
     if(payload.kind!=='expense')for(const field of ['distance_km','drive_energy_kwh','battery_charge_kwh','billed_charge_kwh','odometer_km','soc_start_percent','soc_end_percent','started_at','ended_at','charge_mode']){const value=form.elements[field]?.value;if(value!==undefined&&value!==''&&!form.elements[field].closest('[hidden]'))payload[field]=['started_at','ended_at','charge_mode'].includes(field)?(field==='charge_mode'?value:new Date(value).toISOString()):Number(value);}
-    const photos=[...(this.selectedPhotos||[])],photoLimit=this.recordMode==='accident'?10:5;if(photos.length+(this.editing?.attachments?.length||0)>photoLimit||photos.some(f=>!f.size||f.size>20*1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent=`20MiB 이하 JPG·PNG·WEBP 사진을 최대 ${photoLimit}장 골라 주세요.`;return;}
+    if(this.removedPhotoIds?.size)payload.remove_attachment_ids=[...this.removedPhotoIds];
+    const photos=[...(this.selectedPhotos||[])],photoLimit=this.recordMode==='accident'?10:5;if(photos.length+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)>photoLimit||photos.some(f=>!f.size||f.size>20*1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent=`20MiB 이하 JPG·PNG·WEBP 사진을 최대 ${photoLimit}장 골라 주세요.`;return;}
     const saveBtn=this.$('save'),fill=saveBtn.querySelector('.progress-fill'),label=saveBtn.querySelector('.btn-label')||saveBtn;
     saveBtn.disabled=true;saveBtn.classList.add('loading');
     const updateProgress=(text,pct)=>{
@@ -1173,7 +1187,7 @@ export class VehicleJournal extends HTMLElement {
       }
       updateProgress('기록 저장 중...',80);
       const result=await this.call('record/save',{record_id:this.pendingId,expected_version:this.editing?.version||0,payload});
-      this.editing={id:result.id,version:result.version,input:payload};
+      this.editing={...this.editing,id:result.id,version:result.version,input:payload,attachments:(this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id))};this.removedPhotoIds=new Set();
       for(let i=0;i<preparedPhotos.length;i++){
         const pct=80+Math.round(((i+1)/preparedPhotos.length)*15);
         updateProgress(`사진 업로드 중 (${i+1}/${preparedPhotos.length})`,pct);

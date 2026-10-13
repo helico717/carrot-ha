@@ -407,8 +407,12 @@ class Journal:
         if type(expected) is not int or expected<0 or not isinstance(payload,dict):raise ValueError('잘못된 기록이에요.')
         allowed={'kind','date','ended_date','started_at','ended_at','distance_km','drive_energy_kwh',
                  'battery_charge_kwh','billed_charge_kwh','charge_mode','category','subcategory','actual_krw',
-                 'memo','unit_price_source','unit_price_observed_at','fuel_quantity_source','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location'}
+                 'memo','unit_price_source','unit_price_observed_at','fuel_quantity_source','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location','remove_attachment_ids'}
         if set(payload)-allowed:raise ValueError('지원하지 않는 기록 항목이에요.')
+        removals=payload.get('remove_attachment_ids',[])
+        if not isinstance(removals,list) or len(removals)>10 or any(not isinstance(x,str) for x in removals) or len(set(removals))!=len(removals):raise ValueError('사진 삭제 항목을 확인해 주세요.')
+        for attachment in removals:UUID(attachment)
+        payload={k:v for k,v in payload.items() if k!='remove_attachment_ids'}
         data=dict(payload);kind=data.get('kind')
         if 'location' in data:self.validate_location(data['location'])
         if kind not in ('trip','charge','expense'):raise ValueError('기록 종류를 확인해 주세요.')
@@ -444,10 +448,16 @@ class Journal:
             if old and old[3]!=kind:raise ValueError('기록 종류는 바꿀 수 없어요.')
             if old and json.loads(old[2]).get('purged'):raise Conflict('영구 삭제된 기록이에요.')
             serialized=encode(payload)
-            if old and expected==0 and old[1]=='manual' and json.loads(old[2]).get('input')==payload:return {'id':key,'version':old[0]}
+            if not removals and old and expected==0 and old[1]=='manual' and json.loads(old[2]).get('input')==payload:return {'id':key,'version':old[0]}
             if old and ((old[1]!='manual' and kind!='expense') or old[0]!=expected) or not old and expected!=0:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
             quality={'origin':'manual','energy':'manual','soc':'manual'}
-            self._record(db,key,kind,'manual',data,quality=quality)
+            if removals:
+                if not old or old[1]!='manual':raise ValueError('직접 기록의 사진만 수정할 수 있어요.')
+                for attachment in removals:
+                    if not db.execute("SELECT 1 FROM attachments WHERE vehicle_id=? AND record_id=? AND id=? AND status='active'",(self.vehicle,key,attachment)).fetchone():raise Conflict('사진이 바뀌었어요. 새로고침해 주세요.')
+                for attachment in removals:db.execute("UPDATE attachments SET status='deleted' WHERE vehicle_id=? AND record_id=? AND id=?",(self.vehicle,key,attachment))
+            changed=self._record(db,key,kind,'manual',data,quality=quality)
+            if removals and not changed:db.execute('UPDATE records SET version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(now(),self.vehicle,key))
             extra=json.loads(old[2]) if old else {}
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
             if 'location' in payload:extra['location']=payload['location']

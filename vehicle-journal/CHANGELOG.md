@@ -1,7 +1,16 @@
+## 2026-10-13 — 기존 사진 수정 미리보기·저장 시 제거 및 2열 입력 높이 정렬
+
+- 커밋 제목: vehicle-journal: edit saved photo attachments and align compact fields
+- 변경·이유: 사진 개수에는 기존 첨부가 포함되지만 편집 미리보기는 새 파일만 렌더했다. 인증된 HA 사진 읽기로 기존 첨부의 썸네일·삭제 버튼을 표시하고 삭제 대기 목록을 편집 상태로 관리한다. 닫기는 취소이며 저장 시에만 제거한다. 사진 수·추가 제한에는 삭제 예정 사진을 제외한다. 늦은 사진 응답은 새 편집 창이나 닫힌 창에 반영하지 않는다.
+- 서버: 기존 record/save 트랜잭션에서 사진 UUID·소유 차량/기록·활성 상태·기록 버전을 검증한 뒤 첨부를 삭제 상태로 바꾼다. 사진만 변경해도 기록 버전을 올리며 삭제 명령은 다음 입력값에 남기지 않는다. 사진 파일은 기록 영구 삭제 때 정리되며 기존 백업에는 남아 있을 수 있다.
+- 모바일: 라벨이 1줄·2줄로 달라도 입력창의 세로 위치를 맞춘다. 기존의 같은 행 라벨 비교에 더해 실제 입력창 y 좌표 검증을 추가한다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `carrot-journal-design.js`, `custom_components/carrot_ha/vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`, `record-edit-layout.cjs`, `photo-edit.cjs`, `photo-selection.cjs`.
+- 검증·배포: Python 54개 테스트 통과. 합성 Chrome 기존 사진 미리보기·저장 전 삭제 미전송·닫기 취소·저장 제거 검증 및 서버 소유권/버전·실패 시 사진 보존 회귀 통과. 320/360/390/430px 실제 입력창 높이 정렬 및 1280px 저장·넘침 회귀 통과. 사용자 테스트 기록의 사진은 삭제하지 않는다. 직접 반영 후 Python의 첨부 제거 API는 HA 재시작 필요. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 모바일 기록 날짜 전체 폭·나머지 입력 2열 압축
 
 - 커밋 제목: vehicle-journal: compact mobile record fields into two columns
-- 변경·이유: 440px 이하의 1열 숫자 입력이 공간을 과도하게 차지했다. 모바일에서도 최소 폭 0의 2열 그리드를 유지하고 기록 날짜만 전체 폭으로 배치한다. 메모·사진·위치 등 기존 전체 폭 영역은 유지한다.
+- 변경·이유: 440px 이하의 1열 숫자 입력이 공간을 과도하게 차지했다. 모바일에서도 최소 폭 0의 2열 그리드를 유지하고 기록 날짜만 전체 폭으로 배치한다. 짧은 라벨과 2줄 라벨의 입력창 높이를 맞추기 위해 라벨 영역에 최소 높이를 둔다. 메모·사진·위치 등 기존 전체 폭 영역은 유지한다.
 - 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `vehicle-journal/tests/record-edit-layout.cjs`.
 - 검증·배포: Chromium 320/360/390/430px 날짜 전체 폭과 누적거리·금액 같은 행 배치, 1280px 기존 배치, 저장·넘침·검색 결과·영구 삭제 확인 회귀 통과. 커밋·푸시·HA 직접 반영 진행 중. 화면 CSS 변경이며 버전·태그·릴리즈 발행 및 Python 재시작은 필요하지 않다. 실제 iPhone 실사용은 사용자 확인 대기다.
 

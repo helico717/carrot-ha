@@ -23,6 +23,25 @@ class JournalTests(unittest.TestCase):
         self.archive=Archive(Path(self.tmp.name)/'archive.sqlite3')
         self.journal=Journal(Path(self.tmp.name)/'journal.sqlite3','entry','car','Asia/Seoul')
 
+    def test_saved_photo_removal_is_owned_versioned_and_atomic(self):
+        key,other=str(uuid4()),str(uuid4());photo,foreign=str(uuid4()),str(uuid4())
+        payload={'kind':'expense','date':'2026-01-01','category':'maintenance','actual_krw':100}
+        for record in (key,other):self.journal.save_manual(record,0,payload)
+        with self.journal.connect() as db:
+            for record,attachment in [(key,photo),(other,foreign)]:
+                db.execute('INSERT INTO attachments VALUES (?,?,?,?,?,?,?,?,?,?)',(self.journal.vehicle,attachment,record,attachment+'.png','synthetic.png','image/png',9,'a'*64,'active','2026-01-01'))
+        with self.assertRaises(Conflict):self.journal.save_manual(key,1,dict(payload,remove_attachment_ids=[foreign]))
+        with self.assertRaises(Conflict):self.journal.save_manual(key,2,dict(payload,remove_attachment_ids=[photo]))
+        with self.assertRaises(ValueError):self.journal.save_manual(key,1,dict(payload,category='',remove_attachment_ids=[photo]))
+        with self.journal.connect() as db:self.assertEqual(db.execute('SELECT status FROM attachments WHERE id=?',(photo,)).fetchone()[0],'active')
+        result=self.journal.save_manual(key,1,dict(payload,remove_attachment_ids=[photo]));self.assertEqual(result['version'],2)
+        with self.journal.connect() as db:
+            self.assertEqual(db.execute('SELECT status FROM attachments WHERE id=?',(photo,)).fetchone()[0],'deleted')
+            self.assertEqual(db.execute('SELECT status FROM attachments WHERE id=?',(foreign,)).fetchone()[0],'active')
+            self.assertNotIn('remove_attachment_ids',json.loads(db.execute('SELECT extra_json FROM records WHERE id=?',(key,)).fetchone()[0])['input'])
+        row=next(r for r in self.journal.query('2026-01-01','2026-01-31')['records'] if r['id']==key)
+        self.assertEqual(row['attachments'],[])
+
     def test_purge_requires_deleted_version_confirmation_and_removes_content(self):
         key=str(uuid4());payload={'kind':'expense','date':'2026-01-01','category':'tuning','actual_krw':100,'memo':'private memo','location':{'name':'private place'}}
         self.journal.save_manual(key,0,payload)
