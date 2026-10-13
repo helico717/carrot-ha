@@ -35,6 +35,7 @@ const assert=require('node:assert/strict');
   await page.waitForFunction(()=>window.uploads.length===1);
   assert.deepEqual(await page.evaluate(()=>window.uploads.map(x=>x.type)),['image/jpeg']);
   assert.equal(await page.evaluate(()=>window.saved[0].payload.memo),'Keep this memo');
+  await root.locator('#recordDialog').waitFor({state:'hidden'});
   // Broken photos fail before any record is created; fields remain editable.
   await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openRecord());
   await root.locator('textarea[name="memo"]').fill('Still here');await root.locator('#actualKrw').fill('77000');
@@ -43,6 +44,7 @@ const assert=require('node:assert/strict');
   assert.equal(await page.evaluate(()=>window.saved.length),1);
   assert.equal(await root.locator('textarea[name="memo"]').inputValue(),'Still here');
   await root.locator('#clearPhotos').click();await root.locator('#save').click();await page.waitForFunction(()=>window.saved.length===2);assert.equal(await page.evaluate(()=>window.saved.length),2);
+  await root.locator('#recordDialog').waitFor({state:'hidden'});
   // Editing reuses the ID and current version.
   await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openRecord({id:'existing',version:3,input:{kind:'expense',date:'2026-04-17',category:'maintenance',actual_krw:77000,memo:'existing'}}));
   await root.locator('textarea[name="memo"]').fill('edited');await root.locator('#save').click();
