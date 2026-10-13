@@ -261,4 +261,84 @@ GS칼텍스 삼거리주유소
   print('✓ Test 12 Passed: OCR date delimiter misreads and compact fallback');
 }
 
-print('\nALL RECEIPT PARSER TESTS PASSED SUCCESSFULLY!');
+// 13. Test: Identification numbers like customer ID (고객번호: 20250522) must NOT be extracted as date
+{
+  const customerIdText = `
+고객번호: 20250522
+단가 1,700 수량 10 금액 17,000
+`;
+  const result = parseFuelReceipt(customerIdText);
+  assertEquals(result.date, null, 'Customer ID must NOT be parsed as date even if it forms a valid calendar date');
+  print('✓ Test 13 Passed: Customer ID not confused as date');
+}
+
+// 14. Test: Multiple conflicting distinct dates must result in null (never guess first one)
+{
+  const conflictText = `
+거래일시: 2026-05-22 10:00
+판매일자: 2026-05-20 15:00
+휘발유 1,700 X 10.000 17,000
+`;
+  const result = parseFuelReceipt(conflictText);
+  assertEquals(result.date, null, 'Conflicting distinct dates must result in null (leave blank)');
+  print('✓ Test 14 Passed: Multiple conflicting dates safely result in null');
+}
+
+// 15. Test: Future dates must be rejected
+{
+  const futureText = `
+거래일시: 2035-12-31 23:59
+휘발유 1,700 X 10.000 17,000
+`;
+  const result = parseFuelReceipt(futureText);
+  assertEquals(result.date, null, 'Future date beyond today in KST must be rejected');
+  print('✓ Test 15 Passed: Future date rejected');
+}
+
+// 16. Test: Multiline address extraction must NOT bridge across payment lines
+{
+  const badMultilineText = `
+청계주유소
+경기도 시험시
+승인금액 70000
+가상길 1
+`;
+  const result = parseFuelReceipt(badMultilineText);
+  assertEquals(result.station_address, null, 'Address must not combine lines across payment info');
+  print('✓ Test 16 Passed: Address combining blocked when payment line is interleaved');
+}
+
+// 17. Test: Strict building number matching (building 1 must NOT match 11 or 1-1)
+{
+  const stationInfo = { station_name: '청계주유소', station_address: '경기 의왕시 민백길 1' };
+
+  // Candidates with building 11 and building 1-1
+  const candidates = [
+    { place_name: '청계주유소 분점', road_address_name: '경기 의왕시 민백길 11', latitude: 37.38, longitude: 126.98 },
+    { place_name: '청계주유소 별관', road_address_name: '경기 의왕시 민백길 1-1', latitude: 37.38, longitude: 126.98 }
+  ];
+  const matched = matchStationFromReceipt(stationInfo, candidates);
+  assertEquals(matched, null, 'Building 1 must NOT match building 11 or 1-1');
+
+  // Exact building 1 match
+  const validCandidates = [
+    { place_name: '청계주유소', road_address_name: '경기 의왕시 민백길 1', latitude: 37.3871, longitude: 126.9842 }
+  ];
+  const validMatched = matchStationFromReceipt(stationInfo, validCandidates);
+  assert(validMatched !== null, 'Exact building 1 must match');
+  assertEquals(validMatched.address, '경기 의왕시 민백길 1', 'Correct address matched');
+  print('✓ Test 17 Passed: Strict building number matching (1 != 11, 1 != 1-1)');
+}
+
+// 18. Test: Administrative region mismatch must be rejected
+{
+  const stationInfo = { station_name: '청계주유소', station_address: '경기 의왕시 민백길 1' };
+  const candidates = [
+    { place_name: '청계주유소', road_address_name: '충북 음성군 민백길 1', latitude: 36.9, longitude: 127.6 }
+  ];
+  const matched = matchStationFromReceipt(stationInfo, candidates);
+  assertEquals(matched, null, 'Mismatched province/city must be rejected even if road name and number match');
+  print('✓ Test 18 Passed: Regional mismatch rejected');
+}
+
+print('\nALL RECEIPT PARSER TESTS (18/18) PASSED SUCCESSFULLY!');

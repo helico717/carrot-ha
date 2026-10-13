@@ -1182,11 +1182,16 @@ export class VehicleJournal extends HTMLElement {
     for(const b of this.shadowRoot.querySelectorAll('.auto-filled-badge'))b.remove();
   }
   cancelReceiptOcr(){
+    this.ocrGeneration=(this.ocrGeneration||0)+1;
+    if(this.ocrCloseTimer){clearTimeout(this.ocrCloseTimer);this.ocrCloseTimer=null;}
     if(this.ocrAbortController){this.ocrAbortController.abort();this.ocrAbortController=null;}
     const overlay=this.$('receiptOcrOverlay');if(overlay)overlay.hidden=true;
   }
   async handleReceiptPhoto(file){
     if(!file)return;
+    this.ocrGeneration=(this.ocrGeneration||0)+1;
+    const currentGen=this.ocrGeneration;
+    if(this.ocrCloseTimer){clearTimeout(this.ocrCloseTimer);this.ocrCloseTimer=null;}
     if(this.ocrAbortController)this.ocrAbortController.abort();
     this.ocrAbortController=new AbortController();
     const signal=this.ocrAbortController.signal;
@@ -1195,30 +1200,37 @@ export class VehicleJournal extends HTMLElement {
     if(overlay){overlay.hidden=false;overlay.style.opacity='1';}
     if(dot1)dot1.classList.add('active');if(dot2)dot2.classList.remove('active');if(dot3)dot3.classList.remove('active');
     if(statusText)statusText.textContent='OCR로 인식하는 중이에요.';
+    this.clearAutoFilledStyles();
+    const f=this.$('recordForm').elements;
+    if(!this.userEditedFields?.has('date'))f.date.value='';
+    if(!this.userEditedFields?.has('fuel_type'))f.fuel_type.value='';
+    if(!this.userEditedFields?.has('actual_krw'))f.actual_krw.value='';
+    if(!this.unitPriceEdited)f.unit_price_krw.value='';
+    if(!this.fuelLitersEdited)f.fuel_liters.value='';
     try{
       const onProgress=m=>{
-        if(signal.aborted)return;
+        if(signal.aborted||this.ocrGeneration!==currentGen)return;
         if(m.status==='recognizing text'&&statusText)statusText.textContent='OCR로 인식하는 중이에요.';
       };
       const result=await runReceiptOcr(file,assetBase,onProgress,signal);
-      if(signal.aborted||!this.$('recordDialog')?.open)return;
+      if(signal.aborted||this.ocrGeneration!==currentGen||!this.$('recordDialog')?.open)return;
 
       if(dot2)dot2.classList.add('active');
       if(statusText)statusText.textContent='인식한 정보를 자동으로 입력하는 중이에요.';
 
-      const parsed=result.parsed,f=this.$('recordForm').elements;
+      const parsed=result.parsed;
       this.suppressFuelEstimation=true;
-      if(parsed.date){f.date.value=parsed.date;this.markAutoFilled('dateField',f.date);}
-      if(parsed.fuel_type){f.fuel_type.value=parsed.fuel_type;this.markAutoFilled('fuelTypeField',f.fuel_type);}
-      if(parsed.actual_krw){f.actual_krw.value=Number(parsed.actual_krw).toLocaleString('ko-KR');this.markAutoFilled('amountField',f.actual_krw);}
-      if(parsed.unit_price_krw){
+      if(parsed.date&&!this.userEditedFields?.has('date')){f.date.value=parsed.date;this.markAutoFilled('dateField',f.date);}
+      if(parsed.fuel_type&&!this.userEditedFields?.has('fuel_type')){f.fuel_type.value=parsed.fuel_type;this.markAutoFilled('fuelTypeField',f.fuel_type);}
+      if(parsed.actual_krw&&!this.userEditedFields?.has('actual_krw')){f.actual_krw.value=Number(parsed.actual_krw).toLocaleString('ko-KR');this.markAutoFilled('amountField',f.actual_krw);}
+      if(parsed.unit_price_krw&&!this.unitPriceEdited){
         f.unit_price_krw.value=Number(parsed.unit_price_krw).toLocaleString('ko-KR');
-        this.unitPriceSource='receipt';this.unitPriceEdited=false;
+        this.unitPriceSource='receipt';
         this.markAutoFilled('unitPriceField',f.unit_price_krw);
       }
-      if(parsed.fuel_liters){
+      if(parsed.fuel_liters&&!this.fuelLitersEdited){
         f.fuel_liters.value=parsed.fuel_liters;
-        this.fuelLitersEdited=false;this.fuelQuantitySource='reported';
+        this.fuelQuantitySource='reported';
         this.markAutoFilled('fuelLitersField',f.fuel_liters);
       }
       if(parsed.station_name||parsed.station_address){
@@ -1230,23 +1242,40 @@ export class VehicleJournal extends HTMLElement {
       if(statusText)statusText.textContent='자동 입력이 완료됐어요.';
 
       await new Promise(r=>setTimeout(r,450));
-      if(signal.aborted||!this.$('recordDialog')?.open)return;
+      if(signal.aborted||this.ocrGeneration!==currentGen||!this.$('recordDialog')?.open)return;
       if(overlay){
         overlay.style.opacity='0';
-        setTimeout(()=>{overlay.hidden=true;},300);
+        this.ocrCloseTimer=setTimeout(()=>{
+          if(this.ocrGeneration!==currentGen)return;
+          overlay.hidden=true;this.ocrCloseTimer=null;
+        },300);
       }
-      if(this.$('receiptNotice'))this.$('receiptNotice').hidden=false;
+      if(this.$('receiptNotice')){
+        const notice=this.$('receiptNotice');
+        notice.hidden=false;
+        const matchedCount=parsed?.confidence?.matched_fields?.length||0;
+        if(matchedCount>0){
+          notice.innerHTML='<span>✨ 영수증에서 인식된 정보예요. 내용을 확인하고 [저장]을 눌러주세요.</span>';
+        }else{
+          notice.innerHTML='<span>ℹ️ 영수증에서 명확한 정보를 찾지 못했어요. 직접 확인 후 입력해 주세요.</span>';
+        }
+      }
     }catch(err){
-      if(signal.aborted)return;
+      if(signal.aborted||this.ocrGeneration!==currentGen)return;
       console.warn('[carrot-vehicle-journal] OCR processing failed:',err);
       if(overlay)overlay.hidden=true;
+      if(this.$('receiptNotice')){
+        const notice=this.$('receiptNotice');
+        notice.hidden=false;
+        notice.innerHTML='<span>⚠️ 영수증 정보를 인식하지 못했어요. 직접 입력해 주세요.</span>';
+      }
     }
   }
   async matchAndApplyReceiptStation(parsed,signal){
     try{
       const maps=await this.kakaoMaps();
       if(signal.aborted||!this.$('recordDialog')?.open)return;
-      const query=parsed.station_address||parsed.station_name;
+      const query=(parsed.station_address||parsed.station_name||'').slice(0,60);
       if(!query)return;
       let places=[];
       if(this.kakaoRestConfigured){

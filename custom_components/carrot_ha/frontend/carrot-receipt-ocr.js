@@ -4,6 +4,9 @@
 /**
  * Clean OCR noise numbers (blacklist patterns like business reg, card number, etc.)
  */
+/**
+ * Clean OCR noise numbers (blacklist patterns like business reg, card number, customer number, etc.)
+ */
 export function filterOcrNoise(text) {
   if (!text) return '';
   return text.split('\n').map(line => {
@@ -13,59 +16,122 @@ export function filterOcrNoise(text) {
     clean = clean.replace(/\b\d{4}[-\s]?[*0-9]{4}[-\s]?[*0-9]{4}[-\s]?\d{4}\b/g, ' [CARD_NO] ');
     // Mask phone number: 031-423-2323, 02-123-4567
     clean = clean.replace(/(?:Tel|TEL|전화)?\s*0\d{1,2}[-)\s]*\d{3,4}[-\s]*\d{4}/g, ' [TEL_NO] ');
-    // Mask approval / seq / pos / barcode numbers
-    clean = clean.replace(/(?:승인\s*(?:No|번호)?|일련번호|거래번호|가맹점\s*(?:No|번호)?|고유번호|POS\s*No)\s*[:\s]*[0-9A-Za-z-]+/gi, ' [CODE_NO] ');
-    clean = clean.replace(/\b20\d{12,18}\b/g, ' [BARCODE] ');
+    // Mask customer / member / device / slip / receipt / approval / seq / pos / transaction IDs
+    clean = clean.replace(/(?:고객\s*(?:No|번호)?|회원\s*(?:No|번호)?|단말기\s*(?:No|번호)?|전표\s*(?:No|번호)?|영수증\s*(?:No|번호)?|승인\s*(?:No|번호)?|일련번호|거래\s*(?:No|번호)?|가맹점\s*(?:No|번호)?|고유번호|POS\s*No)\s*[:\s]*[0-9A-Za-z-]+/gi, ' [CODE_NO] ');
+    // Mask standalone barcode or long digit sequence (12 to 24 digits)
+    clean = clean.replace(/\b\d{12,24}\b/g, ' [BARCODE] ');
     return clean;
   }).join('\n');
 }
 
 /**
- * Validate calendar date
+ * Validate calendar date. Strictly rejects future dates (tomorrow or later in KST).
  */
 export function isValidCalendarDate(year, month, day) {
   const y = Number(year), m = Number(month), d = Number(day);
   if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return false;
+  if (y < 2010 || y > 2035) return false;
   if (m < 1 || m > 12 || d < 1 || d > 31) return false;
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return false;
-  // Future dates (tomorrow or later in KST) are rejected
+  // Future dates (strictly past or today in KST UTC+9)
   const now = new Date();
-  const kstToday = new Date(now.getTime() + 9 * 3600000);
+  const kstNow = new Date(now.getTime() + 9 * 3600000);
+  const kstToday = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate()));
   const target = new Date(Date.UTC(y, m - 1, d));
-  const maxAllowed = new Date(Date.UTC(kstToday.getUTCFullYear(), kstToday.getUTCMonth(), kstToday.getUTCDate() + 1));
-  return target <= maxAllowed;
+  return target <= kstToday;
 }
 
 /**
- * Extract date from receipt text
+ * Helper to parse a single date string into YYYY-MM-DD
+ */
+function parseDateString(str) {
+  if (!str) return null;
+  // Compact 8-digit: 20260522
+  const cMatch = /^(\d{4})(\d{2})(\d{2})$/.exec(str.trim());
+  if (cMatch) {
+    const y = Number(cMatch[1]), m = Number(cMatch[2]), d = Number(cMatch[3]);
+    if (isValidCalendarDate(y, m, d)) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  // Formatted: 2026년 05월 22일 or 2026-05-22 or 2026.05.22
+  const fMatch = /(\d{4})[년연넌변전./\s-]+(\d{1,2})[월원./\s-]+(\d{1,2})/.exec(str);
+  if (fMatch) {
+    const y = Number(fMatch[1]), m = Number(fMatch[2]), d = Number(fMatch[3]);
+    if (isValidCalendarDate(y, m, d)) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  // 2-digit year: 26.05.22 or 26/05/22
+  const sMatch = /(2[0-9])[./-](\d{1,2})[./-](\d{1,2})/.exec(str);
+  if (sMatch) {
+    const y = 2000 + Number(sMatch[1]), m = Number(sMatch[2]), d = Number(sMatch[3]);
+    if (isValidCalendarDate(y, m, d)) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract date from receipt text.
+ * Requires contextual indicator or unambiguous calendar date format.
+ * Strictly excludes ID/code lines and rejects conflicting multiple dates.
  */
 export function extractReceiptDate(text) {
-  // Pattern 1: 2026년 05월 22일(금) or 2026-05-22 or 2026.05.22
-  // Tolerate OCR misreads for '년' (연, 넌, 변, 전) and '월' (월, 원)
-  const p1 = /(?:\[등록\]\s*)?(\d{4})[년연넌변전./\s-]+(\d{1,2})[월원./\s-]+(\d{1,2})[일\s]*/g;
-  let match;
-  while ((match = p1.exec(text)) !== null) {
-    const y = Number(match[1]), m = Number(match[2]), d = Number(match[3]);
-    if (isValidCalendarDate(y, m, d)) {
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  if (!text) return null;
+  const lines = text.split('\n');
+  const foundDates = new Set();
+
+  // Pattern 1: With explicit transaction date context (거래일시, 주유일시, [등록], 판매일자, 결제일자 등)
+  const contextDateRegex = /(?:\[등록\]|거래\s*일[시장자]|주유\s*일[시장자]|판매\s*일[시장자]|매출\s*일[시장자]|결제\s*일[시장자]|승인\s*일[시장자]|일[시장자])\s*[:\s]*(\d{4}[년연넌변전./\s-]+\d{1,2}[월원./\s-]+\d{1,2}|2[0-9][./-]\d{1,2}[./-]\d{1,2}|\b20[2-3][0-9](?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\b)/gi;
+
+  for (const line of lines) {
+    // Exclude identification lines containing customer/member/card/device/approval IDs
+    if (/(?:고객|회원|단말기|전표|영수증|가맹점|고유|카드|바코드)\s*(?:번호|No)/i.test(line)) {
+      continue;
+    }
+    let m;
+    while ((m = contextDateRegex.exec(line)) !== null) {
+      const parsed = parseDateString(m[1]);
+      if (parsed) foundDates.add(parsed);
     }
   }
-  // Pattern 2: 26/05/22 or 26-05-22 or 26.05.22
-  const p2 = /\b(2[0-9])[./-](\d{1,2})[./-](\d{1,2})\b/g;
-  while ((match = p2.exec(text)) !== null) {
-    const y = 2000 + Number(match[1]), m = Number(match[2]), d = Number(match[3]);
-    if (isValidCalendarDate(y, m, d)) {
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  // Pattern 2: If no context-based date found, look for unambiguous full date formats:
+  // e.g. 2026년 05월 22일(금) or 2026-05-22 or 2026.05.22
+  if (foundDates.size === 0) {
+    for (const line of lines) {
+      if (line.includes('[CODE_NO]') || line.includes('[CARD_NO]') || line.includes('[BIZ_NO]') || line.includes('[BARCODE]')) continue;
+      if (/(?:고객|회원|단말기|전표|영수증|승인|거래|가맹점|고유|카드|바코드)\s*(?:번호|No)/i.test(line)) continue;
+
+      // Unambiguous Korean date or dash/dot separated date
+      const p1 = /(?:\[등록\]\s*)?(\d{4})[년연넌변전./\s-]+(\d{1,2})[월원./\s-]+(\d{1,2})[일\s]*/g;
+      let m;
+      while ((m = p1.exec(line)) !== null) {
+        const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+        if (isValidCalendarDate(y, mo, d)) {
+          foundDates.add(`${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+        }
+      }
+
+      // 2-digit year separated date (26/05/22, 26.05.22, 26-05-22)
+      const p2 = /\b(2[0-9])[./-](\d{1,2})[./-](\d{1,2})\b/g;
+      while ((m = p2.exec(line)) !== null) {
+        const y = 2000 + Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+        if (isValidCalendarDate(y, mo, d)) {
+          foundDates.add(`${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+        }
+      }
+      // Note: Standalone 8-digit numbers without context are strictly NOT parsed here
+      // to avoid false positives with ID/serial numbers.
     }
   }
-  // Pattern 3: Fallback 8-digit compact date starting with 20xx (e.g. 20260522 in transaction/barcode)
-  const p3 = /\b(20[2-3][0-9])(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\b/g;
-  while ((match = p3.exec(text)) !== null) {
-    const y = Number(match[1]), m = Number(match[2]), d = Number(match[3]);
-    if (isValidCalendarDate(y, m, d)) {
-      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
+
+  // Conflict handling: if multiple distinct dates were found, return null (do not guess)
+  if (foundDates.size === 1) {
+    return Array.from(foundDates)[0];
   }
   return null;
 }
@@ -138,52 +204,79 @@ export function extractStationLocation(text) {
   let stationName = null;
   let stationAddress = null;
 
-  // Station name: prioritize specific name containing 주유소 or 충전소 over generic energy/oil brand
-  const lines = text.split('\n');
-  let fallbackName = null;
-  for (const line of lines) {
-    // Strip noise tokens within line rather than skipping line entirely
-    let cleanLine = line.replace(/\[(?:BIZ_NO|CARD_NO|TEL_NO|CODE_NO|BARCODE)\]/g, ' ').trim();
-    if (!cleanLine) continue;
+  const NON_ADDRESS_WORDS = /(?:승인|금액|결제|카드|할부|단가|수량|합계|과세|부가세|취소|가맹점|대표|전화|Tel|사업자|고객|회원|품목|상품|휘발유|경유|등유|LPG|주유기|세차|포인트|쿠폰|할인)/i;
 
-    // Normalize OCR misread of '1' as '|', 'l', or 'I' immediately following road name
-    cleanLine = cleanLine.replace(/([가-힣]+(?:로|길)\s*)[|lI](\s|$|\()/g, '$11$2');
-
-    // Specific station pattern (e.g. SKE 청계주유소, 직영 삼거리주유소)
-    const specificMatch = /(?:직영\s*)?([가-힣A-Za-z0-9\s]{2,25}(?:주유소|충전소))/i.exec(cleanLine);
-    if (specificMatch && !stationName) {
-      if (!cleanLine.includes('카드') && !cleanLine.includes('발급') && !cleanLine.includes('할인')) {
-        stationName = specificMatch[0].trim();
-      }
-    }
-    // Fallback brand pattern (e.g. SK에너지, GS칼텍스)
-    const brandMatch = /(?:직영\s*)?([가-힣A-Za-z0-9\s]{2,20}(?:에너지|오일))/i.exec(cleanLine);
-    if (brandMatch && !fallbackName) {
-      if (!cleanLine.includes('카드') && !cleanLine.includes('발급') && !cleanLine.includes('할인')) {
-        fallbackName = brandMatch[0].trim();
-      }
-    }
-    // Address pattern: 시/도 + 시/군/구 + 로/길 + 번호
-    const addrMatch = /(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?\s+([가-힣]+[시군구])\s+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(cleanLine);
-    if (addrMatch && !stationAddress) {
-      stationAddress = addrMatch[0].trim();
+  const rawLines = (text || '').split('\n');
+  const cleanLines = [];
+  for (const line of rawLines) {
+    let clean = line.replace(/\[(?:BIZ_NO|CARD_NO|TEL_NO|CODE_NO|BARCODE)\]/g, ' ').trim();
+    if (clean) {
+      // Normalize OCR misread of '1' as '|', 'l', or 'I' immediately following road name
+      clean = clean.replace(/([가-힣]+(?:로|길)\s*)[|lI](\s|$|\()/g, '$11$2');
+      cleanLines.push(clean);
     }
   }
 
-  // 2. Multiline Address Fallback: If address not found on a single line, check full normalized text
-  if (!stationAddress) {
-    const fullNormalized = text.replace(/([가-힣]+(?:로|길)\s*)[|lI](\s|$|\()/g, '$11$2');
-    // Pattern A: Province + City + Road name + Number across line breaks/spaces
-    const multiMatchA = /(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?[\s\n]+([가-힣]+[시군구])[\s\n]+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(fullNormalized);
-    if (multiMatchA) {
-      stationAddress = multiMatchA[0].replace(/\s+/g, ' ').trim();
-    } else {
-      // Pattern B: City/Gun/Gu + Road name + Number (e.g. 의왕시 민백길 1)
-      const multiMatchB = /([가-힣]{2,}[시군구])[\s\n]+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(fullNormalized);
-      if (multiMatchB) {
-        stationAddress = multiMatchB[0].replace(/\s+/g, ' ').trim();
+  let fallbackName = null;
+  for (let i = 0; i < cleanLines.length; i++) {
+    const cleanLine = cleanLines[i];
+
+    // Station name: prioritize specific name containing 주유소 or 충전소 over generic energy/oil brand
+    const specificMatch = /(?:직영\s*)?([가-힣A-Za-z0-9\s]{2,25}(?:주유소|충전소))/i.exec(cleanLine);
+    if (specificMatch && !stationName) {
+      if (!cleanLine.includes('카드') && !cleanLine.includes('발급') && !cleanLine.includes('할인') && !cleanLine.includes('적립')) {
+        stationName = specificMatch[0].trim();
       }
     }
+
+    // Fallback brand pattern (e.g. SK에너지, GS칼텍스)
+    const brandMatch = /(?:직영\s*)?([가-힣A-Za-z0-9\s]{2,20}(?:에너지|오일))/i.exec(cleanLine);
+    if (brandMatch && !fallbackName) {
+      if (!cleanLine.includes('카드') && !cleanLine.includes('발급') && !cleanLine.includes('할인') && !cleanLine.includes('적립')) {
+        fallbackName = brandMatch[0].trim();
+      }
+    }
+
+    // Single-line Address pattern: Province? + City/Gun/Gu + Road name + Number
+    if (!stationAddress && !NON_ADDRESS_WORDS.test(cleanLine)) {
+      const fullAddrMatch = /(?:(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?\s+)?([가-힣]+[시군구])\s+([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(cleanLine);
+      if (fullAddrMatch) {
+        stationAddress = fullAddrMatch[0].trim();
+      }
+    }
+  }
+
+  // Multiline Address Fallback: strictly adjacent consecutive lines only
+  // Must NOT have intermediate payment/approval/amount lines.
+  if (!stationAddress) {
+    for (let i = 0; i < cleanLines.length - 1; i++) {
+      const lineA = cleanLines[i];
+      if (NON_ADDRESS_WORDS.test(lineA)) continue;
+
+      // Line A has province and/or city/gun/gu
+      const areaMatch = /(?:(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?\s*)?([가-힣]+[시군구])/.exec(lineA);
+      if (areaMatch) {
+        const nextLine = cleanLines[i + 1];
+        // If the immediate next line contains payment words, strictly DO NOT combine!
+        if (NON_ADDRESS_WORDS.test(nextLine)) {
+          continue;
+        }
+
+        // The immediate next line must begin with road name + building number
+        const roadMatch = /^([가-힣0-9\s]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(nextLine);
+        if (roadMatch) {
+          const combined = `${areaMatch[0]} ${roadMatch[0]}`.replace(/\s+/g, ' ').trim();
+          if (combined.length <= 60) {
+            stationAddress = combined;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (stationAddress && stationAddress.length > 60) {
+    stationAddress = null;
   }
 
   return { station_name: stationName || fallbackName, station_address: stationAddress };
@@ -281,8 +374,37 @@ export function parseFuelReceipt(rawOcrText) {
 }
 
 /**
+ * Parse road address into structured components: sido, sigungu, road, mainNum, subNum
+ */
+export function parseRoadAddressComponents(addr) {
+  if (!addr || typeof addr !== 'string') return null;
+  const clean = addr.replace(/\(.*?\)/g, ' ').replace(/\[.*?\]/g, ' ').trim();
+
+  // Province (시/도)
+  const sidoM = /(서울|경기|인천|강원|충북|충남|전북|전남|경북|경남|제주|부산|대구|광주|대전|울산|세종)(?:특별(?:시|자치시)|광역(?:시)|도|특별자치도)?/.exec(clean);
+  const sido = sidoM ? sidoM[1] : null;
+
+  // City / Gun / Gu (시/군/구)
+  const sigunguM = /([가-힣]+[시군구])/.exec(clean);
+  const sigungu = sigunguM ? sigunguM[1] : null;
+
+  // Road name and building number: e.g. "민백길 1" or "민백길 1-2"
+  const roadM = /([가-힣0-9]+(?:로|길))\s*(\d+)(?:-(\d+))?/.exec(clean);
+  if (!roadM) return null;
+
+  return {
+    sido,
+    sigungu,
+    road: roadM[1].replace(/\s+/g, ''),
+    mainNum: Number(roadM[2]),
+    subNum: roadM[3] ? Number(roadM[3]) : 0
+  };
+}
+
+/**
  * Match gas station candidate using address and normalized name against search results.
- * Strictly requires unique candidate and both road name + building number match.
+ * Strictly requires unique candidate and exact road name + main/sub building number match.
+ * Prevents building 1 from matching 11 or 1-1, and validates administrative regions.
  */
 export function matchStationFromReceipt(stationInfo, searchCandidates) {
   if (!stationInfo || !Array.isArray(searchCandidates) || searchCandidates.length === 0) {
@@ -292,38 +414,68 @@ export function matchStationFromReceipt(stationInfo, searchCandidates) {
   if (!station_name && !station_address) return null;
 
   // Clean station name for matching (e.g. "직영 SKE 청계주유소" -> "청계주유소")
-  const normName = (station_name || '').replace(/^(?:직영\s*|\(주\)\s*)/, '').replace(/^[A-Za-z0-9]+\s+/, '').trim();
+  const normName = (station_name || '')
+    .replace(/^(?:직영\s*|\(주\)\s*)/, '')
+    .replace(/^[A-Za-z0-9]+\s+/, '')
+    .trim();
 
-  // Extract road name and building number from address (e.g. "민백길 1")
-  let roadWithNum = null;
-  if (station_address) {
-    const rm = /([가-힣0-9]+(?:로|길)\s*\d+(?:-\d+)?)/.exec(station_address);
-    if (rm) roadWithNum = rm[1].replace(/\s+/g, '');
-  }
+  const receiptComp = station_address ? parseRoadAddressComponents(station_address) : null;
 
   const matches = [];
   for (const item of searchCandidates) {
     const candidateName = (item.name || item.place_name || '').trim();
     const candidateAddr = (item.address || item.road_address_name || item.address_name || '').trim();
-    const candidateAddrNoSpace = candidateAddr.replace(/\s+/g, '');
+    const candidateComp = parseRoadAddressComponents(candidateAddr);
 
-    // Check address criteria: road name + building number must match if available
-    const addrMatches = roadWithNum ? candidateAddrNoSpace.includes(roadWithNum) : false;
+    let addrMatches = false;
+    if (receiptComp && candidateComp) {
+      // 1. Road name must match exactly
+      const roadMatches = receiptComp.road === candidateComp.road;
+      // 2. Building number: mainNum and subNum must match strictly! (1 != 11, 1 != 1-1)
+      const numMatches = receiptComp.mainNum === candidateComp.mainNum && receiptComp.subNum === candidateComp.subNum;
+      // 3. Region checks: if both specify city/gun/gu or province, they must NOT contradict
+      let regionMatches = true;
+      if (receiptComp.sigungu && candidateComp.sigungu && receiptComp.sigungu !== candidateComp.sigungu) {
+        regionMatches = false;
+      }
+      if (receiptComp.sido && candidateComp.sido && receiptComp.sido !== candidateComp.sido) {
+        regionMatches = false;
+      }
 
-    // Check name criteria: candidate must contain normalized station name
-    const nameMatches = normName ? (candidateName.includes(normName) || normName.includes(candidateName)) : false;
+      addrMatches = roadMatches && numMatches && regionMatches;
+    }
 
+    // Name criteria
+    let nameMatches = false;
+    if (normName && candidateName) {
+      nameMatches = candidateName.includes(normName) || normName.includes(candidateName);
+    }
+
+    const isGasStation = candidateName.includes('주유소') || candidateName.includes('충전소') ||
+      (item.category_name && (item.category_name.includes('주유소') || item.category_name.includes('충전소')));
+
+    // Candidate qualification:
+    // Case 1: Both address and name match
     if (addrMatches && nameMatches) {
-      matches.push(item);
-    } else if (addrMatches && (candidateName.includes('주유소') || candidateName.includes('충전소'))) {
-      // Address matched exactly to a gas station
-      matches.push(item);
+      matches.push({ item, rank: 1 });
+    }
+    // Case 2: Address matches exactly to a gas station and receipt had no specific station name
+    else if (addrMatches && isGasStation && !normName) {
+      matches.push({ item, rank: 2 });
+    }
+    // Case 3: Address matches exactly to a gas station and name is present but not directly matched
+    else if (addrMatches && isGasStation) {
+      matches.push({ item, rank: 3 });
     }
   }
 
-  // Must be strictly unique! If 0 or >1 ambiguous candidates, return null (leave blank)
-  if (matches.length === 1) {
-    const selected = matches[0];
+  if (matches.length === 0) return null;
+
+  // Disambiguation:
+  // If exactly 1 candidate matched on both address and name, pick it
+  const rank1 = matches.filter(m => m.rank === 1);
+  if (rank1.length === 1) {
+    const selected = rank1[0].item;
     return {
       name: selected.name || selected.place_name,
       address: selected.address || selected.road_address_name || selected.address_name,
@@ -332,6 +484,21 @@ export function matchStationFromReceipt(stationInfo, searchCandidates) {
       station_id: selected.station_id || null
     };
   }
+
+  // If there are multiple rank 1 matches or competing gas stations at the same address,
+  // we cannot disambiguate. Return null (leave blank).
+  if (matches.length === 1 && matches[0].rank <= 2) {
+    const selected = matches[0].item;
+    return {
+      name: selected.name || selected.place_name,
+      address: selected.address || selected.road_address_name || selected.address_name,
+      latitude: Number(selected.latitude || selected.y),
+      longitude: Number(selected.longitude || selected.x),
+      station_id: selected.station_id || null
+    };
+  }
+
+  // Ambiguous: return null
   return null;
 }
 
