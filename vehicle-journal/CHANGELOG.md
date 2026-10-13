@@ -1,3 +1,13 @@
+## 2026-10-13 — 0.8.14-beta.5 실제 발행 확인
+
+- 커밋 제목: `vehicle-journal: record 0.8.14-beta.5 publication verification`.
+- 발행 대상: `0ded40cac4bd4171a6d39755cfeff795da2a5a40`. main과 신규 `v0.8.14-beta.5` 태그가 이 커밋으로 원격 일치했고 manifest `0.8.14-beta.5`를 확인했다. 이후 이 결과 문서 커밋은 태그를 이동하지 않는다.
+- Release: https://github.com/helico717/carrot-ha/releases/tag/v0.8.14-beta.5 — 2026-10-13 KST 23:21:13 발행, prerelease=true, draft=false. 로컬 전체 노트가 GitHub 본문에 그대로 포함됨을 확인했다. beta.4 이후 73개 커밋·57개 변경 파일 대조, 기존 beta.1~4 노트 및 CHANGELOG 전체 항목 색인을 포함했다.
+- Actions: https://github.com/helico717/carrot-ha/actions/runs/38412586087 — `HACS Release`, `completed/success`, head_sha와 태그 일치 확인. 이전 v0.8.14 실행과 구분한다.
+- 검증: 준비 항목의 Python/SQL/OCR/대시보드·Chrome·Worker·Comma polling·카메라 회귀 결과 유지. 실제 새 베타의 HA 설치/재시작/운영 확인은 수행하지 않았다. 로더 원본 테스트의 fixture 에셋 경로 오류는 임시 사본으로 검증했으며 실행 코드 또는 테스트 원본 수정 없음.
+- 배포: GitHub/HACS pre-release 배포 완료. 사용자가 HACS 베타 버전 표시 → 0.8.14-beta.5 업데이트 → HA 재시작 → 브라우저 새로고침을 수행한다. Worker/D1/Comma 변경·배포 없음. 개인 DB·사진·설정·미추적 중복 파일은 발행 대상에 넣지 않았다.
+- 관련 파일: 본 CHANGELOG만 추가 기록. 문서 커밋·푸시 대상이며 추가 버전/태그/Release는 발행하지 않는다. 휴대폰 OCR·다음 자동 충전 장소·서버 API 실제 저장/삭제·14일 탐색·예약 NAS/장기 GFS 확인은 기존 제한대로 남아 있다.
+
 ## 2026-10-13 — 0.8.14-beta.5 누적 pre-release 준비
 
 - 커밋 제목: `vehicle-journal: prepare 0.8.14-beta.5 prerelease`.
