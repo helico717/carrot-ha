@@ -1,3 +1,15 @@
+## 2026-10-13 — 차계부 데스크톱 레이아웃 최대 폭 제한 해제 및 화면 전체 확장 (Full-Width)
+
+- 커밋 제목: vehicle-journal: expand desktop container to full width and remove max-width restriction
+- 변경·이유:
+  - 데스크톱/태블릿 화면 전체 확장 (Full-Width 레이아웃):
+    - PC나 와이드 화면에서 차계부 본문 카드 및 테이블이 `max-width: 1280px` / `1320px`에 가로막혀 우측과 여백이 붕 뜨던 문제를 해결하고, 화면 좌우 끝까지 시원하게 꽉 채우는 형태로 확장했다.
+    - 패널 런타임(`carrot-journal-panel-runtime.js`): `<main>` 컨테이너의 `max-width: 1320px; margin: auto;`를 제거하고 `width: 100%; max-width: none; box-sizing: border-box; padding: 16px 20px; margin: 0;`으로 설정하여 상단 헤더와 자연스럽게 이어지도록 최적화했다.
+    - 디자인 및 본체 스타일(`carrot-journal-design.js`, `carrot-vehicle-journal.js`): `.shell`의 `max-width: 1280px; margin: auto;`를 해제하고 `width: 100%; max-width: none; box-sizing: border-box; margin: 0; padding: 24px 16px;`으로 설정했다.
+    - 모바일 완전 보존: 모바일 뷰(`@media(max-width:600px)` 및 `@media(max-width:760px)`)는 이미 360~430px 너비에서 100% 뷰포트를 사용하고 있으며, 모든 반응형 미디어 쿼리 패딩 및 스타일 규칙이 독립 격리되어 있어 기존 모바일 UI에 0.1%의 사이드 이펙트나 깨짐 없이 완벽히 보존된다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-panel-runtime.js`, `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 20개 테스트 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 상세기록 탭 내 중복 '기록 남기기' 버튼 삭제 및 분류 선택 하단 여백 제거
 
 - 커밋 제목: vehicle-journal: remove redundant ledger add button and eliminate whitespace under category filter

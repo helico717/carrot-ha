@@ -25,9 +25,10 @@ export const journalDesign = `:host {
     .shell {
       background: var(--j-bg);
       border-radius: 24px;
-      padding: 30px;
+      padding: 24px 16px;
       min-width: 0;
       width: 100%;
+      box-sizing: border-box;
     }
     @media(max-width:600px){
       .shell{
@@ -1434,7 +1435,7 @@ export const journalDesign = `:host {
       .lightbox-nav-btn.next { right: 6px; }
     }
 
-.shell{max-width:1280px;margin:auto}
+.shell{max-width:none;width:100%;box-sizing:border-box;margin:0}
 .status{margin:24px 0 10px;padding:12px 16px;font-size: 14px;color:var(--j-sub);background:var(--j-surface);border:1px solid var(--j-border);border-radius:12px;text-align:center}
 #headline{font-weight:850}.cost-list{min-width:0}.recent-list-wrap{min-height:100px}
 .period-tab-btn:focus-visible,.legend-item:focus-visible{outline:3px solid var(--j-blue);outline-offset:2px}
