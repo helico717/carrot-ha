@@ -6,7 +6,7 @@
 - 사진 파일은 DB 트랜잭션에서 정리 대기 목록을 먼저 보존한 뒤 삭제하며 실패 시 다음 HA 시작/자동 동기화 때 재시도한다. 데이터 제거와 파일 정리를 원자적이라고 가정하지 않는다.
 - 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `api.py`, `runtime.py`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/test_journal.py`, `test_api_authorization.py`, `test_runtime_schedule.py`, `record-edit-layout.cjs`.
 - 검증: Python 차계부 52개 테스트 통과. 확인 누락·활성 기록·버전 충돌 거부, 영구 삭제 후 복원/수정 차단, 자동 동기화 재유입 방지, 사진 삭제 실패 후 재시작 재시도 검증. Chromium 다섯 화면 너비의 폼 저장·레이아웃 및 영구 삭제 버튼·확인 취소/승인 요청 검증 통과.
-- 배포: 사용자의 실제 삭제된 기록은 영구 삭제하지 않았다. 커밋·HA 백업/반영 진행 중이며 Python API 사용에는 사용자 HA 재시작 필요. 릴리즈 발행 없음.
+- 배포: `e8cdc2f` main 푸시 완료. HA 커밋별 백업 후 화면·API·저장·런타임 다섯 파일 직접 반영 및 SHA-256 일치 확인. 외부 HTTP 화면 두 파일 해시 일치, 운영 Chrome의 삭제된 실제 기록에 사진·복원·영구 삭제 버튼 표시 확인. 카드·디자인 모듈은 동일한 `0.8.14-beta.4-417d02bf2910` URL로 로드됨. 사용자의 실제 기록은 영구 삭제하지 않았다. Python API와 충전소 선택 로직은 사용자 HA 재시작 대기이며 실제 운영 영구 삭제 성공은 미검증. 릴리즈 발행 없음.
 
 ## 2026-10-13 — 충전 기록 저장·모바일 입력 겹침 및 모호한 충전소 자동 확정 수정
 
