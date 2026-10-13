@@ -885,37 +885,66 @@ export const journalDesign = `:host {
       background: #141c23;
       border: 1px solid #334454;
       border-radius: 24px;
-      width: min(580px, calc(100% - 24px));
-      padding: 20px 22px 24px;
-      max-height: 90vh;
-      overflow-y: auto;
+      width: min(540px, calc(100vw - 24px));
+      max-height: calc(100dvh - 48px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      padding: 0 !important;
+      overflow: hidden !important;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
       position: fixed;
       inset: 0;
       margin: auto;
       z-index: 2000;
+      display: flex;
+      flex-direction: column;
     }
     dialog#recordDialog::backdrop {
       background: rgba(4, 8, 12, 0.75);
       backdrop-filter: blur(8px);
     }
+    #recordDialog #recordForm {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: inherit;
+      overflow: hidden;
+    }
     .modal-header-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--j-border);
-      position: sticky;
-      top: 0;
+      padding: 16px 20px;
       background: #141c23;
-      z-index: 10;
+      border-bottom: 1px solid var(--j-border);
+      flex-shrink: 0;
+      margin: 0;
+      position: relative;
+      z-index: 20;
     }
     .modal-header-actions {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       flex-shrink: 0;
+    }
+    .modal-scroll-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 20px 24px;
+      box-sizing: border-box;
+      -webkit-overflow-scrolling: touch;
+    }
+    #recordDialog [hidden] {
+      display: none !important;
+    }
+    #recordDialog .fullfield,
+    #recordDialog #memoField,
+    #recordDialog #recordLocationField,
+    #recordDialog #recordPhotoField,
+    #recordDialog #importSourceDetails {
+      grid-column: 1 / -1 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
     }
     /* 저장, 닫기 버튼 크기, 높이, 폰트, 모서리 둥글기 100% 일치 */
     #recordDialog #save,
@@ -1542,7 +1571,7 @@ export const journalDesign = `:host {
   .settings-message{padding:8px 14px;font-size:12px}
 }
 .ledger-category-location{display:flex;align-items:center;gap:8px;min-width:0}.ledger-place-name{font-weight:400;overflow-wrap:anywhere;min-width:0;line-height:1.5}.ledger-category-location .cat-highlight-pill{flex-shrink:0}
-#recordTypeDialog{width:min(440px,calc(100vw - 32px));background:#141c23;border:1px solid #334454;border-radius:24px;padding:20px 22px 24px;color:var(--j-ink);box-shadow:0 25px 60px rgba(0,0,0,0.8)}#recordTypeDialog::backdrop{background:rgba(4,8,12,0.75);backdrop-filter:blur(8px)}.record-type-choices{display:flex;flex-direction:column;gap:9px;margin-top:14px}.type-card{background:#101820;border:1px solid var(--j-border);border-radius:15px;padding:12px 14px;display:flex;align-items:center;gap:13px;cursor:pointer;text-align:left;transition:all 0.15s ease;color:var(--j-ink);width:100%}.type-card:hover{background:#17232d;border-color:#486074;transform:translateY(-1px)}.type-icon-box{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.type-icon-box svg{width:22px;height:22px}.type-text-wrap{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.type-main-title{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.2px}.type-sub-title{font-size:11.5px;color:var(--j-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.type-chevron{color:var(--j-sub);opacity:0.6;font-size:18px}.tint-energy{background:rgba(129,230,197,0.12);color:#81e6c5}.tint-maint{background:rgba(245,158,11,0.12);color:#f59e0b}.tint-wash{background:rgba(96,165,250,0.12);color:#60a5fa}.tint-trip{background:rgba(52,211,153,0.12);color:#34d399}.tint-accident{background:rgba(248,113,113,0.12);color:#f87171}.tint-receipt{background:rgba(192,132,252,0.12);color:#c084fc}#recordDialog .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}#recordDialog #driveModeField,#recordDialog #tankModeField{display:flex;gap:16px;flex-wrap:wrap}#recordDialog #driveModeField label,#recordDialog #tankModeField label{display:flex;flex-direction:row;align-items:center;gap:6px}#recordDialog input[type=radio]{width:auto}#recordDialog #tankModeField small{flex-basis:100%}#recordDialog{max-height:calc(100dvh - 48px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-width:calc(100vw - 24px);padding:18px 20px 22px}#recordDialog .fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--j-sub)}#recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318;border:1px solid var(--j-border);border-radius:10px;padding:8px 11px;font-size:13.5px;color:var(--j-ink);min-height:38px;box-sizing:border-box}#recordDialog .fields input:focus,#recordDialog .fields select:focus,#recordDialog .fields textarea:focus{border-color:var(--j-accent);box-shadow:0 0 0 2px rgba(129,230,197,0.15);outline:none}#recordDialog .fields textarea{min-height:54px;line-height:1.45}.photo-pick-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:72px;height:72px;min-height:72px;border-radius:10px;background:#141f27;border:1.5px dashed rgba(255,255,255,0.2);cursor:pointer}.photo-pick-tile span{font-size:11px;font-weight:600}#recordPhotoField{gap:8px}#photoPreview{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-top:6px}.photo-thumb-wrapper{width:70px;height:70px;flex-shrink:0;border-radius:10px;position:relative;overflow:hidden;border:1px solid var(--j-border)}.photo-thumb-wrapper img{width:100%;height:100%;object-fit:cover;display:block}.btn-thumb-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;min-height:18px;padding:0;background:rgba(0,0,0,0.75);color:#fff;border:none;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}#recordDialog #recordForm>.row.spaced{position:sticky;top:0;background:#141c23;z-index:10;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--j-border)}
+#recordTypeDialog{width:min(440px,calc(100vw - 32px));background:#141c23;border:1px solid #334454;border-radius:24px;padding:20px 22px 24px;color:var(--j-ink);box-shadow:0 25px 60px rgba(0,0,0,0.8)}#recordTypeDialog::backdrop{background:rgba(4,8,12,0.75);backdrop-filter:blur(8px)}.record-type-choices{display:flex;flex-direction:column;gap:9px;margin-top:14px}.type-card{background:#101820;border:1px solid var(--j-border);border-radius:15px;padding:12px 14px;display:flex;align-items:center;gap:13px;cursor:pointer;text-align:left;transition:all 0.15s ease;color:var(--j-ink);width:100%}.type-card:hover{background:#17232d;border-color:#486074;transform:translateY(-1px)}.type-icon-box{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.type-icon-box svg{width:22px;height:22px}.type-text-wrap{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.type-main-title{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.2px}.type-sub-title{font-size:11.5px;color:var(--j-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.type-chevron{color:var(--j-sub);opacity:0.6;font-size:18px}.tint-energy,.tint-charging,.tint-refueling{background:rgba(129,230,197,0.12);color:#81e6c5}.tint-maint,.tint-maintenance{background:rgba(245,158,11,0.12);color:#f59e0b}.tint-wash,.tint-washing{background:rgba(96,165,250,0.12);color:#60a5fa}.tint-trip{background:rgba(52,211,153,0.12);color:#34d399}.tint-accident{background:rgba(248,113,113,0.12);color:#f87171}.tint-receipt{background:rgba(192,132,252,0.12);color:#c084fc}#recordDialog .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:4px 0 14px;align-items:start}#recordDialog #driveModeField,#recordDialog #tankModeField{display:flex;gap:16px;flex-wrap:wrap}#recordDialog #driveModeField label,#recordDialog #tankModeField label{display:flex;flex-direction:row;align-items:center;gap:6px}#recordDialog input[type=radio]{width:auto}#recordDialog #tankModeField small{flex-basis:100%}#recordDialog .fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--j-sub)}#recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318;border:1px solid var(--j-border);border-radius:10px;padding:8px 11px;font-size:13.5px;color:var(--j-ink);min-height:38px;box-sizing:border-box}#recordDialog .fields input:focus,#recordDialog .fields select:focus,#recordDialog .fields textarea:focus{border-color:var(--j-accent);box-shadow:0 0 0 2px rgba(129,230,197,0.15);outline:none}#recordDialog .fields textarea{min-height:54px;line-height:1.45}.photo-pick-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:72px;height:72px;min-height:72px;border-radius:10px;background:#141f27;border:1.5px dashed rgba(255,255,255,0.2);cursor:pointer}.photo-pick-tile span{font-size:11px;font-weight:600}#recordPhotoField{gap:8px}#photoPreview{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-top:6px}.photo-thumb-wrapper{width:70px;height:70px;flex-shrink:0;border-radius:10px;position:relative;overflow:hidden;border:1px solid var(--j-border)}.photo-thumb-wrapper img{width:100%;height:100%;object-fit:cover;display:block}.btn-thumb-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;min-height:18px;padding:0;background:rgba(0,0,0,0.75);color:#fff;border:none;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}
 #vehicleManageDialog .settings-toggle{display:flex;flex-direction:row;align-items:center;gap:8px;margin:12px 0;line-height:1.5}
 #vehicleManageDialog .settings-toggle input[type=checkbox]{width:18px;height:18px;min-height:18px;padding:0;margin:0;flex:none;accent-color:var(--j-accent)}
 #vehicleManageDialog .settings-backup-row span{min-width:0;overflow-wrap:anywhere}

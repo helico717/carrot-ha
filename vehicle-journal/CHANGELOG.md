@@ -1,3 +1,34 @@
+## 2026-10-13 — 차계부 카테고리 틴트 색상 복원, 주유 아이콘 교체, 모달 헤더 스크롤 마감 및 지도 최하단 배치
+
+- 커밋 제목: vehicle-journal: fix category tint colors, reorder fields to place map at bottom, and fix header scroll clipping
+- 변경·이유:
+  - **카테고리 선택 모달 색상 빠짐(흰색) 수정**:
+    - `carrot-vehicle-journal.js`에서 생성되는 `.tint-charging`, `.tint-maintenance`, `.tint-washing` 클래스가 CSS에서 누락되어 아이콘 박스가 색상 없이 흰색으로 나오던 문제 해결.
+    - 충전(민트 `#81e6c5`), 정비(앰버 `#f59e0b`), 세차(파랑 `#60a5fa`) 등 차계부 공통 카테고리 틴트 색상 복원.
+  - **내연기관 주유 기록 그래픽 교체 (정통 주유기 아이콘 적용)**:
+    - `recordTypeIcons.refueling`의 기존 빌딩/아파트 모양 SVG를 본체 기둥, 계량창, 바닥 받침, 주유 호스 및 주유건 노즐이 선명한 표준 Fuel Pump SVG로 전면 교체.
+  - **스크롤 시 헤더 마감 이상(지도가 헤더 위/옆으로 삐져나옴) 수정**:
+    - `#recordDialog`에 지정되어 있던 패딩으로 인해 `sticky` 헤더 상단과 좌우 틈새로 지도가 삐져나오던 구조적 결함 해결.
+    - 다이얼로그 패딩을 0으로 없애고 `overflow: hidden; display: flex; flex-direction: column;` 구조로 변경.
+    - 헤더(`.modal-header-row`)를 다이얼로그 최상단 모서리에 완벽 밀착(`flex-shrink: 0; padding: 16px 20px;`)하고, 본문(`.modal-scroll-body`)만 내부 스크롤되도록 분리하여 지도가 헤더 밖으로 절대 새어 나오지 않도록 마감 처리.
+  - **충전/주유 기록 위치 선택기 및 지도 최하단 이동 (핵심 수치 최상단 배치)**:
+    - 모달 오픈 시 위치/지도가 상단 80%를 차지하여 금액·단가·누적거리를 적으려면 스크롤을 내려야 했던 불편 개선.
+    - 날짜 바로 다음에 누적거리, 금액, 단가, 리터/kWh가 2열 그리드로 먼저 노출되고, 메모·사진 아래 최하단에 위치 선택기 및 지도가 나타나도록 순서 전면 개편.
+  - **정비/기타 기록 및 폼 UI 겹침 버그 수정**:
+    - `#recordDialog [hidden] { display: none !important; }`를 추가하여 숨겨진 필드가 CSS 명시도로 인해 강제 노출되거나 그리드 자리를 차지해 다른 요소와 겹치던 문제 원천 차단.
+    - `.fullfield`, `#memoField`, `#recordLocationField`, `#recordPhotoField`, `#importSourceDetails`에 `grid-column: 1 / -1; width: 100%;`를 부여하여 그리드 어긋남 완전 해결.
+  - **유종 드롭다운 변경 시 단가 연동 및 미취급 유종 빈칸 처리**:
+    - 드롭다운에서 다른 유종 선택 시 해당 주유소의 해당 유종 단가로 즉시 갱신되며, 해당 주유소에서 판매하지 않는 유종일 경우 단가 입력칸을 빈칸(`''`)으로 자동 변경.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: 틴트 클래스 통일, 다이얼로그 overflow-hidden/flex-column 구조 개편, 헤더 밀착 마감, fullfield 그리드 span, hidden 우선순위 강제.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: 정통 주유기 SVG 교체, modal-scroll-body 래퍼 적용, dedicated 필드 순서 개편(지도 최하단), 유종 미취급 시 단가 빈칸 처리.
+  - `vehicle-journal/review-record-ui.html`: 모바일 인터랙티브 검토 HTML 동기화.
+  - `vehicle-journal/CHANGELOG.md`: 작업 내역 기록.
+- 검증:
+  - `node --check` 구문 검사 통과 (`carrot-vehicle-journal.js`, `carrot-journal-design.js`).
+  - 모바일 조작 및 반응형 뷰포트 검증.
+- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+
 ## 2026-10-13 — 차계부 기록 모달 모바일 최적화, 저장·닫기 버튼 규격 통일 및 버튼 일체형 프로그레스 바 개편
 
 - 커밋 제목: vehicle-journal: mobile-friendly record modals, button-integrated progress, and unified header actions
