@@ -1,3 +1,12 @@
+## 2026-10-13 — 0.8.14-beta.5 누적 pre-release 준비
+
+- 커밋 제목: `vehicle-journal: prepare 0.8.14-beta.5 prerelease`.
+- 변경·이유: 사용자 요청으로 현재 Git 관리 main을 새 pre-release로 발행한다. 마지막 GitHub pre-release `v0.8.14-beta.4`부터 소스/문서 기준 `fad027aae44394e597de85a366dfdc91458f4aa2`까지 전체 커밋·57개 파일 diff를 대조했고, 차량 관리·이관·스냅샷·NAS·장소/연비 통계·기록/사진/영구 삭제·OCR·화면 개선·14일 배터리 탐색·브랜치 전환 계획을 모두 노트에 반영했다. 기존 CHANGELOG 전체 항목 색인 및 beta.1~beta.4 원문을 포함해 누적 변경을 보존한다. 브랜치 계획은 문서이며 미구현임을 구분한다.
+- 관련 파일: `custom_components/carrot_ha/manifest.json`, `.github/release-notes/v0.8.14-beta.5.md`, 본 기록. manifest/tag는 0.8.14-beta.5로 일치시키며 기존 태그/미추적 중복 파일은 유지한다.
+- 검증: 차계부 Python 55건·schema 9건·OCR 파서 20건·dashboard 12건·latest 6건·incremental 5건·history cache 1건·charge graph 27건 통과. Chrome 기본 browser-check 통과. Chrome 주행 입력·사진 편집 및 로더 회귀 통과. 기존 loader-update 테스트 서버가 path.basename으로 leaflet.css 하위 경로를 버리는 ENOENT는 임시 사본 서버에서만 경로/MIME를 수정해 검증했고 저장소 코드는 변경하지 않았다. Worker 증분/benchmark 통과(미변경 1 query / 81 bytes), Comma parameter polling 4건·카메라 회귀 4건/주행 안전 차단 통과. 발행 결과는 후속 기록으로 확정한다. Python suite의 unclosed event loop ResourceWarning은 실패가 아니며 실기 장애로 해석하지 않는다.
+- 배포: main 커밋/푸시·새 태그·GitHub Actions Release 발행 대상. 이번 요청은 HACS pre-release 패키지 배포이며 직접 HA 동기화나 사용자 재시작을 대신 수행하지 않는다. Worker/D1/Comma 변경·배포 없음.
+- 제한: 실제 휴대폰 OCR·다음 자동 충전 위치·새 서버 API 실사용·14일 배터리 페이지·NAS 03:00 및 장기 GFS는 미확인. 기존 개발 버튼은 유지한다. 사용자 HACS 베타 업데이트/HA 재시작 후 확인 필요. 확정 원격 커밋·Actions·Release 링크는 후속 발행 기록에 남긴다.
+
 ## 2026-10-13 — 차계부 데스크톱 레이아웃 최대 폭 제한 해제 및 화면 전체 확장 (Full-Width)
 
 - 커밋 제목: vehicle-journal: expand desktop container to full width and remove max-width restriction
