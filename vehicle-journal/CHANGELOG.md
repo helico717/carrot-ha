@@ -1,5 +1,7 @@
 ## 2026-10-13 — 영구 삭제된 파생 비용의 부모 수정·복원 재생성 방지
 
+- 실제 반영: `150a6b1` main 원격 확인, HA 커밋별 저장 모듈 백업·반영 및 SHA-256 일치 확인. 실행 중인 Python은 사용자 HA 재시작 대기다.
+
 - 커밋 제목: vehicle-journal: preserve purged derived costs during parent edits
 - 변경·이유: 수동 충전비·주유 동반 세차비를 개별 영구 삭제한 뒤 부모 기록을 수정/복원하면 파생 비용 내용이 다시 생성될 수 있는 경로를 차단한다. 영구 삭제 표식은 관련 상태 변경과 비용 재작성에서 유지한다.
 - 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`.
