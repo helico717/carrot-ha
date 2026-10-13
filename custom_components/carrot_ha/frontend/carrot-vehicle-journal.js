@@ -198,7 +198,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('vehicleManageList').onclick=e=>this.manageVehicleAction(e);
     this.$('snapshotVehicleList').onclick=e=>this.manageVehicleAction(e);
     this.$('settingsNav').onclick=e=>{const button=e.target.closest('[data-settings-nav]');if(button)this.selectSettingsSection(button.dataset.settingsNav);};
-    this.$('vehicleManageDialog').addEventListener('click',e=>{const button=e.target.closest('[data-key-toggle]');if(button){const input=this.$(button.dataset.keyToggle);input.type=input.type==='password'?'text':'password';button.textContent=input.type==='password'?'보기':'숨기기';}});
+    this.$('vehicleManageDialog').addEventListener('click',e=>{if(e.target===this.$('vehicleManageDialog'))this.$('vehicleManageDialog').close();const button=e.target.closest('[data-key-toggle]');if(button){const input=this.$(button.dataset.keyToggle);input.type=input.type==='password'?'text':'password';button.textContent=input.type==='password'?'보기':'숨기기';}});
     this.$('saveMapKey').onclick=()=>this.saveJournalSettings({map_key:this.$('kakaoKey').value.trim()});
     this.$('addLocation').onclick=()=>{this.draftLocation={name:'',address:'',latitude:null,longitude:null};this.setDraftDirty(true);this.renderLocation();};
     this.$('locationPin').onclick=()=>this.openLocationPicker();
@@ -221,6 +221,9 @@ export class VehicleJournal extends HTMLElement {
     for(let i=0;i<4;i++)if(this.$('tab'+i))this.$('tab'+i).onclick=()=>this.selectTab(i);
     for(const id of ['add','addRecent','addLedger'])if(this.$(id))this.$(id).onclick=()=>this.chooseRecordType();
     if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
+    if(this.$('recordDialog'))this.$('recordDialog').onclick=e=>{if(e.target===this.$('recordDialog'))this.$('recordDialog').close();};
+    if(this.$('closeRecordType'))this.$('closeRecordType').onclick=()=>this.$('recordTypeDialog').close();
+    if(this.$('recordTypeDialog'))this.$('recordTypeDialog').onclick=e=>{if(e.target===this.$('recordTypeDialog'))this.$('recordTypeDialog').close();};
     if(this.$('closeLightbox'))this.$('closeLightbox').onclick=()=>this.$('photoViewerDialog')?.close();
     if(this.$('lightboxPrev'))this.$('lightboxPrev').onclick=()=>this.stepLightbox(-1);
     if(this.$('lightboxNext'))this.$('lightboxNext').onclick=()=>this.stepLightbox(1);
@@ -1108,7 +1111,7 @@ export class VehicleJournal extends HTMLElement {
     form.elements.fuel_type.required=mode==='refueling';this.$('actualKrw').required=!['trip','accident'].includes(mode);this.$('amountField').childNodes[0].textContent={refueling:'주유금액 · 원',charging:'충전금액 · 원',washing:'세차비 · 원',accident:'사고 처리 금액 · 원 (선택)'}[mode]||'실제 금액 · 원';
     this.$('billedField').childNodes[0].textContent='청구 충전량 · kWh';
     const container=form.querySelector('.fields');this.originalFieldOrder=this.originalFieldOrder||[...container.children];for(const node of this.originalFieldOrder)container.append(node);
-    if(dedicated){const order=['dateField','odometerField','amountField','unitPriceField','fuelLitersField','billedField','fuelTypeField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails'];for(const id of order){const node=this.$(id);if(node)container.append(node);}}
+    if(dedicated){const order=mode==='refueling'?['dateField','odometerField','fuelTypeField','unitPriceField','amountField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails']:['dateField','odometerField','amountField','billedField','unitPriceField','fuelTypeField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails'];for(const id of order){const node=this.$(id);if(node)container.append(node);}}
     if(mode==='trip'){container.append(this.$('memoField'),this.$('recordPhotoField'),this.$('recordLocationField'));}
     this.$('recordPhotoField').querySelector('small').textContent=`사진당 20MiB 이하, 최대 ${mode==='accident'?10:5}장. 저장할 때 축소·압축해요.`;
     this.updateSaveButtonVisibility();

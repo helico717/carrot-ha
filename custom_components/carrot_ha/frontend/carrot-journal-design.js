@@ -880,6 +880,10 @@ export const journalDesign = `:host {
     /* ======================================================== */
     /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */
     /* ======================================================== */
+    /* 모든 네이티브 다이얼로그 닫힘 상태 시 완전 숨김 보장 */
+    dialog:not([open]) {
+      display: none !important;
+    }
     dialog#recordDialog {
       color: var(--j-ink);
       background: #141c23;
@@ -894,8 +898,14 @@ export const journalDesign = `:host {
       inset: 0;
       margin: auto;
       z-index: 2000;
-      display: flex;
       flex-direction: column;
+      box-sizing: border-box;
+    }
+    dialog#recordDialog[open] {
+      display: flex !important;
+    }
+    dialog#recordDialog:not([open]) {
+      display: none !important;
     }
     dialog#recordDialog::backdrop {
       background: rgba(4, 8, 12, 0.75);
@@ -904,11 +914,14 @@ export const journalDesign = `:host {
     #recordDialog #recordForm {
       display: flex;
       flex-direction: column;
-      height: 100%;
-      max-height: inherit;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: 100%;
       overflow: hidden;
+      margin: 0;
+      padding: 0;
     }
-    .modal-header-row {
+    #recordDialog .modal-header-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -916,7 +929,7 @@ export const journalDesign = `:host {
       background: #141c23;
       border-bottom: 1px solid var(--j-border);
       flex-shrink: 0;
-      margin: 0;
+      margin: 0 !important;
       position: relative;
       z-index: 20;
     }
@@ -927,12 +940,14 @@ export const journalDesign = `:host {
       flex-shrink: 0;
     }
     .modal-scroll-body {
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
       padding: 16px 20px 24px;
       box-sizing: border-box;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     #recordDialog [hidden] {
       display: none !important;

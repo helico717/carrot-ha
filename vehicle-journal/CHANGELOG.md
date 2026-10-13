@@ -1,3 +1,28 @@
+## 2026-10-13 — 차계부 기록 모달 닫기 불가(영구 노출) 긴급 버그 수정 및 백드롭 터치 닫기 지원
+
+- 커밋 제목: vehicle-journal: fix unclosable record dialog and enable backdrop dismiss
+- 변경·이유:
+  - **기록 모달 닫기 불가 및 화면 영구 고정 버그 긴급 해결 (`display: flex` trap 수정)**:
+    - 직전 커밋(`ef8a1bf`)에서 `dialog#recordDialog`에 무조건적인 `display: flex;`가 부여되면서 브라우저의 기본 `<dialog:not([open])>` 숨김 스타일(`display: none`)이 오버라이드됨.
+    - 이로 인해 모달을 닫아도(`dialog.close()`), 폼을 저장해도, 또는 페이지 새로고침 시에도 다이얼로그가 화면 중앙에 영구적으로 표시되어 닫히지 않던 심각한 결함 해결.
+    - `dialog:not([open]) { display: none !important; }` 및 `dialog#recordDialog[open] { display: flex !important; }`, `dialog#recordDialog:not([open]) { display: none !important; }`를 적용하여 닫힐 때 100% 즉시 숨겨지도록 수정.
+  - **헤더 잘림 및 내부 스크롤 불가 현상 해결 (`min-height: 0` 적용)**:
+    - CSS Flexbox 명세상 자식 요소의 `min-height` 기본값이 `auto`로 작동하여 `#recordForm`과 `.modal-scroll-body`가 내용물 크기(900px+)만큼 팽창하고 뷰포트 중앙 배치로 인해 상단 헤더(닫기/저장 버튼)와 하단이 화면 밖으로 잘려 나가던 문제 해결.
+    - `#recordForm`과 `.modal-scroll-body`에 `min-height: 0; flex: 1 1 auto;`를 부여하여 다이얼로그 높이 내에서 본문만 완벽하게 스크롤되고 헤더는 항상 최상단에 고정 노출되도록 보장.
+  - **백드롭(배경) 클릭/터치 시 모달 닫기 지원**:
+    - 모바일 및 데스크톱에서 다이얼로그 바깥 어두운 배경(백드롭)을 터치/클릭했을 때 모달이 즉시 닫히도록 `recordDialog`, `recordTypeDialog`, `vehicleManageDialog`에 백드롭 닫기 이벤트 리스너 추가 (`e.target === dialog`).
+  - **주유 및 충전 폼 필드 2열 그리드 배치 자연화**:
+    - 주유 모드(`refueling`)일 때 2행에 `유종`과 `단가`가 나란히 오고, 3행에 `주유금액`과 `주유량`이 나란히 오도록 배치 최적화.
+    - 충전 모드(`charging`)일 때 2행에 `충전금액`과 `청구 충전량`이 배치되도록 분기 처리.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: 다이얼로그 닫힘 강제 display:none, recordDialog[open] 전용 display:flex, flexbox min-height:0 스크롤 복원.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: 백드롭 터치 닫기 지원, 주유/충전 필드 순서 최적화.
+  - `vehicle-journal/CHANGELOG.md`: 작업 내역 및 배포 상태 기록.
+- 검증:
+  - 구문 및 스타일 속성 검증 통과.
+  - HA 직접 배포 후 설치 파일 SHA-256 일치 확인.
+- 배포: 수정 커밋 main 푸시 완료. HA SSH 직접 동기화(`hassio@192.168.0.140:22`) 및 백업 적용 완료.
+
 ## 2026-10-13 — 차계부 카테고리 틴트 색상 복원, 주유 아이콘 교체, 모달 헤더 스크롤 마감 및 지도 최하단 배치
 
 - 커밋 제목: vehicle-journal: fix category tint colors, reorder fields to place map at bottom, and fix header scroll clipping
