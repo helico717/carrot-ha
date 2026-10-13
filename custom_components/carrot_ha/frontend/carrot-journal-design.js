@@ -878,13 +878,15 @@ export const journalDesign = `:host {
     /* ======================================================== */
     /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */
     /* ======================================================== */
+    /* [사용자 요청] 놓친 기록을 남겨요 모달 다이얼로그            */
+    /* ======================================================== */
     dialog#recordDialog {
       color: var(--j-ink);
       background: #141c23;
       border: 1px solid #334454;
       border-radius: 24px;
       width: min(580px, calc(100% - 24px));
-      padding: 24px 26px;
+      padding: 20px 22px 24px;
       max-height: 90vh;
       overflow-y: auto;
       box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -901,24 +903,101 @@ export const journalDesign = `:host {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 18px;
-      padding-bottom: 14px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
       border-bottom: 1px solid var(--j-border);
+      position: sticky;
+      top: 0;
+      background: #141c23;
+      z-index: 10;
     }
+    .modal-header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    /* 저장, 닫기 버튼 크기, 높이, 폰트, 모서리 둥글기 100% 일치 */
+    #recordDialog #save,
+    #recordDialog #close,
     .modal-close-btn {
-      background: var(--j-surface);
-      border: 1px solid var(--j-border);
-      color: var(--j-sub);
-      font-size: 14.5px;
-      font-weight: 600;
-      padding: 6px 14px;
-      min-height: 32px;
-      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
+      min-height: 36px;
+      max-height: 36px;
+      padding: 0 15px;
+      font-size: 13.5px;
+      font-weight: 700;
+      border-radius: 9px;
+      box-sizing: border-box;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
     }
-    .modal-close-btn:hover {
+    #recordDialog #save {
+      background: var(--j-accent);
+      color: #06231a;
+      border: 1px solid var(--j-accent);
+      box-shadow: 0 2px 8px rgba(129, 230, 197, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+    #recordDialog #save:hover:not(:disabled) {
+      background: #9cf2d7;
+      border-color: #9cf2d7;
+    }
+    #recordDialog #save.loading {
+      background: #17242e !important;
+      color: var(--j-accent) !important;
+      border-color: rgba(129, 230, 197, 0.4) !important;
+      cursor: wait;
+      box-shadow: none;
+    }
+    #recordDialog #close,
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
       color: var(--j-ink);
-      border-color: #486074;
     }
+    #recordDialog #close:hover,
+    .modal-close-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+    .btn-save-progress .progress-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(129, 230, 197, 0.25), rgba(129, 230, 197, 0.5));
+      transition: width 0.25s ease-out;
+      pointer-events: none;
+    }
+    .btn-save-progress .btn-content {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-save-progress .spinner {
+      display: none;
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(129, 230, 197, 0.3);
+      border-top-color: var(--j-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .btn-save-progress.loading .spinner {
+      display: inline-block;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
     .form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1463,9 +1542,7 @@ export const journalDesign = `:host {
   .settings-message{padding:8px 14px;font-size:12px}
 }
 .ledger-category-location{display:flex;align-items:center;gap:8px;min-width:0}.ledger-place-name{font-weight:400;overflow-wrap:anywhere;min-width:0;line-height:1.5}.ledger-category-location .cat-highlight-pill{flex-shrink:0}
-#recordTypeDialog{width:400px;max-width:calc(100vw - 40px);padding:24px}.record-type-choices{display:flex;flex-direction:column;gap:8px}.record-type-choices button{display:flex;align-items:center;gap:16px;text-align:left;padding:14px 16px;font-size:17px}.record-type-choices button span{font-size:24px}#recordDialog[data-mode]:not([data-mode="maintenance"]) .fields{display:flex;flex-direction:column;gap:20px}#recordDialog #driveModeField,#recordDialog #tankModeField{display:flex;gap:16px;flex-wrap:wrap}#recordDialog #driveModeField label,#recordDialog #tankModeField label{display:flex;flex-direction:row;align-items:center;gap:6px}#recordDialog input[type=radio]{width:auto}#recordDialog #tankModeField small{flex-basis:100%}#recordDialog{max-height:calc(100dvh - 64px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-width:calc(100vw - 32px)}
-.photo-pick-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:90px;height:90px;font-size:24px}.photo-pick-tile span{font-size:14px}#recordPhotoField{gap:10px}
-#recordDialog[data-mode]:not([data-mode="maintenance"]) #recordForm>.row.spaced{position:sticky;top:0;background:var(--j-surface);z-index:2;padding-bottom:12px}#recordDialog[data-mode]:not([data-mode="maintenance"]) #save{padding:8px 12px;min-height:38px}
+#recordTypeDialog{width:min(440px,calc(100vw - 32px));background:#141c23;border:1px solid #334454;border-radius:24px;padding:20px 22px 24px;color:var(--j-ink);box-shadow:0 25px 60px rgba(0,0,0,0.8)}#recordTypeDialog::backdrop{background:rgba(4,8,12,0.75);backdrop-filter:blur(8px)}.record-type-choices{display:flex;flex-direction:column;gap:9px;margin-top:14px}.type-card{background:#101820;border:1px solid var(--j-border);border-radius:15px;padding:12px 14px;display:flex;align-items:center;gap:13px;cursor:pointer;text-align:left;transition:all 0.15s ease;color:var(--j-ink);width:100%}.type-card:hover{background:#17232d;border-color:#486074;transform:translateY(-1px)}.type-icon-box{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.type-icon-box svg{width:22px;height:22px}.type-text-wrap{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.type-main-title{font-size:15px;font-weight:700;color:#fff;letter-spacing:-0.2px}.type-sub-title{font-size:11.5px;color:var(--j-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.type-chevron{color:var(--j-sub);opacity:0.6;font-size:18px}.tint-energy{background:rgba(129,230,197,0.12);color:#81e6c5}.tint-maint{background:rgba(245,158,11,0.12);color:#f59e0b}.tint-wash{background:rgba(96,165,250,0.12);color:#60a5fa}.tint-trip{background:rgba(52,211,153,0.12);color:#34d399}.tint-accident{background:rgba(248,113,113,0.12);color:#f87171}.tint-receipt{background:rgba(192,132,252,0.12);color:#c084fc}#recordDialog .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}#recordDialog #driveModeField,#recordDialog #tankModeField{display:flex;gap:16px;flex-wrap:wrap}#recordDialog #driveModeField label,#recordDialog #tankModeField label{display:flex;flex-direction:row;align-items:center;gap:6px}#recordDialog input[type=radio]{width:auto}#recordDialog #tankModeField small{flex-basis:100%}#recordDialog{max-height:calc(100dvh - 48px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-width:calc(100vw - 24px);padding:18px 20px 22px}#recordDialog .fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--j-sub)}#recordDialog .fields input,#recordDialog .fields select,#recordDialog .fields textarea{margin-top:0;background:#0d1318;border:1px solid var(--j-border);border-radius:10px;padding:8px 11px;font-size:13.5px;color:var(--j-ink);min-height:38px;box-sizing:border-box}#recordDialog .fields input:focus,#recordDialog .fields select:focus,#recordDialog .fields textarea:focus{border-color:var(--j-accent);box-shadow:0 0 0 2px rgba(129,230,197,0.15);outline:none}#recordDialog .fields textarea{min-height:54px;line-height:1.45}.photo-pick-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:72px;height:72px;min-height:72px;border-radius:10px;background:#141f27;border:1.5px dashed rgba(255,255,255,0.2);cursor:pointer}.photo-pick-tile span{font-size:11px;font-weight:600}#recordPhotoField{gap:8px}#photoPreview{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-top:6px}.photo-thumb-wrapper{width:70px;height:70px;flex-shrink:0;border-radius:10px;position:relative;overflow:hidden;border:1px solid var(--j-border)}.photo-thumb-wrapper img{width:100%;height:100%;object-fit:cover;display:block}.btn-thumb-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;min-height:18px;padding:0;background:rgba(0,0,0,0.75);color:#fff;border:none;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1}#recordDialog #recordForm>.row.spaced{position:sticky;top:0;background:#141c23;z-index:10;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--j-border)}
 #vehicleManageDialog .settings-toggle{display:flex;flex-direction:row;align-items:center;gap:8px;margin:12px 0;line-height:1.5}
 #vehicleManageDialog .settings-toggle input[type=checkbox]{width:18px;height:18px;min-height:18px;padding:0;margin:0;flex:none;accent-color:var(--j-accent)}
 #vehicleManageDialog .settings-backup-row span{min-width:0;overflow-wrap:anywhere}

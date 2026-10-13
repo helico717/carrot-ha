@@ -1,3 +1,34 @@
+## 2026-10-13 — 차계부 기록 모달 모바일 최적화, 저장·닫기 버튼 규격 통일 및 버튼 일체형 프로그레스 바 개편
+
+- 커밋 제목: vehicle-journal: mobile-friendly record modals, button-integrated progress, and unified header actions
+- 변경·이유:
+  - **헤더 액션 버튼 규격 통일 (저장 & 닫기 버튼 크기/스타일 불일치 수정)**:
+    - 기존에 `#save`(`min-height: 38px, padding: 8px 12px`)와 `#close`(`min-height: 32px, padding: 6px 14px`)의 높이·패딩·곡률이 서로 달라 발생하던 크기 불일치 문제를 해결.
+    - `.modal-header-actions`로 두 버튼을 나란히 묶고 `height: 36px, min-height: 36px, max-height: 36px, padding: 0 15px, font-size: 13.5px, border-radius: 9px, font-weight: 700`로 완전 대칭 통일.
+    - 기존 "HA에 기록 저장" 문구를 단순 `"저장"`으로 변경.
+    - 상세 기록 수정 화면의 경우 기존 기록과 변경사항이 발생했을 때만(`draftDirty === true`) 닫기 버튼 왼쪽에 `[저장]` 버튼이 자연스럽게 나타나도록 개선 (신규 작성 시에는 항상 노출).
+  - **버튼 일체형 실시간 프로그레스 바 & 진행 상태 표시**:
+    - 사진 압축 및 저장 중 저장 버튼이 비활성화(`disabled`)되며 버튼 자체가 프로그레스 바로 전환.
+    - 단계별 실시간 진행 문구(`사진 압축 중 (1/3)`, `기록 저장 중...`, `저장 완료! ✓`)와 게이지 채움 애니메이션(`.progress-fill`) 및 미니 스피너 시각화.
+  - **모바일 최적화 콤팩트 폼 레이아웃**:
+    - 폼 필드를 2열 그리드(`grid-template-columns: 1fr 1fr`)와 슬림 인풋으로 재구성하여 불필요한 스크롤 및 화면 낭비 최소화.
+    - 충전/주유 모달에서 저장 버튼이 타이틀 아래 거대 블록으로 덩그러니 분리되던 레거시 로직 제거 및 상단 헤더 우측으로 일원화.
+    - 사진 첨부 영역을 콤팩트 가로 스크롤 포토 레일(70×70px 썸네일 + 원터치 삭제 버튼)로 개편.
+  - **카테고리 선택 모달 벡터 SVG 아이콘화**:
+    - OS 기본 이모지(💧, 🚗, 🛣️, 🔧, ⛽ 등) 대신 세련된 인라인 SVG 벡터 아이콘과 카드 레이아웃(`type-card`) 적용.
+  - **정비/기타 기록 비용 분류 항목 정돈**:
+    - 비용 분류 select에서 중복/무관 카테고리(`주유비`, `충전비`, `세차비`, `사고`)를 제거하고 7개 필수 카테고리만 노출.
+- 관련 파일:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: 버튼 규격 통일 CSS, 버튼 일체형 프로그레스 바 스타일, SVG 카테고리 카드, 모바일 콤팩트 폼 그리드.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: 모달 템플릿 헤더 액션 통합, 실시간 프로그레스 연동, dirty state 변경 감지 로직, SVG 아이콘 매핑.
+  - `vehicle-journal/review-record-ui.html`: 모바일 인터랙티브 검토용 HTML.
+  - `vehicle-journal/CHANGELOG.md`: 작업 내역 기록.
+- 검증:
+  - `node --check` 구문 검사 통과 (`carrot-vehicle-journal.js`, `carrot-journal-design.js`).
+  - `vehicle-journal/schema/validate_schema.py` 통과.
+  - 모바일 조작 및 인터랙션 시뮬레이션 검토 파일(`review-record-ui.html`) 사용자 검토 승인 완료.
+- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+
 ## 2026-10-13 — 차계부 설정 창 모바일 상·하·좌·우 여백 및 Safe Area Inset 복원
 
 - 커밋 제목: vehicle-journal: restore safe area margins and padding for settings dialog on mobile

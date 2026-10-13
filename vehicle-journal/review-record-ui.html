@@ -1,0 +1,1332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>차계부 모바일 기록 전 과정 UI 개편 검토 프로토타입</title>
+<style>
+:root {
+  --j-bg: #0b1014;
+  --j-surface: #141c23;
+  --j-raised: #1c2630;
+  --j-card-bg: #101820;
+  --j-border: #283744;
+  --j-border-focus: #4b667e;
+  --j-ink: #f1f6fa;
+  --j-sub: #9ab0bf;
+  --j-accent: #81e6c5;
+  --j-accent-hover: #9cf2d7;
+  --j-accent-dark: #123d32;
+  --j-blue: #60a5fa;
+  --j-amber: #f59e0b;
+  --j-purple: #c084fc;
+  --j-red: #f87171;
+  --j-radius: 16px;
+  --j-input-radius: 10px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #070b0e;
+  color: var(--j-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+/* 상단 검토 툴바 */
+.inspector-bar {
+  background: #10171e;
+  border-bottom: 1px solid var(--j-border);
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+.inspector-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.badge-tag {
+  background: rgba(129, 230, 197, 0.15);
+  color: var(--j-accent);
+  border: 1px solid rgba(129, 230, 197, 0.35);
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.inspector-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.btn-tab {
+  background: var(--j-surface);
+  border: 1px solid var(--j-border);
+  color: var(--j-sub);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-tab:hover { color: #fff; border-color: var(--j-border-focus); }
+.btn-tab.active {
+  background: var(--j-accent);
+  color: #06231a;
+  border-color: var(--j-accent);
+}
+
+/* 뷰포트 레이아웃 */
+.main-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px 12px;
+  min-height: calc(100vh - 60px);
+}
+
+/* 스마트폰 디바이스 목업 (PC에서는 목업, 모바일에서는 100% 네이티브 핏) */
+.phone-frame {
+  width: 100%;
+  max-width: 412px;
+  height: 840px;
+  max-height: calc(100vh - 80px);
+  background: var(--j-bg);
+  border-radius: 40px;
+  border: 4px solid #22303c;
+  box-shadow: 0 25px 70px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+@media (max-width: 540px) {
+  .inspector-bar { padding: 8px 12px; }
+  .main-wrapper { padding: 0; min-height: 100vh; }
+  .phone-frame {
+    max-width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border: none;
+    border-radius: 0;
+  }
+}
+
+/* 스마트폰 상태바 */
+.status-bar {
+  padding: 10px 22px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  flex-shrink: 0;
+  background: var(--j-bg);
+}
+.dynamic-island {
+  width: 90px;
+  height: 20px;
+  background: #000;
+  border-radius: 14px;
+}
+
+/* 스크린 화면 본체 */
+.phone-screen {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  background: var(--j-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ======================================================== */
+/* 0. 대시보드 진입점 시뮬레이션 (최근 기록 & 기록 추가 버튼)   */
+/* ======================================================== */
+.screen-home {
+  padding: 16px 18px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.home-hero-card {
+  background: linear-gradient(135deg, #173832 0%, var(--j-surface) 100%);
+  border: 1px solid var(--j-border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home-hero-tag {
+  color: var(--j-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.home-hero-stat {
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+}
+.home-hero-sub {
+  font-size: 12.5px;
+  color: var(--j-sub);
+}
+.recent-list-card {
+  background: var(--j-surface);
+  border: 1px solid var(--j-border);
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-head-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.recent-item:last-child { border-bottom: none; }
+.recent-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.recent-badge-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+.pill-maint { background: rgba(245, 158, 11, 0.15); color: var(--j-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+.pill-charge { background: rgba(129, 230, 197, 0.15); color: var(--j-accent); border: 1px solid rgba(129, 230, 197, 0.3); }
+.pill-wash { background: rgba(96, 165, 250, 0.15); color: var(--j-blue); border: 1px solid rgba(96, 165, 250, 0.3); }
+.recent-name { font-size: 13.5px; font-weight: 600; }
+.recent-meta { font-size: 11.5px; color: var(--j-sub); }
+.recent-amount { font-size: 14.5px; font-weight: 700; }
+.btn-edit-inline {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--j-sub);
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+/* 모바일 전용 하단 플로팅 액션 버튼 (FAB) */
+.fab-add-record {
+  position: absolute;
+  bottom: 24px;
+  right: 20px;
+  background: var(--j-accent);
+  color: #06231a;
+  border: none;
+  border-radius: 28px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(129, 230, 197, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  z-index: 50;
+}
+.fab-add-record:active { transform: scale(0.96); }
+
+/* ======================================================== */
+/* 모바일 모달 팝업 & 바텀 시트 시스템                     */
+/* ======================================================== */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.modal-overlay.open { display: flex; animation: fadeIn 0.2s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.bottom-sheet {
+  background: var(--j-surface);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border: 1px solid var(--j-border);
+  border-bottom: none;
+  max-height: 92%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.7);
+  animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* 바텀 시트 상단 드래그 핸들 바 */
+.sheet-drag-handle {
+  width: 38px;
+  height: 4.5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+
+/* ======================================================== */
+/* 1. 카테고리 선택 모달 ("어떤 기록을 남길까요?")           */
+/* ======================================================== */
+.sheet-header {
+  padding: 12px 20px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+.btn-sheet-close {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--j-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.type-grid {
+  padding: 16px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.type-card {
+  background: var(--j-card-bg);
+  border: 1px solid var(--j-border);
+  border-radius: 16px;
+  padding: 13px 15px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+.type-card:active {
+  background: #17232d;
+  transform: scale(0.985);
+  border-color: var(--j-border-focus);
+}
+.type-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.type-icon-box svg { width: 23px; height: 23px; stroke-width: 2.2; }
+.type-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.type-main-title {
+  font-size: 15px;
+  font-weight: 750;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+.type-sub-title {
+  font-size: 11.5px;
+  color: var(--j-sub);
+}
+.type-chevron {
+  color: var(--j-sub);
+  opacity: 0.6;
+  font-size: 18px;
+}
+
+/* 카테고리별 테마 컬러 틴트 */
+.tint-energy { background: rgba(129, 230, 197, 0.12); color: #81e6c5; }
+.tint-maint { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
+.tint-wash { background: rgba(96, 165, 250, 0.12); color: #60a5fa; }
+.tint-trip { background: rgba(52, 211, 153, 0.12); color: #34d399; }
+.tint-accident { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+.tint-receipt { background: rgba(192, 132, 252, 0.12); color: #c084fc; }
+
+/* ======================================================== */
+/* 2 & 3. 콤팩트 모바일 기록 폼 모달                        */
+/* ======================================================== */
+.form-sheet {
+  height: 94%;
+}
+.form-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(20, 28, 35, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.form-header-title {
+  font-size: 17px;
+  font-weight: 750;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ======================================================== */
+/* 프로그레스 바 일체형 저장 버튼 (진행 상태 텍스트 + 게이지) */
+/* ======================================================== */
+.btn-save-progress {
+  position: relative;
+  background: var(--j-accent);
+  color: #06241b;
+  border: none;
+  border-radius: 9px;
+  padding: 7px 15px;
+  font-size: 13.5px;
+  font-weight: 750;
+  cursor: pointer;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  min-height: 35px;
+  box-shadow: 0 2px 8px rgba(129, 230, 197, 0.25);
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.btn-save-progress:active:not(:disabled) { transform: scale(0.97); }
+.btn-save-progress.loading {
+  background: #17242e !important;
+  color: var(--j-accent) !important;
+  border: 1px solid rgba(129, 230, 197, 0.4);
+  cursor: wait;
+  box-shadow: none;
+}
+.btn-save-progress .progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(129, 230, 197, 0.25), rgba(129, 230, 197, 0.5));
+  transition: width 0.25s ease-out;
+  pointer-events: none;
+}
+.btn-save-progress .btn-content {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.spinner {
+  display: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(129, 230, 197, 0.3);
+  border-top-color: var(--j-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.btn-save-progress.loading .spinner { display: inline-block; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* 바닥 고정 저장 바 (모바일 엄지손가락 친화) */
+.bottom-action-bar {
+  padding: 10px 18px 20px;
+  background: linear-gradient(to top, var(--j-surface) 80%, transparent);
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  margin-top: auto;
+}
+.btn-bottom-full {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 12px;
+  min-height: 46px;
+}
+
+/* ======================================================== */
+/* 콤팩트 폼 바디 (세로 스크롤 대폭 단축)                    */
+/* ======================================================== */
+.form-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row-compact-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.input-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--j-sub);
+  letter-spacing: -0.1px;
+}
+.input-control {
+  background: #0d1319;
+  border: 1px solid var(--j-border);
+  color: var(--j-ink);
+  border-radius: var(--j-input-radius);
+  padding: 8px 11px;
+  font-size: 13.5px;
+  font-family: inherit;
+  width: 100%;
+  min-height: 40px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-control:focus {
+  outline: none;
+  border-color: var(--j-accent);
+  box-shadow: 0 0 0 2px rgba(129, 230, 197, 0.15);
+}
+.textarea-control {
+  resize: none;
+  min-height: 52px;
+  line-height: 1.45;
+}
+
+/* 위치 섹션 콤팩트 카드 */
+.card-location-compact {
+  background: var(--j-card-bg);
+  border: 1px solid var(--j-border);
+  border-radius: 13px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.loc-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.loc-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-loc-del {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--j-sub);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.loc-summary-pill {
+  background: rgba(96, 165, 250, 0.12);
+  color: var(--j-blue);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.loc-search-bar {
+  display: flex;
+  gap: 6px;
+}
+.btn-loc-sub {
+  background: var(--j-raised);
+  border: 1px solid var(--j-border);
+  color: var(--j-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 38px;
+}
+
+/* 사진 첨부 가로 레일 (Photo Rail) */
+.card-photo-compact {
+  background: var(--j-card-bg);
+  border: 1px solid var(--j-border);
+  border-radius: 13px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.photo-rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+.btn-photo-add {
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+  background: #141f27;
+  border: 1.5px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--j-sub);
+  cursor: pointer;
+}
+.btn-photo-add:active { border-color: var(--j-accent); color: var(--j-accent); }
+.btn-photo-add svg { width: 20px; height: 20px; stroke: currentColor; fill: none; }
+.btn-photo-add span { font-size: 10.5px; font-weight: 600; }
+.photo-thumb-wrapper {
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--j-border);
+}
+.photo-thumb-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.btn-thumb-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* 변경 감지 시 저장 버튼 등장 애니메이션 */
+.btn-appear {
+  animation: popScale 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+@keyframes popScale {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.notice-box {
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 11.5px;
+  color: var(--j-blue);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+</style>
+</head>
+<body>
+
+<!-- 상단 검토 툴바 -->
+<header class="inspector-bar">
+  <div class="inspector-left">
+    <span class="badge-tag">모바일 전과정 UI 검증</span>
+    <strong style="font-size: 13.5px;">차계부 모바일 친화 개편 데모</strong>
+  </div>
+  <div class="inspector-tabs">
+    <button class="btn-tab active" onclick="simulateFlow('home')">대시보드 시작</button>
+    <button class="btn-tab" onclick="simulateFlow('select')">1. 카테고리 선택</button>
+    <button class="btn-tab" onclick="simulateFlow('maint_new')">2. 정비 신규</button>
+    <button class="btn-tab" onclick="simulateFlow('charge_new')">3. 충전 신규</button>
+    <button class="btn-tab" onclick="simulateFlow('maint_edit')">4. 수정(변경감지)</button>
+  </div>
+</header>
+
+<main class="main-wrapper">
+  <!-- 스마트폰 프레임 (모바일 접속 시 풀스크린 자동 핏) -->
+  <div class="phone-frame">
+    <!-- 상태바 -->
+    <div class="status-bar">
+      <span>1:58</span>
+      <div class="dynamic-island"></div>
+      <span>5G 100%</span>
+    </div>
+
+    <!-- 스크린 화면 본체 -->
+    <div class="phone-screen" id="screenContainer">
+
+      <!-- ======================================================== -->
+      <!-- [화면 0] 대시보드 / 최근 기록 목록 (시작점)                -->
+      <!-- ======================================================== -->
+      <div class="screen-home" id="screenHome">
+        <div class="home-hero-card">
+          <span class="home-hero-tag">2026년 10월 · ID.4</span>
+          <div class="home-hero-stat">128,450원</div>
+          <span class="home-hero-sub">총 주행 1,180km · 전비 6.2km/kWh</span>
+        </div>
+
+        <div class="recent-list-card">
+          <div class="card-head-row">
+            <span class="card-title">최근 기록</span>
+            <span style="font-size: 12px; color: var(--j-sub);">더보기 ›</span>
+          </div>
+
+          <!-- 기록 항목 1 (정비 기록 - 클릭 시 수정 모달로 진입) -->
+          <div class="recent-item">
+            <div class="recent-item-info">
+              <div class="recent-badge-title">
+                <span class="cat-pill pill-maint">정비 / 소모품</span>
+                <span class="recent-name">조수석 휠 하우스 플라스틱 트림</span>
+              </div>
+              <span class="recent-meta">2026. 7. 28. · 사진 3장</span>
+            </div>
+            <div style="display:flex; align-items:center;">
+              <strong class="recent-amount">53,500원</strong>
+              <button class="btn-edit-inline" onclick="openModal('modalMaintEdit')">수정</button>
+            </div>
+          </div>
+
+          <!-- 기록 항목 2 (충전 기록) -->
+          <div class="recent-item">
+            <div class="recent-item-info">
+              <div class="recent-badge-title">
+                <span class="cat-pill pill-charge">충전비</span>
+                <span class="recent-name">지식정보관 급속 충전</span>
+              </div>
+              <span class="recent-meta">2026. 10. 13. · 57.02 kWh</span>
+            </div>
+            <div style="display:flex; align-items:center;">
+              <strong class="recent-amount">18,500원</strong>
+              <button class="btn-edit-inline" onclick="openModal('modalChargeNew')">보기</button>
+            </div>
+          </div>
+
+          <!-- 기록 항목 3 (세차 기록) -->
+          <div class="recent-item">
+            <div class="recent-item-info">
+              <div class="recent-badge-title">
+                <span class="cat-pill pill-wash">세차비</span>
+                <span class="recent-name">노터치 자동 세차</span>
+              </div>
+              <span class="recent-meta">2026. 10. 05. · 주차장 앞</span>
+            </div>
+            <div style="display:flex; align-items:center;">
+              <strong class="recent-amount">12,000원</strong>
+              <button class="btn-edit-inline">보기</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 모바일 엄지 영역 플로팅 기록 추가 버튼 (FAB) -->
+        <button class="fab-add-record" onclick="openModal('modalRecordType')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          기록 남기기
+        </button>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- [모달 1] 카테고리 선택 모달 (어떤 기록을 남길까요?)         -->
+      <!-- ======================================================== -->
+      <div class="modal-overlay" id="modalRecordType">
+        <div class="bottom-sheet">
+          <div class="sheet-drag-handle"></div>
+          <div class="sheet-header">
+            <h2 class="sheet-title">어떤 기록을 남길까요?</h2>
+            <button class="btn-sheet-close" onclick="closeModal('modalRecordType')">닫기</button>
+          </div>
+
+          <div class="type-grid">
+            <!-- 충전 기록 -->
+            <button class="type-card" onclick="openFromType('modalChargeNew')">
+              <div class="type-icon-box tint-energy">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                </svg>
+              </div>
+              <div class="type-text-wrap">
+                <span class="type-main-title">충전 기록</span>
+                <span class="type-sub-title">충전 금액 · 충전량(kWh) · 단가 · 충전소 위치</span>
+              </div>
+              <span class="type-chevron">›</span>
+            </button>
+
+            <!-- 정비/기타 기록 -->
+            <button class="type-card" onclick="openFromType('modalMaintNew')">
+              <div class="type-icon-box tint-maint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                </svg>
+              </div>
+              <div class="type-text-wrap">
+                <span class="type-main-title">정비/기타 기록</span>
+                <span class="type-sub-title">소모품 교체 · 튜닝 · 보험 · 세금 · 통행료 등</span>
+              </div>
+              <span class="type-chevron">›</span>
+            </button>
+
+            <!-- 세차 기록 -->
+            <button class="type-card">
+              <div class="type-icon-box tint-wash">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                </svg>
+              </div>
+              <div class="type-text-wrap">
+                <span class="type-main-title">세차 기록</span>
+                <span class="type-sub-title">세차비 · 계기판 거리 · 세차장 위치</span>
+              </div>
+              <span class="type-chevron">›</span>
+            </button>
+
+            <!-- 주행 기록 -->
+            <button class="type-card">
+              <div class="type-icon-box tint-trip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <div class="type-text-wrap">
+                <span class="type-main-title">주행 기록</span>
+                <span class="type-sub-title">구간 거리(km) · 계기판 누적거리 입력</span>
+              </div>
+              <span class="type-chevron">›</span>
+            </button>
+
+            <!-- 사고 기록 -->
+            <button class="type-card">
+              <div class="type-icon-box tint-accident">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+              </div>
+              <div class="type-text-wrap">
+                <span class="type-main-title">사고 기록</span>
+                <span class="type-sub-title">사고 수리비 · 현장 및 수리 사진 최대 10장</span>
+              </div>
+              <span class="type-chevron">›</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- [모달 2] 정비/기타 신규 기록 폼 (콤팩트 레이아웃 & 로딩바) -->
+      <!-- ======================================================== -->
+      <div class="modal-overlay" id="modalMaintNew">
+        <div class="bottom-sheet form-sheet">
+          <div class="sheet-drag-handle"></div>
+
+          <!-- 상단 고정 헤더: 타이틀 + 상단 콤팩트 저장 버튼 + 닫기 -->
+          <div class="form-sticky-header">
+            <h2 class="form-header-title">정비/기타 기록</h2>
+            <div class="header-actions">
+              <button class="btn-save-progress" onclick="handleSaveAction(this, 'maint_new')">
+                <span class="progress-fill"></span>
+                <span class="btn-content">
+                  <span class="spinner"></span>
+                  <span class="btn-label">저장</span>
+                </span>
+              </button>
+              <button class="btn-sheet-close" onclick="closeModal('modalMaintNew')">닫기</button>
+            </div>
+          </div>
+
+          <!-- 스크롤 폼 바디 (과도한 여백 압축) -->
+          <div class="form-scroll-content">
+            <!-- 날짜 & 분류 (2열 나란히) -->
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">기록 날짜</label>
+                <input type="date" class="input-control" value="2026-10-13">
+              </div>
+              <div class="input-group">
+                <label class="input-label">비용 분류</label>
+                <!-- [요청사항 반영] 주유비, 충전비, 세차비, 사고 제거 완료 -->
+                <select class="input-control">
+                  <option value="maintenance" selected>정비 / 소모품</option>
+                  <option value="tuning">튜닝</option>
+                  <option value="insurance">보험</option>
+                  <option value="tax">세금</option>
+                  <option value="parking">주차비</option>
+                  <option value="toll">통행료</option>
+                  <option value="other">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 세부 작업 & 금액 (2열 나란히) -->
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">세부 작업</label>
+                <input type="text" class="input-control" placeholder="타이어 · 와이퍼 등" value="에어컨 필터 교체">
+              </div>
+              <div class="input-group">
+                <label class="input-label">실제 금액 · 원</label>
+                <input type="text" class="input-control" value="38,000">
+              </div>
+            </div>
+
+            <!-- 메모 -->
+            <div class="input-group">
+              <label class="input-label">메모</label>
+              <textarea class="input-control textarea-control" placeholder="특이사항이나 교체 주기 메모">PM 0.3 초미세먼지 활성탄 필터 교체</textarea>
+            </div>
+
+            <!-- 위치 카드 (콤팩트) -->
+            <div class="card-location-compact">
+              <div class="loc-topline">
+                <span class="loc-title">📍 기록된 위치</span>
+                <button class="btn-loc-del">위치 제거</button>
+              </div>
+              <div class="loc-summary-pill">
+                <span>아파트 지하 2층 주차장</span>
+                <small style="opacity: 0.7;">직접 지정</small>
+              </div>
+            </div>
+
+            <!-- 사진 첨부 레일 (2/5) -->
+            <div class="card-photo-compact">
+              <div class="loc-topline">
+                <span class="loc-title">📷 사진 첨부 (2/5)</span>
+                <small style="font-size: 11px; color: var(--j-sub);">저장 시 자동 압축</small>
+              </div>
+              <div class="photo-rail">
+                <button class="btn-photo-add">
+                  <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  <span>추가</span>
+                </button>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=150" alt="사진">
+                  <button class="btn-thumb-remove">✕</button>
+                </div>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=150" alt="사진">
+                  <button class="btn-thumb-remove">✕</button>
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size: 11px; color: var(--j-sub); margin: 0; line-height: 1.4;">
+              * 미확인 항목은 비워 두셔도 저장됩니다.
+            </p>
+          </div>
+
+          <!-- 하단 플로팅 저장 바 (엄지 접근용 - 상단과 로딩 상태 동기화) -->
+          <div class="bottom-action-bar">
+            <button class="btn-save-progress btn-bottom-full" onclick="handleSaveAction(this, 'maint_new')">
+              <span class="progress-fill"></span>
+              <span class="btn-content">
+                <span class="spinner"></span>
+                <span class="btn-label">저장</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- [모달 3] 충전 신규 기록 폼 (헤더 버튼 분리 문제 완전 해결)  -->
+      <!-- ======================================================== -->
+      <div class="modal-overlay" id="modalChargeNew">
+        <div class="bottom-sheet form-sheet">
+          <div class="sheet-drag-handle"></div>
+
+          <!-- 상단 고정 헤더: 덩그러니 분리되던 큰 블록 대신 깔끔한 우측 저장 배치 -->
+          <div class="form-sticky-header">
+            <h2 class="form-header-title">충전 기록</h2>
+            <div class="header-actions">
+              <button class="btn-save-progress" onclick="handleSaveAction(this, 'charge_new')">
+                <span class="progress-fill"></span>
+                <span class="btn-content">
+                  <span class="spinner"></span>
+                  <span class="btn-label">저장</span>
+                </span>
+              </button>
+              <button class="btn-sheet-close" onclick="closeModal('modalChargeNew')">닫기</button>
+            </div>
+          </div>
+
+          <div class="form-scroll-content">
+            <!-- 날짜 & 단가 (2열) -->
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">기록 날짜</label>
+                <input type="date" class="input-control" value="2026-10-13">
+              </div>
+              <div class="input-group">
+                <label class="input-label">단가 · 원/kWh</label>
+                <input type="text" class="input-control" value="324.4">
+              </div>
+            </div>
+
+            <!-- 충전 금액 & 청구 충전량 (2열) -->
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">충전 금액 · 원</label>
+                <input type="text" class="input-control" value="18,500">
+              </div>
+              <div class="input-group">
+                <label class="input-label">청구 충전량 · kWh</label>
+                <input type="text" class="input-control" value="57.02">
+              </div>
+            </div>
+
+            <!-- 충전 종류 & 계기판 거리 (2열) -->
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">충전 종류</label>
+                <select class="input-control">
+                  <option value="fast" selected>급속 (100kW+)</option>
+                  <option value="slow">완속 (7kW)</option>
+                  <option value="unknown">기타</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label class="input-label">계기판 거리 · km</label>
+                <input type="text" class="input-control" value="48,250">
+              </div>
+            </div>
+
+            <!-- 위치 카드 & 검색 바 (콤팩트 통합) -->
+            <div class="card-location-compact">
+              <div class="loc-topline">
+                <span class="loc-title">📍 기록된 위치</span>
+                <button class="btn-loc-del">위치 제거</button>
+              </div>
+              <div class="loc-summary-pill">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">남서울대 지식정보관 전기차충전소</span>
+                <small style="opacity: 0.7; flex-shrink: 0;">카카오맵</small>
+              </div>
+              <div class="loc-search-bar">
+                <input type="text" class="input-control" placeholder="장소·주소 검색" value="남서울대학교 지식정보관" style="min-height: 38px;">
+                <button class="btn-loc-sub">검색</button>
+                <button class="btn-loc-sub">지도</button>
+              </div>
+            </div>
+
+            <!-- 메모 -->
+            <div class="input-group">
+              <label class="input-label">메모</label>
+              <textarea class="input-control textarea-control" placeholder="충전기 번호나 특이사항">환경부 급속 2호기 (SOC 18% → 80%)</textarea>
+            </div>
+
+            <!-- 사진 레일 -->
+            <div class="card-photo-compact">
+              <div class="loc-topline">
+                <span class="loc-title">📷 첨부 사진 (1/5)</span>
+              </div>
+              <div class="photo-rail">
+                <button class="btn-photo-add">
+                  <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  <span>추가</span>
+                </button>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1558441719-8b449c6ff670?w=150" alt="사진">
+                  <button class="btn-thumb-remove">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-action-bar">
+            <button class="btn-save-progress btn-bottom-full" onclick="handleSaveAction(this, 'charge_new')">
+              <span class="progress-fill"></span>
+              <span class="btn-content">
+                <span class="spinner"></span>
+                <span class="btn-label">저장</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- [모달 4] 상세 기록 수정 모달 (변경사항 감지 시 저장 등장)  -->
+      <!-- ======================================================== -->
+      <div class="modal-overlay" id="modalMaintEdit">
+        <div class="bottom-sheet form-sheet">
+          <div class="sheet-drag-handle"></div>
+
+          <!-- 상단 헤더: 변경사항이 생길 때만 닫기 왼쪽에 저장 버튼이 짠! -->
+          <div class="form-sticky-header">
+            <h2 class="form-header-title">상세 기록 수정</h2>
+            <div class="header-actions">
+              <!-- 변경 감지 시 활성화되는 저장 버튼 -->
+              <button id="btnEditSaveHeader" class="btn-save-progress btn-appear" style="display: none;" onclick="handleSaveAction(this, 'maint_edit')">
+                <span class="progress-fill"></span>
+                <span class="btn-content">
+                  <span class="spinner"></span>
+                  <span class="btn-label">저장</span>
+                </span>
+              </button>
+              <button class="btn-sheet-close" onclick="closeModal('modalMaintEdit')">닫기</button>
+            </div>
+          </div>
+
+          <div class="form-scroll-content">
+            <!-- 변경 테스트 안내 박스 -->
+            <div class="notice-box">
+              <span>✍️ 항목을 수정하면 닫기 왼쪽에 [저장]이 나타납니다.</span>
+              <button onclick="resetChangeDetection()" style="background:transparent; border:1px solid var(--j-blue); color:var(--j-blue); border-radius:5px; font-size:11px; padding:2px 6px; cursor:pointer;">초기화</button>
+            </div>
+
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">기록 날짜</label>
+                <input type="date" class="input-control" value="2026-07-28" oninput="markDirty()">
+              </div>
+              <div class="input-group">
+                <label class="input-label">비용 분류</label>
+                <select class="input-control" onchange="markDirty()">
+                  <option value="maintenance" selected>정비 / 소모품</option>
+                  <option value="tuning">튜닝</option>
+                  <option value="insurance">보험</option>
+                  <option value="tax">세금</option>
+                  <option value="parking">주차비</option>
+                  <option value="toll">통행료</option>
+                  <option value="other">기타</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row-compact-2">
+              <div class="input-group">
+                <label class="input-label">세부 작업</label>
+                <input type="text" class="input-control" value="조수석 휠 하우스 플라스틱 트림 교체" oninput="markDirty()">
+              </div>
+              <div class="input-group">
+                <label class="input-label">실제 금액 · 원</label>
+                <input type="text" class="input-control" value="53,500" oninput="markDirty()">
+              </div>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">메모</label>
+              <textarea class="input-control textarea-control" oninput="markDirty()">이전 수리에서 미흡하게 진행되었던 부분 교체</textarea>
+            </div>
+
+            <!-- 사진 레일 (3/5) -->
+            <div class="card-photo-compact">
+              <div class="loc-topline">
+                <span class="loc-title">📷 첨부 사진 (3/5)</span>
+              </div>
+              <div class="photo-rail">
+                <button class="btn-photo-add" onclick="markDirty()">
+                  <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                  <span>추가</span>
+                </button>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1511919884226-fd3cad34687c?w=150" alt="사진">
+                  <button class="btn-thumb-remove" onclick="markDirty()">✕</button>
+                </div>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=150" alt="사진">
+                  <button class="btn-thumb-remove" onclick="markDirty()">✕</button>
+                </div>
+                <div class="photo-thumb-wrapper">
+                  <img src="https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=150" alt="사진">
+                  <button class="btn-thumb-remove" onclick="markDirty()">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+// 모달 열기/닫기 제어
+function openModal(id) {
+  closeAllModals();
+  const el = document.getElementById(id);
+  if (el) el.classList.add('open');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+}
+function closeAllModals() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+}
+function openFromType(nextModalId) {
+  closeModal('modalRecordType');
+  setTimeout(() => openModal(nextModalId), 150);
+}
+
+// 상단 검토 툴바 탭 전환
+function simulateFlow(target) {
+  document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  closeAllModals();
+  if (target === 'home') {
+    // 대시보드 화면 유지
+  } else if (target === 'select') {
+    openModal('modalRecordType');
+  } else if (target === 'maint_new') {
+    openModal('modalMaintNew');
+  } else if (target === 'charge_new') {
+    openModal('modalChargeNew');
+  } else if (target === 'maint_edit') {
+    openModal('modalMaintEdit');
+  }
+}
+
+// 상세 기록 수정 화면의 변경 감지(Dirty Checking) 로직
+let isDirty = false;
+function markDirty() {
+  if (!isDirty) {
+    isDirty = true;
+    const saveBtn = document.getElementById('btnEditSaveHeader');
+    saveBtn.style.display = 'inline-flex';
+    saveBtn.classList.add('btn-appear');
+  }
+}
+function resetChangeDetection() {
+  isDirty = false;
+  const saveBtn = document.getElementById('btnEditSaveHeader');
+  saveBtn.style.display = 'none';
+}
+
+// ========================================================
+// 프로그레스 바 일체형 저장 버튼 인터랙션 시뮬레이션
+// ========================================================
+function handleSaveAction(triggerBtn, modalType) {
+  // 모달 내 모든 저장 버튼(상단+하단)의 상태를 동기화
+  const modalEl = triggerBtn.closest('.modal-overlay');
+  const allSaveButtons = modalEl.querySelectorAll('.btn-save-progress');
+
+  allSaveButtons.forEach(btn => {
+    btn.disabled = true;
+    btn.classList.add('loading');
+  });
+
+  const steps = [
+    { text: '사진 압축 중 (1/3)', pct: 30, delay: 500 },
+    { text: '사진 압축 중 (2/3)', pct: 60, delay: 600 },
+    { text: '사진 압축 중 (3/3)', pct: 85, delay: 600 },
+    { text: '기록 저장 중...', pct: 95, delay: 500 },
+    { text: '저장 완료! ✓', pct: 100, delay: 600 }
+  ];
+
+  let stepIdx = 0;
+  function nextStep() {
+    if (stepIdx < steps.length) {
+      const step = steps[stepIdx];
+      allSaveButtons.forEach(btn => {
+        const label = btn.querySelector('.btn-label');
+        const fill = btn.querySelector('.progress-fill');
+        if (label) label.textContent = step.text;
+        if (fill) fill.style.width = step.pct + '%';
+      });
+      stepIdx++;
+      setTimeout(nextStep, step.delay);
+    } else {
+      setTimeout(() => {
+        allSaveButtons.forEach(btn => {
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          const label = btn.querySelector('.btn-label');
+          const fill = btn.querySelector('.progress-fill');
+          if (label) label.textContent = '저장';
+          if (fill) fill.style.width = '0%';
+        });
+        closeModal(modalEl.id);
+        alert('기록이 성공적으로 저장되었습니다! (데모 시뮬레이션)');
+        if (modalType === 'maint_edit') resetChangeDetection();
+      }, 400);
+    }
+  }
+
+  nextStep();
+}
+</script>
+</body>
+</html>
