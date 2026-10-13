@@ -27,7 +27,7 @@
 - 검증:
   - `node --check` 구문 검사 통과 (`carrot-vehicle-journal.js`, `carrot-journal-design.js`).
   - 모바일 조작 및 반응형 뷰포트 검증.
-- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+- 배포: 수정 커밋 `ef8a1bf` main 푸시 완료. HA `/config/carrot_ha/deployment-backups/ef8a1bf97d863ea2624152c239b00cf98079a07c/`에 백업 후 SSH 직접 반영 완료. 로컬 및 HA 설치 파일 SHA-256 일치 (`carrot-journal-design.js`: `32c11d30...`, `carrot-vehicle-journal.js`: `6aec394e...`). frontend-version API `0.8.14-beta.4-a2bea3a95f7f` 갱신 확인. 브라우저 새로고침(또는 패널 재진입)으로 즉시 적용 가능.
 
 ## 2026-10-13 — 차계부 기록 모달 모바일 최적화, 저장·닫기 버튼 규격 통일 및 버튼 일체형 프로그레스 바 개편
 
