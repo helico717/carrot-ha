@@ -207,6 +207,7 @@ class Journal:
         self._dirty(db,set(previous+dates))
 
     def _expense(self, db, key, data, owner='journal', payment=None, version=None):
+        if db.execute("SELECT 1 FROM records WHERE vehicle_id=? AND id=? AND source_fingerprint='purged'",(self.vehicle,key)).fetchone():return False
         self._dirty(db,[r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))])
         db.execute('''INSERT OR REPLACE INTO expenses VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
             (self.vehicle,key,data['date'],data.get('paid_date'),data['category'],data.get('subcategory'),
@@ -256,7 +257,7 @@ class Journal:
                         db.execute("UPDATE records SET status='superseded',version=version+1 WHERE vehicle_id=? AND id=?",(self.vehicle,old_key))
                 for source in deleted:
                     key=self.identity('charge',source)
-                    db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=?",(self.vehicle,key))
+                    db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(self.vehicle,key))
                     self._dirty(db,[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))])
                 self._dirty(db,old_days)
             self.aggregate()
@@ -462,19 +463,20 @@ class Journal:
                     if data.get('category')=='refueling' and data.get('wash_cost_krw',0)>0:
                         wash=dict(kind='expense',date=data['date'],category='washing',subcategory='주유와 함께 세차',memo='',actual_krw=data['wash_cost_krw'])
                         self._record(db,wash_id,'expense','manual',wash,quality=quality);self._expense(db,wash_id,wash)
-                    else:db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=?",(self.vehicle,wash_id))
+                    else:db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(self.vehicle,wash_id))
             else:
                 self._mobility(db,key,data);self._parts(db,key,data,quality)
                 if kind=='charge':
                     associated=self.identity('manual_charge_cost',key)
-                    db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=?",(self.vehicle,associated))
+                    db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(self.vehicle,associated))
                     old_dates=[r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,associated))]
                     self._dirty(db,old_dates)
                 if kind=='charge' and data.get('actual_krw') is not None:
                     expense_id=self.identity('manual_charge_cost',key)
                     self._record(db,expense_id,'expense','manual',data,quality=quality)
                     self._expense(db,expense_id,dict(data,category='charging'))
-                    db.execute('INSERT OR IGNORE INTO expense_members VALUES (?,?,?)',(self.vehicle,expense_id,key))
+                    if db.execute('SELECT 1 FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,expense_id)).fetchone():
+                        db.execute('INSERT OR IGNORE INTO expense_members VALUES (?,?,?)',(self.vehicle,expense_id,key))
             db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',
                        (self.vehicle,key,'administrator','save',serialized,now()))
             version=db.execute('SELECT version FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()[0]
@@ -563,10 +565,10 @@ class Journal:
             dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))]
             wash_id=self.identity('refueling_wash_cost',key)
             wash_status=status if status=='deleted' or (json.loads(row[3]).get('input') or {}).get('wash_cost_krw',0)>0 else 'deleted'
-            db.execute('UPDATE records SET status=? WHERE vehicle_id=? AND id=?',(wash_status,self.vehicle,wash_id))
+            db.execute("UPDATE records SET status=? WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(wash_status,self.vehicle,wash_id))
             dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,wash_id))]
             associated=self.identity('manual_charge_cost',key)
-            db.execute('UPDATE records SET status=? WHERE vehicle_id=? AND id=?',(status,self.vehicle,associated))
+            db.execute("UPDATE records SET status=? WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(status,self.vehicle,associated))
             dates += [r[0] for r in db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,associated))]
             self._dirty(db,dates)
             db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,changed_at) VALUES (?,?,?,?,?)',

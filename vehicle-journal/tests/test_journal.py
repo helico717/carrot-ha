@@ -50,6 +50,16 @@ class JournalTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT count(*) FROM expenses WHERE record_id=?',(key,)).fetchone()[0],0)
             self.assertEqual(db.execute('SELECT source_fingerprint FROM records WHERE id=?',(key,)).fetchone()[0],'purged')
 
+    def test_parent_edit_does_not_recreate_purged_charge_cost(self):
+        key=str(uuid4());payload={'kind':'charge','date':'2026-01-01','battery_charge_kwh':10,'actual_krw':3000}
+        self.journal.save_manual(key,0,payload)
+        cost=self.journal.identity('manual_charge_cost',key)
+        self.journal.change_status(cost,1,'deleted');self.journal.purge_record(cost,2,True)
+        self.journal.save_manual(key,1,dict(payload,actual_krw=4000))
+        with self.journal.connect() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM expenses WHERE record_id=?',(cost,)).fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT status FROM records WHERE id=?',(cost,)).fetchone()[0],'superseded')
+
     def test_photo_cleanup_queue_retries_after_restart(self):
         from unittest.mock import patch
         key=str(uuid4());self.journal.save_manual(key,0,{'kind':'expense','date':'2026-01-01','category':'other','actual_krw':100})
