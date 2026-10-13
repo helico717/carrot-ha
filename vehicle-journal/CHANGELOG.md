@@ -20,8 +20,9 @@
   - `vehicle-journal/CHANGELOG.md`: 작업 내역 및 배포 상태 기록.
 - 검증:
   - 구문 및 스타일 속성 검증 통과.
-  - HA 직접 배포 후 설치 파일 SHA-256 일치 확인.
-- 배포: 수정 커밋 main 푸시 완료. HA SSH 직접 동기화(`hassio@192.168.0.140:22`) 및 백업 적용 완료.
+  - HA 직접 배포 후 설치 파일 SHA-256 일치 확인 (`carrot-journal-design.js`: `7112e6ac...`, `carrot-vehicle-journal.js`: `f6087a9d...`).
+  - HA `frontend-version` API `0.8.14-beta.4-bbcbf66b1722` 정상 갱신 확인.
+- 배포: 수정 커밋 `0094220` main 푸시 완료. HA `/config/carrot_ha/deployment-backups/009422037ccc03dd6450cd0d6b5319da7da4159a/`에 백업 후 SSH 직접 반영 완료. 브라우저 새로고침(또는 패널 재진입)으로 즉시 적용 가능.
 
 ## 2026-10-13 — 차계부 카테고리 틴트 색상 복원, 주유 아이콘 교체, 모달 헤더 스크롤 마감 및 지도 최하단 배치
 
