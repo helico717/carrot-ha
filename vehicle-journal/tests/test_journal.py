@@ -23,6 +23,18 @@ class JournalTests(unittest.TestCase):
         self.archive=Archive(Path(self.tmp.name)/'archive.sqlite3')
         self.journal=Journal(Path(self.tmp.name)/'journal.sqlite3','entry','car','Asia/Seoul')
 
+    def test_manual_odometer_record_reloads_in_linked_vehicle_ledger_and_limits_photos(self):
+        key=str(uuid4());self.journal.save_manual(key,0,{'kind':'trip','date':'2026-01-01','odometer_km':123456.7})
+        result=self.journal.query('2026-01-01','2026-01-31',include_trips=False,expenses_only=True,manual_records=True)
+        record=next(r for r in result['records'] if r['id']==key)
+        self.assertEqual(record['odometer_km'],123456.7);self.assertEqual(record['kind'],'trip')
+        with self.journal.connect() as db:
+            photo=str(uuid4());db.execute('INSERT INTO attachments VALUES (?,?,?,?,?,?,?,?,?,?)',(self.journal.vehicle,photo,key,photo+'.png','synthetic.png','image/png',9,'a'*64,'active','2026-01-01'))
+        with self.assertRaises(sqlite3.IntegrityError):
+            with self.journal.connect() as db:
+                second=str(uuid4());db.execute('INSERT INTO attachments VALUES (?,?,?,?,?,?,?,?,?,?)',(self.journal.vehicle,second,key,second+'.png','synthetic.png','image/png',9,'b'*64,'active','2026-01-01'))
+        self.assertEqual(len(next(r for r in self.journal.query('2026-01-01','2026-01-31')['records'] if r['id']==key)['attachments']),1)
+
     def test_saved_photo_removal_is_owned_versioned_and_atomic(self):
         key,other=str(uuid4()),str(uuid4());photo,foreign=str(uuid4()),str(uuid4())
         payload={'kind':'expense','date':'2026-01-01','category':'maintenance','actual_krw':100}

@@ -1704,5 +1704,7 @@ export const journalDesign = `:host {
 @media(max-width:440px){#recordDialog .fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px}#recordDialog #dateField{grid-column:1 / -1}#recordDialog .fields>label:not(.fullfield):not(#dateField){display:grid;grid-template-rows:minmax(38px,auto) auto;align-content:start;line-height:1.45}#recordDialog .modal-header-row{padding:14px 16px}#recordDialog .modal-scroll-body{padding:16px}#recordDialog .loc-header-title-wrap{flex-wrap:wrap}#recordDialog .loc-summary-pill{max-width:100%}}
 
 .btn-record-purge{color:#ff8585!important;border-color:#704047!important}
+
+#recordDialog[data-mode=trip] #dateField,#recordDialog[data-mode=trip] #odometerField{grid-column:1 / -1}
 `;
 

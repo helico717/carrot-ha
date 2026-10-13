@@ -1,3 +1,12 @@
+## 2026-10-13 — 주행 기록 열기 오류 및 날짜·누적거리·사진 1장 전용 폼
+
+- 커밋 제목: vehicle-journal: fix trip entry and simplify odometer records
+- 변경·이유: 운영 브라우저에서 주행 기록 선택 시 읽기 전용 value 대입 오류가 발생해 선택창만 닫히는 것을 재현했다. 구간/누적거리 라디오 값 대입 경로를 제거하고 날짜·필수 숫자 누적거리·선택 사진 최대 1장만 표시한다. 메모·위치·구간거리 선택은 폼에서 숨기고 새 저장 요청에서 제외한다.
+- 조회: 연결 차량도 직접 입력한 주행 기록을 상세 목록에서 조회·수정·삭제할 수 있도록 capability 기반 조회 옵션을 추가한다. 자동 주행 원장은 이 목록에 섞지 않는다. 기존 서버는 새 옵션을 받지 않으며 새 서버 적용에는 HA 재시작이 필요하다.
+- 사진: 화면과 SQLite 첨부 추가/복원 트리거에서 주행 기록 최대 1장을 검증한다. 기존 구간 주행 기록 형식은 DB에서 보존하며, 사진 여러 장인 이전 기록은 편집 저장 전에 1장으로 정리해야 한다.
+- 관련 파일: frontend 카드·디자인, vehicle_journal API·store·schema.sql, `vehicle-journal/schema/001_initial.sql`, `vehicle-journal/tests/trip-record.cjs`, `test_journal.py`.
+- 검증·배포: Python 55개·스키마 9개 검증 통과. 합성 Chromium의 실제 주행 기록 선택 클릭·세 항목 노출·빈 누적거리 거부·사진 2장 거부·1장 업로드·저장 요청 검증 통과. DB의 연결 차량 수동 주행 재조회·누적거리 및 사진 1장 SQL 제한 검증 통과. 커밋·HA 반영 진행 중. 직접 배포하며 릴리즈·태그 발행 없음. 실제 사용자 주행 기록을 임의로 생성하지 않는다.
+
 ## 2026-10-13 — 기존 사진 수정 미리보기·저장 시 제거 및 2열 입력 높이 정렬
 
 - 커밋 제목: vehicle-journal: edit saved photo attachments and align compact fields

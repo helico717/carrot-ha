@@ -325,8 +325,8 @@ class Journal:
             raise ValueError('기록 필터를 확인해 주세요.')
         record_categories=sorted(set(record_categories or []))
         record_filter=" AND r.kind!='trip'" if not include_trips else ''
-        if expenses_only:record_filter=" AND r.kind='expense'"
-        elif manual_records:record_filter=" AND (r.kind='expense' OR (r.kind='trip' AND r.origin='manual'))"
+        if manual_records:record_filter=" AND (r.kind='expense' OR (r.kind='trip' AND r.origin='manual'))"
+        elif expenses_only:record_filter=" AND r.kind='expense'"
         time_order='COALESCE(e.accounting_date,m.started_at) DESC,r.id'
         record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
@@ -345,7 +345,7 @@ class Journal:
                 AND accounting_timezone=? AND day BETWEEN ? AND ? ORDER BY day''',
                 (self.vehicle,self.time_zone,start,end))]
             record_sql='''SELECT r.id,r.kind,r.origin,r.status,r.version,r.quality_json,r.extra_json,
-                m.started_at,m.ended_at,m.distance_km,m.drive_energy_kwh,m.battery_charge_kwh,m.billed_charge_kwh,
+                m.started_at,m.ended_at,m.odometer_km,m.distance_km,m.drive_energy_kwh,m.battery_charge_kwh,m.billed_charge_kwh,
                 COALESCE(m.charge_mode,(SELECT m2.charge_mode FROM expense_members em JOIN mobility m2 ON m2.vehicle_id=em.vehicle_id AND m2.record_id=em.charge_id WHERE em.vehicle_id=r.vehicle_id AND em.expense_id=r.id LIMIT 1)) AS charge_mode,
                 m.memo AS mobility_memo,e.accounting_date,e.category,e.subcategory,
                 e.actual_krw,e.estimated_krw,e.memo AS expense_memo,e.payment_owner,e.payment_id,e.payment_version
@@ -398,7 +398,7 @@ class Journal:
         for category,count in counts.items():
             cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})['count']=count
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'station_stats':station_stats,'efficiency_facts':efficiency_facts,'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'manual_trip_records_supported':True,'station_stats':station_stats,'efficiency_facts':efficiency_facts,'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 
@@ -462,6 +462,7 @@ class Journal:
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
             if 'location' in payload:extra['location']=payload['location']
             db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
+            if kind=='trip' and db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]>1:raise ValueError('주행 기록 사진은 최대 1장이에요.')
             if kind=='expense':
                 count=db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]
                 if data.get('category')!='accident' and count>5:raise ValueError('사진이 5장을 초과하는 사고 기록의 분류는 바꿀 수 없어요.')

@@ -30,7 +30,7 @@ const recordTypeDescs={
   refueling:'주유 금액 · 주유량(L) · 단가 · 주유소 위치',
   maintenance:'소모품 교체 · 튜닝 · 보험 · 세금 · 통행료 등',
   washing:'세차비 · 계기판 누적거리 · 세차장 위치',
-  trip:'구간 주행거리(km) · 계기판 누적거리 입력',
+  trip:'날짜 · 계기판 누적거리 · 사진 1장',
   accident:'사고 수리비 · 현장 및 수리 사진 최대 10장',
   receipt:'카메라로 영수증 촬영 및 자동 입력'
 };
@@ -285,11 +285,12 @@ export class VehicleJournal extends HTMLElement {
       const month=this.$('month')?.value;const range=this.range();if(!range)throw new Error('기록 기간을 골라 주세요.');const scope=this.scope;
       const selectedEntry=this.entry,selectedOffset=this.offset,selectedFilters=this.ledgerFilterKey();
       const manualVehicle=this.entries.find(e=>e.entry_id===this.entry)?.linked===false;
-      const filterParams=this.recordFiltersSupported?{include_trips:manualVehicle,expenses_only:!manualVehicle,record_sort:this.recordSort,record_categories:[...this.recordCategories]}:{};
+      const filterParams=this.recordFiltersSupported?{include_trips:manualVehicle,expenses_only:!manualVehicle,record_sort:this.recordSort,record_categories:[...this.recordCategories],...(this.manualTripRecordsSupported?{include_manual_trips:true}:{})}:{};
       const [data,previous]=await Promise.all([this.call('query',{from:range.from,to:range.to,offset:selectedOffset,...filterParams}),this.call('query',{from:range.previousFrom,to:range.previousTo,offset:0}).catch(()=>null)]);
       data.previous=previous;
       if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month')?.value!==month||this.scope!==scope||this.ledgerFilterKey()!==selectedFilters)return;
       if(data.expense_category_groups_supported&&!this.recordFiltersSupported){this.recordFiltersSupported=true;this.reloadPending=true;}
+      if(data.manual_trip_records_supported&&!this.manualTripRecordsSupported){this.manualTripRecordsSupported=true;this.reloadPending=true;}
       this.data=data;preserveView(this,()=>this.renderData());this.dispatchEvent(new Event('journal-rendered'));
     }catch(error){
       if(this.$('message')){
@@ -603,7 +604,7 @@ export class VehicleJournal extends HTMLElement {
     this.renderSpendingComparison();
     this.updateLedgerFilters();
     const manualVehicle=this.entries.find(e=>e.entry_id===this.entry)?.linked===false;
-    const visibleRecords=d.records.filter(r=>(r.kind==='expense'||(manualVehicle&&r.kind==='trip'&&r.origin==='manual'))&&(!this.recordCategories.size||this.recordCategories.has(this.recordCategory(r))));
+    const visibleRecords=d.records.filter(r=>(r.kind==='expense'||(r.kind==='trip'&&r.origin==='manual'))&&(!this.recordCategories.size||this.recordCategories.has(this.recordCategory(r))));
     if(this.recordSort!=='time')visibleRecords.sort((a,b)=>{const av=a.actual_krw??a.estimated_krw,bv=b.actual_krw??b.estimated_krw;return av==null?(bv==null?0:1):bv==null?-1:(av-bv)*(this.recordSort==='amount_desc'?-1:1);});
     this.$('records').innerHTML=visibleRecords.map(r=>{
       const hasPhotos=r.attachments?.length>0;
@@ -1105,22 +1106,23 @@ export class VehicleJournal extends HTMLElement {
     if(mode==='washing')visible.add('odometerField');
     if(mode==='refueling')for(const id of ['odometerField','fuelTypeField','unitPriceField','fuelLitersField','tankModeField','washCostField'])visible.add(id);
     if(mode==='charging')for(const id of ['odometerField','billedField','unitPriceField'])visible.add(id);
-    if(mode==='trip'){visible.add('driveModeField');visible.add(form.elements.distance_mode.value==='distance'?'distanceField':'odometerField');}
+    if(mode==='trip'){visible.clear();for(const id of ['dateField','odometerField','recordPhotoField'])visible.add(id);}
     if(kind==='charge')for(const id of ['chargeField','modeField','billedField','startField','endField','socStartField','socEndField'])visible.add(id);
-    for(const id of ['categoryField','subcategoryField','amountField','recordLocationField','odometerField','distanceField','energyField','chargeField','modeField','billedField','startField','endField','socStartField','socEndField','driveModeField','fuelTypeField','unitPriceField','fuelLitersField','tankModeField','washCostField']){const field=this.$(id);field.hidden=!visible.has(id);for(const control of field.querySelectorAll('input:not([type=file]),select,textarea'))control.disabled=field.hidden;}
+    for(const id of ['memoField','recordPhotoField','importSourceDetails','categoryField','subcategoryField','amountField','recordLocationField','odometerField','distanceField','energyField','chargeField','modeField','billedField','startField','endField','socStartField','socEndField','driveModeField','fuelTypeField','unitPriceField','fuelLitersField','tankModeField','washCostField']){const field=this.$(id);field.hidden=!visible.has(id);for(const control of field.querySelectorAll('input:not([type=file]),select,textarea'))control.disabled=field.hidden;}
+    form.elements.odometer_km.required=mode==='trip';this.$('odometerField').childNodes[0].textContent=mode==='trip'?'계기판 누적거리 · km':'계기판 누적거리 · km (선택)';
     form.elements.fuel_type.required=mode==='refueling';this.$('actualKrw').required=!['trip','accident'].includes(mode);this.$('amountField').childNodes[0].textContent={refueling:'주유금액 · 원',charging:'충전금액 · 원',washing:'세차비 · 원',accident:'사고 처리 금액 · 원 (선택)'}[mode]||'실제 금액 · 원';
     this.$('billedField').childNodes[0].textContent='청구 충전량 · kWh';
     const container=form.querySelector('.fields');this.originalFieldOrder=this.originalFieldOrder||[...container.children];for(const node of this.originalFieldOrder)container.append(node);
     if(dedicated){const order=mode==='refueling'?['dateField','odometerField','fuelTypeField','unitPriceField','amountField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails']:['dateField','odometerField','amountField','billedField','unitPriceField','fuelTypeField','fuelLitersField','tankModeField','washCostField','driveModeField','distanceField',...(mode==='accident'?['recordPhotoField']:[]),'memoField',...(mode!=='accident'?['recordPhotoField']:[]),'recordLocationField','importSourceDetails'];for(const id of order){const node=this.$(id);if(node)container.append(node);}}
     if(mode==='trip'){container.append(this.$('memoField'),this.$('recordPhotoField'),this.$('recordLocationField'));}
-    this.$('recordPhotoField').querySelector('small').textContent=`사진당 20MiB 이하, 최대 ${mode==='accident'?10:5}장. 저장할 때 축소·압축해요.`;
+    this.$('recordPhotoField').querySelector('small').textContent=`사진당 20MiB 이하, 최대 ${mode==='trip'?1:mode==='accident'?10:5}장. 저장할 때 축소·압축해요.`;
     this.updateSaveButtonVisibility();
   }
   renderSelectedPhotos(){
     for(const url of this.photoURLs||[])URL.revokeObjectURL(url);
     this.photoURLs=[];this.$('photoPreview').replaceChildren();const generation=this.photoPreviewGeneration=(this.photoPreviewGeneration||0)+1;
     const existing=(this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id));
-    this.$('photoCount').textContent=`${(this.selectedPhotos?.length||0)+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)}/${this.recordMode==='accident'?10:5}`;
+    this.$('photoCount').textContent=`${(this.selectedPhotos?.length||0)+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)}/${this.recordMode==='trip'?1:this.recordMode==='accident'?10:5}`;
     this.$('clearPhotos').hidden=!this.selectedPhotos?.length;
     this.$('recordError').textContent='';
     for(const photo of existing){
@@ -1155,9 +1157,9 @@ export class VehicleJournal extends HTMLElement {
     const fields=record?.import_source?.fields||{};for(const [source,target] of Object.entries({'주유량':'fuel_liters','단가':'unit_price_krw','누적주행거리':'odometer_km','충전량':'billed_charge_kwh'})){if(fields[source]!==undefined&&!form.elements[target].value)form.elements[target].value=String(fields[source]).replaceAll(',','');}
     if(record?.input?.full_tank===false||String(fields['구분']||'').includes('부분'))form.elements.tank_mode.value='partial';
     const vehicleFuel=this.entries.find(e=>e.entry_id===this.entry)?.fuel;form.elements.fuel_type.value=record?.input?.fuel_type||(['gasoline','diesel'].includes(vehicleFuel)?vehicleFuel:'');
-    if(this.recordMode==='trip')form.elements.distance_mode.value=record?.input?.distance_km!=null&&record?.input?.odometer_km==null?'distance':'odometer';
+
     this.$('dialogTitle').textContent={washing:'세차 기록',accident:'사고 기록',trip:'주행 기록',refueling:'주유 기록',charging:'충전 기록',maintenance:'정비/기타 기록'}[this.recordMode];
-    this.$('importSourceDetails').hidden=!record?.import_source;this.$('importSourceFields').innerHTML=Object.entries(record?.import_source?.fields||{}).map(([key,value])=>`<div class="list-row"><span>${esc(key)}</span><span>${['금액','단가'].includes(key)&&value!==''?money(Number(String(value).replaceAll(',',''))):esc(value===''?'미입력':value)}</span></div>`).join('');this.formFields();this.renderSelectedPhotos();this.$('recordDialog').showModal();this.renderLocation();if(!record&&['refueling','charging'].includes(this.recordMode)&&this.automaticLocations!==false)this.autoSelectStation();
+    this.$('importSourceDetails').hidden=!record?.import_source;this.$('importSourceFields').innerHTML=Object.entries(record?.import_source?.fields||{}).map(([key,value])=>`<div class="list-row"><span>${esc(key)}</span><span>${['금액','단가'].includes(key)&&value!==''?money(Number(String(value).replaceAll(',',''))):esc(value===''?'미입력':value)}</span></div>`).join('');this.formFields();this.renderSelectedPhotos();this.$('recordDialog').showModal();if(this.recordMode!=='trip')this.renderLocation();if(!record&&['refueling','charging'].includes(this.recordMode)&&this.automaticLocations!==false)this.autoSelectStation();
   }
   async saveRecord(event){
     event.preventDefault();if(this.draftLocation)this.draftLocation={...this.draftLocation,name:this.$('locationName').value.trim()};const form=this.$('recordForm'),payload={kind:this.$('kind').value||'expense',date:form.elements.date.value,memo:form.elements.memo.value,location:this.draftLocation&&(this.draftLocation.name||this.draftLocation.latitude!=null)?this.draftLocation:null};
@@ -1165,12 +1167,12 @@ export class VehicleJournal extends HTMLElement {
     if(payload.kind==='expense'){payload.category=['refueling','charging','washing','accident'].includes(this.recordMode)?this.recordMode:form.elements.category.value;payload.subcategory=form.elements.subcategory.value;}
     if(this.recordMode==='refueling'){for(const key of ['fuel_liters','unit_price_krw','wash_cost_krw']){const raw=form.elements[key].value.replaceAll(',','');if(raw!=='')payload[key]=Number(raw);}payload.fuel_quantity_source=this.fuelQuantitySource||'reported';payload.unit_price_source=this.unitPriceSource||'manual';if(this.unitPriceSource==='opinet'&&this.unitPriceObserved)payload.unit_price_observed_at=this.unitPriceObserved;payload.full_tank=form.elements.tank_mode.value==='full';payload.fuel_type=form.elements.fuel_type.value;}
     if(this.recordMode==='charging'){for(const key of ['billed_charge_kwh','unit_price_krw']){const raw=form.elements[key].value.replaceAll(',','');if(raw!=='')payload[key]=Number(raw);}}
-    if(this.recordMode==='trip'){if(form.elements.distance_mode.value==='distance'){delete payload.odometer_km;if(form.elements.distance_km.value!=='')payload.distance_km=Number(form.elements.distance_km.value);}else delete payload.distance_km;}
+    if(this.recordMode==='trip'){delete payload.distance_km;delete payload.location;delete payload.memo;}
     const rawAmt=form.elements.actual_krw?.value?.replace(/[^\d]/g,'');
     if(rawAmt)payload.actual_krw=Number(rawAmt);
     if(payload.kind!=='expense')for(const field of ['distance_km','drive_energy_kwh','battery_charge_kwh','billed_charge_kwh','odometer_km','soc_start_percent','soc_end_percent','started_at','ended_at','charge_mode']){const value=form.elements[field]?.value;if(value!==undefined&&value!==''&&!form.elements[field].closest('[hidden]'))payload[field]=['started_at','ended_at','charge_mode'].includes(field)?(field==='charge_mode'?value:new Date(value).toISOString()):Number(value);}
     if(this.removedPhotoIds?.size)payload.remove_attachment_ids=[...this.removedPhotoIds];
-    const photos=[...(this.selectedPhotos||[])],photoLimit=this.recordMode==='accident'?10:5;if(photos.length+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)>photoLimit||photos.some(f=>!f.size||f.size>20*1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent=`20MiB 이하 JPG·PNG·WEBP 사진을 최대 ${photoLimit}장 골라 주세요.`;return;}
+    const photos=[...(this.selectedPhotos||[])],photoLimit=this.recordMode==='trip'?1:this.recordMode==='accident'?10:5;if(photos.length+((this.editing?.attachments||[]).filter(p=>!this.removedPhotoIds?.has(p.id)).length)>photoLimit||photos.some(f=>!f.size||f.size>20*1024*1024||!['image/jpeg','image/png','image/webp'].includes(f.type))){this.$('recordError').textContent=`20MiB 이하 JPG·PNG·WEBP 사진을 최대 ${photoLimit}장 골라 주세요.`;return;}
     const saveBtn=this.$('save'),fill=saveBtn.querySelector('.progress-fill'),label=saveBtn.querySelector('.btn-label')||saveBtn;
     saveBtn.disabled=true;saveBtn.classList.add('loading');
     const updateProgress=(text,pct)=>{

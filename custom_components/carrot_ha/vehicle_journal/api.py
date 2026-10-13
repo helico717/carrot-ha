@@ -72,13 +72,13 @@ async def user_default_set(hass,connection,msg):
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/query',vol.Required('entry_id'):str,
     vol.Required('from'):str,vol.Required('to'):str,vol.Optional('offset',default=0):int,
-    vol.Optional('include_trips',default=True):bool,vol.Optional('record_categories',default=[]):[str],vol.Optional('expenses_only',default=False):bool,vol.Optional('record_sort',default='time'):vol.In(['time','amount_desc','amount_asc'])})
+    vol.Optional('include_trips',default=True):bool,vol.Optional('record_categories',default=[]):[str],vol.Optional('expenses_only',default=False):bool,vol.Optional('include_manual_trips',default=False):bool,vol.Optional('record_sort',default='time'):vol.In(['time','amount_desc','amount_asc'])})
 @websocket_api.async_response
 async def query(hass,connection,msg):
     r=runtime(hass,connection,msg)
     if r:
         try:
-            result=await hass.async_add_executor_job(r['journal'].query,msg['from'],msg['to'],100,msg['offset'],msg['include_trips'],msg['record_categories'],msg['expenses_only'],msg['record_sort'],bool(r.get('manual_vehicle')))
+            result=await hass.async_add_executor_job(r['journal'].query,msg['from'],msg['to'],100,msg['offset'],msg['include_trips'],msg['record_categories'],msg['expenses_only'],msg['record_sort'],bool(r.get('manual_vehicle') or msg.get('include_manual_trips')))
             from ..vehicle import values
             live={} if r.get('manual_vehicle') else values(r)
             if r.get('manual_vehicle'):result['status']={'phase':'complete','manual':True}

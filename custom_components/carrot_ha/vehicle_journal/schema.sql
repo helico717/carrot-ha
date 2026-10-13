@@ -146,11 +146,11 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS attachments_record ON attachments(vehicle_id,record_id,status);
 DROP TRIGGER IF EXISTS attachments_limit_insert;
 CREATE TRIGGER attachments_limit_insert BEFORE INSERT ON attachments
-WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active') >= CASE WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
+WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active') >= CASE WHEN (SELECT kind FROM records WHERE vehicle_id=NEW.vehicle_id AND id=NEW.record_id)='trip' THEN 1 WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
 BEGIN SELECT RAISE(ABORT,'maximum active attachments exceeded'); END;
 DROP TRIGGER IF EXISTS attachments_limit_update;
 CREATE TRIGGER attachments_limit_update BEFORE UPDATE OF status,vehicle_id,record_id ON attachments
-WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active' AND NOT (vehicle_id=OLD.vehicle_id AND id=OLD.id)) >= CASE WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
+WHEN NEW.status = 'active' AND (SELECT COUNT(*) FROM attachments WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id AND status='active' AND NOT (vehicle_id=OLD.vehicle_id AND id=OLD.id)) >= CASE WHEN (SELECT kind FROM records WHERE vehicle_id=NEW.vehicle_id AND id=NEW.record_id)='trip' THEN 1 WHEN (SELECT category FROM expenses WHERE vehicle_id=NEW.vehicle_id AND record_id=NEW.record_id)='accident' THEN 10 ELSE 5 END
 BEGIN SELECT RAISE(ABORT,'maximum active attachments exceeded'); END;
 -- Daily contributions retain allocation evidence after raw telemetry is purged.
 CREATE TABLE IF NOT EXISTS day_parts (
