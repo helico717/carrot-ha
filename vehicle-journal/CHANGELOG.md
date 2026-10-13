@@ -27,7 +27,7 @@
   - `node --check` 구문 검사 통과 (`carrot-vehicle-journal.js`, `carrot-journal-design.js`).
   - `vehicle-journal/schema/validate_schema.py` 통과.
   - 모바일 조작 및 인터랙션 시뮬레이션 검토 파일(`review-record-ui.html`) 사용자 검토 승인 완료.
-- 배포: Git 커밋 및 main 푸시, HA 서버 직접 동기화(`hassio@192.168.0.140:22`) 및 SHA-256 검증 완료.
+- 배포: 수정 커밋 `062adde` main 푸시 완료. HA `/config/carrot_ha/deployment-backups/062adde407d1d1d99e2d0eca64137c5e58b1488c/`에 백업 후 SSH 직접 반영 완료. 로컬 및 HA 설치 파일 SHA-256 일치 (`carrot-journal-design.js`: `f486b143...`, `carrot-vehicle-journal.js`: `9a913bc2...`). frontend-version API `0.8.14-beta.4-0d08c2294056` 갱신 확인. 브라우저 새로고침(또는 패널 재진입)으로 즉시 적용 가능.
 
 ## 2026-10-13 — 차계부 설정 창 모바일 상·하·좌·우 여백 및 Safe Area Inset 복원
 
