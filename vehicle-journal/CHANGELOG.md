@@ -1,3 +1,20 @@
+## 2026-10-13 — 주유 영수증 촬영·앨범 선택 팝업 추가 및 파일 입력 분리
+
+- 커밋 제목: vehicle-journal: add receipt source modal and separate camera and album inputs
+- 변경·이유:
+  - 신규 선택 팝업: ‘주유 영수증 촬영’ 메뉴 선택 시 카메라나 파일 선택기를 즉시 열지 않고 “주유 영수증을 어떻게 올리시겠어요?” 질문 팝업(`#receiptSourceDialog`)을 먼저 노출하도록 변경했다.
+  - 버튼 레이아웃 및 그래픽: 왼쪽 “직접 촬영할게요”(카메라 SVG 아이콘)와 오른쪽 “앨범에서 선택할게요”(앨범 SVG 아이콘)를 나란히 배치했다. 이모티콘이나 문자 기호 대신 기존 차계부 기록 메뉴와 일치하는 24×24 stroke 2.2 스타일의 정제된 벡터 아이콘을 적용했다.
+  - 환경별 동작 및 입력 분리:
+    - 촬영 전용 input(`#receiptCameraInput`): `capture="environment"` 속성으로 모바일 환경(iPhone Safari, Android Chrome)에서 후면 카메라 직접 촬영을 요청한다.
+    - 앨범 전용 input(`#receiptAlbumInput`): `capture` 속성을 제거하여 사진 보관함/파일 선택창을 호출한다.
+    - 데스크톱 환경에서는 두 버튼 모두 표준 단일 파일 선택창을 안전하게 연다.
+    - 두 입력 모두 `multiple` 속성 없이 1장의 영수증 사진만 선택할 수 있도록 제한했다.
+    - 파일 선택 시작 전 및 완료 시 `input.value = ''`로 초기화하여 동일한 사진을 다시 선택해도 `change` 이벤트 및 OCR이 정상 재실행되도록 보장했다.
+  - 기존 OCR 파이프라인 연계: 촬영과 앨범 선택 모두 사진 선택 즉시 동일한 영수증 OCR 처리 경로(`handleReceiptPhoto`)로 진입하며, 전체 팝업 진행 화면(`#receiptOcrOverlay`), 3단계 요체 안내, 필드별 자동입력 하이라이트, 사용자 확인·수정 및 수동 저장 흐름을 동일하게 유지한다. 선택 취소 시 빈 기록 저장이나 OCR을 실행하지 않는다.
+  - HA Android 앱 제한(이슈 #6055): Android Chrome에서는 카메라가 즉시 실행되나, Home Assistant Android 공식 앱은 WebView 파일 피커 인텐트 구현 한계로 인해 `capture="environment"` 지정 시에도 시스템 사진 선택창이 열릴 수 있음을 확인하고, 두 경로를 분리된 요소로 격리하여 안전성을 확보했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 18개, 다이얼로그 마크업·CSS 어설션 테스트 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 영수증 OCR 날짜 오인식 방지, 다중 행 주소 연결 제한 및 엄격한 장소 매칭
 
 - 커밋 제목: vehicle-journal: prevent date false positives and restrict multiline address matching
