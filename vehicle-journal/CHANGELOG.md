@@ -1,3 +1,26 @@
+## 2026-10-13 — 상세기록 탭 내 중복 '기록 남기기' 버튼 삭제 및 분류 선택 하단 여백 제거
+
+- 커밋 제목: vehicle-journal: remove redundant ledger add button and eliminate whitespace under category filter
+- 변경·이유:
+  - 상세기록 탭(`#page3`) 내 중복 '기록 남기기' 버튼 삭제:
+    - 어느 탭에서든 상단에 항상 노출되는 공통 `+ 기록 남기기` 버튼이 이미 존재하므로, 상세기록 탭 내부 카드에 별도로 들어간 `<button id="addLedger" class="btn-record-primary">＋ 기록 남기기</button>` 버튼을 삭제했다.
+    - 패널 제목을 `<div class="ledger-panel-header"><h2>차량 지출 내역이에요.</h2></div>`로 정리하고 불필요한 이벤트 바인딩 배열에서 `addLedger`를 제거했다.
+  - '분류 선택' 버튼과 하단 기록 목록 사이 빈 공간 완전 제거:
+    - 원인:
+      1) `.ledger-filters`의 하단 마진(`margin: 16px 0 20px;`) 20px.
+      2) `.table-wrap`(`overflow: auto/visible`)과의 마진 미상쇄 및 `.table`/`.ledger-table`의 상단 마진(`margin-top: 15px/8px`).
+      3) 모바일 환경(`@media(max-width:760px)`)에서 thead의 유일한 표시 요소인 `#ledgerAmountHeader`(`금액 · 시간순`)가 우측 정렬된 상태에서 `padding: 8px 0`을 차지하고, 첫 번째 행(`tbody tr`)이 `padding: 18px 0`을 가지며 좌측 `분류 선택` 버튼 바로 아래에 70px 이상의 거대한 빈 공간이 형성되던 문제.
+    - 조치:
+      1) `.ledger-filters`: `margin: 12px 0 0;`으로 하단 마진 20px을 제거.
+      2) `.ledger-dropdown:not([open]) .ledger-category-filters`: `display: none !important;`를 명시하여 닫힌 상태에서 레이아웃 공간 차지 방지.
+      3) `#page3 .table-wrap`: `margin-top: 4px;`로 컴팩트하게 밀착.
+      4) `#page3 .ledger-table`: `margin-top: 0 !important;`로 상단 기본 마진 무효화.
+      5) 데스크톱 `.ledger-table th`: 패딩을 `8px 6px`로 정돈.
+      6) 모바일 `#page3 .ledger-table thead tr`: `margin-bottom: 0;` 및 `#ledgerAmountHeader` 패딩을 `2px 0 4px`, `line-height: 1.2`로 축소.
+      7) 모바일 `#page3 .ledger-table tbody tr:first-child`: 첫 행 상단 패딩을 `6px`로 줄여 `금액 · 시간순` 바로 아래에 첫 기록이 군더더기 없이 이어지도록 최적화.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-journal-design.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, 본 변경 기록.
+- 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 20개 테스트 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 사진 업로드 대기 전용 팝업 추가, 대시보드 복귀 취소 버튼 및 주유소 위치 자동 반영 보완
 
 - 커밋 제목: vehicle-journal: add receipt waiting modal with cancel button and fix auto station location apply

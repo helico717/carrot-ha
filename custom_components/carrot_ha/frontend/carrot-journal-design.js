@@ -1169,22 +1169,26 @@ export const journalDesign = `:host {
     }
 
     /* 관리 열 버튼 정렬 (사진 N장, 수정, 삭제) */
-    .ledger-table{table-layout:fixed;min-width:760px}
+    .ledger-table{table-layout:fixed;min-width:760px;margin-top:0 !important}
     .ledger-date-col{width:14%}.ledger-memo-col{width:49%}.ledger-value-col{width:13%}.ledger-actions-col{width:24%}
+    .ledger-table th{padding:8px 6px}
     .ledger-table td{overflow-wrap:anywhere;vertical-align:middle}
     .ledger-table .memo-text-col{min-width:0}
+    #page3 .table-wrap{margin-top:4px}
+    #page3 .ledger-table{margin-top:0 !important}
     #page3 .ledger-table td:last-child{white-space:normal}
     .ledger-table .btn-table-action{margin-bottom:4px}
     @media(max-width:760px){
-      #page3 .table-wrap{overflow:visible}
-      #page3 .ledger-table{display:block;min-width:0;table-layout:auto;margin-top:8px}
+      #page3 .table-wrap{overflow:visible;margin-top:4px}
+      #page3 .ledger-table{display:block;min-width:0;table-layout:auto;margin-top:0 !important}
       #page3 .ledger-table colgroup{display:none}
       #page3 .ledger-table thead{display:block}
-      #page3 .ledger-table thead tr{display:flex;justify-content:flex-end}
+      #page3 .ledger-table thead tr{display:flex;justify-content:flex-end;margin-bottom:0}
       #page3 .ledger-table thead th{display:none}
-      #page3 .ledger-table thead #ledgerAmountHeader{display:block;padding:8px 0;font-size:12px;border:0}
+      #page3 .ledger-table thead #ledgerAmountHeader{display:block;padding:2px 0 4px;font-size:12px;border:0;line-height:1.2}
       #page3 .ledger-table tbody{display:block}
       #page3 .ledger-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'memo amount' 'date date' 'actions actions';gap:8px 12px;padding:18px 0;border-bottom:1px solid var(--j-border)}
+      #page3 .ledger-table tbody tr:first-child{padding-top:6px}
       #page3 .ledger-table td{display:block;padding:0;border:0;min-width:0}
       #page3 .ledger-table td:nth-child(1){grid-area:date;font-size:12px;color:var(--j-sub)}
       #page3 .ledger-table td:nth-child(1) small{display:inline;margin-left:6px}
@@ -1243,8 +1247,11 @@ export const journalDesign = `:host {
     .fuel-switch{display:flex;gap:4px;margin-left:auto}.fuel-switch .active{background:var(--j-accent);color:#102c24}
     .savings-controls .settings{margin-top:20px}.savings-controls summary{cursor:pointer;color:var(--j-accent)}
     .cost-bar{height:14px;background:#263844;border-radius:5px;overflow:hidden;margin:10px 0 24px}.cost-bar:last-child{margin-bottom:0}.cost-bar span{display:block;height:100%;background:#81e6c5}.cost-bar.orange span{background:#ffb76b}.savings-bars .mint{color:#81e6c5}.savings-bars .orange{color:#ffb76b}
-    .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:16px 0 20px}
+    .ledger-panel-header{margin-bottom:0}
+    .ledger-panel-header h2{margin:0;font-size:20px;font-weight:750}
+    .ledger-filters{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;margin:12px 0 0}
     .ledger-dropdown{position:relative;max-width:100%}
+    .ledger-dropdown:not([open]) .ledger-category-filters{display:none !important}
     .ledger-dropdown summary{cursor:pointer;min-height:34px;box-sizing:border-box;padding:4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650}
     #ledgerFilterSummary{margin-left:8px;color:var(--j-accent);font-size:13px}
     .ledger-category-filters{position:absolute;left:0;top:calc(100% + 6px);z-index:10;display:grid;grid-template-columns:1fr 1fr;gap:4px;width:260px;max-width:calc(100vw - 72px);padding:10px;box-sizing:border-box;border:1px solid var(--j-border);border-radius:12px;background:var(--j-surface);box-shadow:0 12px 30px #0008}
