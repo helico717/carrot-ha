@@ -1,3 +1,10 @@
+## 2026-10-13 — 주유 영수증 OCR 코어 에셋 보완 및 도로명 번호 정규화
+
+- 커밋 제목: vehicle-journal: bundle tesseract core glue assets and normalize address digits
+- 변경·이유: Tesseract.js Web Worker는 원시 `.wasm`이 아닌 Emscripten JS 글루 파일(`tesseract-core-simd-lstm.wasm.js`, `tesseract-core-lstm.wasm.js`)을 `importScripts`로 로드하므로, 코어 JS 에셋을 로컬 번들에 추가하고 `corePath` 디렉토리 경로 전달을 수정했다. 또한 감열지 영수증 폰트에서 도로명 뒤 건물번호 1이 파이프(`|`) 또는 영문(`l`/`I`)으로 인식되는 문제를 정규화했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-receipt-ocr.js`, `custom_components/carrot_ha/frontend/carrot-assets/tesseract/tesseract-core-simd-lstm.wasm.js`, `custom_components/carrot_ha/frontend/carrot-assets/tesseract/tesseract-core-lstm.wasm.js`, 본 변경 기록.
+- 검증·배포: 사용자 실제 영수증 사진(`KakaoTalk_Photo_2026-10-13-19-56-23.jpeg`)을 헤드리스 Google Chrome에서 직접 구동하여 날짜(2026-05-22), 유종(고급휘발유), 단가(2,445원), 수량(28.630L), 금액(70,000원), 주유소(직영 9 청계주유소), 주소(경기도 의왕시 민백길 1), 삼각 일관성 통과를 E2E로 확인. Python 55개, 스키마 9개, JSC 파서 9개 검증 통과. HA 직접 반영 및 SHA-256 일치 확인. 릴리즈 발행 없음.
+
 ## 2026-10-13 — 주유 영수증 촬영·OCR 인식 및 자동 입력 UI 구현
 
 - 커밋 제목: vehicle-journal: implement fuel receipt OCR and auto-fill UI

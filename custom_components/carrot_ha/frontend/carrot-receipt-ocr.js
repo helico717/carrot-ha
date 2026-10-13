@@ -134,8 +134,11 @@ export function extractStationLocation(text) {
   let fallbackName = null;
   for (const line of lines) {
     // Strip noise tokens within line rather than skipping line entirely
-    const cleanLine = line.replace(/\[(?:BIZ_NO|CARD_NO|TEL_NO|CODE_NO|BARCODE)\]/g, ' ').trim();
+    let cleanLine = line.replace(/\[(?:BIZ_NO|CARD_NO|TEL_NO|CODE_NO|BARCODE)\]/g, ' ').trim();
     if (!cleanLine) continue;
+
+    // Normalize OCR misread of '1' as '|', 'l', or 'I' immediately following road name
+    cleanLine = cleanLine.replace(/([가-힣]+(?:로|길)\s*)[|lI](\s|$|\()/g, '$11$2');
 
     // Specific station pattern (e.g. SKE 청계주유소, 직영 삼거리주유소)
     const specificMatch = /(?:직영\s*)?([가-힣A-Za-z0-9\s]{2,25}(?:주유소|충전소))/i.exec(cleanLine);
@@ -394,7 +397,7 @@ export async function runReceiptOcr(file, assetBase, onProgress, abortSignal) {
 
   const tesseractBase = new URL('tesseract/', assetBase).href;
   const workerPath = new URL('worker.min.js', tesseractBase).href;
-  const corePath = new URL('tesseract-core-simd-lstm.wasm', tesseractBase).href;
+  const corePath = tesseractBase;
   const langPath = new URL('lang/', tesseractBase).href;
 
   let worker = null;
