@@ -2,6 +2,7 @@
 from datetime import timedelta
 import json
 import time
+import math
 from .store import stamp,encode,now
 from .stations import coordinates
 from ..archive_codec import loads
@@ -28,8 +29,18 @@ def position(archive,journal,started):
         data=loads(body).get('data',{});gps=data.get('gps') or {};lat,lon=gps.get('latitude'),gps.get('longitude')
         try:coordinates(lat,lon)
         except ValueError:continue
-        if gps.get('accuracyM') is not None and (not isinstance(gps['accuracyM'],(int,float)) or gps['accuracyM']>100):continue
-        candidates.append((abs((stamp(observed)-start).total_seconds()),{'latitude':lat,'longitude':lon,'observed_at':observed,'basis':'charge_start_nearest_state'}))
+        accuracy=gps.get('accuracyM')
+        if accuracy is not None and (type(accuracy) not in (int,float) or not math.isfinite(accuracy) or not 0<=accuracy<=100):continue
+        measured=gps.get('measured_at') or (data.get('field_measured_at') or {}).get('gps')
+        if not measured or gps.get('fresh') is False or data.get('onroad') is True:continue
+        try:
+            measurement=stamp(measured);receipt=stamp(observed)
+            if abs((measurement-receipt).total_seconds())>60 or abs((measurement-start).total_seconds())>120:continue
+            speed=gps.get('speedMps')
+            if speed is not None and (type(speed) not in (int,float) or not math.isfinite(speed) or speed>1):continue
+        except (ValueError,TypeError):continue
+        candidates.append((abs((measurement-start).total_seconds()),{'latitude':lat,'longitude':lon,'observed_at':observed,'gps_measured_at':measured,'accuracy_m':accuracy,'basis':'charge_start_fresh_stationary_gps'}))
+
     return min(candidates,key=lambda p:p[0])[1] if candidates else None
 
 
@@ -67,8 +78,8 @@ def propagate(journal):
 async def enrich(hass,manager,archive,journal):
     if not manager.automatic_locations or not manager.kakao_rest_key:return
     for item in await hass.async_add_executor_job(pending,journal):
-        point=item[2].get('source_position') or await hass.async_add_executor_job(position,archive,journal,item[3])
-        selected=None;message='충전 시점 GPS가 없어 장소를 자동 선택하지 않았어요.'
+        point=await hass.async_add_executor_job(position,archive,journal,item[3])
+        selected=None;message='충전 시작 2분 이내의 신선한 정차 GPS가 없어 장소를 자동 선택하지 않았어요.'
         if point:
             try:
                 result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']

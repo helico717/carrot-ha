@@ -14,6 +14,12 @@ def coordinates(lat,lon):
     if type(lat)not in (int,float) or type(lon)not in (int,float) or not math.isfinite(lat) or not math.isfinite(lon) or not -90<=lat<=90 or not -180<=lon<=180:raise ValueError('위치 좌표를 확인해 주세요.')
 
 
+def distance_m(lat,lon,other_lat,other_lon):
+    a,b=math.radians(lat),math.radians(other_lat)
+    h=math.sin((b-a)/2)**2+math.cos(a)*math.cos(b)*math.sin(math.radians(other_lon-lon)/2)**2
+    return 6371000*2*math.asin(min(1,math.sqrt(h)))
+
+
 class Stations:
     def __init__(self,manager):self.manager=manager;self.cache={};self.lock=asyncio.Lock();self.requests=0;self.day=''
     async def get(self,service,path,params):
@@ -58,10 +64,17 @@ class Stations:
         if kind not in ('charging','refueling'):raise ValueError('장소 종류를 확인해 주세요.')
         result=[];observed=datetime.now(timezone.utc).isoformat()
         if kind=='charging':
-            response=await self.cached(('chargers',round(lat,5),round(lon,5)),'kakao','search/keyword.json',{'query':'전기차 충전소','x':lon,'y':lat,'radius':2000,'sort':'distance','size':15})
-            for place in response.get('documents',[])[:15]:
-                a,b=float(place['y']),float(place['x']);coordinates(a,b)
-                result.append({'location':{'name':place['place_name'][:200],'address':(place.get('road_address_name') or place.get('address_name',''))[:300],'latitude':a,'longitude':b,'provider':'kakao','station_id':str(place['id'])[:100],'station_type':'charging','selection_source':'automatic'},'distance_m':float(place.get('distance') or 0),'unit_price_krw':None,'price_basis':'existing_ev_tariff'})
+            places={}
+            # Keyword matches can differ between spaced and unspaced station names.
+            for query in ('전기차 충전소',):
+                response=await self.cached(('chargers',round(lat,5),round(lon,5),query),'kakao','search/keyword.json',{'query':query,'x':lon,'y':lat,'radius':2000,'sort':'distance','size':15})
+                for place in response.get('documents',[])[:15]:
+                    try:
+                        a,b=float(place['y']),float(place['x']);coordinates(a,b)
+                        key=str(place['id'])
+                        places[key]={'location':{'name':place['place_name'][:200],'address':(place.get('road_address_name') or place.get('address_name',''))[:300],'latitude':a,'longitude':b,'provider':'kakao','station_id':key[:100],'station_type':'charging','selection_source':'automatic'},'distance_m':distance_m(lat,lon,a,b),'unit_price_krw':None,'price_basis':'existing_ev_tariff'}
+                    except (ValueError,TypeError,KeyError):continue
+            result=list(places.values())
         else:
             if fuel not in PRODUCTS:raise ValueError('실제 주유 유종을 선택해 주세요.')
             x,y=await self.transform(lon,lat,'WGS84','KTM')
@@ -73,7 +86,12 @@ class Stations:
                 price=float(oil.get('PRICE') or 0)
                 result.append({'location':{'name':str(oil['OS_NM'])[:200],'address':str(oil.get('NEW_ADR') or oil.get('VAN_ADR') or '')[:300],'latitude':a,'longitude':b,'provider':'opinet','station_id':str(oil['UNI_ID'])[:100],'station_type':'refueling','selection_source':'automatic'},'distance_m':float(oil.get('DISTANCE') or 0),'unit_price_krw':price if math.isfinite(price) and price>0 else None,'price_observed_at':observed,'price_basis':'opinet_current','fuel_type':fuel})
         result.sort(key=lambda p:p['distance_m'])
-        return {'candidates':result,'selected':result[0] if result else None,'message':'가장 가까운 후보를 자동 선택했어요. 실제 방문 장소와 단가를 확인해 주세요.' if result else '주변 장소를 찾지 못했어요. 직접 위치를 지정해 주세요.'}
+        selected=result[0] if result else None
+        if kind=='charging' and selected and selected['distance_m']>150:
+            return {'candidates':result,'selected':None,'message':'150m 이내 충전소 후보가 없어 자동 지정하지 않았어요. 실제 충전소를 검색해 선택해 주세요.'}
+        if kind=='charging' and selected and len(result)>1 and result[1]['distance_m']-selected['distance_m']<25:
+            return {'candidates':result,'selected':None,'message':'비슷한 거리에 여러 충전소가 있어 자동 확정하지 않았어요. 실제 이용한 충전소를 검색해 선택해 주세요.'}
+        return {'candidates':result,'selected':selected,'message':'가장 가까운 후보를 자동 선택했어요. 실제 방문 장소와 단가를 확인해 주세요.' if result else '주변 장소를 찾지 못했어요. 직접 위치를 지정해 주세요.'}
     async def price_at(self,lat,lon,fuel):
         response=await self.nearby('refueling',lat,lon,fuel)
         selected=response['selected']

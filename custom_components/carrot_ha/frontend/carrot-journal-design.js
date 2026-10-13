@@ -1686,5 +1686,21 @@ export const journalDesign = `:host {
   .backup-guide-header{flex-direction:column;align-items:flex-start;gap:8px}
   .backup-guide-btn{width:100%;justify-content:center}
 }
+
+/* Record forms: constrain intrinsic date widths and keep result rows unshrunk. */
+#recordDialog .fields{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;width:100%}
+#recordDialog .fields>*,#recordDialog .fields label{min-width:0;max-width:100%}
+#recordDialog .fields input:not([type=radio]):not([type=checkbox]),#recordDialog .fields select,#recordDialog .fields textarea{min-width:0;max-width:100%;width:100%;box-sizing:border-box}
+#recordDialog input[type=date],#recordDialog input[type=datetime-local]{appearance:none;-webkit-appearance:none;display:block;min-inline-size:0;inline-size:100%}
+#recordDialog input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
+#recordDialog .modal-scroll-body{min-width:0;max-width:100%}
+#recordDialog #recordError:empty{display:none}
+#recordDialog #recordError{margin:0 0 12px;overflow-wrap:anywhere}
+#recordDialog #placeResults{min-width:0;max-width:100%;overscroll-behavior:contain}
+#recordDialog .place-result-item{flex:0 0 auto!important;min-height:max-content!important}
+#recordDialog .place-result-name,#recordDialog .place-result-addr{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+#recordDialog .loc-header-title-wrap{flex:1;min-width:0}
+#recordDialog .loc-summary-pill{min-width:0}
+@media(max-width:440px){#recordDialog .fields{grid-template-columns:minmax(0,1fr)}#recordDialog .modal-header-row{padding:14px 16px}#recordDialog .modal-scroll-body{padding:16px}#recordDialog .loc-header-title-wrap{flex-wrap:wrap}#recordDialog .loc-summary-pill{max-width:100%}}
 `;
 

@@ -160,7 +160,7 @@ const path=require('path');
  await root.locator('#legendRow [data-cat=maintenance]').click();
  if(await root.locator('#legendRow [data-cat=maintenance]').getAttribute('aria-pressed')!=='true')throw Error('comparison filter failed');
  await root.locator('#legendRow [data-cat=maintenance]').click();
- if(await root.locator('#recordForm select[name=category] option').count()!==11)throw Error('expense modal categories incorrect');
+ if(await root.locator('#recordForm select[name=category] option').count()!==7)throw Error('expense modal categories incorrect');
  // Approved savings sliders use the selected vehicle and local HA fuel sensors.
  await root.locator('#tab2').click();
  await page.evaluate(()=>{

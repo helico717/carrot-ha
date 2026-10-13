@@ -60,7 +60,7 @@ class FactsTests(unittest.TestCase):
         with self.assertRaises(ValueError):ManagedStore(directory).load()
     def test_automatic_position_fee_unchanged_and_user_override(self):
         archive=Archive(Path(self.temp.name)/'archive.db')
-        archive.put({'schema':1,'device_id':'car','event_id':'state1','kind':'state','observed_at':'2026-01-01T01:00:00+00:00','data':{'gps':{'latitude':37.5,'longitude':127.0,'accuracyM':5}}})
+        archive.put({'schema':1,'device_id':'car','event_id':'state1','kind':'state','observed_at':'2026-01-01T01:00:00+00:00','data':{'gps':{'latitude':37.5,'longitude':127.0,'accuracyM':5,'measured_at':'2026-01-01T01:00:00+00:00','speedMps':0}}})
         archive.put({'schema':1,'device_id':'car','event_id':'charge1','kind':'charge','observed_at':'2026-01-01T02:00:00+00:00','data':{'started_at':'2026-01-01T01:00:00+00:00','ended_at':'2026-01-01T02:00:00+00:00','duration_s':3600,'energy_kwh':10,'cost_krw':3000,'can_mode':4}})
         sync(archive,self.j);before=self.j.query('2026-01-01','2026-01-31')['totals']['charge_effective_krw'];item=auto.pending(self.j)[0];point=auto.position(archive,self.j,item[3]);self.assertIsNotNone(point)
         location={'name':'Charger','latitude':37.5,'longitude':127.0,'provider':'kakao','station_id':'42','station_type':'charging','selection_source':'automatic'}
@@ -84,5 +84,20 @@ class FactsTests(unittest.TestCase):
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
     async def test_ev_nearest_and_no_station_tariff(self):
         station=Stations(types.SimpleNamespace())
-        async def cached(*args,**kw):return {'documents':[{'id':'far','place_name':'Far','x':'127','y':'37.5','distance':'1000'},{'id':'near','place_name':'Near','x':'127','y':'37.5','distance':'10'}]}
+        async def cached(*args,**kw):return {'documents':[{'id':'far','place_name':'Far','x':'127','y':'37.51','distance':'1000'},{'id':'near','place_name':'Near','x':'127','y':'37.5','distance':'10'}]}
         station.cached=cached;r=await station.nearby('charging',37.5,127);self.assertEqual(r['selected']['location']['station_id'],'near');self.assertIsNone(r['selected']['unit_price_krw']);self.assertEqual(r['selected']['price_basis'],'existing_ev_tariff')
+
+    async def test_duplicate_coordinates_do_not_pick_first_station(self):
+        station=Stations(types.SimpleNamespace())
+        async def cached(*args,**kw):return {'documents':[{'id':key,'place_name':key,'x':'127','y':'37.5'} for key in ['A','B']]}
+        station.cached=cached
+        result=await station.nearby('charging',37.5,127)
+        self.assertIsNone(result['selected']);self.assertEqual(len(result['candidates']),2)
+        self.assertIn('여러 충전소',result['message'])
+
+    async def test_remote_station_is_not_selected(self):
+        station=Stations(types.SimpleNamespace())
+        async def cached(*args,**kw):return {'documents':[{'id':'A','place_name':'A','x':'127','y':'37.51'}]}
+        station.cached=cached
+        result=await station.nearby('charging',37.5,127)
+        self.assertIsNone(result['selected'])
