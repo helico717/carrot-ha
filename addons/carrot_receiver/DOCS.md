@@ -44,11 +44,15 @@ DB는 전환 검증 및 명시적 rollback을 위해 그대로 보존합니다.
 넣지 않도록 HA 관리 경로에서 입력합니다. 설정 후 사용자 기기 재부팅이 필요합니다.
 새 url은 `https://<직접 접속 도메인>/carrot-receiver`, device는 기존 ID 그대로입니다.
 
+<details><summary>폐기된 이전 서버 복귀 참고 — 현재 설치/복구에 실행하지 않음</summary>
+
 rollback은 이 모듈의 `--rollback`으로 직접 설정만 제거한 뒤 사용자가 재부팅합니다.
 명시적 rollback 표시를 남겨 자동 provisioning이 다시 직접 연결을 켜지 않게 합니다.
 HA 쪽 자체 수신기 주소도 비우고 사용자 재시작해야 기존 source로 돌아갑니다.
 차량 outbox·파라미터 처리 DB·HA archive/journal 기록은 지우지 않습니다.
 파라미터 queue namespace는 수신 DB identity별로 분리하여 Cloudflare 숫자 ID와 충돌하지 않습니다.
+
+</details>
 
 ## 보관과 제한
 

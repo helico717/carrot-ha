@@ -137,7 +137,7 @@ Cloudflare가 없다는 현재 설명 및 호환 코드 식별자는 폐기할 �
 | `vehicle-journal/validation-plan.md` | 과거 서버 설명 폐기 표시 | 3 |
 | `vehicle-journal/vehicle-management.md` | 서버 언급 없음 | 0 |
 
-새 복구 안내·본 감사 기록·보관 원문도 작성 후 검토 대상에 포함합니다.
+새 복구 안내·본 감사 기록·보관 원문과 0.9 베타 노트를 포함해 **총 109개 Markdown**을 다시 읽고 검토했습니다.
 
 ## 연결 저장소와 실행 파일 추가 점검
 
@@ -161,3 +161,11 @@ Cloudflare가 없다는 현재 설명 및 호환 코드 식별자는 폐기할 �
 - 새 수신 앱 운영 확인: 0.1.3 started, 외부 /health 200,
   실제 telemetry POST 및 HA archive ACK 200, 설정 pending/터미널 bootstrap 요청 200.
 - HA 화면 문구·옵션 정리는 0.9.0-beta.1 패키지 설치/사용자 HA 재시작 후 적용.
+
+추가된 Markdown 6개: `.github/release-notes/v0.9.0-beta.1.md`, `cloudflare/README.md`,
+`collector/README.md`, `docs/CLEAN_INSTALL_RECOVERY.md`,
+`docs/archive/cloudflare-guides-before-direct-receiver.md`, 본 감사 문서.
+현재 카메라 설치 설명은 WebCodecs/WLV1로 정리했고 이전 수신 앱 rollback 설명도 폐기 참고로 분리합니다.
+
+최종 회귀: [Linux CI](https://github.com/helico717/carrot-ha/actions/runs/38578662800),
+Python 438건 + 대시보드 12건 전부 통과/생략 없음. 실제 초기화/백업 복원과 장기 운영은 별도 확인입니다.
