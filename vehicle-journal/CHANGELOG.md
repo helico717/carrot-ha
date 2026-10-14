@@ -1,3 +1,12 @@
+## 2026-10-14 — 양방향 충전요금 최종 배포 확인
+
+- 커밋 제목: `vehicle-journal: record bidirectional payment deployment verification` (문서만 수정).
+- 구현: `0f7f367` 양방향 결제 연결·내구성 큐·레거시 보정 복구, `f5163fb` 기존 비충전 분류 보존.
+- 검증: 분류 보존 회귀 포함 차계부 62개 통과. 관련 결제/대시보드/스키마/동기화 검증은 아래 항목 참조. 기존 이벤트 루프 경고 외 실패 없음.
+- 배포: `f5163fb70d78c318befd689e47fd0729391d6e2b` main 푸시 및 기존 `v0.8.14-beta.5` 태그 원격 일치 확인. HA Python 파일 5개 최종 커밋과 SHA-256 일치, 코드 백업 `/config/carrot_ha/deployment-backups/f5163fb/`. 기존 Release ID 411761651 유지·pre-release=true·최종 릴리즈 노트 확인. Actions https://github.com/helico717/carrot-ha/actions/runs/38494951582 성공. 원격 태그 소스 확인 완료; 전체 ZIP 추가 다운로드 검증은 전송 지연으로 중단했으며 Actions/태그/개별 소스로 발행을 검증함.
+- 운영: Python 적용을 위한 사용자 HA 재시작 및 실제 양쪽 화면의 금액·복구 확인은 대기. 직접 배포했으므로 현재 설치에서는 HA 재시작이 필요하며, HACS 경로를 사용할 경우 동일 beta.5 다시 다운로드 후 재시작. Cloudflare·D1·Comma 변경/배포 없음. 새 프리릴리즈를 만들지 않았으며 기존 beta.5를 사용자 명시 요청대로 갱신함.
+- 관련 파일: `vehicle-journal/CHANGELOG.md`. 이 확인 기록은 실행 코드 변경이 없어 별도 버전 상승·태그 이동·배포를 하지 않는다.
+
 ## 2026-10-14 — 양방향 결제 배포 검증 및 기존 지출 분류 보존
 
 - 커밋 제목: `vehicle-journal: preserve reclassified expenses during payment recovery`.
