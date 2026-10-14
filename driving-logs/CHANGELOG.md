@@ -1,5 +1,20 @@
 # 주행 로그 변경 기록
 
+## 2026-10-14 — 애드온 진단 로그 범위 검토
+
+- 사용자 질문: 추후 troubleshooting을 위해 애드온 로그 화면에 모든 로그를 표시하는
+  방향의 장단점. 이번 요청은 설계 상담이며 구현 요청으로 확대하지 않는다.
+- 현재 receiver.py는 access_log=None, 오류 종류/시간별 정리만 logging 출력하므로
+  정상 수신·DB 저장·HA ACK 단계는 로그 화면에서 추적하기 어렵다.
+- 권고: 중요 단계의 시각·처리 결과·지연·cursor/건수·오류/재시도·부팅 버전 기록,
+  기본 INFO/WARNING/ERROR와 일시 DEBUG, 반복 오류 제한·용량/기간 제한 보관.
+  토큰·인증 헤더·GPS/영상/전체 CAN·원본 payload를 상시 로그에 넣지 않는다.
+- HAOS 애드온 로그는 해당 앱 로그이다. HA Core/Comma 전체 원본 로그를 자동
+  포함하는 화면이 아니며 통합 진단은 별도 연결/권한 설계가 필요하다. 수신기 기존
+  telemetry/trip/ACK 이벤트 로그 확대는 Comma 추가 업데이트 없이 가능한 범위다.
+- 관련: addons/carrot_receiver/receiver.py와 공식 Supervisor log endpoints.
+  코드·설정·배포·기기 Pull/재부팅·릴리즈 변경 없이 조사 기록만 게시한다.
+
 ## 2026-10-14 — 대시보드 Cloudflare 상태 문구 조사
 
 - 사용자 첨부: 대시보드 footer에 Cloudflare · ok 잔존.
