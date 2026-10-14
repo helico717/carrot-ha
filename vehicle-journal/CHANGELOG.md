@@ -1,3 +1,9 @@
+## 2026-10-14 — vehicle-journal: Linux 단위 검사 환경과 배포 준비 기록
+
+- docs/CI 준비 main 커밋 ceeb00c 확인. 새 CI는 HA 미설치 상태에서 통합 시작을 호출해 중단.
+- tools/run-unit-suite.py의 namespace package로 통합 시작을 분리하고 실제 순수 모듈/차계부 suite를 검사.
+  차계부 실행 코드·DB·사진 변경 없음. Linux 재검사·수신 앱 설치·릴리즈 확인 대기.
+
 ## 2026-10-14 — vehicle-journal: 이전 서버 문서 폐기 표시와 복구/누적 베타 안내
 
 - 이유: 사용자가 HA를 주 화면으로 명시하고 모든 Markdown의 이전 서버 내용 정리와 쉬운 초기화 복구 안내를 요청함.

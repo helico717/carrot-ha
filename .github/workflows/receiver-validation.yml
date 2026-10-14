@@ -7,6 +7,7 @@ on:
       - 'custom_components/carrot_ha/**'
       - 'tests/**'
       - 'tools/receiver-recovery.py'
+      - 'tools/run-unit-suite.py'
       - '.github/workflows/receiver-validation.yml'
   workflow_dispatch:
 permissions:
@@ -26,9 +27,9 @@ jobs:
       - name: Python regression suites in isolated processes
         run: |
           for suite in tests/test_*.py; do
-            python -m unittest discover -s tests -p "$(basename "$suite")"
+            python tools/run-unit-suite.py --pattern "$(basename "$suite")"
           done
-          python -m unittest discover -s vehicle-journal/tests
+          python tools/run-unit-suite.py --directory vehicle-journal/tests
       - name: Dashboard loading and state preservation
         run: |
           node --test tests/dashboard-live-loading.test.mjs tests/dashboard-lazy-runtime.test.mjs tests/dashboard-view-state.test.mjs tests/dashboard-battery-pagination.test.mjs

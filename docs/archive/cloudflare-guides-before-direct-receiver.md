@@ -93,7 +93,7 @@ README의 HACS 설치 순서로 설치합니다. 장치 ID는 본인이 정한 �
 ## 3. 콤마(Comma) 기기 연동 (Git 기반 내장 데몬)
 
 > [!TIP]
-> **수동 SCP 파일 복사가 필요 없습니다!**  
+> **수동 SCP 파일 복사가 필요 없습니다!**
 > Carrot HA 수집기와 파라미터 동기화 모듈은 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치에 정식 내장 데몬(`selfdrive/carrot/ha`)으로 통합되어 있습니다.
 
 기기 설정 순서:
@@ -231,7 +231,7 @@ Adding `/carrot_ha_static/carrot-dashboard.js` as a dashboard resource automatic
 ## 3. Comma Device Setup (Git-Managed Native Daemon)
 
 > [!TIP]
-> **No manual SCP or file copy is required!**  
+> **No manual SCP or file copy is required!**
 > The Carrot HA collector, param sync, and reverse terminal are natively integrated into the [`helico717/openpilot`](https://github.com/helico717/openpilot) repository on branch `carrot-wip-model_selector-ha` under `selfdrive/carrot/ha`.
 
 Setup steps:
@@ -417,7 +417,7 @@ IP·동일 네트워크·콤마 전원·SSH 활성화를 확인하세요. 콤마
 ## 3. 콤마에 내장 브랜치 설치 및 연결 복원
 
 > [!TIP]
-> **수동 SCP 파일 복사가 필요 없습니다!**  
+> **수동 SCP 파일 복사가 필요 없습니다!**
 > 수집기, 파라미터 동기화, 역방향 터미널 클라이언트는 이미 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치에 정식 내장 데몬(`selfdrive/carrot/ha`)으로 통합되어 있습니다.
 
 ### A. openpilot 브랜치 확인 및 전환
@@ -596,8 +596,8 @@ Worker가 아직 구버전이면 자동 조회 API가 404를 반환하며 Comma�
 홈 어시스턴트(HA)에서 CarrotPilot 파라미터를 원격으로 제어하고 튜닝하기 위한 아키텍처 및 안전 설정 안내입니다.
 
 > [!NOTE]
-> **수동 SCP 파일 복사가 필요 없습니다!**  
-> `param_sync.py`를 포함한 파라미터 동기화 모듈은 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치(`openpilot/selfdrive/carrot/ha/param_sync.py`)에 이미 정식 내장되어 있습니다.  
+> **수동 SCP 파일 복사가 필요 없습니다!**
+> `param_sync.py`를 포함한 파라미터 동기화 모듈은 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치(`openpilot/selfdrive/carrot/ha/param_sync.py`)에 이미 정식 내장되어 있습니다.
 > 콤마 기기에서 해당 브랜치를 사용 중이라면 별도의 파일 복사 없이 즉시 사용할 수 있습니다.
 
 ---
@@ -771,7 +771,7 @@ Carrot HA 시스템은 역할에 따라 **2개의 독립된 저장소**로 분�
    - **방법 1 (가장 추천 - HA 터미널 카드 단축 버튼 사용)**:
      1. Home Assistant에서 **Comma 원격 터미널** 카드를 엽니다.
      2. **[연결]** 버튼 클릭.
-     3. **`[📥 당근 Git Pull]`** 버튼 클릭!  
+     3. **`[📥 당근 Git Pull]`** 버튼 클릭!
         *(기기에서 `cd /data/openpilot && git reset --hard && git pull --ff-only`가 실행되어 충돌 없이 깔끔하게 반영됩니다.)*
      4. **`[🔄 기기 재부팅]`** 버튼 클릭하여 재부팅 완료.
    - **방법 2 (당근 웹 UI)**:
