@@ -1,3 +1,12 @@
+## 2026-10-14 — Linux 전체 통과 및 생략된 연결 검사 보완
+
+- Linux CI 38577408742 성공: HA 47 suites + 차계부 62건 = Python 412건 중 409통과/3생략,
+  대시보드 12건 통과. 검증 링크: https://github.com/helico717/carrot-ha/actions/runs/38577408742.
+- 생략 3건은 companion 수집기 소스 및 PyAV 미설치에 따른 CAN/영상/실제 sender 연동 검사.
+  기능 보존 요청에 따라 CI에 게시된 Comma 커밋 d5879396의 sparse checkout과 PyAV 16.0.1을 추가.
+  test_can_capture는 명시된 companion 경로를 지원하도록 테스트만 보완. 실제 운영 코드 변경 없음.
+- 후속 CI에서 실제 CAN wire·영상 remux/socket·Comma 파일 송신까지 확인 후 릴리즈 태그 발행 예정.
+
 ## 2026-10-14 — 운영 진단 앱 적용 및 기존 검사 대조
 
 - 공식 Supervisor 백업 포함 update로 수신 앱 0.1.3 설치/started 확인.
