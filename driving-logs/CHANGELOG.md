@@ -37,6 +37,14 @@
   기기 Pull/재부팅 미실행. 처음은 기존 터미널 불가 시 당근웹/로컬/VPN에서 설치 필요.
 - 기존 trip 측정 범위·최고속도·부분 품질 메타데이터 유지 점검을 수신기 0.1.2에 반영.
   관련 API wire와 계산을 유지하며 UI·CAN·차계부 실행 코드 변경 없음.
+- 최종 준비: 수신기 0.1.2 실제 started/boot auto/Watchdog, 외부 HTTPS 200 확인.
+  기존 HA archive의 동일 서버 비공개 online backup integrity=ok, 마지막 상태 1건
+  자체 수신기 seed 및 원래 측정 시각 보존 확인. 원문/토큰은 출력·Git에 없음.
+- Comma 최종 원격 40148b0d. 초기 인증 지연 중 수집/outbox 보존 및 공유 credential
+  회복 보정(537f5d90/cd24a0ec/40148b0d), 직접 연결 6/polling 4/outbox 1 통과.
+- HA 소스 반영·비공개 일회 옵션 준비 완료지만 사용자 HA Core 재시작 미실행.
+  Comma Pull/재부팅 미실행. 실차·HA 재시작 중 수신·실제 백업 복원·24시간 관측은 대기.
+  새 HA 버전·태그·Release 없음. Cloudflare DB 삭제·Worker 변경/배포 없음.
 
 ## 2026-10-14 — 자체 서버 직접 통신 가능성 조사
 

@@ -117,7 +117,7 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
 7. 실제 검증 전 기존 Cloudflare DB 삭제/수신 중단 금지. 잔존 의존 확인 후 사용 종료.
    24시간 부하·디스크 증가/보관 정리 및 실차 결과는 로컬 테스트와 별도 기록.
 
-## 현재 상태
+## 사전 작성 시 상태
 
 실행 코드 수정 전. 이 문서와 CHANGELOG만 작성. 네트워크·운영 설치·실차 검증 미완료.
 후속 구현·검증·배포 기록을 각 단계에 추가하며 미완료를 완료로 보고하지 않는다.
@@ -146,3 +146,29 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
   신규 연결 4·기존 polling 4 통과. 차계부는 CHANGELOG에 환경 실패를 구분 기록.
 - 아직 사용자 재시작·Comma Git 업데이트/전환·실차 동작·24시간 관측·HAOS 실제
   백업 복원은 미완료다. 전체 기능 무영향/전환 완료를 주장하지 않는다.
+
+## 2026-10-14 최종 배포 준비·인계
+
+- 수신기 0.1.2 설치/실행, boot auto/Watchdog 확인. 실제 외부 HTTPS health 200,
+  provisioning 200 및 scoped credential 내부 대조 성공. 기존 HA / 응답 200.
+- HA 최종 실행 소스 63개 SHA-256/문법 검증. 코드는 967beff와 동일하며 이후
+  main 21b358d는 수신기 측 기존 주행 품질 보존 보정이다. 새 HA 태그/Release 없음.
+- 일회 직접 연결 설정은 HA 서버 내부 0600 파일에 준비했다. 다음 사용자 HA Core
+  재시작 때 기존 모든 options를 보존하고 receiver 필드만 적용한다. HACS 재다운로드는
+  직접 배포한 개발 코드를 덮어쓸 수 있으므로 이번 설치 절차와 혼용하지 않는다.
+- 기존 HA archive를 같은 서버의 비공개 복구 폴더에 SQLite online backup으로 저장,
+  integrity_check=ok. 마지막 상태 1건은 자체 수신기에 초기화했고 원래 측정 시각을
+  보존했다. GPS/토큰/본문을 PC·출력·Git으로 옮기지 않았다. 과거 HA 기록은 삭제하지 않음.
+- Comma 최종 원격 40148b0dc66744636ea4fcfe270e7365b758a4b5 확인.
+  537f5d90·cd24a0ec·40148b0d로 초기 인증 실패 중에도 CAN/outbox 보관 지속,
+  인증 완료 후 공유 전송/CAN 파일/파라미터 credential 갱신을 보정했다.
+  신규 직접 연결 6·기존 parameter polling 4·outbox lane 1 통과.
+- 사용자 적용 순서: HA 화면의 Home Assistant 다시 시작 → Comma 지정 브랜치에서
+  당근웹 Git 업데이트·재부팅 또는 `cd /data/openpilot && git pull --ff-only && sudo reboot`.
+  기존 HA 터미널이 불가하면 첫 설치는 당근웹/기존 로컬·VPN 경로가 필요하다.
+  이후 장치 인증으로 자체 서버에서 연결 설정을 받아 영구 저장하며 Cloudflare 호출 없음.
+- 현재 HA 실행 프로세스와 Comma 설치 소스는 사용자 재시작/업데이트 전이다.
+  새로운 실제 telemetry/trip/params/camera/terminal/log와 HA Core 재시작 중 수신,
+  실제 HAOS backup restore·24시간 부하 검증은 사용자 적용 후 확인 대상이다.
+- Cloudflare 원본 DB·기존 옵션은 검증 중 복구용으로 보존한다. 직접 mode 오류에
+  자동 cloud fallback은 없으며 cloud 복귀는 명시적 rollback만 가능하다.
