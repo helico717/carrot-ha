@@ -110,19 +110,22 @@ export async function maintainArchive(env, now = Date.now()) {
   // Only a durably acknowledged consumer permits expiration. Bound each run.
   const telemetry = await env.DB.prepare(`DELETE FROM telemetry_history WHERE sequence IN (
     SELECT h.sequence FROM telemetry_history h JOIN archive_consumers a ON a.device_id=h.device_id
-    WHERE h.updated_at<? AND h.sequence<=a.telemetry_sequence ORDER BY h.updated_at LIMIT 200)`)
-    .bind(cutoff).run();
+    WHERE h.updated_at<? AND h.sequence<=a.telemetry_sequence ORDER BY h.updated_at LIMIT 200)
+    RETURNING sequence`)
+    .bind(cutoff).all();
   const trips = await env.DB.prepare(`DELETE FROM trips WHERE id IN (
     SELECT t.id FROM trips t JOIN trip_sync_revision r ON r.trip_id=t.id
     JOIN archive_consumers a ON a.device_id=t.device_id
-    WHERE t.ended_at<? AND r.sequence<=a.trip_sequence ORDER BY t.ended_at LIMIT 100)`)
-    .bind(tripCutoff).run();
+    WHERE t.ended_at<? AND r.sequence<=a.trip_sequence ORDER BY t.ended_at LIMIT 100)
+    RETURNING id`)
+    .bind(tripCutoff).all();
   await env.DB.prepare(`DELETE FROM telemetry_contexts WHERE rowid IN (
     SELECT c.rowid FROM telemetry_contexts c WHERE NOT EXISTS (
       SELECT 1 FROM telemetry_history h WHERE h.device_id=c.device_id AND h.context_hash=c.hash) LIMIT 100)` ).run();
   const budget = await env.DB.prepare('SELECT resource,bytes,max_bytes FROM archive_budget').all();
-  const result = {purged_telemetry: telemetry.meta?.changes ?? telemetry.changes ?? 0,
-    purged_trips: trips.meta?.changes ?? trips.changes ?? 0, budget: budget.results || [],
+  // D1 meta.changes includes trigger bookkeeping. Count RETURNING rows instead.
+  const result = {purged_telemetry: (telemetry.results || []).length,
+    purged_trips: (trips.results || []).length, budget: budget.results || [],
     database_bytes: budget.meta?.size_after ?? null};
   if (result.budget.some(b => b.bytes > b.max_bytes * 0.8)) console.warn('Archive storage pressure', JSON.stringify(result.budget));
   if (result.database_bytes >= 350000000) console.warn('D1 total storage pressure', result.database_bytes);
