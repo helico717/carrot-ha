@@ -1825,3 +1825,18 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - b3a887e main 푸시 및 화면 3개 파일 백업·내부/외부 HTTP 해시 확인 완료. 마지막 Python a48aa01 파일은 이전에 배포됐고 이번 사용자 재시작으로 적용 대상이다.
 - 제한: 실제 휴대폰 신규 주유 입력·해당 단가 확인은 사용자 현장 검증 대기. 합성 Chrome에서 GPS/단가/수정 보호/저장 검증은 통과했다. 새벽 03:00 예약 시각 실행 및 장기 GFS 세대 누적은 아직 관측하지 않았으며 예약 코드·보관 회귀·HA Core 즉시 백업과 임시 복원 검증으로 확인했다. 전국 방문 지도와 OCR은 기존 합의대로 후속이다. UI 품질 개선은 사용자 요청으로 중단했다.
 - 커밋 제목: `vehicle-journal: record final restart and verification status`. 문서만 변경, 실행 코드/릴리즈/Comma/Worker 변경 없음.
+## 2026-10-14 — 직접 차량 수신 전환의 차계부 보존 점검
+
+- 제목: `vehicle-journal: record unchanged journal migration regression` (기록만 수정).
+- 이유: 사용자가 Cloudflare 대신 HAOS 수신 애드온을 요청하면서 기존 기능 전체 보존을
+  요구했다. 차계부 계산·DB·사진·결제·UI 실행 코드는 변경하지 않는다.
+- 관련: docs/direct-vehicle-receiver-plan-2026-10-14.md의 보존 목록, HA cloud.py의
+  기존 cloud 이벤트 ID 유지와 source별 cursor, 기존 vehicle-journal/tests.
+- 검증: 실제 HA Archive와 수신 API를 연결해 이전 주행과 cursor 보존·재수신 중복 없음
+  확인. 기존 충전 74·주행 73건 통과. 차계부 62건은 Windows SQLite 임시 파일 정리
+  오류를 gc 수집으로 구분했으며 60건 통과, NAS directory fsync의 Windows 미지원
+  2건은 실패로 남김. NAS 실행 코드와 보관 정책은 수정하지 않는다.
+- 배포: 차계부 원본 DB·사진·HA 설정은 삭제/이관하지 않는다. 수신 애드온은 설치·
+  내부 및 외부 HTTPS health 200 확인; HA 사용자 재시작과 실차 전환/차계부 표시
+  검증은 미완료. 버전·태그·Release 변경 없음.
+
