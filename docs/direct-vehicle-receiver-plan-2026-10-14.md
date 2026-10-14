@@ -172,3 +172,16 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
   실제 HAOS backup restore·24시간 부하 검증은 사용자 적용 후 확인 대상이다.
 - Cloudflare 원본 DB·기존 옵션은 검증 중 복구용으로 보존한다. 직접 mode 오류에
   자동 cloud fallback은 없으며 cloud 복귀는 명시적 rollback만 가능하다.
+
+## 사용자 적용 후 운영 확인
+
+- 사용자는 HA와 Comma 업데이트/재부팅 완료, HA 원격 터미널과 주차 카메라 정상
+  사용을 직접 확인했다. 원격 접속 복구를 우선한 실사용 확인은 완료 상태다.
+- 읽기 전용 서버 점검으로 수신기 0.1.2 started, HA 직접 source 옵션 적용과 일회
+  setup 소비, HA 상태 이력 cursor=103 확인. 마지막 기기 측정은 22:23:51 KST.
+  기기 telemetry는 게시한 40148b0d와 carrot-wip-model_selector-ha를 보고한다.
+- 아직 새 수신기에 trip은 0건이며 기존 HA 과거 기록은 보존한다. 다음 실제 주행
+  저장/표시·명령 applied/failed 확인·영상/rlog 신규 동기화·HA Core 재시작 동안
+  수신·실제 HAOS 백업 복원·24시간 부하는 별도 확인 대상이다.
+- 추가 기기 업데이트/재부팅은 요구하거나 실행하지 않았다. 기능 변경 없이 확인
+  기록만 추가하며, 이 확인을 모든 기능/장기 검증 완료로 확대하지 않는다.
