@@ -1,13 +1,19 @@
 """Exercise the actual standalone receiver, including durable recovery and isolation."""
 import asyncio
+import ast
 from datetime import datetime, timezone, timedelta
 import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import types
+import sys
+import importlib
+from urllib.parse import urlencode
 import unittest
 
 from aiohttp.test_utils import TestClient, TestServer
+from aiohttp import ClientTimeout
 
 spec = importlib.util.spec_from_file_location('receiver', Path('addons/carrot_receiver/receiver.py'))
 receiver = importlib.util.module_from_spec(spec)
@@ -20,8 +26,9 @@ class ReceiverTests(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.directory.name) / 'receiver.sqlite3'
         self.store = receiver.Store(self.path)
         self.config = {'devices': [
-            {'device_id': 'car', 'upload_token': 'u' * 32, 'view_token': 'v' * 32},
+            {'device_id': 'car', 'upload_token': 'u' * 32, 'view_token': 'v' * 32, 'provision_token': 'p' * 32},
             {'device_id': 'other', 'upload_token': 'x' * 32, 'view_token': 'y' * 32}]}
+        self.config['public_url'] = 'https://ha.example/carrot-receiver'
         self.client = TestClient(TestServer(receiver.create_app(self.config, self.store)))
         await self.client.start_server()
 
@@ -52,6 +59,15 @@ class ReceiverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.request('/api/latest-state?device_id=other'))[0], 403)
         self.assertEqual((await self.request('/api/telemetry', {**self.telemetry(), 'deviceId': 'other'}))[0], 403)
         self.assertEqual((await self.request('/api/latest-state?device_id=car', token='bad'))[0], 401)
+
+    async def test_authenticated_provision_cannot_read_or_write_records(self):
+        status, body = await self.request('/api/provision', {'device_id': 'car'}, token='p' * 32)
+        self.assertEqual(status, 200)
+        self.assertEqual(body['config'], {'transport': 'direct', 'url': 'https://ha.example/carrot-receiver',
+                                         'device': 'car', 'token': 'u' * 32})
+        self.assertEqual((await self.request('/api/provision', {'device_id': 'other'}, token='p' * 32))[0], 403)
+        self.assertEqual((await self.request('/api/latest-state?device_id=car', token='p' * 32))[0], 401)
+        self.assertEqual((await self.request('/api/telemetry', self.telemetry(), token='p' * 32))[0], 401)
 
     async def test_retry_latest_priority_and_backup_restore(self):
         newer = self.telemetry()
@@ -152,6 +168,54 @@ class ReceiverTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(raw['gps']['fresh'])
         await self.request('/api/telemetry', second)
         self.assertEqual(self.store.latest('car')['state']['raw_json'], raw)
+
+    async def test_actual_ha_sync_preserves_legacy_history_and_separates_cursors(self):
+        package = types.ModuleType('_receiver_ha_test')
+        package.__path__ = [str(Path('custom_components/carrot_ha').resolve())]
+        sys.modules[package.__name__] = package
+        feed_module = importlib.import_module(package.__name__ + '.cloud_feed')
+        archive_module = importlib.import_module(package.__name__ + '.storage')
+        restore_module = importlib.import_module(package.__name__ + '.cloud_archive')
+        archive = archive_module.Archive(Path(self.directory.name) / 'ha.sqlite3')
+        legacy = self.trip()
+        legacy['id'] = 'legacy-trip'
+        legacy_row = {**self.store.trip({'raw': receiver.packed(legacy), 'device': 'car', 'sequence': 1})}
+        for event in feed_module.parse_feed({'trips': [legacy_row]}, 'car'):
+            archive.put_cloud(event)
+        archive.cursor('telemetry', 9000)
+        archive.cursor('trip_changes', 4000)
+        await self.request('/api/telemetry', self.telemetry())
+        await self.request('/api/trips', self.trip())
+        tree = ast.parse(Path('custom_components/carrot_ha/cloud.py').read_text(encoding='utf-8'))
+        tree.body = [node for node in tree.body if isinstance(node, (ast.AsyncFunctionDef, ast.ClassDef))]
+        async def refresh(*args):
+            return None
+        ns = {'asyncio': asyncio, 'json': json, 'datetime': datetime, 'timezone': timezone,
+              'urlencode': urlencode, 'ClientTimeout': ClientTimeout, 'parse_feed': feed_module.parse_feed,
+              'restore_page': restore_module.restore_page, 'refresh_runtime_costs': refresh,
+              'async_get_clientsession': lambda hass: self.client.session,
+              'async_dispatcher_send': lambda *args: None, '_LOGGER': receiver.LOG}
+        exec(compile(tree, 'cloud.py', 'exec'), ns)
+        entry = types.SimpleNamespace(data={'device_id': 'car'}, entry_id='entry',
+            options={'receiver_url': str(self.client.make_url('')).rstrip('/'), 'receiver_view_token': 'v' * 32,
+                     'cloud_url': 'https://must-not-be-used.invalid', 'cloud_view_token': 'old'})
+        runtime = {'entry': entry, 'archive': archive, 'lock': asyncio.Lock(), 'latest': None}
+        async def executor(fn, *args):
+            return await asyncio.to_thread(fn, *args)
+        hass = types.SimpleNamespace(async_add_executor_job=executor)
+        await ns['sync'](hass, runtime)
+        self.assertEqual(runtime['cloud_status'], 'ok')
+        prefix = 'receiver:' + self.store.identity + ':'
+        self.assertEqual(archive.cursor('telemetry'), 9000)
+        self.assertEqual(archive.cursor('trip_changes'), 4000)
+        self.assertEqual(archive.cursor(prefix + 'telemetry'), 1)
+        self.assertEqual(archive.cursor(prefix + 'trip_changes'), 1)
+        self.assertEqual(runtime['archive_acknowledged'], (1, 1))
+        self.assertEqual(len(archive.history('car', 'trip')), 2)
+        revision = archive.revision
+        await ns['sync'](hass, runtime)
+        self.assertEqual(archive.revision, revision)
+        self.assertEqual(len(archive.history('car', 'trip')), 2)
 
 
 if __name__ == '__main__':

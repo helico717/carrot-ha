@@ -62,21 +62,27 @@ def healthy_panda(body, previous):
     if not isinstance(panda, dict):
         return
     before = (previous or {}).get('panda') or {}
+    if not isinstance(before, dict):
+        before = {}
+    missing = object()
     def integer(value):
+        if value is missing:
+            return None
         try:
             number = float(value if value is not None else 0)
             return int(number) if math.isfinite(number) and number >= 0 else None
         except (TypeError, ValueError):
             return None
     fields = ('rxBufferOverflow', 'txBufferOverflow', 'spiErrorCount')
-    current = {key: integer(panda.get(key)) for key in fields}
-    old = {key: integer(before.get(key)) for key in fields}
-    uptime, old_uptime = integer(panda.get('uptimeS')), integer(before.get('uptimeS'))
+    current = {key: integer(panda.get(key, missing)) for key in fields}
+    old = {key: integer(before.get(key, missing)) for key in fields}
+    uptime, old_uptime = integer(panda.get('uptimeS', missing)), integer(before.get('uptimeS', missing))
     same = (previous is not None and uptime is not None and old_uptime is not None and uptime >= old_uptime
             and all(current[key] is not None and old[key] is not None and current[key] >= old[key] for key in fields))
     delta = {key: current[key] - old[key] if same else None for key in fields}
     new_overflow = bool(same and (delta['rxBufferOverflow'] > 0 or delta['txBufferOverflow'] > 0))
-    fault = (str(panda.get('faultStatus') or '').lower() not in ('', 'none') or bool(panda.get('faults'))
+    fault = (str(panda.get('faultStatus') or '').lower() not in ('', 'none')
+             or isinstance(panda.get('faults'), list) and bool(panda['faults'])
              or panda.get('heartbeatLost') is True or panda.get('safetyRxChecksInvalid') is True)
     interval = None
     if previous:
@@ -192,7 +198,12 @@ class Store:
                             enriched['gps'] = {**before['gps'], 'fresh': False, 'source': 'lastKnown'}
                     # Identical latest retries keep the previously computed delta.
                     if previous and at == previous['at']:
-                        enriched = before
+                        if exists:
+                            stored = db.execute('SELECT raw FROM telemetry WHERE device=? AND at=?', (device, at)).fetchone()
+                            if unpacked(stored['raw']) == body:
+                                enriched = before
+                            elif isinstance(enriched.get('panda'), dict) and isinstance(before.get('panda'), dict):
+                                enriched['panda']['counterHealth'] = before['panda'].get('counterHealth')
                     else:
                         healthy_panda(enriched, before)
                     db.execute('''INSERT INTO latest VALUES (?,?,?) ON CONFLICT(device) DO UPDATE
@@ -418,6 +429,10 @@ def create_app(config, store):
                 raise ValueError('invalid_token')
         if item['upload_token'] == item['view_token']:
             raise ValueError('distinct_credentials_required')
+        provision = item.get('provision_token')
+        if provision and (not isinstance(provision, str) or not 32 <= len(provision) <= 256
+                          or not provision.isascii() or any(c.isspace() for c in provision)):
+            raise ValueError('invalid_provision_token')
     all_tokens = [item[key] for item in devices for key in ('upload_token', 'view_token')]
     if len(set(all_tokens)) != len(all_tokens):
         raise ValueError('duplicate_credentials')
@@ -425,14 +440,14 @@ def create_app(config, store):
     async def handler(request):
         path = request.path
         if path == '/health' and request.method == 'GET':
-            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.0'})
+            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.1'})
         if path == '/api/source' and request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
         upload = (path in ('/api/telemetry', '/api/trips', '/api/settings/sync', '/api/params/ack') and request.method == 'POST'
                   or path in ('/api/params/pending', '/api/terminal/bootstrap'))
-        key = 'upload_token' if upload else 'view_token'
+        key = 'provision_token' if path == '/api/provision' else 'upload_token' if upload else 'view_token'
         credential = request.headers.get('Authorization', '').removeprefix('Bearer ')
-        item = next((item for item in devices if hmac.compare_digest(item[key].encode(), credential.encode())), None)
+        item = next((item for item in devices if item.get(key) and hmac.compare_digest(item[key].encode(), credential.encode())), None)
         if item is None:
             return web.json_response({'error': 'unauthorized'}, status=401)
         device = item['device_id']
@@ -444,6 +459,10 @@ def create_app(config, store):
             return web.json_response({'error': 'device_mismatch'}, status=403)
         q = request.query
         call, args = None, ()
+        if path == '/api/provision' and request.method == 'POST':
+            public_url = base_url(config.get('public_url', ''))
+            return web.json_response({'config': {'transport': 'direct', 'url': public_url,
+                'device': device, 'token': item['upload_token']}}, headers={'Cache-Control': 'no-store'})
         if path == '/api/source' and request.method == 'GET':
             return web.json_response({'schema': 'carrot-receiver-v1', 'source_id': store.identity, 'device_id': device})
         if path in ('/api/telemetry', '/api/trips') and request.method == 'POST':

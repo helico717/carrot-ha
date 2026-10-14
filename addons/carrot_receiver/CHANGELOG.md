@@ -1,3 +1,7 @@
+# 0.1.1
+
+- Authenticated setup using the previous device upload identity, without Git secrets or device file editing.
+
 # 0.1.0
 
 - Independent durable telemetry/trips, scoped credentials and HA incremental API.

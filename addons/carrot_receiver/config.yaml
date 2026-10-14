@@ -1,5 +1,5 @@
 name: Carrot Vehicle Receiver
-version: "0.1.0"
+version: "0.1.1"
 slug: carrot_receiver
 description: Independent durable vehicle records and command queue for Carrot HA
 url: https://github.com/helico717/carrot-ha
@@ -16,11 +16,14 @@ ports_description:
 options:
   devices: []
   max_database_mb: 1024
+  public_url: ""
 schema:
   devices:
     - device_id: str
       upload_token: password
       view_token: password
+      provision_token: password?
   max_database_mb: int(128,16384)
+  public_url: str
 backup: cold
 watchdog: http://[HOST]:[PORT:8099]/health

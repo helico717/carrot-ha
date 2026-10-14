@@ -20,6 +20,16 @@
   Nginx Proxy Manager가 443을 처리하며 사용자 include 경로 존재 확인.
 - 사용자 지시: Comma는 별도 답장 전까지 오프라인으로 간주. 연결 시도/실기 검증 없음.
 - 현재: 애드온 실제 설치·독립 HTTPS 경로·HA 코드 반영 준비 단계. 전환 완료 아님.
+- 설치 진행: 8303aae 수신기 저장소 기반 ARM64 빌드/실행 성공, 애드온 slug
+  874ccb4c_carrot_receiver. 기존 프록시 사용자 include로 /carrot-receiver 경로 추가,
+  독립 health 및 HA 기존 root 경로 모두 외부 HTTPS 200 확인.
+- HA 소스 62개 기존 백업·SHA-256·문법 확인 후 반영(54 변경/8 동일). 사용자 재시작과
+  실제 source 설정 적용은 대기. 설정·DB·사진은 동기화 대상에서 제외.
+- 후속 구현: 기존 장치 upload identity로 인증된 자체 서버 provisioning과 Git 공개 URL
+  매핑, HA 일회 준비 옵션 적용. Git에 토큰/장치 ID 없음. 수신 10/일회 setup 2,
+  Comma 직접 설정 4/polling 4 검증 통과. 원격 기기 실행은 아직 미검증.
+- 기능 보존: 충전 74/주행 73/카메라 17(1 skip)/터미널 4/파일 로그 15(1 skip),
+  Worker 기존 증분/benchmark 통과. 차계부 환경 제약은 별도 CHANGELOG에 기록.
 
 ## 2026-10-14 — 자체 서버 직접 통신 가능성 조사
 

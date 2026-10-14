@@ -103,6 +103,8 @@ async def async_setup(hass, config):
     return True
 
 async def async_setup_entry(hass, entry):
+    from .direct_receiver import apply_prepared
+    await apply_prepared(hass, entry)
     archive = await hass.async_add_executor_job(Archive, hass.config.path('carrot_ha', entry.entry_id + '.sqlite3'), hass.config.time_zone)
     latest = await hass.async_add_executor_job(archive.latest, entry.data['device_id'])
     hass.data[DOMAIN][entry.entry_id] = {'entry': entry, 'archive': archive, 'lock': asyncio.Lock(), 'latest': latest}
