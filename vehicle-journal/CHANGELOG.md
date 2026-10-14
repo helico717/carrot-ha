@@ -1,3 +1,12 @@
+## 2026-10-14 — 자동 충전 결제 양방향 동기화
+
+- 커밋 제목: `vehicle-journal: synchronize charge payments in both dashboards`.
+- 변경·이유: 차계부 수정이 별도 보정으로 남아 차량 대시보드의 추정 요금과 달라지던 문제를 수정. 자동 충전 지출은 기존 HA charge_payment 원본으로 연결하고, 차계부→원본 쓰기를 SQLite 내구성 큐로 저장한 뒤 재시도한다. 차량 대시보드→차계부 수정도 즉시 원본 투영을 갱신한다. 이전 차계부 보정은 실제 결제 수정 시각과 비교해 최신 값만 한 번 복구하며, 메모·장소 등 차계부 부가정보는 보존한다. 오래 열린 편집창은 버전 충돌로 거절한다. 수동으로 추가한 별도 지출은 자동 충전과 임의 병합하지 않는다.
+- 관련 파일: `vehicle_journal/{store,source,payment_sync,api}.py`, `charge_ws.py`, `vehicle-journal/tests/{test_journal,test_payment_sync}.py`, 기존 beta.5 릴리즈 노트.
+- 검증: 차계부 전체·충전 결제 API/저장·스키마·한/영 요금 표시·최신 상태/이력/증분 동기화 회귀 통과. 합성 데이터로 양방향 수정, 0원, 실제 금액 삭제, 레거시 복구와 최신 결제 우선, DB 쓰기 전/후 중단 및 재시작 복구 확인. 시스템 Python의 Pillow 부재는 번들 Python으로 해결; 기존 unclosed event loop 경고는 남아 있음.
+- 배포: main 푸시·HA 코드 백업/직접 반영·기존 `v0.8.14-beta.5` 재발행 준비 중. 사용자 2026-10-14 명시 요청에 따라 새 프리릴리즈를 만들지 않고 기존 태그/Release를 갱신한다. Python 적용을 위한 사용자 HA 재시작 및 실제 양쪽 화면 확인은 대기.
+- 제한: 열린 화면은 기존 갱신 주기(최대 약 60초) 또는 새로고침 때 갱신. Cloudflare·D1·Comma 변경/배포 없음. 수동 독립 지출 및 원본이 없는 기록은 자동 결제와 연결하지 않는다.
+
 ## 2026-10-13 — 0.8.14-beta.5 실제 발행 확인
 
 - 커밋 제목: `vehicle-journal: record 0.8.14-beta.5 publication verification`.

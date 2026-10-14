@@ -61,6 +61,8 @@ def snapshot(archive, journal):
 def sync(archive, journal, force=False):
     """ACK only after facts AND daily summary are committed. Replay is safe."""
     with journal.lock:
+        from .payment_sync import reconcile
+        reconcile(archive,journal)
         with archive.connect() as db:
             row=db.execute('SELECT generation,acknowledged FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
         if not force and row and row[0]==row[1]:return False

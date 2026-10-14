@@ -15,10 +15,15 @@ async def _write(hass, connection, msg, actual, exclusion=False):
         return
     try:
         async with runtime['lock']:
+            if 'journal' in runtime:
+                from .vehicle_journal.source import sync
+                await hass.async_add_executor_job(sync,runtime['archive'],runtime['journal'],True)
             method = runtime['archive'].set_charge_excluded if exclusion else runtime['archive'].set_charge_payment
             result = await hass.async_add_executor_job(method,
                 runtime['entry'].data['device_id'], msg['payment_id'], msg['source_event_ids'],
                 msg['expected_version'], actual)
+            if 'journal' in runtime:
+                await hass.async_add_executor_job(sync,runtime['archive'],runtime['journal'],True)
             try:
                 await refresh_runtime_costs(hass, runtime)
             except Exception:

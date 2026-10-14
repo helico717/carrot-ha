@@ -123,7 +123,7 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(result['recent_records'][0]['memo'],'corrected')
         with self.assertRaises(Conflict):
             self.journal.change_status(record['id'],record['version'],'deleted')
-        deleted=self.journal.change_status(record['id'],saved['version'],'deleted')
+        deleted=self.journal.change_status(record['id'],result['recent_records'][0]['version'],'deleted')
         sync(self.archive,self.journal,True)
         self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['recent_records'],[])
         self.journal.change_status(record['id'],deleted['version'],'active')

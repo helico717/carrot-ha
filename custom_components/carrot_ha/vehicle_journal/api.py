@@ -109,7 +109,33 @@ async def query(hass,connection,msg):
 @websocket_api.async_response
 async def save(hass,connection,msg):
     r=runtime(hass,connection,msg)
-    if r:await execute(hass,connection,msg,r['journal'].save_manual,msg['record_id'],msg['expected_version'],msg['payload'])
+    if not r:return
+    if 'archive' not in r:
+        await execute(hass,connection,msg,r['journal'].save_manual,msg['record_id'],msg['expected_version'],msg['payload'])
+        return
+    from .source import sync
+    from ..charge_costs import refresh_runtime_costs,PaymentConflict
+    from homeassistant.helpers.dispatcher import async_dispatcher_send
+    def write():
+        with r['journal'].lock:
+            sync(r['archive'],r['journal'],True)
+            r['journal'].save_manual(msg['record_id'],msg['expected_version'],msg['payload'])
+            sync(r['archive'],r['journal'],True)
+            with r['journal'].connect() as db:
+                version=db.execute('SELECT version FROM records WHERE vehicle_id=? AND id=?',(r['journal'].vehicle,msg['record_id'])).fetchone()[0]
+            return {'id':msg['record_id'],'version':version}
+    try:
+        async with r['lock']:
+            result=await hass.async_add_executor_job(write)
+            await refresh_runtime_costs(hass,r)
+        async_dispatcher_send(hass,'carrot_ha'+r['entry'].entry_id)
+        connection.send_result(msg['id'],result)
+    except (Conflict,PaymentConflict) as error:
+        connection.send_error(msg['id'],'conflict',str(error))
+    except ValueError:
+        connection.send_error(msg['id'],'invalid_input','입력한 충전 금액을 확인해 주세요.')
+    except Exception:
+        connection.send_error(msg['id'],'storage_failed','동기화를 완료하지 못했어요. 저장된 변경은 재시도돼요.')
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/record/status',vol.Required('entry_id'):str,

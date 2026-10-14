@@ -57,6 +57,11 @@ class Journal:
                 self._migrate_v1(db)
             if exists and db.execute('SELECT version FROM journal_schema').fetchall() != [(3,)]:
                 raise ValueError('Unsupported journal schema')
+        # Durable journal-to-archive payment writes survive either DB failing.
+        with self.connect() as db:
+            db.execute('''CREATE TABLE IF NOT EXISTS payment_outbox (
+                record_id TEXT PRIMARY KEY, payment_id TEXT NOT NULL,
+                source_ids TEXT NOT NULL, expected_version INTEGER NOT NULL, actual INTEGER)''')
         # SQL is copied into the integration package for HACS distributions.
         with self.connect() as db:
             db.executescript(Path(__file__).with_name('schema.sql').read_text())
@@ -239,13 +244,22 @@ class Journal:
                 for group in groups:
                     data = group['data']; source = group['event_id']; key = self.identity('expense',source)
                     live_group_ids.append(key)
-                    override = db.execute('SELECT extra_json FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
-                    if override and json.loads(override[0]).get('journal_override'):
+                    override = db.execute('SELECT extra_json,status FROM records WHERE vehicle_id=? AND id=?',(self.vehicle,key)).fetchone()
+                    extra=json.loads(override[0]) if override else {}
+                    if extra.get('journal_override') and not extra.get('payment_linked'):
                         continue
                     value = dict(date=data['accounting_date'],category='charging',actual_krw=data['actual_cost_krw'],
                                  estimated_krw=data['estimated_cost_krw'])
+                    if extra.get('payment_linked') and extra.get('input'):
+                        local=extra['input']
+                        value.update(date=local.get('date',value['date']),memo=local.get('memo',''),subcategory=local.get('subcategory'))
+                        local['actual_krw']=data['actual_cost_krw']
+                        extra['input']=local
+                        db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
                     self._record(db,key,'expense','automatic',value,source,
-                                 'excluded' if data.get('excluded') else 'active',{'origin':'automatic','cost_source':data['cost_source']})
+                                 override[1] if override and extra.get('journal_override') and override[1]=='deleted' else ('excluded' if data.get('excluded') else 'active'),{'origin':'automatic','cost_source':data['cost_source']})
+                    extra.update(payment_linked=True,payment_source_ids=data['source_event_ids'])
+                    db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
                     self._expense(db,key,value,'ha_charge_payment',source,data['payment_version'])
                     db.execute('DELETE FROM expense_members WHERE vehicle_id=? AND expense_id=?',(self.vehicle,key))
                     for member in data['source_event_ids']:
@@ -459,6 +473,8 @@ class Journal:
             changed=self._record(db,key,kind,'manual',data,quality=quality)
             if removals and not changed:db.execute('UPDATE records SET version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(now(),self.vehicle,key))
             extra=json.loads(old[2]) if old else {}
+            linked=bool(old and old[1]=='automatic' and kind=='expense' and extra.get('payment_linked'))
+            if linked and (data.get('category')!='charging' or (data.get('actual_krw') is not None and data['actual_krw']>999999999)):raise ValueError('자동 충전 결제의 분류는 바꿀 수 없어요.')
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
             if 'location' in payload:extra['location']=payload['location']
             db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
@@ -466,7 +482,11 @@ class Journal:
             if kind=='expense':
                 count=db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]
                 if data.get('category')!='accident' and count>5:raise ValueError('사진이 5장을 초과하는 사고 기록의 분류는 바꿀 수 없어요.')
-                self._expense(db,key,data)
+                if linked:
+                    payment=db.execute('SELECT payment_id,payment_version,estimated_krw FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,key)).fetchone()
+                    db.execute('INSERT OR REPLACE INTO payment_outbox VALUES (?,?,?,?,?)',(key,payment[0],encode(extra['payment_source_ids']),payment[1],data.get('actual_krw')))
+                    self._expense(db,key,dict(data,estimated_krw=payment[2]),'ha_charge_payment',payment[0],payment[1])
+                else:self._expense(db,key,data)
                 if data.get('category')=='refueling' or old:
                     wash_id=self.identity('refueling_wash_cost',key)
                     old_wash=db.execute('SELECT accounting_date FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,wash_id)).fetchall()
