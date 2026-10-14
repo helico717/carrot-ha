@@ -1946,7 +1946,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       color_mode: this.getEffectiveTheme()
     });
 
-    // Make load a permanent simulated action so it never queries Cloudflare or HA REST APIs
+    // Make load a permanent simulated action so it never queries Vehicle receiver or HA REST APIs
     this.dashCard.load = async () => {
       this.applyDebugTelemetry();
     };

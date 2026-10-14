@@ -311,7 +311,7 @@ class CarrotDashboard extends HTMLElement {
 .parking-tiles{margin-top:18px}
 
 .trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
-</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.live_status||v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>최신 확인 ${time(v.live_checked_at||v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`);
+</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>차량 수신기 · ${esc(v.live_status||v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>최신 확인 ${time(v.live_checked_at||v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`);
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
@@ -908,7 +908,7 @@ class CarrotDashboard extends HTMLElement {
       row('crosshairs-gps','GPS 정확도',n(v.gps_accuracy_m,1),'m'),
       row('parking','주차 기록 시각',v.parking_at?time(v.parking_at,this._hass?.config?.time_zone):'—'),
       row('cloud-check','HA 동기화 시각',v.last_sync?time(v.last_sync,this._hass?.config?.time_zone):'—'),
-      row('cloud-outline','클라우드 연동 상태',v.cloud_status||'—'),
+      row('cloud-outline','차량 수신기 상태',v.cloud_status||'—'),
       row('calculator','SOC 계산 배터리 용량',n(v.soc_capacity_kwh,1),'kWh'),
       row('fan','공조 송풍 단계',n(v.blower_level,0)),
       row('fan-auto','공조 송풍 제어 전압',n(v.blower_volt,2),'V'),

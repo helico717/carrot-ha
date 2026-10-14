@@ -1,3 +1,10 @@
+## 0.1.3
+
+- 수신/저장/HA ACK/명령 처리 결과·UTC 시각·익명 요청/차량 식별·분당 요약을 로그 화면에 출력.
+- DEBUG 1~60분 후 INFO 자동 복귀, 반복 오류 30초 제한, 파일 약 8MiB 순환 보관.
+- 토큰/GPS/원본 본문·예외 메시지 비기록 및 검증 추가.
+- 초기화 복구 안내와 Windows/Mac 비밀번호 안전 입력 도구 연결.
+
 # 0.1.2
 
 - Preserve existing trip measurement bounds, maximum speed and missing quality metadata behavior.

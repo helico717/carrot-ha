@@ -1,3 +1,4 @@
+# DEPRECATED standalone cloud collector reference; current Comma daemon is Git-managed in helico717/openpilot.
 """Standalone MyID4 CAN reader -> existing Cloudflare API, with durable outbox."""
 import json
 import os

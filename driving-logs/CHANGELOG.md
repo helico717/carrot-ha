@@ -1,5 +1,29 @@
 # 주행 로그 변경 기록
 
+## 2026-10-14 — 자체 수신기 진단·표시·전수 문서·복구·0.9 베타 준비
+
+- 사용자 요청: 추천 방식으로 진단 로그 확대, 모든 Markdown과 프로젝트 파일의 이전 서버 의존 점검,
+  HA 중심 정리, HA/Comma/둘 다 초기화에 대비한 쉬운 안내 및 완료 후 v0.9.0-beta.1 발행.
+- 수신 앱 0.1.3: UTC 시각·요청 식별·익명 차량 번호·저장/ACK/명령 결과·분당 요약,
+  기본 INFO, 최대 60분 DEBUG 자동 종료, 동일 오류 30초 제한, 파일 2MiB×4 순환 보관.
+  토큰·GPS·원본 본문·인증 헤더·개인 장치 ID·예외 메시지를 로그에 넣지 않음.
+- 대시보드/튜너의 고정 Cloudflare 문구 제거, 폐기된 설정 입력란 제거, 기존 비공개 옵션 보존.
+- CLEAN_INSTALL_RECOVERY: 3개 초기화 경우·백업 유무·개인 보관 정보·외부 경로 복구·Windows/Mac
+  SSH/설정 명령·카메라·성공 확인. tools/receiver-recovery.py는 설치된 Git 설정 CLI만 호출하고 키는 stdin 전달.
+- 문서 전수 103개 검토 목록은 cloudflare-retirement-audit에 기록. 과거 설치 안내는 실행 금지 보관,
+  과거 서비스 설명 취소선. 원작 Android 및 원작 손님 지원용 선택적 터널은 HA 경로 밖이므로 보존.
+- 클린 Comma 설치 조사: direct-connection.json만 있을 때 manager 시작 조건 누락 확인.
+  companion openpilot의 시작 조건 보완 및 실제 함수를 분리 실행하는 회귀 검사 추가.
+- 관련 파일: addons/carrot_receiver/*, config_flow/strings/ko/frontend 표시, tests/test_receiver_*,
+  tests/test_direct_receiver.py, tools/receiver-recovery.py, 모든 감사 표 분류 문서,
+  companion process_config.py 및 test_direct_connection.py. 기록/영상의 기존 API·계산·보관 정책 유지.
+- 검증: 진단 3건 및 수신 10건 초기 통과. 나머지 검증·Git 게시·앱 운영 반영·릴리즈 확인 진행 중.
+  HA Core/Comma 재부팅·새 정상 주행·장기 운영은 별도 사용자 검증. 기존 Worker 배포/DB 변경 없음.
+
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../docs/CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
+# 주행 로그 변경 기록
+
 ## 2026-10-14 — 애드온 진단 로그 범위 검토
 
 - 사용자 질문: 추후 troubleshooting을 위해 애드온 로그 화면에 모든 로그를 표시하는
@@ -15,13 +39,13 @@
 - 관련: addons/carrot_receiver/receiver.py와 공식 Supervisor log endpoints.
   코드·설정·배포·기기 Pull/재부팅·릴리즈 변경 없이 조사 기록만 게시한다.
 
-## 2026-10-14 — 대시보드 Cloudflare 상태 문구 조사
+## 2026-10-14 — 대시보드 ~~Cloudflare~~ 상태 문구 조사
 
-- 사용자 첨부: 대시보드 footer에 Cloudflare · ok 잔존.
-- 원인: carrot-dashboard-ko.js/en.js footer의 서버 이름이 Cloudflare 문자열로
+- 사용자 첨부: 대시보드 footer에 ~~Cloudflare~~ · ok 잔존.
+- 원인: carrot-dashboard-ko.js/en.js footer의 서버 이름이 ~~Cloudflare~~ 문자열로
   고정되어 있다. 상태값은 live_status/cloud_status 공통 키이며 실제 연결 대상을
   나타내는 이름이 아니다. 직접 source 적용 후에도 동일 상태 키를 재사용한다.
-- 현재 직접 receiver 적용은 앞선 운영 점검으로 확인. 이번 질문의 표시가 Cloudflare
+- 현재 직접 receiver 적용은 앞선 운영 점검으로 확인. 이번 질문의 표시가 ~~Cloudflare~~
   통신 재개를 증명하지 않는다. 표시 문구 전환 누락과 실제 통신 경로를 구분해 안내.
 - 코드 읽기 조사만 수행. 실행 코드·배포·기기 업데이트·재부팅·릴리즈 변경 없음.
 
@@ -33,7 +57,7 @@
   서버 읽기 확인으로 자체 수신기 trip feed는 0건, cursor=0, has_more=false.
 - 확인된 범위: 사용자 업데이트 후 새 파일 로그 HA 목록 표시. 영상 재생·rlog 내용
   전체·일반 주행 내역 업로드·장거리/충전·장기 운영은 이 화면만으로 확인하지 않음.
-- 기록만 갱신. 기기 명령·코드 수정·재부팅·새 릴리즈·Cloudflare 변경 없음.
+- 기록만 갱신. 기기 명령·코드 수정·재부팅·새 릴리즈·~~Cloudflare~~ 변경 없음.
 
 ## 2026-10-14 — 사용자 재시작 후 직접 연결 운영 확인
 
@@ -50,12 +74,12 @@
 
 ## 2026-10-14 — 직접 수신 전환 전 기록
 
-- 사용자 요청: Cloudflare 의존을 자체 HAOS 수신 애드온으로 이전하되 기존 기능
+- 사용자 요청: ~~Cloudflare~~ 의존을 자체 HAOS 수신 애드온으로 이전하되 기존 기능
   하나도 변경하지 않고, 본격 수정 전에 이유와 전체 보존·복구·검증 기준을 기록.
 - docs/direct-vehicle-receiver-plan-2026-10-14.md에 원인·현재 경로·기능 목록·인증/
   cursor/queue-ID·보관·백업·이전·네트워크·가용성 차이·검증/전환 순서를 작성.
 - 실행 코드 수정 전 작성. 이전 기능·날짜 기록/설정·결제·파일·안전 차단 보존.
-  기존 Cloudflare DB 삭제/기기 수동 소스 수정/에이전트 재부팅/새 Release 발행 없음.
+  기존 ~~Cloudflare~~ DB 삭제/기기 수동 소스 수정/에이전트 재부팅/새 Release 발행 없음.
 - 검증: 현재 코드 경로와 이전 누적 릴리즈 기록 대조. 실제 애드온/외부 연결 미검증.
   본 문서와 기록을 먼저 커밋·푸시 후 구현 진행 예정.
 - 사전 기록은 3c9e4f0로 main 커밋·원격 게시 후 실행 코드 작업 시작.
@@ -77,7 +101,7 @@
   매핑, HA 일회 준비 옵션 적용. Git에 토큰/장치 ID 없음. 수신 10/일회 setup 2,
   Comma 직접 설정 4/polling 4 검증 통과. 원격 기기 실행은 아직 미검증.
 - 기능 보존: 충전 74/주행 73/카메라 17(1 skip)/터미널 4/파일 로그 15(1 skip),
-  Worker 기존 증분/benchmark 통과. 차계부 환경 제약은 별도 CHANGELOG에 기록.
+  ~~Worker~~ 기존 증분/benchmark 통과. 차계부 환경 제약은 별도 CHANGELOG에 기록.
 - 자동 설정 967beff main 게시 후 HA 최종 소스 63개 hash/문법 확인. 자체 서버
   실제 HTTPS provisioning 200과 장치/새 credential 내부 대조 성공(원문 미출력).
   HA 비공개 일회 source 설정 준비, 기존 terminal_enabled와 직접 HA 주소 보존 확인.
@@ -92,12 +116,12 @@
   회복 보정(537f5d90/cd24a0ec/40148b0d), 직접 연결 6/polling 4/outbox 1 통과.
 - HA 소스 반영·비공개 일회 옵션 준비 완료지만 사용자 HA Core 재시작 미실행.
   Comma Pull/재부팅 미실행. 실차·HA 재시작 중 수신·실제 백업 복원·24시간 관측은 대기.
-  새 HA 버전·태그·Release 없음. Cloudflare DB 삭제·Worker 변경/배포 없음.
+  새 HA 버전·태그·Release 없음. ~~Cloudflare~~ DB 삭제·~~Worker~~ 변경/배포 없음.
 
 ## 2026-10-14 — 자체 서버 직접 통신 가능성 조사
 
-- 요청: 코드 변경 없이 Cloudflare 의존 제거의 기능 보존 가능성·장단점 검토.
-- 확인: 일반 상태/주행은 Worker 저장 후 cloud.py가 HA로 동기화하며, 파라미터
+- 요청: 코드 변경 없이 ~~Cloudflare~~ 의존 제거의 기능 보존 가능성·장단점 검토.
+- 확인: 일반 상태/주행은 ~~Worker~~ 저장 후 cloud.py가 HA로 동기화하며, 파라미터
   큐/ACK/설정 동기화도 Worker에 의존한다. 영상/rlog·주차 카메라·터미널의 본
   전송은 HA 직접 경로가 있지만 초기 주소/토큰 발견은 terminal_bootstrap에 의존한다.
 - 판단: 수신 저장·인증·명령 큐·직접 연결 설정을 자체 서버로 옮기면 현재 HA 기능
@@ -107,14 +131,14 @@
   수신 서비스는 HA 재시작 중 수신 가능하나 동일 서버/회선 장애는 공유한다.
 - 관련: cloudflare/src/worker.js, HA cloud.py/terminal_bootstrap.py/terminal_relay.py/
   camera_http.py/driving_logs/http.py, openpilot collector.py/param_sync.py/terminal.py.
-- 검증: 로컬 코드 읽기와 HA 공식 외부 접근 문서 검토. 운영 네트워크의 Cloudflare
+- 검증: 로컬 코드 읽기와 HA 공식 외부 접근 문서 검토. 운영 네트워크의 ~~Cloudflare~~
   프록시/터널 사용 여부 및 원작 앱의 전체 활성 기능은 미확인. 실행 코드·설정·DB·
   릴리즈·배포 변경 없음. 조사 기록만 로컬 반영.
 
 ## 2026-10-14 — 저장 용량과 프리릴리즈 범위 재점검
 
 - 이유: 사용자 요청으로 장기 용량 위험 및 beta.6/beta.7의 이전 변경 포함 여부를 재검토.
-- 운영 조회: D1 280,588,288 bytes. 압축·중복 제거·용량 예산·ACK 기반 정리로 여유를
+- 운영 조회: ~~D1~~ 280,588,288 bytes. 압축·중복 제거·용량 예산·ACK 기반 정리로 여유를
   확보했으나 예산은 본문 기준이며 물리 DB 전체 상한 보장은 아니다.
 - HA 설치 버전은 0.8.14-beta.5이며 자동 archive ACK와 새 압축 응답 해독 코드가
   설치되지 않았음을 읽기 전용 확인. 일회성 ACK 이후의 지속 정리와 실제 cron 실행,
@@ -156,7 +180,7 @@
   차계부/텔레메트리 archive와 별도 파일 저장.
 - HA API: `driving_logs/http.py`, 통합 `__init__.py` 등록. 목적별 장치 HMAC 인증,
   관리자 인증 이후 장치 범위 1시간 HttpOnly 조회 세션, 목록·구간·파일·영상 Range 응답.
-- Comma: `ha/driving_logs.py`와 `terminal.py` 연결. 기존 discovery 결과 공유로 새 Worker
+- Comma: `ha/driving_logs.py`와 `terminal.py` 연결. 기존 discovery 결과 공유로 새 ~~Worker~~
   polling 없이 HA 직접 전송. 완료·잠금 해제 원본만 최신부터 순차 전송, 원본 TS 보존,
   FFmpeg stream-copy MP4 생성, FFprobe 길이가 있으면 시작시각 계산. 전송 상태는 Git 밖.
 - UI: `frontend/carrot_logs/`는 원본 당근웹 로그 HTML·생성 UI/로그 번들·스타일 재사용.
@@ -174,7 +198,7 @@
   openpilot `ha/tests/test_driving_logs.py`.
 - 통과: 저장/해시/중단 재개/용량/경로 검증 4건, 실제 HTTP 및 Comma sender→HA receiver
   통합 2건, Chromium 목록·선택·정렬·영상 창 URL·닫기·모바일, dashboard live/lazy/view-state,
-  cloud live/incremental/history cache, Worker incremental/benchmark, Comma param/terminal/logs 12건.
+  cloud live/incremental/history cache, ~~Worker~~ incremental/benchmark, Comma param/terminal/logs 12건.
 - 전체 Comma 92건 중 기존 카메라 검사 2건 실패: `encode_media` 누락 및 PyAV 누락 기대
   불일치. 카메라 소스·테스트의 HEAD 대비 변경 없음 확인. 기기 장애로 판단하지 않는다.
 - 환경 보정: Mac 기본 Python 3.9에는 `asyncio.timeout`이 없어 기존 terminal 검사 실패.
@@ -285,7 +309,7 @@
   전송 확인/진행/결과·정렬·영상·모바일 검사 통과. 원본 HUD/GPU 픽셀·아이콘·전후
   seek·상단 이전/다음·현재 구간 표시·HUD 토글·닫기·라이브 소켓 0개 검사 통과.
 - 기존 dashboard live/lazy/view-state 10건, incremental 5건·history 1건·Comma param
-  polling 4건 통과. Worker benchmark 통과. Worker incremental은 기존 스키마의
+  polling 4건 통과. ~~Worker~~ benchmark 통과. ~~Worker~~ incremental은 기존 스키마의
   `measurements_json` 중복 마이그레이션 오류에서 실패(해당 코드 변경 없음).
 - UTF-8 모드에서 cloud-live 6건 통과. 로그 HTTP 검사에 미인증 summary 거부·
   인증된 원본 크기 요약·다른 엔트리 작업 ID 조회 거부를 추가했다.
@@ -308,7 +332,7 @@
 - 최종 검사: 실제 수신 rlog/MP4로 재생 진행·일시정지·seek 기록 갱신, SVG 그래프,
   모바일 크기, 닫기 및 목록·썸네일·선택 검사 통과. API/저장/전송 통합 6건 및
   기존 dashboard live/lazy/view-state 회귀 통과.
-- Comma·Worker·D1/KV·manifest 변경 없음. 버전 상승·태그·Release 발행 없음.
+- Comma·~~Worker~~·D1/KV·manifest 변경 없음. 버전 상승·태그·Release 발행 없음.
 - 새 replay-source API 활성화를 위해 사용자 HA 재시작 1회와 강력 새로고침이 필요하다.
   운영 8번 대시보드에서 수정 리플레이를 확인한 것은 아직 아니다.
 - 코드 게시: HA 첫 단계 `4d16902`, 썸네일·목록·리플레이 보정 `5d082d2`를 원격 main에
@@ -325,37 +349,37 @@
   이전 자료 보존, 시간/바이트 예산과 시간당 정리, 주행/상태 송신 lane 분리를 구현한다.
 - 자동 승인 심사는 운영 DB 전체 백업의 개인정보 전송을 거절했다. 사용자가 GPS·
   주행 이력을 포함한 전체 백업을 PC 비공개 Temp 경로에 저장하도록 명시적으로 허용한
-  뒤 D1 export 성공. 백업 SQLite integrity_check 및 54,950개 변환 행의 원문 gzip
+  뒤 ~~D1~~ export 성공. 백업 SQLite integrity_check 및 54,950개 변환 행의 원문 gzip
   복원 동등성을 확인. 본문 440,750,825→169,225,858 bytes; 원본 백업 유지.
   민감 원문·장치 ID·토큰·백업 다운로드 링크는 문서/Git에 포함하지 않는다.
-- 합성 Worker storage/history/incremental/benchmark, HA live 6·incremental 5·history 1,
+- 합성 ~~Worker~~ storage/history/incremental/benchmark, HA live 6·incremental 5·history 1,
   dashboard 10건 통과. Windows에서 Comma 전체 69건 중 fcntl 부재 2·symlink 권한 1·
   기존 workflow bash 경로 1 실패. 실행 코드 배포·운영 DB 변환은 아직 진행 전이다.
 - Git 게시: HA/Worker 구현 `83ed541`, Comma 기능 `e9c9f4cd`와 동시 upstream을
   보존한 병합 `0522a86662ecf48949dd37cb1a2aedcd573486b9` 원격 확인.
-- 운영 복구: 호환 모드 Worker dee4175f 배포 후 54,950행 무손실 본문 압축 적용.
+- 운영 복구: 호환 모드 ~~Worker~~ dee4175f 배포 후 54,950행 무손실 본문 압축 적용.
   DB bytes 499,998,720→274,784,256. 원문/행/커서 삭제 없음. 이어 additive
-  migration_archive_storage.sql 적용, 최종 Worker 8703ca54 배포. 크기 약276MB,
+  migration_archive_storage.sql 적용, 최종 ~~Worker~~ 8703ca54 배포. 크기 약276MB,
   telemetry 본문/공유 context 예산 사용169.3MB/250MB, trips9.6MB/75MB.
 - beta.6 manifest/태그 일치·GitHub Release 생성 확인. Actions 38556238637 성공.
   HA 수신 ACK 실행 코드는 HACS 설치·사용자 재시작 대기이다.
-- 변환 직후 D1 metadata API 7009 및 HA cloud API timeout이 일시 발생했으나 이후
+- 변환 직후 ~~D1~~ metadata API 7009 및 HA cloud API timeout이 일시 발생했으나 이후
   읽기/쓰기 재개 확인. HA 실제 latest 약0.305s/history66건 약0.604s/trips 약0.307s,
   history 원래 deviceId 포함 payload 복원 확인. 오래된 오전 미전송 trip이 서버에
   수신되기 시작했으나 오후 주행 수신 완료는 아직 확인하지 않았다.
-- 일회성 변환/ALTER/index에서 각각54,950/54,988 rows_written 발생. 이후 D1 info
+- 일회성 변환/ALTER/index에서 각각54,950/54,988 rows_written 발생. 이후 ~~D1~~ info
   최근24h117,303 writes 측정. 현재 요청은 동작하지만 계정 전체/UTC 일일 한도와
   장기 무료 플랜 보장은 미검증. 정상 유지보수 부담을 줄이도록 정리를200행/시간으로
   제한한다(초기 오래된 자료 정리에 수일 소요 가능; 미수신 자료는 삭제하지 않음).
 - 실제 첫 HA durable cursor ACK 성공(telemetry55278/trip395), 14일 초과 확인 자료
-  200건 정리. 초기 응답의400은 D1 meta.changes에 예산 트리거200쓰기가 포함된
+  200건 정리. 초기 응답의400은 ~~D1~~ meta.changes에 예산 트리거200쓰기가 포함된
   것이므로 RETURNING 행 수로 보정했다. 보정 커밋0ee0c0e·Worker3473f4ad 배포.
 - 운영 CPU 검증에서 100건 압축 복원이73~78ms로 측정돼 무료 CPU 기준 대비
   보정한다. opt-in 압축 전송을 HA executor에서 복원하고 shared context는 페이지당
   한 번 전송한다. 새 HA는100건×최대10페이지, 이전 HA는 원문 호환8건 페이지.
   최신 상태 경로는 그대로 두고 beta.7로 HA 수정본을 발행한다. 2개 복원/손상/상한
   검사와 기존 ACK/incremental/live 검사 통과. 실제 새 CPU·오후 주행 수신은 후속 확인.
-- beta.7 압축 전송 구현2b206ff 게시·Worker e18e1cef 배포. 운영 HA 서버 메모리에서
+- beta.7 압축 전송 구현2b206ff 게시·~~Worker~~ e18e1cef 배포. 운영 HA 서버 메모리에서
   게시된 cloud_archive.py로 실제100건을 복원해 장치 ID/값 형식 검사 통과(파일 설치 없음).
   요청 CPU4ms 확인. 기존8건 원문 복원은21ms 표본이 있어2건으로 추가 제한한다.
   새 HA100건×10페이지는 유지하며 이전 HA catch-up은 느려질 수 있다. unchanged
@@ -366,7 +390,7 @@
   telemetry 송신9~13ms. 작은 snapshot 나머지는 JSON+immutable context 참조로
   저장해 매건 gzip 비용을 줄이고, 큰 나머지/반복 context/기존 이력은 gzip을 유지한다.
   HA beta.7 복원기는 JSON/gzip을 이미 지원하므로 추가 HA 버전 상승은 필요 없다.
-- 최종 게시/배포: Worker ed8b0f6 코드·dff4cdad-9c35-49fc-bb79-15ca3a884e3e 배포,
+- 최종 게시/배포: ~~Worker~~ ed8b0f6 코드·dff4cdad-9c35-49fc-bb79-15ca3a884e3e 배포,
   POST telemetry4~9ms/200 표본 확인. 새 JSON 경로의 missing-context 회귀가 검증 중
   실패해 guard를 추가하고 storage/history/sync/benchmark 및 HA 복원·ACK·history·
   dashboard 검사를 다시 통과했다. 민감 자료 없는 일시 tail은 모두 종료했다.
@@ -403,15 +427,15 @@
   oldest outbox를 번갈아 전송하며 oldest 실패 시 최신 텔레메트리로 되돌아간다.
   따라서 온라인 상태 갱신과 오래된 행 뒤의 주행 업로드 정체가 공존할 수 있다.
   영상/rlog 송신 완료를 기다리는 주행 API 조건은 해당 수집기 코드에 없다.
-- HTTP 500 응답 원문의 원인은 아직 미확인. Worker 오류 스트림 접속은 응답 대기;
+- HTTP 500 응답 원문의 원인은 아직 미확인. ~~Worker~~ 오류 스트림 접속은 응답 대기;
   HA SSH 앱 Docker 보호 모드로 컨테이너 로그 조회 불가, 보호 모드는 변경하지 않았다.
   기기 파일 수정·대기열 삭제·재부팅·수동 원본 재전송은 수행하지 않았다.
-- 후속 원인 확정: 운영 Worker 오류 스트림에서 `/api/telemetry` HTTP 500과
+- 후속 원인 확정: 운영 ~~Worker~~ 오류 스트림에서 `/api/telemetry` HTTP 500과
   `D1_ERROR: Exceeded maximum DB size`, handleArchivedTelemetry 저장 실패 확인.
-  D1 info 실제 bytes=499,998,720. 읽기 전용 단일 집계 결과 telemetry_history
+  ~~D1~~ info 실제 bytes=499,998,720. 읽기 전용 단일 집계 결과 telemetry_history
   54,965행·본문 합계 440,754,890 bytes, 14일 초과 29,865행, 가장 오래된 시각
   2026-07-28, 가장 최근 저장 2026-10-14 09:24:50 KST.
-- 인과관계: D1 용량 초과 → 09:25:50 상태 이력 저장 실패 → oldest-first 대기열
+- 인과관계: ~~D1~~ 용량 초과 → 09:25:50 상태 이력 저장 실패 → oldest-first 대기열
   정체 → 뒤의 오후 주행 미전송. latest 우선 경로로 온라인 상태는 갱신될 수 있다.
   영상/rlog 완료 조건이 일반 주행 업로드를 막았다는 증거는 없다.
 - 보관 정리 관련: 로컬 Worker는 기본 14일 telemetry purge 및 scheduled handler가
@@ -420,11 +444,11 @@
 - 조사 완료 후 HA 원격 터미널 연결 해제. 복구·DB 삭제·보관 정책 변경·코드 배포는
   이번 원인 분석 요청에서 수행하지 않았다. 조사 문서만 커밋·푸시 대상이다.
 - 과거 다이어트 범위 대조: 2026-10-04 `68d6a28`은 HA 로컬 archive_codec/storage
-  압축 구현이며 Cloudflare 파일 변경 없음. docs/sqlite-lossless-compression.md에도
-  Worker·D1·Comma 변경/배포 없음이 명시돼 있다. 운영 HA 압축 결과는 약
-  415MB→213MB로 별도 기록돼 있다. Cloudflare 압축의 배포 누락으로 해석하지 않는다.
-- 별도 보관 정책 커밋 `9fcf64b`(2026-09-17)은 HA와 Worker purge를 추가했다.
-  운영 Worker 배포 조회 최신은 2026-10-03 02:25:46 KST,
+  압축 구현이며 ~~Cloudflare~~ 파일 변경 없음. docs/sqlite-lossless-compression.md에도
+  ~~Worker~~·~~D1~~·Comma 변경/배포 없음이 명시돼 있다. 운영 HA 압축 결과는 약
+  415MB→213MB로 별도 기록돼 있다. ~~Cloudflare~~ 압축의 배포 누락으로 해석하지 않는다.
+- 별도 보관 정책 커밋 `9fcf64b`(2026-09-17)은 HA와 ~~Worker~~ purge를 추가했다.
+  운영 ~~Worker~~ 배포 조회 최신은 2026-10-03 02:25:46 KST,
   version d73bcf6c-1ac4-48cd-84ae-0eaeec74a866. 원격 예약 실제 설정은 미확인.
 
 - 사용자 범위: 16~17시 일반 차량 대시보드 주행 내역. 영상/rlog 로그 목록과 구분한다.

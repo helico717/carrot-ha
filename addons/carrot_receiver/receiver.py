@@ -15,6 +15,9 @@ import time
 from urllib.parse import urlsplit
 import uuid
 import zlib
+import traceback
+
+from diagnostics import Diagnostics, configure as configure_logging, request_id, vehicle_label
 
 from aiohttp import web
 
@@ -226,6 +229,7 @@ class Store:
                         healthy_panda(enriched, before)
                     db.execute('''INSERT INTO latest VALUES (?,?,?) ON CONFLICT(device) DO UPDATE
                         SET at=excluded.at,raw=excluded.raw''', (device, at, packed(enriched)))
+            LOG.debug('telemetry_committed duplicate=%s', bool(exists))
             return {'ok': True}
         identity = body.get('id')
         if not isinstance(identity, str) or not 1 <= len(identity) <= 128:
@@ -253,6 +257,7 @@ class Store:
                 # New revision on material changes; identical retries do not advance the cursor.
                 db.execute('DELETE FROM trips WHERE device=? AND id=?', (device, identity))
                 db.execute('INSERT INTO trips(device,id,ended,raw) VALUES (?,?,?,?)', (device, identity, ended, raw))
+        LOG.info('trip_committed changed=%s', not previous or previous['raw'] != raw)
         return {'ok': True, 'id': identity}
 
     @staticmethod
@@ -328,6 +333,7 @@ class Store:
             db.execute('''INSERT INTO acknowledgements VALUES (?,?,?,?) ON CONFLICT(device) DO UPDATE
                 SET telemetry=MAX(telemetry,excluded.telemetry),trips=MAX(trips,excluded.trips),at=excluded.at''',
                        (device, *values, stamp()))
+        LOG.info('archive_ack durable_telemetry=%d durable_trips=%d', *values)
         return {'ok': True}
 
     def maintenance(self):
@@ -357,6 +363,7 @@ class Store:
         with self.connect() as db:
             db.execute('INSERT INTO settings VALUES (?,?,?) ON CONFLICT(device) DO UPDATE SET raw=excluded.raw,at=excluded.at',
                        (device, data, at))
+        LOG.info('settings_committed values=%d', len(values))
         return {'ok': True, 'updated_at': at}
 
     def settings(self, device, query):
@@ -396,6 +403,7 @@ class Store:
                 value = str(int(value)) if isinstance(value, bool) else str(value)
                 ids.append(db.execute('INSERT INTO commands(device,param_name,param_value,created_at) VALUES (?,?,?,?)',
                                       (device, name, value, at)).lastrowid)
+        LOG.info('commands_queued count=%d', len(ids))
         return {'ok': True, 'queued': len(ids), 'ids': ids, 'at': at}
 
     def pending(self, device):
@@ -420,6 +428,7 @@ class Store:
                 for identity in items:
                     db.execute("UPDATE commands SET status=?,applied_at=? WHERE device=? AND id=? AND status='pending'",
                                (status, stamp(), device, identity))
+        LOG.info('commands_ack applied=%d failed=%d', len(groups[0][1]), len(groups[1][1]))
         return {'ok': True, 'acked': len(ids)}
 
     def command_status(self, device, query):
@@ -456,6 +465,7 @@ class Store:
 
 
 def create_app(config, store):
+    diagnostics = Diagnostics(LOG)
     devices = config['devices']
     for item in devices:
         if not isinstance(item.get('device_id'), str) or not 1 <= len(item['device_id']) <= 128:
@@ -477,7 +487,7 @@ def create_app(config, store):
     async def handler(request):
         path = request.path
         if path == '/health' and request.method == 'GET':
-            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.2'})
+            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.3'})
         if path == '/api/source' and request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
         upload = (path in ('/api/telemetry', '/api/trips', '/api/settings/sync', '/api/params/ack') and request.method == 'POST'
@@ -488,6 +498,7 @@ def create_app(config, store):
         if item is None:
             return web.json_response({'error': 'unauthorized'}, status=401)
         device = item['device_id']
+        vehicle_label.set('vehicle-' + str(devices.index(item) + 1))
         body = await request.json() if request.method == 'POST' else None
         if body is not None and not isinstance(body, dict):
             raise ValueError('object_required')
@@ -498,6 +509,7 @@ def create_app(config, store):
         call, args = None, ()
         if path == '/api/provision' and request.method == 'POST':
             public_url = base_url(config.get('public_url', ''))
+            LOG.info('connection_provisioned transport=direct')
             return web.json_response({'config': {'transport': 'direct', 'url': public_url,
                 'device': device, 'token': item['upload_token']}}, headers={'Cache-Control': 'no-store'})
         if path == '/api/source' and request.method == 'GET':
@@ -534,24 +546,49 @@ def create_app(config, store):
 
     @web.middleware
     async def errors(request, handler):
+        start = time.perf_counter()
+        context = request_id.set(uuid.uuid4().hex[:12])
+        vehicle_context = vehicle_label.set('-')
+        error_type, status = None, 500
         try:
-            return await handler(request)
-        except web.HTTPException:
+            response = await handler(request)
+            status = response.status
+            return response
+        except web.HTTPException as error:
+            status, error_type = error.status, type(error).__name__
             raise
         except OverflowError:
+            status, error_type = 503, 'receiver_capacity'
             return web.json_response({'error': 'receiver_capacity', 'retryable': True}, status=503)
         except LookupError:
+            status, error_type = 404, 'settings_not_found'
             return web.json_response({'error': 'settings_not_found'}, status=404)
         except (ValueError, TypeError, KeyError):
+            status, error_type = 400, 'invalid_request'
             return web.json_response({'error': 'invalid_request'}, status=400)
         except Exception as error:
-            LOG.error('Request failed (%s)', type(error).__name__)
+            status, error_type = 503, type(error).__name__
+            frames = ['%s:%d:%s' % (Path(frame.filename).name, frame.lineno, frame.name)
+                      for frame in traceback.extract_tb(error.__traceback__)[-8:]]
+            LOG.debug('storage_error_frames=%s', ' '.join(frames))
             return web.json_response({'error': 'storage_unavailable', 'retryable': True}, status=503)
+        finally:
+            diagnostics.record(request.method, request.path, status, (time.perf_counter() - start) * 1000, error_type)
+            vehicle_label.reset(vehicle_context)
+            request_id.reset(context)
 
     app = web.Application(client_max_size=MAX_BODY, middlewares=[errors])
     app.router.add_route('*', '/{path:.*}', handler)
 
     async def maintenance(app):
+        async def summaries():
+            deadline = time.monotonic() + config.get('debug_minutes', 15) * 60
+            while True:
+                await asyncio.sleep(60)
+                diagnostics.summary()
+                if config.get('log_level') == 'DEBUG' and LOG.level == logging.DEBUG and time.monotonic() >= deadline:
+                    LOG.setLevel(logging.INFO)
+                    LOG.info('debug_window_expired log_level=INFO')
         async def loop():
             while True:
                 await asyncio.sleep(3600)
@@ -561,18 +598,24 @@ def create_app(config, store):
                 except Exception as error:
                     LOG.error('Maintenance deferred (%s)', type(error).__name__)
         task = asyncio.create_task(loop())
+        summary_task = asyncio.create_task(summaries())
+        LOG.info('receiver_started version=0.1.3 devices=%d database_limit_mb=%d log_level=%s',
+                 len(devices), store.max_bytes // 1048576, logging.getLevelName(LOG.level))
         yield
         task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        summary_task.cancel()
+        await asyncio.gather(task, summary_task, return_exceptions=True)
+        diagnostics.summary()
         await asyncio.to_thread(store.checkpoint)
+        LOG.info('receiver_stopped database_checkpoint=complete')
     app.cleanup_ctx.append(maintenance)
     return app
 
 
 if __name__ == '__main__':
     import os
-    logging.basicConfig(level=logging.INFO)
     data = Path(os.environ.get('CARROT_RECEIVER_DATA', '/data'))
     config = json.loads((data / 'options.json').read_text())
+    configure_logging(data, config.get('log_level', 'INFO'))
     store = Store(data / 'receiver.sqlite3', int(config.get('max_database_mb', 1024)) * 1048576)
     web.run_app(create_app(config, store), host='0.0.0.0', port=8099, access_log=None)

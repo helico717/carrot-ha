@@ -1,4 +1,4 @@
-"""Poll the MyID4-compatible Worker; credentials never reach the frontend."""
+"""Sync the own vehicle receiver; legacy source compatibility preserves old archives."""
 import asyncio
 import json
 import logging

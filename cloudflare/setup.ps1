@@ -1,3 +1,4 @@
+throw 'Deprecated: current HA setup uses Carrot Vehicle Receiver. See docs/CLEAN_INSTALL_RECOVERY.md. This legacy setup is disabled.'
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $databaseId = Read-Host 'D1 database_id (UUID)'

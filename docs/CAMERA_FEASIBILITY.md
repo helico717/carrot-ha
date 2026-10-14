@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 > 초기 조사 기록이다. 현재 설치와 업데이트는 [CAMERA_SETUP.md](CAMERA_SETUP.md)를 따른다.
 
 # 카메라 연동 조사 및 검증 순서
@@ -8,7 +10,7 @@
 
 - comma four, ajouatom/openpilot `happymaj11r/carrot-wip-model_selector`, 커밋 `5cb0f3e590a28d0138ad9f48506f65743cdaa326`.
 - HAOS ARM64, HA Core 2026.9.0. DuckDNS를 통한 외부 접속. DuckDNS만으로 실제 TLS/포트/미디어 연결 경로까지 확인되지는 않는다.
-- 기존 collector는 HTTPS Worker 업로드 방식이다. 저장소 설치 절차에는 VPN/Tunnel 구성이 없다.
+- 기존 collector는 HTTPS ~~Worker~~ 업로드 방식이다. 저장소 설치 절차에는 VPN/Tunnel 구성이 없다.
 - 사용자가 보낸 프로세스 목록은 차량에서 분리한 상태다. 주차 중 실차 상태의 증거로 사용하지 않는다.
 - 목표: 외부에서 광각/실내 카메라 엔터티 조회, Android/iOS 지원, 현재 브랜치와 텔레메트리 유지. HAOS 중계 애드온 추가는 허용된다.
 
@@ -36,7 +38,7 @@
 
 차량의 하드웨어 H.264 출력을 재인코딩 없이 HAOS ARM64 중계 서비스에서 표준 재생 형식으로 전달하는 구성을 우선 평가한다. [HA camera WebRTC 인터페이스](https://developers.home-assistant.io/docs/core/entity/camera/)를 사용하되, HTTPS HA 접속이 WebRTC 미디어 연결까지 보장하지 않으므로 외부 iOS 네트워크에서 ICE/TURN 또는 HLS 경로를 실제 검증한다.
 
-사용자는 추가 VPN 계정 없이 기존 HTTPS 접속을 활용하는 방향을 선택했다. 콤마가 HA HTTPS origin으로 outbound WSS 연결하는 방식을 채택한다. 원본 Cloudflare TCP 중계는 별도 네트워크 binding을 필요로 하므로 기존 Worker API를 단순 재활성화하지 않는다. 공용 카메라 포트를 열지 않는다.
+사용자는 추가 VPN 계정 없이 기존 HTTPS 접속을 활용하는 방향을 선택했다. 콤마가 HA HTTPS origin으로 outbound WSS 연결하는 방식을 채택한다. 원본 ~~Cloudflare~~ TCP 중계는 별도 네트워크 binding을 필요로 하므로 기존 ~~Worker~~ API를 단순 재활성화하지 않는다. 공용 카메라 포트를 열지 않는다.
 
 원본의 검증 가능한 동작 범위에 맞춰 첫 실험은 offroad로 한정한다. 주행 중 조회는 지원 완료로 간주하지 않는다. 마지막 시청자가 나가면 전송을 정리하고 비정상 종료에는 장치 측 timeout을 적용한다. 여러 시청자는 차량 upstream을 공유해야 한다. 종료 시 다른 기능이 시작한 프로세스나 상태를 해제하지 않도록 소유권을 추적한다.
 
@@ -78,7 +80,7 @@ python -m openpilot.selfdrive.carrot.ha.camera.probe --vehicle-disconnected
 ### 선택한 HTTPS 구성
 
 - 콤마의 별도 camera agent가 HA 외부 HTTPS origin의 전용 WSS endpoint에 연결한다. 기존 collector/Worker는 그대로 둔다. 평소에는 제어 메시지와 heartbeat만 교환하며 영상은 생성/전송하지 않는다.
-- 장치별 영상 전용 credential을 사용한다. 기존 Worker UPLOAD/VIEW 토큰이나 HA 관리자 장기 토큰을 영상 장치 인증에 재사용하지 않는다. 시작/정지 제어는 세션 ID에 묶고 임의 명령 실행을 제공하지 않는다.
+- 장치별 영상 전용 credential을 사용한다. 기존 ~~Worker~~ UPLOAD/VIEW 토큰이나 HA 관리자 장기 토큰을 영상 장치 인증에 재사용하지 않는다. 시작/정지 제어는 세션 ID에 묶고 임의 명령 실행을 제공하지 않는다.
 - agent는 wide/driver의 H.264를 재인코딩하지 않고 각각 MPEG-TS로 포장하여 카메라 식별자와 함께 WSS binary message로 보낸다. 카메라별 timestamp, SPS/PPS/키프레임, 스트림 재시작 처리는 구현 검증 대상이다.
 - HA 통합은 bounded queue로 수신하여 HA 컨테이너의 loopback HTTP feed로 제공한다. loopback listener는 127.0.0.1에만 바인딩하고 임의 세션 토큰을 검사한다. 외부 영상 포트를 추가하지 않는다. 느린 소비자에게 무제한 버퍼링하지 않고 스트림을 재시작한다.
 - 표준 camera 엔터티는 해당 feed를 HA stream에 제공한다. 첫 버전의 브라우저 출력은 **HLS**로 정한다. HTTPS HA 접속 경로를 그대로 활용하며 iOS/Android를 검증한다. 내장 go2rtc/WebRTC 자동 선택으로 외부 연결 성공을 가정하지 않고, 초기 재생 경로를 HLS로 검증한다. WebRTC 저지연 최적화는 후속 단계다.

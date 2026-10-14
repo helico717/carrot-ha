@@ -1,12 +1,14 @@
-# Cloudflare 의존 제거와 HAOS 차량 수신 애드온 전환 기록
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
+# ~~Cloudflare~~ 의존 제거와 HAOS 차량 수신 애드온 전환 기록
 
 작성: 2026-10-14. 본 문서는 실행 코드 수정 전에 작성한 작업 기준이다.
 
 ## 왜 하는가
 
-- 원작은 자체 서버 없이 Cloudflare Worker/D1을 차량과 앱 사이의 접점으로 사용했다.
+- 원작은 자체 서버 없이 ~~Cloudflare~~ Worker/D1을 차량과 앱 사이의 접점으로 사용했다.
 - 현재 사용자는 Raspberry Pi 4 + HAOS 자체 서버를 운영하고 HA를 주 화면으로 사용한다.
-- 2026-10-14 D1 물리 용량 499,998,720 bytes로 이력 업로드가 HTTP 500 실패했다.
+- 2026-10-14 ~~D1~~ 물리 용량 499,998,720 bytes로 이력 업로드가 HTTP 500 실패했다.
   압축/중복 제거로 약 281MB로 복구했지만 무료 일일 100,000행 쓰기 제한은 별개다.
   이번 대량 변환과 구조/색인 변경도 쓰기 예산을 소비해 제한 알림이 발생했다.
 - 이미 HA에 보관하는 기록을 Cloudflare에도 저장하고 다시 다운로드하는 중복,
@@ -23,20 +25,20 @@
   기기 재부팅은 금지. HA 본체 재시작과 Comma Pull/재부팅은 사용자가 실행한다.
 - 현재 개별 주행 로그 지침의 버전·태그·Release 없이 개발하는 원칙을 유지한다.
   이번 요청만으로 새 pre-release 발행 권한을 추론하지 않는다.
-- 운영 Cloudflare 삭제/Worker 중지/기존 DB 삭제는 전환 검증 전에 수행하지 않는다.
+- 운영 ~~Cloudflare~~ 삭제/Worker 중지/기존 DB 삭제는 전환 검증 전에 수행하지 않는다.
   이전 데이터는 기존 HA archive·차계부와 승인된 개인 백업을 보존한다.
 
 ## 수정 전 기준과 현재 경로
 
 - HA main: manifest 0.8.14-beta.7. 실행 중 HA는 마지막 확인 beta.5.
-- cloud.py/cloud_live.py: Worker latest-state, telemetry-history, trip-changes를 읽고
+- cloud.py/cloud_live.py: ~~Worker~~ latest-state, telemetry-history, trip-changes를 읽고
   Archive.put_cloud로 저장. 같은 이벤트 ID·동일 내용은 중복 갱신하지 않는다.
 - HA 설정 조회/변경/처리 확인: __init__.py의 SettingsView/ParamSetView/ParamStatusView
-  → Worker /api/settings 및 /api/params/{queue,status}.
+  → ~~Worker~~ /api/settings 및 /api/params/{queue,status}.
 - Comma collector.py: 독립 telemetry/trips 전송 lane + SQLite outbox. 성공 응답 이후 삭제.
 - Comma param_sync.py: pending 조회 → 로컬 7000 검증·적용·readback → applied/failed ACK.
   처리 ID는 기기에 영속 저장한다. 서버 변경 시 숫자 ID 충돌을 막아야 한다.
-- terminal_bootstrap.py 및 Worker terminal_bootstrap.js: HA가 주소/별도 토큰을
+- terminal_bootstrap.py 및 ~~Worker~~ terminal_bootstrap.js: HA가 주소/별도 토큰을
   짧은 유효기간으로 게시, Comma가 조회한다. 터미널/카메라/파일 본 통신은 HA 직접 경로.
 - 파일 driving_logs/http.py: HA 원본 수신; 영상·rlog 완료와 일반 주행 저장은 독립.
 - Worker에는 원작 Android/FCM/impact/snapshot/AI/별도 외부 서버 관련 함수도 존재한다.
@@ -96,7 +98,7 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
 
 - 직접 HTTPS/WSS 접속 또는 VPN 도달성 확인이 필요하다. HA의 UI ingress 경로만으로
   차량 수신을 만들면 HA 중단 시 끊기므로 수신기의 독립 포트/외부 경로가 필요하다.
-- Cloudflare Tunnel/프록시 주소를 쓰면 D1/Worker는 없어도 네트워크는 여전히 Cloudflare를
+- ~~Cloudflare~~ Tunnel/프록시 주소를 쓰면 D1/Worker는 없어도 네트워크는 여전히 Cloudflare를
   통과한다. 완전 제거와 DB 제거를 혼동하지 않는다. 현재 외부 네트워크는 확인 대상.
 - HA Core 재시작 시 애드온 수신 가능. HAOS/호스트 재부팅·정전·회선 장애 시 모두 중단.
   Comma outbox로 기록은 재전송하지만 실시간 화면·카메라·명령은 지연된다.
@@ -114,7 +116,7 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
 5. HA 설치 코드·기기 Git 커밋 준비와 원격 확인. 사용자 restart/Pull 후 direct 전환.
 6. 차량 새 상태/주행/파라미터 성공·실패·재시도, 카메라/터미널/영상/로그와 과거 자료,
    HA Core 재시작 중 수신·이후 catch-up·backup restore 검증.
-7. 실제 검증 전 기존 Cloudflare DB 삭제/수신 중단 금지. 잔존 의존 확인 후 사용 종료.
+7. 실제 검증 전 기존 ~~Cloudflare~~ DB 삭제/수신 중단 금지. 잔존 의존 확인 후 사용 종료.
    24시간 부하·디스크 증가/보관 정리 및 실차 결과는 로컬 테스트와 별도 기록.
 
 ## 사전 작성 시 상태
@@ -138,7 +140,7 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
   일시 실패 때 이전 cloud로 보내지 않고 대기한다. 장치 Pull/재부팅은 사용자 수행.
 - HA는 operator가 준비한 비공개 일회 설정을 다음 사용자 재시작 때 적용하고 나머지
   options를 보존한다. 적용된 준비값이 이후 사용자 설정을 덮어쓰지 않도록 소비 표시한다.
-- Comma는 사용자 확인으로 켜짐/인터넷 연결 상태로 갱신. Cloudflare 장애 가능성만
+- Comma는 사용자 확인으로 켜짐/인터넷 연결 상태로 갱신. ~~Cloudflare~~ 장애 가능성만
   보고됐으며 실제 기기 원인 단정/에이전트 기기 재부팅은 하지 않았다.
 - 기능 회귀: 수신 10·HA 증분 5/latest 6/ACK 1/압축 2/cache 1·대시보드 10,
   충전 74/주행 73/카메라 17(1 skip)/터미널 4/로그 15(1 skip) 통과.
@@ -166,11 +168,11 @@ Comma → HTTPS 차량 수신 애드온(영속 SQLite) → HA 로컬 동기화 �
 - 사용자 적용 순서: HA 화면의 Home Assistant 다시 시작 → Comma 지정 브랜치에서
   당근웹 Git 업데이트·재부팅 또는 `cd /data/openpilot && git pull --ff-only && sudo reboot`.
   기존 HA 터미널이 불가하면 첫 설치는 당근웹/기존 로컬·VPN 경로가 필요하다.
-  이후 장치 인증으로 자체 서버에서 연결 설정을 받아 영구 저장하며 Cloudflare 호출 없음.
+  이후 장치 인증으로 자체 서버에서 연결 설정을 받아 영구 저장하며 ~~Cloudflare~~ 호출 없음.
 - 현재 HA 실행 프로세스와 Comma 설치 소스는 사용자 재시작/업데이트 전이다.
   새로운 실제 telemetry/trip/params/camera/terminal/log와 HA Core 재시작 중 수신,
   실제 HAOS backup restore·24시간 부하 검증은 사용자 적용 후 확인 대상이다.
-- Cloudflare 원본 DB·기존 옵션은 검증 중 복구용으로 보존한다. 직접 mode 오류에
+- ~~Cloudflare~~ 원본 DB·기존 옵션은 검증 중 복구용으로 보존한다. 직접 mode 오류에
   자동 cloud fallback은 없으며 cloud 복귀는 명시적 rollback만 가능하다.
 
 ## 사용자 적용 후 운영 확인

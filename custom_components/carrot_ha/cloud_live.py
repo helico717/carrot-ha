@@ -1,6 +1,6 @@
 """Demand-driven latest state, independent of archive catch-up.
 
-One read per entry per 15 seconds, including failed attempts. No D1/KV writes,
+One read per entry per 15 seconds, including failed attempts. No history writes,
 route downloads, or local archive work on the dashboard's critical path.
 """
 import asyncio

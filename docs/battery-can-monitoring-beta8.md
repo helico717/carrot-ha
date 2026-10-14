@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 배터리 CAN 엔터티 — 0.8.12-beta.8
 
 ## 추가 엔터티와 의미
@@ -43,7 +45,7 @@ CAN 수신 당시 차량이 보고한 팩 내부 측정 지점의 최저·최고
 - Comma 전체84개 중82개 통과. 기존 카메라 검사2개 실패:
   누락된 protocol.encode_media, PyAV remux compatibility 예상과 실제 불일치.
   관련 카메라 소스/테스트는 이번 변경에 포함되지 않는다. 실제 기기 장애 근거가 아니다.
-- dashboard live/lazy/view와 Worker incremental 11개 검사, sync benchmark 통과.
+- dashboard live/lazy/view와 ~~Worker~~ incremental 11개 검사, sync benchmark 통과.
 - 실기 설치 후 엔터티 수신·Recorder의 실제 장기 기록은 아직 확인하지 않았다.
 
 분석 근거: [전체 CAN 재검수](https://github.com/helico717/meb-can-research/blob/main/docs/raw-can-full-audit-2026-10-05.md) (비공개 연구 저장소).

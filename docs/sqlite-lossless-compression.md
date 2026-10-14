@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # HA 로컬 SQLite 손실 없는 압축: 이유, 구현, 진단과 복구
 
 작성: 2026-10-04 (한국 시간). 배포 대상: `v0.8.12-beta.2` pre-release.
@@ -27,7 +29,7 @@
 - 최신 상태, 배터리 7일 그래프, overview, state/trip/charge history 및 since 조회, 그룹 충전 내역의 변환 전후·복원 후 결과 동일. 모든 이벤트 원문은 전체 테이블 해시로 검증했다.
 - Raspberry Pi HAOS 운영 DB는 **읽기 전용**으로 1,000건만 읽고 메모리에서 테스트했다. 원문 및 SQL 계산값 동일. 마지막 표본: 일반 파싱 831.01ms, 계산 projection 154.04ms, SQL 측정값 조회 104.04→30.07ms. 전체 원문 복원은 1380.73ms, 압축 비용 2.631ms/건. 이는 단일 표본이며 실제 전체 HA 지연이나 장시간 보증이 아니다.
 - 대량 계산에서 원문을 중복 파싱하던 초기 구현은 Pi 성능 측정 후 제거했다. 원문 조회에는 여전히 복원 비용이 있다. 1,000건 일반 history 조회가 계산 전용 경로와 동일한 속도라는 주장은 하지 않는다.
-- 자동 회귀: 전체 Python 검사, 새 압축/복원 검사, dashboard-live-loading/lazy-runtime/view-state 등 JS 검사, Worker incremental/benchmark, Comma param_polling. 최종 집계와 Actions 링크는 아래 배포 기록에 추가한다.
+- 자동 회귀: 전체 Python 검사, 새 압축/복원 검사, dashboard-live-loading/lazy-runtime/view-state 등 JS 검사, ~~Worker~~ incremental/benchmark, Comma param_polling. 최종 집계와 Actions 링크는 아래 배포 기록에 추가한다.
 - 기존 `tests/motion-status.test.mjs`: parked/unknown 기대값 충돌. 변경 전 `637a7ef` 사본에서도 동일 실패 재현. 이 변경에서 frontend는 수정하지 않았으며 기존 실패를 압축 기능의 성공으로 숨기지 않는다.
 
 ## 적용 계획 — 사용자는 HACS 설치·재시작만
@@ -82,7 +84,7 @@ python3 scripts/restore_archive_json.py current.sqlite3 restored.sqlite3
 
 ## 배포 기록 및 미확인 사항
 
-- 운영 DB와 HA 소스에 직접 변경하지 않았다. Worker·D1·Comma 변경/배포 없음.
+- 운영 DB와 HA 소스에 직접 변경하지 않았다. ~~Worker~~·~~D1~~·Comma 변경/배포 없음.
 - pre-release 설치 후 운영 변환·실제 화면/API·24시간 관측은 아직 미실행이다.
 
 ### 최종 로컬 검증 집계
@@ -90,7 +92,7 @@ python3 scripts/restore_archive_json.py current.sqlite3 restored.sqlite3
 - Python: 232 tests, 성공, 2 skipped. 신규 압축/복원 8 tests 포함.
 - JavaScript 전체: 55 tests 중 54 성공, 1 기존 motion-status 실패. 변경 전 HEAD 별도 checkout에서도 같은 실패 재현.
 - 지정 dashboard-live-loading/lazy-runtime/view-state 및 camera lifecycle: 13 tests 모두 성공.
-- Worker incremental_sync와 benchmark 성공. unchanged revision은 1 indexed query/81 bytes 유지.
+- ~~Worker~~ incremental_sync와 benchmark 성공. unchanged revision은 1 indexed query/81 bytes 유지.
 - Comma param_polling: 4 tests 성공. Comma 코드는 변경하지 않음.
 - Python 구문 컴파일 및 git diff --check 성공.
 

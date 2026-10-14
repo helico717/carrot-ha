@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 긴 주행 이력 동기화 실패 — 2026-10-06
 
 HA SSH 읽기 전용 검사에서 최신 차량 상태는 계속 저장되지만 긴 주행은 HA에
@@ -20,6 +22,6 @@ HA 최신 상태 조회 성공 시각을 별도로 기록하고 연결 엔터티
 동기화가 저장한 뒤 커서를 전진시키도록 한다.
 
 검증: HA Python 299 tests 통과(3 skip), 최신/lazy/view-state JS 10 tests 통과,
-Worker incremental 및 benchmark 통과, Comma param polling 4 tests 통과.
+~~Worker~~ incremental 및 benchmark 통과, Comma param polling 4 tests 통과.
 Cloudflare/Comma 코드 및 Worker/D1 배포 변경 없음. 실기 복구는 사용자 HA
 재시작 후 DB와 화면으로 별도 확인한다.

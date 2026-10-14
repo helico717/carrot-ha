@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 당근웹 로그 — HA 직접 반영 및 검증
 
 2026-10-14 후속 직접 반영: 원본 HUD·GPU 경로/차선/도로 경계, 현재 구간 표시·
@@ -49,7 +51,7 @@ SHA-256 검증·원자적 공개를 사용한다. 원본 TS를 변경하지 않�
 재생용 MP4를 만든다. 이 복사본도 HA 용량에 포함된다.
 
 Comma의 FFmpeg와 기존 원격 터미널 HA 연결 설정이 필요하다. 전송은 기존 terminal
-discovery 결과를 공유하므로 새 Worker polling은 추가하지 않는다. purpose별 HMAC
+discovery 결과를 공유하므로 새 ~~Worker~~ polling은 추가하지 않는다. purpose별 HMAC
 업로드 자격을 사용하며 HA 관리자 토큰은 기기에 넣지 않는다. 원격 터미널 연결 설정을
 끄면 로그 전송도 종료된다. 터미널의 주행 중 명령 거부 규칙은 그대로 유지한다.
 
@@ -94,7 +96,7 @@ Worker/D1/KV 변경과 배포는 없다. 이동통신 데이터 사용과 주행
 - 실제 Comma 전송 함수→HA 수신기 통합 검사 통과(합성 파일; 영상 디코딩 검증은 아님).
 - Chromium에서 원본 로그 UI의 목록·선택·정렬 대화상자·영상 창 URL·닫기·모바일 배치 검사 통과.
 - 기존 dashboard live/lazy/view-state, cloud live, incremental sync, history cache,
-  Worker incremental/benchmark 및 Comma param polling/terminal 검사 통과.
+  ~~Worker~~ incremental/benchmark 및 Comma param polling/terminal 검사 통과.
 - Comma 전체 92건 중 카메라 검사 2건 실패: `encode_media` 누락 및 PyAV 누락 검사 기대 불일치.
   해당 카메라 소스·테스트는 이번 변경에서 수정하지 않았고 HEAD와 동일하다.
 - 실차 FFmpeg/전송 속도·CPU/열, HA 재시작 후 신규 API, 실제 로그 영상 재생,

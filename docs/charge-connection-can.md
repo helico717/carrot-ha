@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 충전 연결 CAN 기록 — 2026-10-04
 
 ## 목적과 범위
@@ -16,7 +18,7 @@
 
 Comma 기존 CAN 수신/샘플링 경로에서 bus0과 bus1을 별도로 디코딩한다. 기본값이 아닌 실제 vl_all 수신값만 저장한다. 후보 메시지는 선택적 parser로 추가하므로 구형 DBC의 미지원 메시지가 기존 배터리 파서를 중단하지 않는다. CAN 송신·UDS 조회·새 스레드·추가 클라우드 조회/KV 쓰기는 없다.
 
-기존 telemetry JSON -> Worker -> HA archive 경로로 원시 필드와 field_measured_at가 보존된다. 기존 압축 projection에서도 이 필드는 유지한다. HA Recorder가 엔터티를 제외하지 않았다면 ON/OFF/unknown 및 속성 변화가 이력에 기록된다. 기존 CAN 샘플링(최대 4초 수신 후 26초 대기), 주차 업로드 약 60초, HA polling 때문에 짧은 순간 변화를 놓칠 수 있다. 완전한 연결/분리 이벤트 로그나 즉시 표시를 보장하지 않는다.
+기존 telemetry JSON -> ~~Worker~~ -> HA archive 경로로 원시 필드와 field_measured_at가 보존된다. 기존 압축 projection에서도 이 필드는 유지한다. HA Recorder가 엔터티를 제외하지 않았다면 ON/OFF/unknown 및 속성 변화가 이력에 기록된다. 기존 CAN 샘플링(최대 4초 수신 후 26초 대기), 주차 업로드 약 60초, HA polling 때문에 짧은 순간 변화를 놓칠 수 있다. 완전한 연결/분리 이벤트 로그나 즉시 표시를 보장하지 않는다.
 
 ## 실차 비교
 
@@ -38,7 +40,7 @@ HA는 HACS beta.3 설치 및 재시작. Comma는 게시된 carrot-wip-model_sele
 - Release: https://github.com/helico717/carrot-ha/releases/tag/v0.8.12-beta.3 (pre-release=true).
 - HACS Release Actions 성공: https://github.com/helico717/carrot-ha/actions/runs/37183984702 . API published_at=2026-10-04T06:50:36Z (15:50:36 KST).
 - Comma 원격: fe7f59539121abb6400b1823cdf7d271856aac2b. 원격 자동 동기화 e170586f 위로 이번 변경만 재적용했고 force push 없이 게시. 재적용 후 충전 관련 12개 테스트 통과.
-- Worker incremental 검사/benchmark 통과. Worker/D1 변경·배포 없음. 실차 설치/수신 검증 및 운영 압축 실행은 수행하지 않음.
+- ~~Worker~~ incremental 검사/benchmark 통과. Worker/D1 변경·배포 없음. 실차 설치/수신 검증 및 운영 압축 실행은 수행하지 않음.
 
 ### HA 원격 읽기 전용 확인 — 2026-10-04 16:10 KST
 

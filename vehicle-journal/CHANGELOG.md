@@ -1,10 +1,22 @@
+## 2026-10-14 — vehicle-journal: 이전 서버 문서 폐기 표시와 복구/누적 베타 안내
+
+- 이유: 사용자가 HA를 주 화면으로 명시하고 모든 Markdown의 이전 서버 내용 정리와 쉬운 초기화 복구 안내를 요청함.
+- 관련: vehicle-journal AGENTS/README/CHANGELOG/deployment/implementation-plan/usage/validation-plan,
+  .agents/rules/vehicle-journal.md의 역사 서버 표현 취소선/현재 지시 우선 명시.
+  docs/CLEAN_INSTALL_RECOVERY.md는 HA 기록·사진·수신 앱을 함께 백업하고 기기 밖에 보관하도록 안내.
+- 차계부 실행 코드·DB·사진·계산·분류·결제 로직은 변경하지 않음.
+- 검증/배포: 문서 링크·이전 베타 누적 노트와 diff 대조 진행. Git 커밋/푸시 및 v0.9.0-beta.1 발행 대기.
+  개인 기록은 공개 자료에 포함하지 않음. Windows NAS fsync 등 기존 환경 제약은 별도 검증 기록을 유지.
+
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../docs/CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 ## 2026-10-14 — 양방향 충전요금 최종 배포 확인
 
 - 커밋 제목: `vehicle-journal: record bidirectional payment deployment verification` (문서만 수정).
 - 구현: `0f7f367` 양방향 결제 연결·내구성 큐·레거시 보정 복구, `f5163fb` 기존 비충전 분류 보존.
 - 검증: 분류 보존 회귀 포함 차계부 62개 통과. 관련 결제/대시보드/스키마/동기화 검증은 아래 항목 참조. 기존 이벤트 루프 경고 외 실패 없음.
 - 배포: `f5163fb70d78c318befd689e47fd0729391d6e2b` main 푸시 및 기존 `v0.8.14-beta.5` 태그 원격 일치 확인. HA Python 파일 5개 최종 커밋과 SHA-256 일치, 코드 백업 `/config/carrot_ha/deployment-backups/f5163fb/`. 기존 Release ID 411761651 유지·pre-release=true·최종 릴리즈 노트 확인. Actions https://github.com/helico717/carrot-ha/actions/runs/38494951582 성공. 원격 태그 소스 확인 완료; 전체 ZIP 추가 다운로드 검증은 전송 지연으로 중단했으며 Actions/태그/개별 소스로 발행을 검증함.
-- 운영: Python 적용을 위한 사용자 HA 재시작 및 실제 양쪽 화면의 금액·복구 확인은 대기. 직접 배포했으므로 현재 설치에서는 HA 재시작이 필요하며, HACS 경로를 사용할 경우 동일 beta.5 다시 다운로드 후 재시작. Cloudflare·D1·Comma 변경/배포 없음. 새 프리릴리즈를 만들지 않았으며 기존 beta.5를 사용자 명시 요청대로 갱신함.
+- 운영: Python 적용을 위한 사용자 HA 재시작 및 실제 양쪽 화면의 금액·복구 확인은 대기. 직접 배포했으므로 현재 설치에서는 HA 재시작이 필요하며, HACS 경로를 사용할 경우 동일 beta.5 다시 다운로드 후 재시작. ~~Cloudflare~~·~~D1~~·Comma 변경/배포 없음. 새 프리릴리즈를 만들지 않았으며 기존 beta.5를 사용자 명시 요청대로 갱신함.
 - 관련 파일: `vehicle-journal/CHANGELOG.md`. 이 확인 기록은 실행 코드 변경이 없어 별도 버전 상승·태그 이동·배포를 하지 않는다.
 
 ## 2026-10-14 — 양방향 결제 배포 검증 및 기존 지출 분류 보존
@@ -12,9 +24,9 @@
 - 커밋 제목: `vehicle-journal: preserve reclassified expenses during payment recovery`.
 - 변경·이유: 이전에 다른 지출 분류로 바꾼 차계부 보정은 충전 결제로 재분류하지 않도록 복구 대상에서 제외. 충전 분류인 자동 결제만 연동한다.
 - 관련 파일: `vehicle_journal/payment_sync.py`, `vehicle-journal/tests/test_payment_sync.py`, CHANGELOG 및 beta.5 릴리즈 노트.
-- 검증: 첫 구현 `0f7f367`의 차계부 61개, 결제 Python 35개, 스키마 9개, 금액 표시 8개, 대시보드 10개, cloud live/증분/캐시 12개, Comma 파라미터 4개 회귀 및 Worker 증분·벤치마크 통과. 추가 분류 보존 회귀 포함 차계부 전체 재검증. 기존 이벤트 루프 경고 외 실패 없음. Python 문법 검증의 Mac 캐시 쓰기 제한은 임시 캐시 경로로 해결.
+- 검증: 첫 구현 `0f7f367`의 차계부 61개, 결제 Python 35개, 스키마 9개, 금액 표시 8개, 대시보드 10개, cloud live/증분/캐시 12개, Comma 파라미터 4개 회귀 및 ~~Worker~~ 증분·벤치마크 통과. 추가 분류 보존 회귀 포함 차계부 전체 재검증. 기존 이벤트 루프 경고 외 실패 없음. Python 문법 검증의 Mac 캐시 쓰기 제한은 임시 캐시 경로로 해결.
 - 배포: `0f7f367` main 및 기존 beta.5 태그 원격 일치, HA Python 파일 5개 백업/설치 SHA-256 일치. 기존 Release ID 411761651 유지·pre-release=true·새 노트 확인, HACS Release Actions https://github.com/helico717/carrot-ha/actions/runs/38494539873 성공. GitHub API 캐시 응답은 갱신 전 노트를 반환해 별도 요청으로 최신 노트를 검증했다. 이번 추가 보호도 검증·푸시·HA 파일 반영·동일 beta.5 태그 갱신 예정.
-- 운영 적용: HA 재시작 및 실제 양쪽 화면 확인은 사용자 대기. HA 코드 백업은 `/config/carrot_ha/deployment-backups/0f7f367/`. Cloudflare·D1·Comma 변경 없음.
+- 운영 적용: HA 재시작 및 실제 양쪽 화면 확인은 사용자 대기. HA 코드 백업은 `/config/carrot_ha/deployment-backups/0f7f367/`. ~~Cloudflare~~·~~D1~~·Comma 변경 없음.
 
 ## 2026-10-14 — 자동 충전 결제 양방향 동기화
 
@@ -23,7 +35,7 @@
 - 관련 파일: `vehicle_journal/{store,source,payment_sync,api}.py`, `charge_ws.py`, `vehicle-journal/tests/{test_journal,test_payment_sync}.py`, 기존 beta.5 릴리즈 노트.
 - 검증: 차계부 전체·충전 결제 API/저장·스키마·한/영 요금 표시·최신 상태/이력/증분 동기화 회귀 통과. 합성 데이터로 양방향 수정, 0원, 실제 금액 삭제, 레거시 복구와 최신 결제 우선, DB 쓰기 전/후 중단 및 재시작 복구 확인. 시스템 Python의 Pillow 부재는 번들 Python으로 해결; 기존 unclosed event loop 경고는 남아 있음.
 - 배포: main 푸시·HA 코드 백업/직접 반영·기존 `v0.8.14-beta.5` 재발행 준비 중. 사용자 2026-10-14 명시 요청에 따라 새 프리릴리즈를 만들지 않고 기존 태그/Release를 갱신한다. Python 적용을 위한 사용자 HA 재시작 및 실제 양쪽 화면 확인은 대기.
-- 제한: 열린 화면은 기존 갱신 주기(최대 약 60초) 또는 새로고침 때 갱신. Cloudflare·D1·Comma 변경/배포 없음. 수동 독립 지출 및 원본이 없는 기록은 자동 결제와 연결하지 않는다.
+- 제한: 열린 화면은 기존 갱신 주기(최대 약 60초) 또는 새로고침 때 갱신. ~~Cloudflare~~·~~D1~~·Comma 변경/배포 없음. 수동 독립 지출 및 원본이 없는 기록은 자동 결제와 연결하지 않는다.
 
 ## 2026-10-13 — 0.8.14-beta.5 실제 발행 확인
 
@@ -31,7 +43,7 @@
 - 발행 대상: `0ded40cac4bd4171a6d39755cfeff795da2a5a40`. main과 신규 `v0.8.14-beta.5` 태그가 이 커밋으로 원격 일치했고 manifest `0.8.14-beta.5`를 확인했다. 이후 이 결과 문서 커밋은 태그를 이동하지 않는다.
 - Release: https://github.com/helico717/carrot-ha/releases/tag/v0.8.14-beta.5 — 2026-10-13 KST 23:21:13 발행, prerelease=true, draft=false. 로컬 전체 노트가 GitHub 본문에 그대로 포함됨을 확인했다. beta.4 이후 73개 커밋·57개 변경 파일 대조, 기존 beta.1~4 노트 및 CHANGELOG 전체 항목 색인을 포함했다.
 - Actions: https://github.com/helico717/carrot-ha/actions/runs/38412586087 — `HACS Release`, `completed/success`, head_sha와 태그 일치 확인. 이전 v0.8.14 실행과 구분한다.
-- 검증: 준비 항목의 Python/SQL/OCR/대시보드·Chrome·Worker·Comma polling·카메라 회귀 결과 유지. 실제 새 베타의 HA 설치/재시작/운영 확인은 수행하지 않았다. 로더 원본 테스트의 fixture 에셋 경로 오류는 임시 사본으로 검증했으며 실행 코드 또는 테스트 원본 수정 없음.
+- 검증: 준비 항목의 Python/SQL/OCR/대시보드·Chrome·~~Worker~~·Comma polling·카메라 회귀 결과 유지. 실제 새 베타의 HA 설치/재시작/운영 확인은 수행하지 않았다. 로더 원본 테스트의 fixture 에셋 경로 오류는 임시 사본으로 검증했으며 실행 코드 또는 테스트 원본 수정 없음.
 - 배포: GitHub/HACS pre-release 배포 완료. 사용자가 HACS 베타 버전 표시 → 0.8.14-beta.5 업데이트 → HA 재시작 → 브라우저 새로고침을 수행한다. Worker/D1/Comma 변경·배포 없음. 개인 DB·사진·설정·미추적 중복 파일은 발행 대상에 넣지 않았다.
 - 관련 파일: 본 CHANGELOG만 추가 기록. 문서 커밋·푸시 대상이며 추가 버전/태그/Release는 발행하지 않는다. 휴대폰 OCR·다음 자동 충전 장소·서버 API 실제 저장/삭제·14일 탐색·예약 NAS/장기 GFS 확인은 기존 제한대로 남아 있다.
 
@@ -40,7 +52,7 @@
 - 커밋 제목: `vehicle-journal: prepare 0.8.14-beta.5 prerelease`.
 - 변경·이유: 사용자 요청으로 현재 Git 관리 main을 새 pre-release로 발행한다. 마지막 GitHub pre-release `v0.8.14-beta.4`부터 소스/문서 기준 `fad027aae44394e597de85a366dfdc91458f4aa2`까지 전체 커밋·57개 파일 diff를 대조했고, 차량 관리·이관·스냅샷·NAS·장소/연비 통계·기록/사진/영구 삭제·OCR·화면 개선·14일 배터리 탐색·브랜치 전환 계획을 모두 노트에 반영했다. 기존 CHANGELOG 전체 항목 색인 및 beta.1~beta.4 원문을 포함해 누적 변경을 보존한다. 브랜치 계획은 문서이며 미구현임을 구분한다.
 - 관련 파일: `custom_components/carrot_ha/manifest.json`, `.github/release-notes/v0.8.14-beta.5.md`, 본 기록. manifest/tag는 0.8.14-beta.5로 일치시키며 기존 태그/미추적 중복 파일은 유지한다.
-- 검증: 차계부 Python 55건·schema 9건·OCR 파서 20건·dashboard 12건·latest 6건·incremental 5건·history cache 1건·charge graph 27건 통과. Chrome 기본 browser-check 통과. Chrome 주행 입력·사진 편집 및 로더 회귀 통과. 기존 loader-update 테스트 서버가 path.basename으로 leaflet.css 하위 경로를 버리는 ENOENT는 임시 사본 서버에서만 경로/MIME를 수정해 검증했고 저장소 코드는 변경하지 않았다. Worker 증분/benchmark 통과(미변경 1 query / 81 bytes), Comma parameter polling 4건·카메라 회귀 4건/주행 안전 차단 통과. 발행 결과는 후속 기록으로 확정한다. Python suite의 unclosed event loop ResourceWarning은 실패가 아니며 실기 장애로 해석하지 않는다.
+- 검증: 차계부 Python 55건·schema 9건·OCR 파서 20건·dashboard 12건·latest 6건·incremental 5건·history cache 1건·charge graph 27건 통과. Chrome 기본 browser-check 통과. Chrome 주행 입력·사진 편집 및 로더 회귀 통과. 기존 loader-update 테스트 서버가 path.basename으로 leaflet.css 하위 경로를 버리는 ENOENT는 임시 사본 서버에서만 경로/MIME를 수정해 검증했고 저장소 코드는 변경하지 않았다. ~~Worker~~ 증분/benchmark 통과(미변경 1 query / 81 bytes), Comma parameter polling 4건·카메라 회귀 4건/주행 안전 차단 통과. 발행 결과는 후속 기록으로 확정한다. Python suite의 unclosed event loop ResourceWarning은 실패가 아니며 실기 장애로 해석하지 않는다.
 - 배포: main 커밋/푸시·새 태그·GitHub Actions Release 발행 대상. 이번 요청은 HACS pre-release 패키지 배포이며 직접 HA 동기화나 사용자 재시작을 대신 수행하지 않는다. Worker/D1/Comma 변경·배포 없음.
 - 제한: 실제 휴대폰 OCR·다음 자동 충전 위치·새 서버 API 실사용·14일 배터리 페이지·NAS 03:00 및 장기 GFS는 미확인. 기존 개발 버튼은 유지한다. 사용자 HACS 베타 업데이트/HA 재시작 후 확인 필요. 확정 원격 커밋·Actions·Release 링크는 후속 발행 기록에 남긴다.
 
@@ -135,7 +147,7 @@
   - 바코드 임의 날짜 복원 가정 제거: 불명확한 숫자열에서 날짜 임의 추출을 배제하고 지원하지 않는 경우 공란을 유지하도록 했다.
   - 다중 행 주소 연결 제한: 중간에 결제·승인·품목 정보가 섞인 행(`경기도 시험시 \n 승인금액 70000 \n 가상길 1`)이 주소로 오조합되던 문제를 방지하기 위해 비주소 블랙리스트 단어가 포함된 경우 즉시 연결을 중단하고, 즉시 인접한 다음 행(i+1)이 도로명+건물번호 패턴으로 시작할 때만 결합하도록 제한했다. 60자 초과 긴 검색어는 차단했다.
   - 장소 매칭 엄격화: 도로명 주소의 건물번호 부분 문자열 비교(`.includes`)로 인해 건물번호 1이 11이나 1-1에 오매칭되던 치명적 결함을 수정했다. 도로명, 본번(`mainNum`), 부번(`subNum`), 시/군/구, 시/도를 분해(`parseRoadAddressComponents`)하여 본번과 부번 및 지역이 완벽히 일치할 때만 주소 일치로 판정한다. 동일 주소 경합 주유소는 상호명으로 구별 불가능할 경우 공란을 유지한다.
-  - 불일관성 검증 및 비동기 상태 가드: 동일 브라우저 인스턴스 내 캔버스 픽셀 해시(5회 100% 일치)와 Worker 텍스트 해시(3회 100% 일치) 실측을 통해 "GPU/DPI/메모리로 매번 픽셀이 달라진다"는 가설을 기각하고, 실제 원인인 전처리 클리핑/레이아웃 변동 취약성 및 비동기 타이머 경쟁 상태를 규명했다. `ocrGeneration` 카운터와 `ocrCloseTimer` 타이머 가드를 적용하여 비동기 닫힘/중복 실행 충돌을 방지하고, 새 사진 선택 시 이전 자동입력값을 안전하게 리셋하며 사용자가 수정한 값은 보존하도록 보강했다. 실패 시 안내 배너 문구를 표시한다.
+  - 불일관성 검증 및 비동기 상태 가드: 동일 브라우저 인스턴스 내 캔버스 픽셀 해시(5회 100% 일치)와 ~~Worker~~ 텍스트 해시(3회 100% 일치) 실측을 통해 "GPU/DPI/메모리로 매번 픽셀이 달라진다"는 가설을 기각하고, 실제 원인인 전처리 클리핑/레이아웃 변동 취약성 및 비동기 타이머 경쟁 상태를 규명했다. `ocrGeneration` 카운터와 `ocrCloseTimer` 타이머 가드를 적용하여 비동기 닫힘/중복 실행 충돌을 방지하고, 새 사진 선택 시 이전 자동입력값을 안전하게 리셋하며 사용자가 수정한 값은 보존하도록 보강했다. 실패 시 안내 배너 문구를 표시한다.
   - 테스트 단언문 복원: `test_journal.py`의 `total_cost_krw: 55000` 및 `fuel_liters: 25` 단언문을 온전히 복원했다.
 - 관련 파일: `custom_components/carrot_ha/frontend/carrot-receipt-ocr.js`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `tests/receipt-parser.test.js`, `vehicle-journal/tests/test_journal.py`, 본 변경 기록.
 - 검증·배포: Python 55개, 스키마 9개, JavaScriptCore 18개 테스트(고객번호 날짜 오인식 방지, 복수 상이 날짜 충돌 기각, 미래 날짜 차단, 결제 행 개입 다중 행 주소 차단, 건물번호 1 vs 11 및 1-1 엄격 분리, 지역 불일치 기각 등) 100% 통과. main 커밋 푸시 및 HA 직접 반영·SHA-256 일치 확인. 릴리즈 발행 없음.
@@ -168,7 +180,7 @@
   - 영수증 모드(`isReceiptMode`)를 분리하여 GPS 기반 자동 장소 선택(`autoSelectStation()`)과 폼 기본 날짜/차량 기본 유종이 자동 입력값처럼 채워지는 것을 차단했다.
   - 오피넷 단가 실시간 조회(`applyStationPrice`, `refreshStationPrice`)가 영수증 단가를 덮어쓰지 못하도록 `unitPriceSource === 'receipt'` 가드를 추가했다.
   - 주유량 추정(`estimateFuelLiters`)이 OCR 처리 중에 동작하지 않도록 억제 플래그(`suppressFuelEstimation`)를 적용했다.
-  - 사용자가 새 사진을 선택하거나 팝업을 닫을 때 이전 Web Worker 작업을 중단(`AbortController` 및 Worker 종료)하여 메모리 누수와 지연된 결과 덮어쓰기를 방지했다.
+  - 사용자가 새 사진을 선택하거나 팝업을 닫을 때 이전 Web ~~Worker~~ 작업을 중단(`AbortController` 및 ~~Worker~~ 종료)하여 메모리 누수와 지연된 결과 덮어쓰기를 방지했다.
 - 파서 및 주유소 매칭:
   - Tesseract.js (v5.1.1) WebAssembly 단일 Web Worker로 브라우저 내에서만 동작하며 외부 전송을 하지 않는다.
   - 한국어 영수증 도메인 파서(`parseFuelReceipt`)로 날짜(달력 유효성), 유종(보통/고급휘발유/경유/주유기 번호 분리), 단가, 수량, 결제금액, 주유소명/주소를 추출한다.
@@ -594,7 +606,7 @@
 - 설정창 버튼 최소 높이 38→27px, padding 8/12→5/8px로 약 30% 축소; 분류 버튼도 축소.
 - 관련 파일: vehicle_journal/{vehicles,store,api}.py, frontend/{carrot-vehicle-journal,carrot-journal-design}.js, vehicle-journal/tests/{test_vehicle_import,test_api_authorization}.py, vehicle-management.cjs.
 - 검증: 임시 DB 삭제/사진·사본 삭제, 활성 차량·연동 차량 차단, 삭제 객체 재접속 차단, 재시작 중단 복구 테스트 통과. 기존 원장 테스트 13개와 이관/차량 테스트 14개 통과. 합성 Chrome 확인/취소·빨간 버튼·모바일 검증 통과. API 권한 검사 후속 기록.
-- 배포: 검증 후 main 커밋·푸시·승인된 HA 코드 백업/부분 반영. Python 변경으로 사용자 HA 재시작 필요. 실제 차량 삭제 실행은 하지 않음. 개발 중 새 릴리즈 없음. Cloudflare·Comma 변경 없음.
+- 배포: 검증 후 main 커밋·푸시·승인된 HA 코드 백업/부분 반영. Python 변경으로 사용자 HA 재시작 필요. 실제 차량 삭제 실행은 하지 않음. 개발 중 새 릴리즈 없음. ~~Cloudflare~~·Comma 변경 없음.
 
 ## 2026-10-12 — vehicle-journal: record example placeholder deployment
 
@@ -604,7 +616,7 @@
 ## 2026-10-12 — vehicle-journal: mark vehicle name placeholder as example
 
 - 신규 차량 이름 입력 안내를 ‘예시) 아테온’으로 변경하여 실제 입력값과 예시를 구별.
-- 관련 파일: frontend/carrot-vehicle-journal.js. 문구 확인 및 JS 구문 검사 통과. 승인된 HA 직접 백업·반영 대상; 운영 화면 확인 대기. DB·Python·Cloudflare·Comma 변경 및 새 릴리즈 없음.
+- 관련 파일: frontend/carrot-vehicle-journal.js. 문구 확인 및 JS 구문 검사 통과. 승인된 HA 직접 백업·반영 대상; 운영 화면 확인 대기. DB·Python·~~Cloudflare~~·Comma 변경 및 새 릴리즈 없음.
 
 ## 2026-10-12 — vehicle-journal: record place-label deployment verification
 
@@ -617,7 +629,7 @@
 - 상세 기록 알약 바로 옆에 위치 장소명(없으면 주소)을 구분점 없이 font-weight 400으로 표시. 세부 작업·메모는 기존 다음 줄 유지. 사용자 입력 HTML escaping 유지.
 - 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, vehicle-journal/tests/browser-check.cjs.
 - 검증: 제공 마이클 XLS를 로컬 임시 DB에 이관해 모든 원본 장소명과 조회 결과 일치 확인. 실제 HA 차량/기록 등록 없음. 합성 Chrome 장소명 표시·일반 글씨·escaping 및 기존 대시보드 회귀 검증. 설치 백업·배포 결과 후속 기록.
-- 배포: main 커밋·푸시 후 승인된 HA 화면 파일 직접 반영. DB·사진·Python·Cloudflare·Comma 변경 없음. 운영 브라우저 적용 확인 대기; 개발 중 새 릴리즈 없음.
+- 배포: main 커밋·푸시 후 승인된 HA 화면 파일 직접 반영. DB·사진·Python·~~Cloudflare~~·Comma 변경 없음. 운영 브라우저 적용 확인 대기; 개발 중 새 릴리즈 없음.
 
 ## 2026-10-12 — vehicle-journal: record compact settings deployment verification
 
@@ -631,7 +643,7 @@
 - 오류: 전역 settings/map/config/location/search 요청에 불필요한 entry_id가 포함되어 HA 검증에서 거부되던 문제 수정. 차량별 원장 요청에는 entry_id 유지.
 - 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, carrot-journal-panel-runtime.js, vehicle-journal/tests/vehicle-management.cjs.
 - 검증: JS 구문 검사, 합성 Chrome 차량 등록·휴지통/복원·키 확인/저장 확인·지도 핀·320/360/1280px 여백/중앙 정렬 통과. 전역 요청 entry_id 거부 회귀 및 최신 모듈 로딩/입력 보호/스크롤 복원 통과. 모바일 이미지 확인. 기존 대시보드 탭·차트·수기 저장·escaping·데스크톱/모바일 회귀도 통과.
-- 배포 상태: 8c04da5 main 푸시 완료. HA deployment-backups/8c04da5098999b1c1be09d2d247db7c2fda54c31/에 기존 코드 백업 후 화면 JS 세 파일 반영. 설치·내부/외부 HTTP SHA-256 모두 일치. 고정 로더 모듈 회귀 통과; 사용자는 새로고침 또는 새 화면 버전 적용. 실제 운영 브라우저 클릭 검증은 아직 대기. DB·사진·키 저장값·Python·Cloudflare·Comma 변경 없음. 개발 중 새 릴리즈 없음.
+- 배포 상태: 8c04da5 main 푸시 완료. HA deployment-backups/8c04da5098999b1c1be09d2d247db7c2fda54c31/에 기존 코드 백업 후 화면 JS 세 파일 반영. 설치·내부/외부 HTTP SHA-256 모두 일치. 고정 로더 모듈 회귀 통과; 사용자는 새로고침 또는 새 화면 버전 적용. 실제 운영 브라우저 클릭 검증은 아직 대기. DB·사진·키 저장값·Python·~~Cloudflare~~·Comma 변경 없음. 개발 중 새 릴리즈 없음.
 
 # 차계부 변경 이력
 
@@ -669,7 +681,7 @@
 - 별도 설정 메뉴: 차량/휴지통, 스냅샷, 카카오 JS/REST·오피넷 일반 키 등록/수정/제거, 기존 HA 백업 상태. 비밀 키 조회는 등록 여부만 반환. 위치는 기록 수정 창 메모 아래 표시하고 없는 경우 위치 추가만 제공. 검색·지도 핀·제거를 차계부 보정으로 저장하고 스냅샷 포함. 검색 버튼에서만 외부 조회, 서버 단기 캐시·요청 간격 제한.
 - 확정 후속: NAS 전용 자동전송, 자동 주유소/단가/연비 및 OCR은 이번에 미구현. 누적거리 입력·금액/단가의 추정 주유량 실제 리터 수정·부분 주유 포함 가득 주유 계산 및 참고 화면 흐름을 사용 문서에 기록.
 - 관련 파일: __init__/manifest, vehicle_journal api/runtime/store/schema/photos와 신규 vehicles/importers/snapshots/transfer, frontend 카드/디자인, 설계 스키마·검증, 원장/권한/타이머/신규 이관·차량관리 테스트, vehicle-management.md, 이 변경 이력.
-- 검증: 차계부 Python28개·스키마9개, Chrome 기존 데스크톱/모바일·로더·새 차량/설정/휴지통/미리보기/합성 카카오 검색/핀/제거 통과. 대시보드 로딩/스크롤 Node10개, 카메라/충전/주행 Node20개, cloud live6개·incremental5개·history1개·charge payments11개, Worker incremental/benchmark 및 Comma param polling4개 통과. 테스트 경로 오지정은 올바른 하위 경로에서 재실행.
+- 검증: 차계부 Python28개·스키마9개, Chrome 기존 데스크톱/모바일·로더·새 차량/설정/휴지통/미리보기/합성 카카오 검색/핀/제거 통과. 대시보드 로딩/스크롤 Node10개, 카메라/충전/주행 Node20개, cloud live6개·incremental5개·history1개·charge payments11개, ~~Worker~~ incremental/benchmark 및 Comma param polling4개 통과. 테스트 경로 오지정은 올바른 하위 경로에서 재실행.
 - 외부 검증: 사용자 승인 후 비개인 검색으로 카카오 REST200 확인. 실제 SDK와 공개 좌표로 합성 HA origin에서 JS 지도 생성 성공. 키는 공개 코드/로그/릴리즈/스냅샷에 넣지 않음.
 - 배포·제한: 실행 커밋 `ef75d00204fcd78d1617205f0a81858dcf24bf73` main 푸시·원격 일치 확인. 변경 코드13개를 `/config/carrot_ha/deployment-backups/ef75d00204fcd78d1617205f0a81858dcf24bf73/`에 백업/신규 파일 표시 후 직접 반영, 설치 SHA-256 및 화면2개 HTTP SHA-256 일치. 사용자 명시 승인한 API 키3개는 새 HA 내부 Store에 제한 권한으로 등록하고 값은 출력하지 않음. Python/스키마/의존성 적용은 사용자 HA 재시작 필요, 운영 UI 확인 대기. HA 컨테이너 검사는 SSH 앱 보호 모드로 실행 불가하여 보호 모드를 유지하고 설치 파일 구문 검사로 대체; HA 내부 의존성 설치/새 API 구동은 사용자 재시작 후 확인 필요. 기존 beta.4 유지·신규 릴리즈 미발행. Worker/D1/Comma 변경·배포 없음. XLS/XLSX20MiB·ZIP128MiB/해제256MiB 제한, NAS 보관본 검증 미실시.
 
@@ -811,7 +823,7 @@
 - 커밋 제목: `vehicle-journal: align ledger categories with spending policy`.
 - 변경·이유: 드롭다운에 저장용 전체 분류를 노출했던 오류 수정. 충전비·정비 / 소모품·세차비·튜닝·기타만 표시. 기존 보험·세금·주차비·통행료 기록은 삭제 없이 기타 표시/색상/필터에 통합하고 서버도 페이지 분할 전에 같은 조건 적용. 수기 입력의 기존 네 분류 유지.
 - 관련 파일: frontend 카드, vehicle_journal/store.py, Python/Chromium 회귀, 이 변경 이력.
-- 검증·배포: Chromium 전체 회귀 및 Python 원장/권한 14개 통과. 다섯 분류만 노출·보험/세금/주차/통행료/기타 통합 조회 검증. `b030055a6aa4bd508bf5299ad5802f1329fab32e` main 푸시, HA 백업/직접 반영과 설치/JS HTTP 해시 일치 확인. 백업 `/config/carrot_ha/deployment-backups/b030055a6aa4bd508bf5299ad5802f1329fab32e/`. 운영 Chrome 새로고침 후 드롭다운 전체 및 다섯 지출 분류만 표시 확인. Python 필터는 사용자 HA 재시작 후 활성화하며 운영 전체 조회 검증은 대기. DB·사진·Worker·Comma 변경 없음.
+- 검증·배포: Chromium 전체 회귀 및 Python 원장/권한 14개 통과. 다섯 분류만 노출·보험/세금/주차/통행료/기타 통합 조회 검증. `b030055a6aa4bd508bf5299ad5802f1329fab32e` main 푸시, HA 백업/직접 반영과 설치/JS HTTP 해시 일치 확인. 백업 `/config/carrot_ha/deployment-backups/b030055a6aa4bd508bf5299ad5802f1329fab32e/`. 운영 Chrome 새로고침 후 드롭다운 전체 및 다섯 지출 분류만 표시 확인. Python 필터는 사용자 HA 재시작 후 활성화하며 운영 전체 조회 검증은 대기. DB·사진·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-11 — 상세 기록을 차량 지출 전용으로 변경
 
@@ -819,7 +831,7 @@
 - 변경·이유: 사용자 요청에 따라 상세 기록에서 주행 표시 체크박스·주행 분류·주행 행·충전량 행을 제거. 금액 지출만 표시하고 열 제목을 ‘금액’, 설명을 차량 지출로 변경. 금액 제목 버튼 클릭마다 시간순(최신 먼저) → 높은 순 → 낮은 순 → 시간순 순환, 선택 기간/분류 전체를 SQL에서 페이지 분할 전에 정렬. 실금액 우선·없으면 추정금액 사용, 미확인 금액 마지막·동액 최신일/ID로 안정 정렬. 체크박스 드롭다운의 지출 분류 복수 선택·색상·고정 열 유지. 저장된 주행/충전 원본 및 다른 탭 집계는 보존.
 - 관련 파일: frontend 카드/디자인, vehicle_journal API/store, journal Python/Chromium 테스트, 이 변경 이력.
 - 검증: 지출 전용 필터/금액 정렬을 페이지 조회 전 SQL에 적용하며 이전 서버에서는 화면에서도 주행/충전량 제외. Chromium 회귀 및 Python 원장/권한 14개 통과(Windows 임시 DB 정리에는 GC 보조 사용). 100개 이상 주행 뒤 지출 조회·충전량 제외·복수 지출 분류·높은/낮은 금액 첫 페이지·잘못된 정렬 거절·집계 유지 확인. 운영 Chrome에서도 주행 체크박스/분류 0개, 지출 13행에 거리/kWh 없음, 시간순 → 높은 순 → 낮은 순 → 시간순 클릭 결과와 지출 분류 드롭다운 확인. 운영 검증은 재시작 전 기존 페이지의 화면 처리이며 전체 기간 서버 정렬 검증과 구분.
-- 배포: `3a50385f979ffe0f964962c6da8fc48e9d6a28d3` main 커밋·푸시 완료. 네 실행 모듈 백업/직접 반영 및 설치 SHA-256, 두 JS HA HTTP 해시 일치. 백업 `/config/carrot_ha/deployment-backups/3a50385f979ffe0f964962c6da8fc48e9d6a28d3/`. Python 전체 기간 필터/정렬은 사용자 HA 재시작 후 활성화하며 그 운영 검증은 대기. Worker·Comma·DB/사진 변경 및 릴리즈 발행 없음.
+- 배포: `3a50385f979ffe0f964962c6da8fc48e9d6a28d3` main 커밋·푸시 완료. 네 실행 모듈 백업/직접 반영 및 설치 SHA-256, 두 JS HA HTTP 해시 일치. 백업 `/config/carrot_ha/deployment-backups/3a50385f979ffe0f964962c6da8fc48e9d6a28d3/`. Python 전체 기간 필터/정렬은 사용자 HA 재시작 후 활성화하며 그 운영 검증은 대기. ~~Worker~~·Comma·DB/사진 변경 및 릴리즈 발행 없음.
 - 이전 배포: 드롭다운 변경 `5ad51d8` main 푸시, 두 화면 모듈 설치/HTTP 해시 일치 확인. 이번 요청이 바깥 주행 선택과 주행 분류 동작을 대체함.
 
 ## 2026-10-11 — 상세 기록 분류 선택을 체크박스 드롭다운으로 변경
@@ -829,7 +841,7 @@
 - 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: 실제 Chromium 드롭다운 열기·복수 체크·전체 상태·기존 원장/추세/입력/모바일 회귀 통과. 좁은 화면 열린 메뉴의 가로 넘침 검사 포함. 배포는 main 푸시 후 두 화면 모듈 반영 예정.
 - 이전 배포 확인: `f3d81b0` 네 실행 모듈의 설치 해시 및 두 화면 모듈 HA HTTP 일치. 백업 `/config/carrot_ha/deployment-backups/f3d81b0cdccf1fcc8b8a6f2a11272027c8087163/`. 운영 Chrome 기본 주행 숨김 25행/주행만 72행/주행·충전비 복수 96행과 분류 색상·고정 열 확인. 이는 재시작 전 기존 서버 조회 페이지의 화면 필터 검증이며 기간 전체 서버 필터 완료가 아님. 이번 드롭다운 변경이 이전 화면을 대체함.
-- 제한: 사용자 HA 재시작 후 새 Python 서버 필터 활성화 및 운영 전체 페이지 확인 필요. 신규 릴리즈·Worker·Comma 변경 없음.
+- 제한: 사용자 HA 재시작 후 새 Python 서버 필터 활성화 및 운영 전체 페이지 확인 필요. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-11 — 상세 기록 주행 표시·복수 분류 필터와 고정 열 너비
 
@@ -842,14 +854,14 @@
 - 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle_journal/store.py`, `vehicle_journal/api.py`, `vehicle-journal/tests/browser-check.cjs`, `vehicle-journal/tests/test_journal.py`, 이 변경 이력.
 - 검증: 실제 Chromium 회귀(기본 숨김·주행만·복수 선택·해제·서버 필터 인자·열 너비·최근 지출·모바일/입력/금액/스크롤) 통과. Python 원장/사진/권한 14건 통과(101건 초과 페이지·집계 보존·잘못된 필터/차량 매핑 포함). 기존 dashboard freshness Node 10건 통과.
 - 테스트 환경: 샌드박스 임시 SQLite 접근 오류 후 승인 경로 실행. Windows 기존 테스트 정리 3건은 SQLite 핸들 GC 전 파일 삭제 오류이며, 임시 하네스에서 cleanup 전 GC로 전체 14건 통과. 기존 runtime schedule 전체 discover는 응답 대기로 중단했으며 해당 테스트·실기 동작 성공을 주장하지 않음.
-- 배포: main 커밋·푸시 및 네 실행 모듈 백업/직접 반영 예정. Python 적용은 사용자 HA 재시작 필요. 실제 운영 탭 연결 확인, 배포 후 화면과 신규 서버 조회 검증 상태는 후속 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+- 배포: main 커밋·푸시 및 네 실행 모듈 백업/직접 반영 예정. Python 적용은 사용자 HA 재시작 필요. 실제 운영 탭 연결 확인, 배포 후 화면과 신규 서버 조회 검증 상태는 후속 기록. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 미래 기간 차단 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record future period guard deployment`.
 - 대상: `1f28d55` 미래 기간 차단. main 푸시·두 모듈 백업·HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/1f28d55cf5dbee03b442528f5f6f191c08d088ae/`.
 - 검증: 최종 실제 Chromium 회귀 통과. 설치/HA 로컬 HTTP SHA-256 카드 `0354271504849915606b7aef8d4d18131e1ec1efc8095c37e3032d81d95f3375`, 디자인 `acb24e4e0ec87d05fd9373a7dc9c6d16f7b8b935c025bf2cc7684a103944098e` 일치.
-- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 날짜 선택기 미래 기간 선택 차단
 
@@ -857,14 +869,14 @@
 - 변경·이유: HA 시간대의 현재 월/연도를 입력 max로 설정. 현재 기간의 다음 버튼 비활성화 및 비활성 스타일 적용. 직접 입력 또는 복원된 미래 값은 조회 전 현재 기간으로 보정. 이동 함수와 range 검증에서도 미래 값 거부. 기존 월/연도 범위 의미 유지.
 - 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: JS 구문 및 실제 Chromium 회귀 통과. 월/연도 max·입력 rangeOverflow·현재 기간 다음 버튼 비활성화·직접 미래 입력 보정·이동 함수 우회 차단·월/연도 과거 이동 및 현재 복귀 확인. 기존 모바일/입력/금액/스크롤 회귀 유지. 최초 검사에서 Playwright fill이 change를 발생시켜 이미 보정된 값을 검사한 테스트 순서 문제를 수정한 뒤 통과.
-- 배포: main 커밋·푸시 후 HA 두 모듈 백업 및 직접 반영 예정. 운영 브라우저 확인은 별도 상태로 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+- 배포: main 커밋·푸시 후 HA 두 모듈 백업 및 직접 반영 예정. 운영 브라우저 확인은 별도 상태로 기록. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 날짜 선택기 버튼 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record date navigation deployment`.
 - 대상: `1ff8bd5` 날짜 이동/현재 기간 복귀. main 푸시 및 두 모듈 백업/HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/1ff8bd5b84ef7ebb6692723917b7c0728d85c734/`.
 - 검증: 최종 실제 Chromium 회귀 통과. 설치/HA 로컬 HTTP SHA-256 카드 `0fbff875399f35f88d391dbee8810b5b8aa2abae9cca6efd44a6491ea55f2e2a`, 디자인 `e39b537d8d5914783ee4bb2691a38fc7e6e615c18a36f9b91c59bb4945995a4d` 일치.
-- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 날짜 선택기 이전·다음 및 현재 기간 복귀 버튼
 
@@ -872,14 +884,14 @@
 - 변경·이유: 날짜 입력 왼쪽 이전/오른쪽 다음 버튼과 그 오른쪽 현재 범위 복귀 버튼 추가. 월별은 한 달씩 이동·‘이번 달’, 연도별은 한 해씩 이동·‘올해’. 현재 범위는 HA 설정 시간대 기준. 기존 입력과 선택 탭 유지, 기간 변경 시 상세 기록 페이지 초기화, 기존 오래된 응답 거부 경로 사용.
 - 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: JS 구문 및 실제 Chromium 회귀 통과. 12월→1월/역방향·연도 이동·현재 월/연도 복귀·레이블·페이지 초기화·탭 유지 검증. 320–850px 모바일 가로 넘침 및 기존 입력/금액/스크롤 회귀 통과. 모바일 합성 화면 육안 확인.
-- 배포: main 커밋·푸시 후 두 모듈 백업/HA 직접 반영 예정. 운영 화면 적용은 후속 상태로 구분. 신규 릴리즈·Worker·Comma 변경 없음.
+- 배포: main 커밋·푸시 후 두 모듈 백업/HA 직접 반영 예정. 운영 화면 적용은 후속 상태로 구분. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 화폐 구분 쉼표 수정 HA 반영 확인
 
 - 커밋 제목: `vehicle-journal: record grouped currency deployment`.
 - 대상: `e6d122d` 화폐 표시·공통 지침. main 푸시 및 HA 코드 백업/직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/e6d122d1098494e7b1384aa5f561437153915634/`.
 - 검증: 카드 설치 및 HA 로컬 HTTP SHA-256 `b4a4dc7a38b7e94952050a3299a1bb37a8e19b0f515c0eefbaab443c56671903` 일치. 배포 도구가 함께 반영한 디자인은 기존 해시와 동일. Node 10건 및 실제 Chromium 차계부 회귀 통과.
-- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 모든 대시보드 화폐 천 단위 구분 규칙
 
@@ -896,7 +908,7 @@
 - 대상: `4ea12c3` 승인 제목과 부가 설명 제거. 최종 Chromium 검증 통과 및 main 푸시 완료.
 - 배포: 기존 코드 백업 후 카드 반영 완료. 배포 도구가 디자인 모듈도 동일 커밋에서 다시 반영했으며 디자인은 이전과 동일. 백업 `/config/carrot_ha/deployment-backups/4ea12c389f8db865fd5db59f491ff5a1a4811ed8/`.
 - 검증: 카드 설치/HA 로컬 HTTP SHA-256 `1f21361eec7774ad22e727eb780983747aa87ecc36c22252541d9024da1b7d71` 일치. 디자인 기존 해시 `dcdd3ddb97b1dad4420ace5004dd489c6d60cad5c8aa0211d55f40739d5a4705` 일치.
-- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·Worker·Comma 변경 없음.
+- 제한: 실제 사용자 접속 주소 운영 브라우저 적용은 미확인, 새로고침 후 확인 대기. HA 재시작·신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 승인된 추세 제목 및 비교 문구 간소화
 
@@ -905,7 +917,7 @@
 - 셋째 줄: 기록일 기준 평균, 추정 계산식, 실제·추정 포함, 누적 지출, SOC 기록 범위 등 모든 부가 설명 제거. 비교 수치·변화량 및 일관/수집 상태만 유지. 계산과 데이터는 변경하지 않음.
 - 관련 파일: `carrot-vehicle-journal.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: JS 구문 및 실제 Chromium 회귀 통과. 승인 제목과 유지 대상 두 제목, 부가 설명 제거, 비교 문장, 월/연도·입력·스크롤·모바일 320–850px 확인.
-- 배포: main 커밋·푸시 후 코드 백업 및 HA 카드 모듈 직접 반영 예정. 설치/HTTP/운영 브라우저 상태는 후속 기록. 신규 릴리즈·Worker·Comma 변경 없음.
+- 배포: main 커밋·푸시 후 코드 백업 및 HA 카드 모듈 직접 반영 예정. 설치/HTTP/운영 브라우저 상태는 후속 기록. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-09 — 글자 크기 교환 및 테마 강조 HA 반영 확인
 
@@ -913,7 +925,7 @@
 - 대상: `1e6e2a0` 문구·강조 및 `2e63285` 원래 크기 교환. 최종 두 화면 모듈을 `2e632858cfb8ef928181b26fbcb307c11a82889c`에서 추출해 배포.
 - 검증: 최종 Chromium 회귀 통과. 설치 파일 및 HA 로컬 HTTP 응답 SHA-256 모두 커밋 코드와 일치. 카드 `3618001cb4a22f91bb3b73eb66cbff780810e12f78c001501b1c5cd633aa160e`, 디자인 `dcdd3ddb97b1dad4420ace5004dd489c6d60cad5c8aa0211d55f40739d5a4705`.
 - 배포: main 푸시·기존 코드 백업·두 모듈 HA 직접 반영 완료. 백업 `/config/carrot_ha/deployment-backups/2e632858cfb8ef928181b26fbcb307c11a82889c/`. 실제 사용자 접속 주소의 운영 브라우저 적용은 미확인으로 사용자 새로고침 후 확인 대기. HA 재시작은 실행하지 않음.
-- 제한: 카드 제목 명칭은 사용자 검토 후 변경. 신규 릴리즈·Worker·Comma 변경 없음. 운영 브라우저 적용 완료를 주장하지 않음.
+- 제한: 카드 제목 명칭은 사용자 검토 후 변경. 신규 릴리즈·~~Worker~~·Comma 변경 없음. 운영 브라우저 적용 완료를 주장하지 않음.
 
 ## 2026-10-09 — 기존 첫째·둘째 줄 글자 크기를 정확히 교환
 
@@ -929,7 +941,7 @@
 - 범위: 카드 제목 명칭 변경은 사용자 사전 검토 대상으로 남기며 이번 수정에는 포함하지 않음. 계산·집계 유지.
 - 관련 파일: `carrot-vehicle-journal.js`, `carrot-journal-design.js`, `vehicle-journal/tests/browser-check.cjs`, 이 변경 이력.
 - 검증: JS 두 모듈 구문 및 실제 Chromium 회귀 통과. 월/연도 비교, 증가·감소·일관 강조 색상, 데스크톱/모바일 글자 위계, 320–850px 레이아웃, 입력·escaping·스크롤 검증 포함.
-- 배포: main 커밋·푸시 및 두 모듈 백업 후 HA 직접 반영 예정. 설치/HTTP/운영 브라우저 확인 상태는 후속 기록으로 구분. 신규 릴리즈·Worker·Comma 변경 없음.
+- 배포: main 커밋·푸시 및 두 모듈 백업 후 HA 직접 반영 예정. 설치/HTTP/운영 브라우저 확인 상태는 후속 기록으로 구분. 신규 릴리즈·~~Worker~~·Comma 변경 없음.
 
 ## 2026-10-07 — 추가 추이 및 모바일 한 열 운영 검증 완료
 
@@ -1145,7 +1157,7 @@
   향후 JS 화면 모듈 변경은 재시작 없이 갱신 가능하다. 사용자 요청에 따라 임시
   디버깅 버튼/모니터/뷰 저장은 수정·실사용 검증 완료 후 제거하며 고정 로더는 유지한다.
 - 관련 파일: CHANGELOG.md 및 deployment.md 현재 인계 상태. 문서만 추가 수정했고
-  main 커밋·푸시한다. 새 릴리즈·Cloudflare·Comma 변경/배포 없음.
+  main 커밋·푸시한다. 새 릴리즈·~~Cloudflare~~·Comma 변경/배포 없음.
 
 ## 2026-10-07 — 고정 로더 및 임시 화면 업데이트 버튼
 
@@ -1205,7 +1217,7 @@
   실행 코드 재배포·HA 재시작·새 릴리즈는 수행하지 않았다. 현재 화면 적용 해결은
   사용자 HA 재시작 후 최상위 URL 갱신 및 화면 확인이 남아 있다.
 - 제한: HA Docker 읽기는 SSH 앱 보호 모드로 불가했으며 보호 설정을 변경하지 않았다.
-  캐시 전체 삭제·운영 DB/사진/설정 변경 없음. Cloudflare·Comma 변경/배포 없음.
+  캐시 전체 삭제·운영 DB/사진/설정 변경 없음. ~~Cloudflare~~·Comma 변경/배포 없음.
 
 ## 2026-10-07 — 헤더 타이틀 간소화, 최근 지출 전체 스크롤 표시 및 상세 기록 탭 이동 연동
 
@@ -1341,7 +1353,7 @@
 
 - 커밋 제목: vehicle-journal: apply approved spending prototype to live HA records.
 - review_journal_spending.html 원본은 보존했다. 3단 hero, 일/월/연도 선택, 이전 기간 스택 비교와 분류 선택, 고정 분류 색상, 지출 전용 최근 기록, 모바일 레이아웃과 수기 지출 4개 분류를 적용했다. 샘플 수치와 장치 프레임은 제외했다.
-- 기존 HA 로컬 query만 사용하며 이전 조회 실패가 현재 기록을 차단하지 않는다. Worker·D1·Comma 변경은 없다.
+- 기존 HA 로컬 query만 사용하며 이전 조회 실패가 현재 기록을 차단하지 않는다. ~~Worker~~·~~D1~~·Comma 변경은 없다.
 - 관련 파일: frontend/carrot-vehicle-journal.js, carrot-journal-design.js, carrot-journal-panel.js, tests/browser-check.cjs.
 - Chromium 저장·escaping·오래된 응답 거부·스크롤/스타일 유지·320/360/520/850px·윤년 범위·분류 토글 검증 통과. 실기 화면과 iOS 검증은 대기 중이다.
 - HA 재시작 이후 장거리 주행 동기화와 원장 복구를 확인했다. 전체 디자인 실기 확인 전 베타 발행은 보류한다.
@@ -1358,7 +1370,7 @@
   화면을 되돌리지 않도록 했다. 다른 로컬 삭제 파일은 커밋에 포함하지 않았다.
 - 직접 반영된 파일은 기존 manifest `0.8.13` 상태다. HACS 재다운로드가 이번
   SSH 검증의 필수 단계는 아니다. Python 재시작·실기 복구·iOS 확인은 대기 중이다.
-- 이 준비 커밋은 버전/노트/기록 변경만 포함하며 Worker·D1·Comma는 유지한다.
+- 이 준비 커밋은 버전/노트/기록 변경만 포함하며 ~~Worker~~·~~D1~~·Comma는 유지한다.
   pre-release 발행 및 Actions 결과는 확인 후 별도 기록한다. 정식 발행은
   실사용 검증 후이며 기존 태그를 이동하지 않는다.
 
@@ -1443,7 +1455,7 @@
 - 이전 이미지 자산과 오버레이 검사 파일은 작업 이력으로 유지한다. 오버레이 검사는
   이미지가 없는 현재 원본에 적용하지 않는다.
 - 검증: 백업과 파일 일치, HTML 내 JS 구문 검사, 모바일·데스크톱 렌더링·이미지 없음 확인.
-- 배포: 검토 HTML 및 변경 기록만 main 커밋·푸시. HA·Cloudflare·릴리즈 변경 없음.
+- 배포: 검토 HTML 및 변경 기록만 main 커밋·푸시. HA·~~Cloudflare~~·릴리즈 변경 없음.
 
 ## 2026-10-06 — 차량 우측 하단 고정과 겹침 중간값 조정
 
@@ -1458,7 +1470,7 @@
   CHANGELOG.md. 새 이미지 생성이나 이미지 자산 변경은 없다.
 - 검증: 21개 화면·기간 조합에서 경계·겹침·JS 오류 및 장면 우측 하단 정렬 검사.
   모바일 402px·데스크톱 1280px 월간 스크린샷 육안 확인.
-- 배포: 검토 파일만 main 커밋·푸시. 운영 HA·Cloudflare·릴리즈 변경 없음.
+- 배포: 검토 파일만 main 커밋·푸시. 운영 HA·~~Cloudflare~~·릴리즈 변경 없음.
 
 ## 2026-10-06 — 좌측 제목·우측 차량 구도와 이미지 제작 기준
 
@@ -1468,7 +1480,7 @@
 - 관련 파일: review_journal_spending.html, assets/README.md, CHANGELOG.md.
 - 검증: 모바일·큰 모바일·데스크톱, 320~1920px, 일/월/연도 21개 조합 통과.
   모바일 402px와 데스크톱 1280px의 월간 카드 스크린샷에서 겹침을 육안 확인했다.
-- 배포: 로컬 검토 파일만 main에 커밋·푸시. HA·Cloudflare·버전·릴리즈 변경 없음.
+- 배포: 로컬 검토 파일만 main에 커밋·푸시. HA·~~Cloudflare~~·버전·릴리즈 변경 없음.
 
 ### 다른 차량 이미지 형식과 재사용 편집 프롬프트
 
@@ -1505,7 +1517,7 @@ text and right alignment will be implemented separately in CSS.
 - 검증: 320~1920px·세 화면 모드·일/월/연도 21개 조합에서 큰 제목과 차량의
   실제 알파 겹침, 작은 설명 제거, 차량·텍스트 경계, 지표 단위, JS 오류 검사 통과.
   모바일 월간 스크린샷을 육안 확인했다.
-- 검토 HTML만 커밋·푸시한다. 운영 HA·Cloudflare·manifest·태그·릴리즈는 변경하지 않는다.
+- 검토 HTML만 커밋·푸시한다. 운영 HA·~~Cloudflare~~·manifest·태그·릴리즈는 변경하지 않는다.
 
 ## 2026-10-06 — 차량 이미지 규격화와 오버레이 재수정
 
@@ -1611,7 +1623,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 전용 지침·요구사항·DB/집계/이관/백업/API/검증 계획, schema v1,
   독립 합성 검증 스크립트, 미선정 원본 HTML 후보 2개와 SHA-256 출처 기록 추가.
 - 변경 범위: vehicle-journal/ 및 루트 AGENTS.md 안내. HA 실행 코드·manifest,
-  Cloudflare·Comma 변경 없음. 0.8.12 버전 유지, HACS Release/Worker 배포 없음.
+  ~~Cloudflare~~·Comma 변경 없음. 0.8.12 버전 유지, HACS Release/Worker 배포 없음.
 - 로컬 SQL 9개 검증 통과. null 결제 금액 허용과 실제 0원의 구분을 포함하며
   새 DB 생성·재실행·FK·unique·JSON·사진·transaction rollback 확인.
 - 사용자 추가 요청에 따라 WireGuard 경유 HA SSH 연결 성공. 읽기 전용 source
@@ -1641,7 +1653,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   확인. 운영 소스 파일 직접 복사 없음. Git 제외 로컬 실제 기록 미리보기 확인.
 - 제한: parking/전체 SOC, 표본 기반 자정 정밀 배분, 당시 유가, 자동/수동 링크·
   필드 보정·export API는 후속 범위. 같은 날 자동 기록은 수동 행에 경고만 표시.
-- Cloudflare·Comma 코드/배포 변경 없음. HACS 설치·HA 재시작은 사용자 작업.
+- ~~Cloudflare~~·Comma 코드/배포 변경 없음. HACS 설치·HA 재시작은 사용자 작업.
   실행 코드의 실제 운영 수집/쓰기 확인은 설치 이후에 별도로 기록한다.
 # 2026-10-07 — 최근 30일 주행 엔티티와 월간 요약 속성
 
@@ -1663,7 +1675,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 측정 정책: 기존 전비의 검증·거리 보정·순 에너지·회생제동 기준과 1km/0.5kWh
   표시 조건을 재사용한다. 누락된 에너지는 추정으로 채우지 않는다. 90일 주행 및
   에너지 캐시가 30일 집계를 지원하고, 원시 상태/경로의 14일 보존은 변경하지 않는다.
-- 성능: 기존 60초 이력 동기화의 공유 로컬 요약만 확장한다. 클라우드 요청 및 KV
+- 성능: 기존 60초 이력 동기화의 공유 로컬 요약만 확장한다. 클라우드 요청 및 ~~KV~~
   쓰기 없음. 캐시 거리가 동일할 때 재쓰기를 생략해 월간/30일 집계가 같은 이벤트의
   차계부 outbox 세대를 반복 증가시키지 않게 한다.
 - 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py,
@@ -1671,7 +1683,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   위젯 제목·⚡ 전비·🚘 정수 거리·데이터 수집 중 템플릿도 문서에 추가했다.
 - 검증: 새 기간 경계/월 경계/미래 기록/차량 격리/회생/누락/원시 정리/거리 수정/
   불필요한 쓰기 방지 4건, 센서 18건, 기존 월간 4건·주행 에너지 13건·보정 35건 통과.
-  latest 6건·증분 5건·이력 캐시 1건, 필수 dashboard 10건, Worker 증분 및 benchmark,
+  latest 6건·증분 5건·이력 캐시 1건, 필수 dashboard 10건, ~~Worker~~ 증분 및 benchmark,
   Comma parameter polling 4건, 카메라 4건, 충전 mode 8건·power 9건 통과.
   차계부 14건·schema 9건 통과. 기본 Mac Python의 Pillow 누락은 번들 Python으로
   재검증했고 충전 power 테스트의 독립 import 환경은 기존 센서 stub을 먼저 로드해
@@ -1713,7 +1725,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   tests/{test_entity_migration.py,test_new_sensors.py}, docs/entities.md.
 - 검증: 마이그레이션 4건(12개 한정/Comma·필수 보존/재활성화/다른 차량/옵션 저장),
   센서 속성·기본 활성 정책 포함 19건 통과. rolling/monthly 각 4건·latest 6건·증분 5건·
-  이력 캐시 1건, dashboard/카메라 14건, Worker 증분·benchmark 및 Comma parameter
+  이력 캐시 1건, dashboard/카메라 14건, ~~Worker~~ 증분·benchmark 및 Comma parameter
   polling 4건 통과. 차계부 14건·schema 9건 통과. 프론트엔드 변경 없음.
 - 배포: main 커밋·푸시 후 현재 개발 정책의 백업·부분 배포 대상으로 센서 및
   migration Python 2개만 반영한다. 기존 설치 파일 해시와 수정 전 커밋 일치 확인.
@@ -1743,7 +1755,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
   실제 운영 파일 정리·수집 중 상한 도달은 수행하지 않았다.
 - 배포: main 커밋·푸시 후 현 개발 정책으로 Python/서비스 설명 2개를 기존 해시
   확인·백업 후 부분 반영 대상. 확정 배포 및 사용자 재시작 대기는 후속 기록한다.
-  차계부/차량 화면·Comma·Worker·D1·manifest·태그·새 Release 변경 없음.
+  차계부/차량 화면·Comma·~~Worker~~·~~D1~~·manifest·태그·새 Release 변경 없음.
 # 2026-10-07 — 추이 카드의 미정의 이전 기간 변수 수정
 
 - 배포/실화면 확정: `f597575dac65d507b8ece8017d50a0b2702ce99c` main 푸시 후
@@ -1828,7 +1840,7 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 ## 2026-10-14 — 직접 차량 수신 전환의 차계부 보존 점검
 
 - 제목: `vehicle-journal: record unchanged journal migration regression` (기록만 수정).
-- 이유: 사용자가 Cloudflare 대신 HAOS 수신 애드온을 요청하면서 기존 기능 전체 보존을
+- 이유: 사용자가 ~~Cloudflare~~ 대신 HAOS 수신 애드온을 요청하면서 기존 기능 전체 보존을
   요구했다. 차계부 계산·DB·사진·결제·UI 실행 코드는 변경하지 않는다.
 - 관련: docs/direct-vehicle-receiver-plan-2026-10-14.md의 보존 목록, HA cloud.py의
   기존 cloud 이벤트 ID 유지와 source별 cursor, 기존 vehicle-journal/tests.

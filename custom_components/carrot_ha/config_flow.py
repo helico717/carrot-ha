@@ -25,8 +25,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain='carrot_ha'):
 class BatteryOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
         schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
-                             vol.Optional('cloud_url', default=self.config_entry.options.get('cloud_url', '')): str,
-                             vol.Optional('cloud_view_token', default=self.config_entry.options.get('cloud_view_token', '')): str,
                              vol.Optional('receiver_url', default=self.config_entry.options.get('receiver_url', '')): str,
                              vol.Optional('receiver_view_token', default=self.config_entry.options.get('receiver_view_token', '')): str,
                              vol.Optional('receiver_upload_token', default=self.config_entry.options.get('receiver_upload_token', '')): str,
@@ -34,11 +32,11 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                              vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str,
                              vol.Optional('terminal_enabled', default=self.config_entry.options.get('terminal_enabled', False)): bool,
                              vol.Optional('terminal_ha_url', default=self.config_entry.options.get('terminal_ha_url', '')): str,
-                             vol.Optional('terminal_upload_token', default=self.config_entry.options.get('terminal_upload_token', '')): str})
+})
         errors = {}
         if user_input is not None:
             try:
-                data = schema(user_input)
+                data = {**self.config_entry.options, **schema(user_input)}
                 import math
                 if not math.isfinite(data['soc_capacity_kwh']):
                     raise vol.Invalid('finite required')
@@ -94,7 +92,7 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                     errors['base'] = 'invalid_terminal_token'
                     return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 url = urlsplit(data['cloud_url'])
-                if data['cloud_url'] and (url.scheme != 'https' or not url.hostname or url.path or url.query or url.fragment or url.username or url.password or not data['cloud_view_token']):
+                if not direct and data['cloud_url'] and (url.scheme != 'https' or not url.hostname or url.path or url.query or url.fragment or url.username or url.password or not data['cloud_view_token']):
                     errors['base'] = 'invalid_cloud'
                     return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 return self.async_create_entry(title='', data=data)

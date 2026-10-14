@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # beta.9 실제 CAN 충전 적용 및 삭제 UI
 
 근거: [AC/DC 실차 대조](https://github.com/helico717/meb-can-research/blob/main/docs/raw-can-ac-dc-validation-2026-10-05.md) (비공개 연구 저장소).
@@ -41,7 +43,7 @@ CAN 송신/UDS·수신주기·업로드주기·raw20GB·Worker/D1 변경 없음.
   데스크톱 메뉴에서 확인 팝업·취소,삭제·요금편집·저장실패·비동기스크롤/포커스 보존 통과.
 - 새 JS AC1자리/DC정수·저출력DC분류2건 통과. 전체JS 기존61건 중60통과,
   motion-status1건 실패는HEAD 원본의 별도 임시 checkout에서도 같은 parked/unknown 차이로 재현됐다.
-- 필수 live/lazy/view-state,incremental/history/cloud,Worker incremental 및benchmark 검증 통과.
+- 필수 live/lazy/view-state,incremental/history/cloud,~~Worker~~ incremental 및benchmark 검증 통과.
   source변경 후 그래프·요금·삭제 관련 HA 테스트도 통과.
 
 배포 후 실제 장치 CPU·반응·화면 기록은 아직 별도 실측하지 않았다.
@@ -92,7 +94,7 @@ manifestbeta.9와 기존Release를 유지한다. 원격기기코드·Worker/D1 �
 Chrome 한글/영문·밝은/어두운·390/1200px 8조합에서 버튼/메뉴 수직 중심 일치,
 금액 위 배치, 행 높이(한글 105.1875px, 영문 116px), 결제 수정/0원/삭제/실패,
 기록 삭제/취소 및 비동기 스크롤·입력 상태 유지 통과. 관련 JS 19건 및 HA live/history 12건 통과.
-기존 camera-360 VM 검사는 import.meta 구문 오류, Worker migration 검사는 Windows CRLF에 따른
+기존 camera-360 VM 검사는 import.meta 구문 오류, ~~Worker~~ migration 검사는 Windows CRLF에 따른
 legacy fixture 치환 실패(duplicate measurements_json)로 실패했다. 두 검사의 파일은 변경하지 않았다.
 bootstrap JS 검사는 python3 실행 권한 오류로 이 환경에서 실행되지 않았다.
 Comma 코드와 Worker/D1 변경·배포 없음. 기존 beta.9 설치자는 HACS 다시 다운로드 후 HA 재시작한다.

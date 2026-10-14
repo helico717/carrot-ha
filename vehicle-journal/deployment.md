@@ -1,3 +1,11 @@
+> **현재 사용자 지시 — 2026-10-14:** 주 운영 경로는 자체 HAOS 차량 수신 앱입니다.
+> 이전 Cloudflare 설치/배포와 무료 플랜 지침은 과거 구현 기록입니다. 직접 수신기 배포에는 적용하지 않습니다.
+> 전체 요청 반영·검증 후 **v0.9.0-beta.1** 발행을 사용자가 승인했습니다. 이전 0.8.x 제한·발행 대기보다 우선합니다.
+> Comma Git 전용 배포·기기 소스 SSH/SCP 수정 금지·변경 기록·사용자 재시작 원칙은 유지합니다.
+> 설치/복구는 `docs/CLEAN_INSTALL_RECOVERY.md`, 현재 배포 담당은 `docs/DEVELOPMENT_WORKFLOW.md`를 따릅니다.
+
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../docs/CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # Antigravity 및 다른 개발 에이전트 인계: 차계부 배포
 
 이 문서와 루트 `AGENTS.md`, `vehicle-journal/AGENTS.md`를 먼저 읽는다.
@@ -145,7 +153,7 @@ HACS 업데이트·재다운로드는 직접 배포한 개발 코드를 덮어�
 HA 실기에서 표시·자동 수집·과거 기록·수동 입력·권한·사진·재시작 후 기록 유지·기존
 차량 화면 회귀 등 변경에 맞는 검증을 확인한다. 미실시 항목을 통과했다고 보고하지
 않는다. 사용자 실사용 확인 후 새로운 정식 `0.8.x`의 manifest·태그·Release를
-발행한다. Actions 성공과 정식 Release 여부를 확인한다. Cloudflare·Comma 변경은
+발행한다. Actions 성공과 정식 Release 여부를 확인한다. ~~Cloudflare~~·Comma 변경은
 이 차계부 배포에 필요하지 않다.
 
 ## 각 커밋과 릴리즈의 changelog 작성·검증

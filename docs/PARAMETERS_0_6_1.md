@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 0.6.1 파라미터 화면 수정 및 적용
 
 ## 빈 화면 원인
@@ -15,11 +17,11 @@ iframe 내부 navigation.js는 CURRENT_PAGE를 carrot로 초기화한다. 기존
 
 ## 배포 순서
 
-1. 기존 설정/토큰을 유지하며 cloudflare/src/worker.js를 배포한다. 기존 테이블을 사용하므로 이 변경에는 D1 스키마 변경이 없다.
+1. 기존 설정/토큰을 유지하며 cloudflare/src/worker.js를 배포한다. 기존 테이블을 사용하므로 이 변경에는 ~~D1~~ 스키마 변경이 없다.
 2. Comma의 기존 param_sync.py를 collector/param_sync.py로 교체하고 해당 프로세스를 재시작한다. 기존 수집기 실행 방식은 유지한다.
 3. custom_components/carrot_ha 폴더 전체를 HA /config/custom_components/carrot_ha/에 반영하고 HA를 재시작한다. 이번 변경은 카드 JS 두 파일만 복사해서는 충분하지 않다.
 4. 브라우저 강력 새로고침. /api/carrot_ha/frontend-version 응답은 0.6.1이어야 한다. 리소스 URL은 기존 /carrot_ha_static/carrot-dashboard.js를 유지한다.
-5. 카드에서 그룹/파라미터/검색을 확인한다. Worker 구버전이면 조회는 가능하지만 쓰기는 업데이트 안내로 거절한다.
+5. 카드에서 그룹/파라미터/검색을 확인한다. ~~Worker~~ 구버전이면 조회는 가능하지만 쓰기는 업데이트 안내로 거절한다.
 
 표시 카탈로그는 차량 스냅샷 업로드(기본 180초) 후 다음 HA 조회에 반영된다. 네트워크 중단 중에는 최신화를 보장하지 않는다. 실제 차량 값 변경은 사용자 의도에 맞는 값으로 별도 확인해야 한다.
 

@@ -1,7 +1,9 @@
+> 현재 설치·연결은 [초기화 복구 안내](CLEAN_INSTALL_RECOVERY.md)를 따릅니다. 아래 과거 서버 관련 절차는 폐기되었습니다.
+
 # 주차 카메라 — Git 기반 설치 및 업데이트
 
 영상 경로는 콤마 → HA의 `/api/carrot_ha/v1/camera/…` WebSocket → HA HLS다.
-Cloudflare 대시보드 API와 별개이며, 기존 HTTPS 프록시에서 WebSocket upgrade를 허용해야 한다.
+집 서버의 차량 수신 앱 대시보드 API와 별개이며, 기존 HTTPS 프록시에서 WebSocket upgrade를 허용해야 한다.
 
 ## 저장소별 배포
 

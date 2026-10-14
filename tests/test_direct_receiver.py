@@ -15,6 +15,7 @@ import unittest
 from aiohttp.test_utils import TestClient, TestServer
 from aiohttp import ClientTimeout
 
+sys.path.insert(0, str(Path('addons/carrot_receiver').resolve()))
 spec = importlib.util.spec_from_file_location('receiver', Path('addons/carrot_receiver/receiver.py'))
 receiver = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(receiver)

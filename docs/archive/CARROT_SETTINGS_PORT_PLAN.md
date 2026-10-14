@@ -1,8 +1,10 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 당근 웹 파라미터 설정 화면 HA 이식 계획
 
 > [!NOTE]
 > **이식 완료 안내**:
-> 본 계획서에 정의된 목표(정통 당근 웹 인터페이스 및 CSS 이식, GitHub Wiki 상세 문서 로더 연동, 샌드박스 iframe 및 보안 postMessage 브리지, Cloudflare D1 큐 ID 기반 쓰기 검증)는 **Carrot HA v0.6.0 ~ v0.6.5**에 걸쳐 모두 구현 및 릴리스되었습니다.
+> 본 계획서에 정의된 목표(정통 당근 웹 인터페이스 및 CSS 이식, GitHub Wiki 상세 문서 로더 연동, 샌드박스 iframe 및 보안 postMessage 브리지, ~~Cloudflare~~ ~~D1~~ 큐 ID 기반 쓰기 검증)는 **Carrot HA v0.6.0 ~ v0.6.5**에 걸쳐 모두 구현 및 릴리스되었습니다.
 > 현재 최신 설정 및 사용법은 [README.md](../README.md), [GUIDE.md](GUIDE.md), [COMMA_PARAM_SETUP.md](COMMA_PARAM_SETUP.md)를 참고하세요.
 
 ## 목표와 범위
@@ -19,7 +21,7 @@
 - 로컬 openpilot 참조 소스에는 settings 전용 탐색/렌더링/선택 대화상자/CSS/문서 로더가 있다. published_documentation.js는 공식 Wiki Settings-Catalog.json과 언어별 문서를 사용하고 해시·스키마를 검증한다.
 - 원본 카테고리의 groups → sections → items 구조를 평면 필터로 축약해 탐색 구조가 소실됐다.
 - param_sync.py는 기본 180초 주기로 catalog와 values를 업로드한다. 현재 카드의 4초 폴링은 대기 명령 상태에만 해당하며 카탈로그 주기 갱신이 아니다.
-- 현재 변경 상태는 이름 단위 Set으로 관리하고 Worker 상태 조회는 최근 20개를 반환한다. 동일 이름 연속 변경, 오래된 대기 명령, 실패 처리가 충분하지 않다.
+- 현재 변경 상태는 이름 단위 Set으로 관리하고 ~~Worker~~ 상태 조회는 최근 20개를 반환한다. 동일 이름 연속 변경, 오래된 대기 명령, 실패 처리가 충분하지 않다.
 - 원본 참조 checkout은 helico717/openpilot 포크이며 upstream은 ajouatom/openpilot이다. 조사 당시 HEAD는 bdecdb4351ff4f7ca5c75d63431d21e7ada87bc3. 이 코드가 사용자의 차량 및 스크린샷 버전과 동일하다고 확정할 수 없다.
 
 ## 원인
@@ -42,7 +44,7 @@
 
 ### 3. 통신 어댑터와 상세설명 연결
 
-원본 snapshot 요청을 HA settings API로, 파라미터 변경 요청을 HA param_set 및 Worker queue로 연결한다. 원본이 기대하는 응답 구조는 어댑터에서 변환한다. 화면에 표시한 요청값과 차량이 확인한 적용값을 구분한다.
+원본 snapshot 요청을 HA settings API로, 파라미터 변경 요청을 HA param_set 및 ~~Worker~~ queue로 연결한다. 원본이 기대하는 응답 구조는 어댑터에서 변환한다. 화면에 표시한 요청값과 차량이 확인한 적용값을 구분한다.
 
 파라미터 클릭 시 원본 published documentation 로더 및 렌더러를 연결한다. 파라미터 키/언어로 공식 Wiki 인덱스의 문서를 찾고 캐시·스키마·해시 검증 및 안전한 문서 렌더링을 유지한다. 네트워크 제약이 있으면 고정된 공식 문서 경로만 HA에서 프록시한다. 임의 URL 프록시는 만들지 않는다. 문서 없음, 구버전 의미 불일치, 언어 대체, 로드 실패를 표시하고 catalog의 짧은 설명을 대체 정보로 제공한다.
 
@@ -64,7 +66,7 @@
 
 동일 카탈로그/언어/뷰포트에서 원본과 HA 화면을 나란히 비교한다. 메뉴 순서, 크기, 간격, 색상, 값 편집과 설명 열기 행동을 검증한다. 한글 연속 입력·조합·붙여넣기·커서 이동을 실제 브라우저에서 확인한다. mock 기기로 추가/삭제/메타데이터 변경, 문서 없음, 통신 실패, 명령 지연/실패를 검증한다. 사용자가 선택한 변경에 대해서만 실제 차량 적용을 검증하고 임의 튜닝값은 전송하지 않는다.
 
-collector/Worker/HA 변경을 구버전 호환 순서로 배포하고 필요시 D1 migration, 프런트 버전 갱신, 롤백 절차를 포함한다.
+collector/Worker/HA 변경을 구버전 호환 순서로 배포하고 필요시 ~~D1~~ migration, 프런트 버전 갱신, 롤백 절차를 포함한다.
 
 ## 완료 조건
 
