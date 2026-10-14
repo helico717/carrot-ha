@@ -188,6 +188,20 @@
   재배포·버전 변경·릴리즈는 하지 않는다.
 ## 2026-10-14 — 오후 일반 주행 내역 누락 조사
 
+- 최적화 구현 시작(사용자 전체 적용 요청): cloudflare/src/archive_storage.js,
+  worker.js·wrangler.json·schema.sql·migration_archive_storage.sql, HA cloud.py,
+  openpilot collector.py·engine.py 및 회귀 검사. gzip 무손실 압축과 장치/해시별
+  충전 목록·월별 집계 분리, 한 번의 JOIN으로 기존 raw_json 복원, durable HA ACK
+  이전 자료 보존, 시간/바이트 예산과 시간당 정리, 주행/상태 송신 lane 분리를 구현한다.
+- 자동 승인 심사는 운영 DB 전체 백업의 개인정보 전송을 거절했다. 사용자가 GPS·
+  주행 이력을 포함한 전체 백업을 PC 비공개 Temp 경로에 저장하도록 명시적으로 허용한
+  뒤 D1 export 성공. 백업 SQLite integrity_check 및 54,950개 변환 행의 원문 gzip
+  복원 동등성을 확인. 본문 440,750,825→169,225,858 bytes; 원본 백업 유지.
+  민감 원문·장치 ID·토큰·백업 다운로드 링크는 문서/Git에 포함하지 않는다.
+- 합성 Worker storage/history/incremental/benchmark, HA live 6·incremental 5·history 1,
+  dashboard 10건 통과. Windows에서 Comma 전체 69건 중 fcntl 부재 2·symlink 권한 1·
+  기존 workflow bash 경로 1 실패. 실행 코드 배포·운영 DB 변환은 아직 진행 전이다.
+
 - 장기 개선 검토: docs/cloudflare-storage-review-2026-10-14.md 작성.
   최근 날짜별 본문 집계에서 평균 크기 10/1 8.2KB→10/13 15.6KB 증가 확인.
   15,685 bytes/행 고정 시 14일 본문 316~632MB(60~30초 간격), 압축률 50%

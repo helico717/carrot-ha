@@ -1,3 +1,4 @@
+import {packTelemetry, unpackTelemetry, compressed, decoded, acknowledgeArchive, maintainArchive} from './archive_storage.js';
 // === Inlined panda_counter_health helper functions ===
 const COUNTER_FIELDS = [
   "rxBufferOverflow",
@@ -2431,7 +2432,20 @@ async function handleArchivedTelemetry(request, env) {
     const result=await handleTelemetry(request,env);
     if (result.status!==200) return result;
   }
-  await env.DB.prepare("INSERT OR IGNORE INTO telemetry_history(device_id,updated_at,raw_json) VALUES (?,?,?)").bind(payload.deviceId,payload.updatedAt,JSON.stringify(payload)).run();
+  // Temporary rollout mode reads both formats before the additive migration.
+  const packed = env.ARCHIVE_STORAGE_V1 === '0'
+    ? {raw: await compressed(payload), hash: null, context: null} : await packTelemetry(payload);
+  const statements = [];
+  if (packed.hash) statements.push(env.DB.prepare('INSERT OR IGNORE INTO telemetry_contexts(device_id,hash,raw_json) VALUES(?,?,?)')
+    .bind(payload.deviceId,packed.hash,packed.context));
+  statements.push(env.ARCHIVE_STORAGE_V1 === '0'
+    ? env.DB.prepare("INSERT OR IGNORE INTO telemetry_history(device_id,updated_at,raw_json) VALUES (?,?,?)")
+      .bind(payload.deviceId,payload.updatedAt,packed.raw)
+    : env.DB.prepare("INSERT OR IGNORE INTO telemetry_history(device_id,updated_at,raw_json,context_hash) VALUES (?,?,?,?)")
+      .bind(payload.deviceId,payload.updatedAt,packed.raw,packed.hash));
+  // D1 batch is atomic: a failed archive does not leave orphan context writes.
+  if (env.DB.batch) await env.DB.batch(statements);
+  else for (const statement of statements) await statement.run();
   return json({ok:true});
 }
 async function handleTelemetryHistory(request,env) {
@@ -2440,29 +2454,38 @@ async function handleTelemetryHistory(request,env) {
   const after=Math.max(0,Number.parseInt(params.get("after")||"0",10)||0);
   const limit=boundedLimit(params.get("limit"),20,100);
   const device = params.get('device_id');
-  const result = device
-    ? await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE device_id=? AND sequence>? ORDER BY sequence LIMIT ?').bind(device,after,limit+1).all()
-    : await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE sequence>? ORDER BY sequence LIMIT ?').bind(after,limit+1).all();
+  const result = env.ARCHIVE_STORAGE_V1 === '0'
+    ? (device
+      ? await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE device_id=? AND sequence>? ORDER BY sequence LIMIT ?').bind(device,after,limit+1).all()
+      : await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE sequence>? ORDER BY sequence LIMIT ?').bind(after,limit+1).all())
+    : device
+    ? await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,c.raw_json AS context_json
+        FROM telemetry_history h LEFT JOIN telemetry_contexts c ON c.device_id=h.device_id AND c.hash=h.context_hash
+        WHERE h.device_id=? AND h.sequence>? ORDER BY h.sequence LIMIT ?`).bind(device,after,limit+1).all()
+    : await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,c.raw_json AS context_json
+        FROM telemetry_history h LEFT JOIN telemetry_contexts c ON c.device_id=h.device_id AND c.hash=h.context_hash
+        WHERE h.sequence>? ORDER BY h.sequence LIMIT ?`).bind(after,limit+1).all();
   const rows=result.results||[];
-  return json({events:rows.slice(0,limit),has_more:rows.length>limit});
+  const events = [];
+  const contexts = new Map();
+  for (const row of rows.slice(0,limit)) {
+    const {context_json, ...event} = row;
+    if (context_json && !contexts.has(context_json)) contexts.set(context_json,await decoded(context_json));
+    event.raw_json = await unpackTelemetry(row.raw_json,contexts.get(context_json) || null);
+    events.push(event);
+  }
+  return json({events,has_more:rows.length>limit});
 }
 
 async function purgeExpiredData(env, options = {}) {
+  if (env.ARCHIVE_STORAGE_V1 === '0') return {deferred:'archive_storage_rollout'};
   const telemetryDays = options.telemetryDays || 14;
   const tripDays = options.tripDays || 90;
   const eventDays = options.eventDays || 30;
   const results = {};
   if (env.DB) {
     try {
-      const tRes = await env.DB.prepare(
-        "DELETE FROM telemetry_history WHERE updated_at < datetime('now', '-' || ? || ' days')"
-      ).bind(telemetryDays).run();
-      results.purged_telemetry = tRes?.meta?.changes || 0;
-
-      const trRes = await env.DB.prepare(
-        "DELETE FROM trips WHERE ended_at < datetime('now', '-' || ? || ' days')"
-      ).bind(tripDays).run();
-      results.purged_trips = trRes?.meta?.changes || 0;
+      Object.assign(results, await maintainArchive(env));
 
       const qRes = await env.DB.prepare(
         "DELETE FROM trip_quality WHERE id NOT IN (SELECT id FROM trips)"
@@ -2738,14 +2761,20 @@ export default {
       if (request.method === "GET" && pathname === "/api/params/status") return handleParamsStatus(request, env);
       if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
       if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
-      if (request.method === "POST" && pathname === "/api/telemetry") return handleArchivedTelemetry(request, env);
-      if (request.method === "POST" && pathname === "/api/trips") return handleRecordedTrip(request, env);
+      if (request.method === "POST" && pathname === "/api/telemetry") return await handleArchivedTelemetry(request, env);
+      if (request.method === "POST" && pathname === "/api/archive-ack") {
+        if (!authorize(request,env,false)) return json({error:'unauthorized'},401);
+        if (env.ARCHIVE_STORAGE_V1 === '0') return json({error:'archive_storage_rollout'},404);
+        return await acknowledgeArchive(request,env);
+      }
+      if (request.method === "POST" && pathname === "/api/trips") return await handleRecordedTrip(request, env);
       if (request.method === "GET" && pathname === "/api/json") return handleExport(request, env);
       if (request.method === "GET" && pathname === "/api/trip-changes") return handleTripChanges(request, env);
       if (request.method === "GET" && pathname === "/api/latest-state") return handleLatestState(request, env);
       if (request.method === "GET" && (pathname === "/api/trips" || pathname.startsWith("/api/trips/"))) return handleTripsWithQuality(request, env, pathname);
       return json({error: "not_found"}, 404);
     } catch (err) {
+      if (String(err).includes('archive_capacity')) return json({error:'archive_capacity',retryable:true},503);
       console.error("Top-level worker error:", err);
       return json({error: "internal_error", message: String(err)}, 500);
     }

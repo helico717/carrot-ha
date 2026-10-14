@@ -134,6 +134,9 @@ async def sync(hass, runtime):
                 cursor = item['sequence']
                 await hass.async_add_executor_job(runtime['archive'].cursor,'telemetry',cursor)
             if not history['has_more']:break
+        # Notify cloud retention only after the local durable checkpoints. A
+        # failed ACK is retried, and never invalidates an already saved page.
+        await acknowledge_archive(hass, runtime, session, base, token)
         offset = 0
         try:
             if not incremental_trips:
@@ -197,3 +200,29 @@ async def sync(hass, runtime):
         finally:
             runtime['syncing'] = False
             async_dispatcher_send(hass, 'carrot_ha' + entry.entry_id)
+
+
+async def acknowledge_archive(hass, runtime, session, base, token):
+    now = datetime.now(timezone.utc).timestamp()
+    if now < runtime.get('archive_ack_retry_at', 0) or runtime.get('history_supported') is False:
+        return
+    archive = runtime['archive']
+    telemetry = int(await hass.async_add_executor_job(archive.cursor, 'telemetry') or 0)
+    trips = int(await hass.async_add_executor_job(archive.cursor, 'trip_changes') or 0)
+    pair = (telemetry, trips)
+    if pair == runtime.get('archive_acknowledged'):
+        return
+    try:
+        async with session.post(base + '/api/archive-ack', json={
+            'device_id': runtime['entry'].data['device_id'],
+            'telemetry_sequence': telemetry, 'trip_sequence': trips},
+            headers={'Authorization': 'Bearer ' + token, 'User-Agent': 'CarrotHA/0.8',
+                     'Accept': 'application/json'}, timeout=ClientTimeout(total=15),
+            allow_redirects=False) as response:
+            if response.status != 200 or (await response.json()).get('ok') is not True:
+                runtime['archive_ack_retry_at'] = now + (3600 if response.status in (404,409) else 120)
+                return
+        runtime['archive_acknowledged'] = pair
+    except Exception:
+        runtime['archive_ack_retry_at'] = now + 120
+        _LOGGER.warning('Carrot archive retention acknowledgement deferred; cloud history preserved')

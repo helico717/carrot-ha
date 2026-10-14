@@ -10,4 +10,6 @@ $config = @{
 }
 $json = $config | ConvertTo-Json -Depth 5
 [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'wrangler.json'), $json, [System.Text.UTF8Encoding]::new($false))
+node (Join-Path $PSScriptRoot 'configure_storage.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Storage policy configuration failed.' }
 Write-Host 'wrangler.json saved. No deployment performed.'

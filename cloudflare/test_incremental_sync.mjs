@@ -91,8 +91,8 @@ await call('/api/trips',mtrip);
 assert.equal((await call(`/api/trip-changes?device_id=car&after=${measurementCursor}`)).body.trips.length,0);
 console.log('PASS persisted trip boundaries, metadata-only revision, replay idempotency and one indexed read');
 const legacyDb=new DatabaseSync(':memory:');
-const legacySchema=readFileSync(new URL('./schema.sql',import.meta.url),'utf8')
-  .replace('created_at TEXT NOT NULL,\n  measurements_json TEXT','created_at TEXT NOT NULL')
+const legacySchema=readFileSync(new URL('./schema.sql',import.meta.url),'utf8').split('-- Archive storage migration for new installations')[0]
+  .replace(/created_at TEXT NOT NULL,\r?\n  measurements_json TEXT/,'created_at TEXT NOT NULL')
   .replace(' OR OLD.measurements_json IS NOT NEW.measurements_json','');
 legacyDb.exec(legacySchema);
 legacyDb.exec(readFileSync(new URL('./migration_trip_measurements.sql',import.meta.url),'utf8'));
