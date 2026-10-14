@@ -10,6 +10,16 @@
   기존 Cloudflare DB 삭제/기기 수동 소스 수정/에이전트 재부팅/새 Release 발행 없음.
 - 검증: 현재 코드 경로와 이전 누적 릴리즈 기록 대조. 실제 애드온/외부 연결 미검증.
   본 문서와 기록을 먼저 커밋·푸시 후 구현 진행 예정.
+- 사전 기록은 3c9e4f0로 main 커밋·원격 게시 후 실행 코드 작업 시작.
+- 구현 진행: 독립 HAOS 수신기/SQLite/인증/증분 feed/명령 namespace/연결 게시,
+  HA 직접 source 설정과 source별 cursor, Git 관리 Comma 영구 연결 설정 모듈 작성.
+- 로컬 검증: 수신기 HTTP 8건, HA 증분 5·latest 6·ACK 1·압축 2·history cache 1,
+  대시보드 10건 통과. Windows 기본 cp949 읽기 오류는 UTF-8 실행으로 통과.
+  Comma 69건 중 65 통과; 기존 Windows fcntl 2·symlink 권한 1·bash 경로 1 실패.
+- 사용자 확인: 외부 HA homeassistant202604.duckdns.org(443). Supervisor 읽기 확인으로
+  Nginx Proxy Manager가 443을 처리하며 사용자 include 경로 존재 확인.
+- 사용자 지시: Comma는 별도 답장 전까지 오프라인으로 간주. 연결 시도/실기 검증 없음.
+- 현재: 애드온 실제 설치·독립 HTTPS 경로·HA 코드 반영 준비 단계. 전환 완료 아님.
 
 ## 2026-10-14 — 자체 서버 직접 통신 가능성 조사
 

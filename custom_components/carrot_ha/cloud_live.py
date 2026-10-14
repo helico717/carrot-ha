@@ -16,8 +16,9 @@ from .cloud_feed import parse_feed
 
 async def refresh_live(hass, runtime):
     entry = runtime['entry']
-    base = entry.options.get('cloud_url', '').rstrip('/')
-    token = entry.options.get('cloud_view_token', '')
+    direct = bool(entry.options.get('receiver_url'))
+    base = (entry.options.get('receiver_url') if direct else entry.options.get('cloud_url', '')).rstrip('/')
+    token = entry.options.get('receiver_view_token', '') if direct else entry.options.get('cloud_view_token', '')
     if not base or not token:
         return
     lock = runtime.setdefault('live_lock', asyncio.Lock())

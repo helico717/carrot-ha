@@ -31,7 +31,10 @@
           "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)",
           "terminal_enabled": "Enable parked remote terminal (experimental)",
           "terminal_ha_url": "External HA HTTPS URL (automatic terminal connection)",
-          "terminal_upload_token": "Existing WAYON_UPLOAD_TOKEN (no Comma file edits)"
+          "terminal_upload_token": "Existing WAYON_UPLOAD_TOKEN (no Comma file edits)",
+          "receiver_url": "Vehicle receiver URL (replaces cloud when configured)",
+          "receiver_view_token": "Receiver view token",
+          "receiver_upload_token": "Receiver upload token (connection discovery)"
         }
       }
     },
@@ -40,7 +43,8 @@
       "invalid_cloud": "Enter an HTTPS base URL without a path and a view token.",
       "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace.",
       "invalid_terminal_token": "Use a terminal-only 32–256 character ASCII token different from every other token.",
-      "invalid_terminal_setup": "Enter the external HA HTTPS URL, Worker URL and an upload token separate from the view token."
+      "invalid_terminal_setup": "Enter the external HA HTTPS URL, Worker URL and an upload token separate from the view token.",
+      "invalid_receiver": "Use an HTTPS receiver URL (HTTP only on a private local network), with distinct 32+ character upload and view tokens."
     }
   }
 }

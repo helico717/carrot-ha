@@ -27,6 +27,9 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
         schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
                              vol.Optional('cloud_url', default=self.config_entry.options.get('cloud_url', '')): str,
                              vol.Optional('cloud_view_token', default=self.config_entry.options.get('cloud_view_token', '')): str,
+                             vol.Optional('receiver_url', default=self.config_entry.options.get('receiver_url', '')): str,
+                             vol.Optional('receiver_view_token', default=self.config_entry.options.get('receiver_view_token', '')): str,
+                             vol.Optional('receiver_upload_token', default=self.config_entry.options.get('receiver_upload_token', '')): str,
                              vol.Optional('camera_enabled', default=self.config_entry.options.get('camera_enabled', False)): bool,
                              vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str,
                              vol.Optional('terminal_enabled', default=self.config_entry.options.get('terminal_enabled', False)): bool,
@@ -42,6 +45,26 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                 from urllib.parse import urlsplit
                 data['cloud_url'] = data.get('cloud_url', '').strip().rstrip('/')
                 data['cloud_view_token'] = data.get('cloud_view_token', '').strip()
+                for key in ('receiver_url', 'receiver_view_token', 'receiver_upload_token'):
+                    data[key] = data.get(key, '').strip()
+                data['receiver_url'] = data['receiver_url'].rstrip('/')
+                direct = bool(data['receiver_url'])
+                if direct:
+                    receiver = urlsplit(data['receiver_url'])
+                    import ipaddress
+                    try:
+                        local = ipaddress.ip_address(receiver.hostname or '').is_private
+                    except ValueError:
+                        local = bool(receiver.hostname and (receiver.hostname.endswith('-carrot-receiver')
+                                     or receiver.hostname == 'localhost'))
+                    credentials = [data['receiver_view_token'], data['receiver_upload_token']]
+                    if (receiver.scheme not in ('http', 'https') or (receiver.scheme == 'http' and not local)
+                            or not receiver.hostname or receiver.username or receiver.password
+                            or receiver.query or receiver.fragment or credentials[0] == credentials[1]
+                            or any(not 32 <= len(value) <= 256 or not value.isascii()
+                                or any(c.isspace() for c in value) for value in credentials)):
+                        errors['base'] = 'invalid_receiver'
+                        return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 data['camera_token'] = data.get('camera_token', '').strip()
                 import secrets
                 data['terminal_token'] = self.config_entry.options.get('terminal_token') or secrets.token_hex(32)
@@ -51,8 +74,8 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                     address = urlsplit(data['terminal_ha_url'])
                     if (address.scheme != 'https' or not address.hostname or address.path or address.query
                             or address.fragment or address.username or address.password
-                            or not data['cloud_url'] or not data['terminal_upload_token']
-                            or data['terminal_upload_token'] == data['cloud_view_token']):
+                            or (not direct and (not data['cloud_url'] or not data['terminal_upload_token']
+                                or data['terminal_upload_token'] == data['cloud_view_token']))):
                         errors['base'] = 'invalid_terminal_setup'
                         return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 token = data['camera_token']

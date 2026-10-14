@@ -393,8 +393,10 @@ class SettingsView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:
@@ -431,8 +433,10 @@ class ParamSetView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:
@@ -480,8 +484,10 @@ class ParamStatusView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:
