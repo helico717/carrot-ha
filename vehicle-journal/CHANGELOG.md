@@ -1,3 +1,20 @@
+## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
+
+- Release: https://github.com/helico717/carrot-ha/releases/tag/v0.9.0-beta.1
+- 태그/manifest 0.9.0-beta.1 일치, 대상 3098f4d25248d7ca63d10d2db69dc754345ba033.
+  draft=false, prerelease=true, 본문 11,417자 및 v0.8.12 이후 누적/438건 검증 내용 실제 포함 확인.
+- HACS Release Actions 38579281964 성공:
+  https://github.com/helico717/carrot-ha/actions/runs/38579281964
+- 태그 대상 최종 Direct receiver validation 38579189708 성공(438 Python + 12 JS, 생략 없음):
+  https://github.com/helico717/carrot-ha/actions/runs/38579189708
+- 수신 앱은 이미 0.1.3 운영 적용. HA는 HACS 베타 표시→0.9.0-beta.1 설치→사용자 HA 재시작 필요.
+  이번 게시 확인만으로 아직 설치되지 않은 HA UI/옵션 변경이 운영 적용됐다고 주장하지 않음.
+- Comma 원격 브랜치 최신 문서 커밋 5d69d6ae6904be65f00858a79bc861269291ce53,
+  클린 설치 시작 보완 실행 코드 커밋 d5879396da460d8fde85171f88d90cfde0d721d4.
+  사용자가 HA 원격 터미널에서 cd /data/openpilot && git pull --ff-only && sudo reboot 실행 가능.
+  기기 소스 직접 수정/에이전트 기기 재부팅 없음. 실제 초기화/장기 운영 확인은 별도.
+- 이 발행 확인은 문서 기록만 추가하며 새 버전/태그/Worker 배포를 다시 만들지 않음.
+
 ## 2026-10-14 — v0.9.0-beta.1 발행 전 최종 검증 확정
 
 - 사용자 요청 범위 구현/전수 문서/쉬운 복구 안내 완료. 기존 Markdown 103개 + 신규 6개 = 109개 재검토.
