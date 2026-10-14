@@ -3,6 +3,7 @@ export const MAX_RAW = 262144;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', {fatal: true});
 const MARKER = '_carrot_cloud_archive_v1';
+const contextCache = new Map();
 
 async function transform(bytes, decompress = false) {
   const stream = new Blob([bytes]).stream().pipeThrough(
@@ -55,7 +56,12 @@ export async function packTelemetry(payload) {
   if (JSON.stringify(context).length >= 512) {
     const digest = await crypto.subtle.digest('SHA-256', encoder.encode(JSON.stringify(context)));
     hash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
-    contextRaw = await compressed(context);
+    contextRaw = contextCache.get(hash);
+    if (!contextRaw) {
+      contextRaw = await compressed(context);
+      if (contextCache.size >= 64) contextCache.delete(contextCache.keys().next().value);
+      contextCache.set(hash, contextRaw);
+    }
     for (const key of Object.keys(context)) compact.vehicle[key] = {_carrot_context_field: key};
   }
   const packed = await compressed(compact);

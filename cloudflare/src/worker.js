@@ -2457,7 +2457,7 @@ async function handleTelemetryHistory(request,env) {
   // Measured legacy decompression cost: 73-78ms for 100 records. New HA
   // restores bounded compressed pages locally; old clients keep original JSON.
   const compact = encoding === 'carrot-cloud-archive-v1';
-  const limit=boundedLimit(params.get("limit"),compact ? 20 : 8,compact ? 100 : 8);
+  const limit=boundedLimit(params.get("limit"),compact ? 20 : 2,compact ? 100 : 2);
   const device = params.get('device_id');
   const result = env.ARCHIVE_STORAGE_V1 === '0'
     ? (device

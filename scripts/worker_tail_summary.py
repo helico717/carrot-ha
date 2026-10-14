@@ -20,5 +20,6 @@ for line in sys.stdin:
     print(json.dumps({'route':urlsplit(request.get('url','')).path,
         'status':event.get('event',{}).get('response',{}).get('status'),
         'cpu_ms':event.get('cpuTime'),'wall_ms':event.get('wallTime'),
+        'version':event.get('scriptVersion',{}).get('id'),'at':event.get('eventTimestamp'),
         'outcome':event.get('outcome'),
         'exceptions':[x.get('name') for x in event.get('exceptions',[])]}),flush=True)
