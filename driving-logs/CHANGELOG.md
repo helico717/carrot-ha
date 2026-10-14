@@ -159,6 +159,16 @@
   `measurements_json` 중복 마이그레이션 오류에서 실패(해당 코드 변경 없음).
 - UTF-8 모드에서 cloud-live 6건 통과. 로그 HTTP 검사에 미인증 summary 거부·
   인증된 원본 크기 요약·다른 엔트리 작업 ID 조회 거부를 추가했다.
+- Git 게시: 실행 코드 커밋 `136592135652322184764ab4c61d34531dbf6ccc`를 main에 푸시했다.
+- HA 사전 검사에서 기존 설치 파일이 수정 전 Git 내용과 일치함을 확인한 뒤 코드·자산
+  107개를 직접 설치했다. 모든 설치 파일 SHA-256 일치 확인. 백업:
+  `/config/carrot_ha/deployment-backups/driving-logs-hud-136592135652/before`
+  (실제 경로 `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-136592135652/before`).
+- 외부 DuckDNS HTTPS의 카드·리플레이 로더·레이아웃 CSS·원본 HUD 모듈 4개가
+  게시 커밋과 같은 SHA-256임을 확인했다. 운영 데이터와 토큰·로그·영상을 복사하지 않았다.
+- 배포 완료, 사용자 HA 재시작 1회·강력 새로고침 후 실제 HUD·용량·선택 전송 확인 대기.
+  백엔드는 재시작 전까지 이전 코드다. Comma 변경/Pull·Worker/D1/KV 배포 없음.
+  manifest 버전·태그·GitHub Release 변경 없음. 원작자 NAS 내부 수신 검증은 하지 않았다.
 
 ## 2026-10-14 — 썸네일·목록·리플레이 SSH 반영 완료
 
