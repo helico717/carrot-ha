@@ -232,6 +232,10 @@
   context의 압축 결과64개를 메모리에 캐시해 송신 CPU를 줄인다.
 - 누락 복구 확인: 16:06:35~17:50:18 KST·101,000m 주행이 클라우드 최근 주행 및
   HA archive trip 종료2026-10-14T08:50:18+00:00로 확인됐다. 화면 검증은 별도 후속.
+- 최종 CPU 표본: 기존2건 원문/신규100건 압축 전송4/5ms·ACK2ms·latest0~2ms,
+  telemetry 송신9~13ms. 작은 snapshot 나머지는 JSON+immutable context 참조로
+  저장해 매건 gzip 비용을 줄이고, 큰 나머지/반복 context/기존 이력은 gzip을 유지한다.
+  HA beta.7 복원기는 JSON/gzip을 이미 지원하므로 추가 HA 버전 상승은 필요 없다.
 
 - 장기 개선 검토: docs/cloudflare-storage-review-2026-10-14.md 작성.
   최근 날짜별 본문 집계에서 평균 크기 10/1 8.2KB→10/13 15.6KB 증가 확인.

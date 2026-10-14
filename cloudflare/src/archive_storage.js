@@ -64,13 +64,23 @@ export async function packTelemetry(payload) {
     }
     for (const key of Object.keys(context)) compact.vehicle[key] = {_carrot_context_field: key};
   }
-  const packed = await compressed(compact);
+  // Repeated bulky context is compressed once. Small remaining snapshots use
+  // plain JSON plus the immutable context reference: measured gzip-per-snapshot
+  // upload cost could reach 13ms on Free. Large remainder still uses gzip.
+  const compactRaw = JSON.stringify(compact);
+  const packed = hash && encoder.encode(compactRaw).length <= 8192 ? compactRaw : await compressed(compact);
   // Context references are useful across rows, but don't make small payloads larger.
   if (packed.length + (contextRaw?.length || 0) + 64 >= raw.length) return {raw, hash: null, context: null};
   return {raw: packed, hash, context: contextRaw};
 }
 export async function unpackTelemetry(raw, contextRaw = null) {
-  if (JSON.parse(raw)[MARKER] !== 1) return raw;
+  const outer = JSON.parse(raw);
+  if (outer[MARKER] !== 1 && !contextRaw) {
+    for (const key of ['charge_sessions','charge_months']) {
+      if (outer.vehicle?.[key]?._carrot_context_field === key) throw new Error('Missing archive context');
+    }
+    return raw;
+  }
   const payload = await decoded(raw);
   if (contextRaw) {
     const context = typeof contextRaw === 'string' ? await decoded(contextRaw) : contextRaw;
