@@ -40,7 +40,7 @@ class CarrotLogsCard extends HTMLElement {
   getGridOptions() { return {columns:36,rows:'auto',min_columns:6}; }
   _render() {
     if (this.shadowRoot.querySelector('iframe')) return;
-    this.shadowRoot.innerHTML = `<style>:host{display:block}ha-card{display:block;overflow:hidden}.header{padding:12px 16px;font-weight:600}#error{color:var(--error-color);padding:0 16px}iframe{display:block;width:100%;height:calc(100dvh - 120px);min-height:360px;border:0}</style><ha-card><div class="header">당근웹 로그</div><div id="error" role="status"></div><iframe title="당근웹 로그" src="/carrot_ha_static/carrot_logs/logs.html" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups" allow="fullscreen"></iframe></ha-card>`;
+    this.shadowRoot.innerHTML = `<style>:host{display:block;width:100%;min-width:0;max-width:100%}ha-card{display:block;width:100%;min-width:0;overflow:hidden;box-sizing:border-box}.header{padding:12px 16px;font-weight:600}#error{color:var(--error-color);padding:0 16px}iframe{display:block;width:100%;height:calc(100dvh - 120px);min-height:360px;border:0}</style><ha-card><div class="header">당근웹 로그</div><div id="error" role="status"></div><iframe title="당근웹 로그" src="/carrot_ha_static/carrot_logs/logs.html" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups" allow="fullscreen"></iframe></ha-card>`;
   }
   _send() {
     if (this._ready && this._session) this.shadowRoot.querySelector('iframe').contentWindow.postMessage(

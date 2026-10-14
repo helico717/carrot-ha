@@ -208,6 +208,8 @@ async def _options_updated(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
+        if uploads := hass.data[DOMAIN][entry.entry_id].get('driving_log_upload'):
+            await uploads.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('camera_relay'):
             await relay.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('terminal_relay'):

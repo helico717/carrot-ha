@@ -17,8 +17,8 @@ class DrivingLogTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.store = module.LogStore(self.temp.name, limit=4000)
 
-    def upload(self, number, recorded, size=450):
-        name = f'00000315--4742c01c35--{number}'
+    def upload(self, number, recorded, size=450, route='00000315--4742c01c35'):
+        name = f'{route}--{number}'
         files = {'rlog.zst': size, 'qcamera.mp4': size}
         status = self.store.begin({'segment': name, 'recorded': recorded, 'files': files})
         if status['accepted'] and not status['complete']:
@@ -28,13 +28,37 @@ class DrivingLogTests(unittest.TestCase):
         return name, status
 
     def test_recent_suffix_not_arrival_order_and_evicted_not_reuploaded(self):
-        first, _ = self.upload(1, 100)
-        self.upload(3, 300)
-        middle, _ = self.upload(2, 200)
+        first, _ = self.upload(1, 100, route='old')
+        self.upload(3, 300, route='new')
+        middle, _ = self.upload(2, 200, route='middle')
         self.assertNotIn(first, self.store.state['segments'])
         self.assertIn(middle, self.store.state['segments'])
-        self.assertFalse(self.upload(1, 100)[1]['accepted'])
+        self.assertFalse(self.upload(1, 100, route='old')[1]['accepted'])
         self.assertLessEqual(self.store.usage(), self.store.limit)
+
+    def test_retention_removes_whole_drive_and_rejects_later_siblings(self):
+        self.store.limit = 8000
+        first, _ = self.upload(0, 100, route='old')
+        second, _ = self.upload(1, 160, route='old')
+        self.upload(0, 300, route='new')
+        self.upload(1, 360, route='new')
+        self.upload(2, 420, route='new')
+        self.assertNotIn(first, self.store.state['segments'])
+        self.assertNotIn(second, self.store.state['segments'])
+        self.assertFalse((self.store.root / first).exists())
+        self.assertFalse((self.store.root / second).exists())
+        self.store = module.LogStore(self.temp.name, limit=8000)
+        self.assertFalse(self.upload(2, 500, route='old')[1]['accepted'])
+        self.assertEqual({n.rsplit('--', 1)[0] for n in self.store.state['segments']}, {'new'})
+
+    def test_oversized_drive_is_removed_in_full(self):
+        self.upload(0, 100)
+        self.upload(1, 160)
+        self.assertFalse(self.upload(2, 220)[1]['accepted'])
+        self.assertEqual(self.store.state['segments'], {})
+
+    def test_default_limit_is_ten_decimal_gigabytes(self):
+        self.assertEqual(module.LIMIT, 10_000_000_000)
 
     def test_unfinished_files_not_listed_and_resume_after_restart(self):
         name = '00000315--4742c01c35--9'

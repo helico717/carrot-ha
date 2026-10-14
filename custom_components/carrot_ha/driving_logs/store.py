@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import shutil
 
-LIMIT = 5_000_000_000
+LIMIT = 10_000_000_000
 CHUNK = 256 * 1024
 FILES = {'qcamera.ts', 'qcamera.mp4', 'rlog.zst', 'rlog.bz2', 'rlog',
          'qlog.zst', 'qlog.bz2', 'qlog'}
@@ -31,6 +31,7 @@ class LogStore:
         self.limit = limit
         self.index = self.root / 'index.json'
         self.state = json.loads(self.index.read_text()) if self.index.exists() else {'segments': {}, 'floor': 0}
+        self.state.setdefault('retired_routes', [])
         # A crash after rename but before index persistence is reconciled here.
         for name, item in list(self.state['segments'].items()):
             if not (self.root / name).is_dir():
@@ -70,7 +71,10 @@ class LogStore:
         size = sum(files.values())
         # Reserve metadata overhead; previews are not persisted in this phase.
         budget = self.limit - min(1_000_000, self.limit // 2)
-        if size > budget or recorded <= self.state['floor']:
+        route = name.rsplit('--', 1)[0]
+        route_present = any(key.rsplit('--', 1)[0] == route for key in self.state['segments'])
+        if (size > budget or route in self.state['retired_routes']
+                or (recorded <= self.state['floor'] and not route_present)):
             return {'accepted': False, 'reason': 'outside_retention'}
         old = self.state['segments'].get(name)
         if old:
@@ -85,22 +89,34 @@ class LogStore:
         # Account for two copies of the atomic index while publishing it.
         metadata_bytes = 2 * len(json.dumps({'segments': candidates, 'floor': self.state['floor']}, separators=(',', ':')).encode())
         budget = min(budget, self.limit - metadata_bytes)
+        groups = {}
+        for key, item in candidates.items():
+            groups.setdefault(key.rsplit('--', 1)[0], []).append((key, item))
         kept, total, overflow = set(), 0, False
-        for key, item in sorted(candidates.items(), key=lambda pair: (pair[1]['recorded'], pair[0]), reverse=True):
-            total += sum(item['files'].values())
+        for _, items in sorted(groups.items(), key=lambda pair: (max(i['recorded'] for _, i in pair[1]), pair[0]), reverse=True):
+            total += sum(sum(item['files'].values()) for _, item in items)
             overflow = overflow or total > budget
             if not overflow:
-                kept.add(key)
-        if name not in kept or len(kept) > 5000:
+                kept.update(key for key, _ in items)
+        if len(kept) > 5000:
             return {'accepted': False, 'reason': 'outside_retention'}
         # Ensure storage pressure does not consume the HA system's last space.
-        if shutil.disk_usage(self.root).free < size + min(512_000_000, self.limit):
+        if name in kept and shutil.disk_usage(self.root).free < size + min(512_000_000, self.limit):
             raise OSError('Insufficient free space')
+        retired = set(self.state['retired_routes'])
+        retiring = {key.rsplit('--', 1)[0] for key in self.state['segments'] if key not in kept}
+        if retiring and getattr(self, 'on_retire', None):
+            self.on_retire(retiring)
         for key in list(self.state['segments']):
             if key not in kept:
+                retired.add(key.rsplit('--', 1)[0])
                 self.state['floor'] = max(self.state['floor'], self.state['segments'][key]['recorded'])
                 shutil.rmtree(self.root / key, ignore_errors=False)
                 del self.state['segments'][key]
+        self.state['retired_routes'] = sorted(retired)
+        if name not in kept:
+            self._save()
+            return {'accepted': False, 'reason': 'outside_retention'}
         self.state['segments'][name] = candidates[name]
         (self.root / name).mkdir()
         self._save()

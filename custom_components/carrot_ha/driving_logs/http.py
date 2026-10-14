@@ -9,6 +9,7 @@ from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
 from .store import CHUNK, LogStore
+from .upload import UploadManager, request_segments
 
 
 def upload_token(terminal_token):
@@ -155,6 +156,8 @@ class BrowserView(HomeAssistantView):
 
     async def get(self, request, entry_id, area, action, segment=None, kind=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'dashcam' and action == 'upload':
+            return await self.upload(request, runtime, segment)
         if area not in {'dashcam', 'screenrecord'}:
             raise web.HTTPNotFound()
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
@@ -212,6 +215,8 @@ class BrowserView(HomeAssistantView):
 
     async def post(self, request, entry_id, area, action, segment=None, kind=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'dashcam' and action == 'upload':
+            return await self.upload(request, runtime, segment)
         if area == 'dashcam' and action == 'read-state':
             body = await request.json()
             value = body.get('recentSegment', '')
@@ -220,6 +225,36 @@ class BrowserView(HomeAssistantView):
             runtime['driving_log_read_state'] = {'recentSegment': value}
             return web.json_response({'ok': True, 'recentSegment': value})
         raise web.HTTPNotImplemented(text='로그 서버 전송과 분석은 다음 단계에서 연결됩니다.')
+
+    async def upload(self, request, runtime, action):
+        async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
+            store = await store_for(self.hass, runtime)
+            if 'driving_log_upload' not in runtime:
+                runtime['driving_log_upload'] = UploadManager(self.hass, runtime, store)
+            manager = runtime['driving_log_upload']
+            try:
+                if request.method == 'GET' and action == 'job':
+                    value = manager.snapshot(manager.jobs[request.query.get('id', '')])
+                elif request.method == 'POST':
+                    if request.content_length is None or request.content_length > 256 * 1024:
+                        raise web.HTTPRequestEntityTooLarge(max_size=256 * 1024, actual_size=request.content_length or 0)
+                    body = await request.json()
+                    if not isinstance(body, dict):
+                        raise ValueError('Invalid request')
+                    if action == 'cancel':
+                        value = manager.cancel(str(body.get('id') or ''))
+                    elif action in {'summary', 'start'}:
+                        names, include_all = request_segments(body)
+                        value = manager.summary(names, include_all) if action == 'summary' else manager.start(names, include_all)
+                    else:
+                        raise web.HTTPNotFound()
+                else:
+                    raise web.HTTPNotFound()
+            except KeyError:
+                return web.json_response({'ok': False, 'error': 'Log segment or upload job not found'}, status=404)
+            except (ValueError, StopIteration) as error:
+                return web.json_response({'ok': False, 'error': str(error)}, status=409 if str(error) == 'Upload already running' else 400)
+        return web.json_response(value, headers={'Cache-Control': 'no-store'})
 
 
 def register(hass):

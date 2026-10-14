@@ -73,6 +73,8 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         browse=self.server.make_url('/api/carrot_ha/v1/driving_logs/entry')
         async with self.client.get(str(browse)+'/dashcam/routes') as response:
             self.assertEqual(response.status,401)
+        async with self.client.post(str(browse)+'/dashcam/upload/summary', json={'segments':[segment]}) as response:
+            self.assertEqual(response.status,401)
         async with self.client.post(str(browse)+'/session') as response:
             self.assertEqual(response.status,403)
         async with self.client.post(str(browse)+'/session',headers={'X-Test-Admin':'yes'}) as response:
@@ -80,6 +82,12 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(response.cookies['carrot_logs']['httponly'])
         async with self.client.get(str(browse)+'/dashcam/routes') as response:
             self.assertEqual((await response.json())['routes'][0]['segmentFolders'],[segment])
+        async with self.client.post(str(browse)+'/dashcam/upload/summary', json={'segments':[segment]}) as response:
+            summary = await response.json()
+            self.assertEqual(response.status,200)
+            self.assertEqual(summary['summaries'][0]['totalSize'],12)
+        async with self.client.get(str(browse)+'/dashcam/upload/job?id=another-entry-job') as response:
+            self.assertEqual(response.status,404)
         async with self.client.get(str(browse)+'/dashcam/replay-source/'+segment) as response:
             source=await response.json()
             self.assertEqual(source['mode'],'client')

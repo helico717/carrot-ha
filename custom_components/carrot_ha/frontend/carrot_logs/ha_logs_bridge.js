@@ -15,6 +15,7 @@ function isCompactLandscapeMode() {
   return window.matchMedia('(min-aspect-ratio: 13/10), (horizontal-viewport-segments: 2), (vertical-viewport-segments: 2), (min-width: 640px) and (min-height: 650px)').matches;
 }
 function setDashcamHeaderStatus() {}
+function waitMs(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function showAppToast(message) { document.getElementById('haLogsStatus').textContent = message; }
 window.carrotLogsURL = function(url) {
   if (!logsBase || !/^\/api\/(dashcam|screenrecord)\//.test(url)) throw new Error('HA 로그 주소를 확인해 주세요.');
@@ -26,15 +27,19 @@ async function getJson(url) {
   const data = await response.json();
   if (data.storage) {
     const bytes = data.storage.used;
-    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / 5.00 GB · 최신 로그부터 보관 · 레이더 검증·외부 전송·지도는 다음 단계`;
+    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / ${(data.storage.limit/1e9).toFixed(2)} GB · 최신 주행부터 보관`;
   }
   return data;
 }
 async function postJson(url, body) {
-  if (url !== '/api/dashcam/read-state') throw new Error('로그 서버 전송은 다음 단계에서 연결됩니다. 원본 다운로드와 리플레이를 이용해 주세요.');
+  if (url !== '/api/dashcam/read-state' && !/^\/api\/dashcam\/upload\/(summary|start|cancel)$/.test(url)) throw new Error('지원하지 않는 로그 요청입니다.');
   const response = await fetch(window.carrotLogsURL(url), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  if (!response.ok) throw new Error('HA 로그 상태 저장 실패');
-  return response.json();
+  const data = await response.json();
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data.error || `로그 요청 실패 (${response.status})`);
+    error.status = response.status; error.payload = data; throw error;
+  }
+  return data;
 }
 window.addEventListener('message', event => {
   if (event.origin !== location.origin || event.source !== window.parent || event.data?.type !== 'carrot:logs_session') return;

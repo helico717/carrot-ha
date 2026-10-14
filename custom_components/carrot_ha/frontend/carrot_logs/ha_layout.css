@@ -1,0 +1,14 @@
+/* HA supplies the viewport; media loading must never determine its width. */
+#pageLogs { width: 100%; min-width: 0; box-sizing: border-box; }
+#pageLogs .logs-shell { width: 100%; max-width: none; min-width: 0; margin: 0; box-sizing: border-box; }
+#haRecordedReplay .carrot-replay-controls__heading { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+#haRecordedReplay .carrot-replay-controls__segmentPicker--title { flex: 1; min-width: 0; max-width: 600px; }
+#haRecordedReplay .carrot-replay-controls__segmentSelect { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.ha-replay-step { flex: 0 0 auto; min-width: 52px; height: 44px; padding: 0 12px; border-radius: var(--r-sm); }
+@media (max-width: 600px) {
+  #haRecordedReplay .carrot-replay-controls__header { flex-wrap: wrap; gap: 6px; }
+  #haRecordedReplay .carrot-replay-controls__heading { flex-basis: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 52px 52px; gap: 6px; }
+  #haRecordedReplay .carrot-replay-controls__headerActions { margin-left: auto; }
+  #haRecordedReplay .carrot-replay-controls__segmentPicker--title { max-width: none; }
+  #haRecordedReplay #carrotStage { --carrot-replay-titlebar-height: 104px; }
+}
