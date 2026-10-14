@@ -1,3 +1,14 @@
+## 2026-10-14 — 현재 WLV1 카메라 검사/설치 설명 정리
+
+- PyAV를 설치한 Linux CI 38577775756에서 과거 카메라 검사가 삭제된 encode_media(MPEG-TS)를
+  import하는 문제 확인. 기존 WLV1 카메라 실행 코드 결함과 구분.
+- tests/test_camera_transport.py를 실제 장치↔브라우저 WLV1 소켓·H.264 복원·인증/동시 장치 거절·
+  주차 idle·주행 촬영 중단/새 시청 거절·마지막 시청 종료·잘못된 프레임 무시·늦은 종료 보호 검사로 갱신.
+  7건 로컬 통과. 과거 검사 원문은 docs/archive/camera-transport-test-before-wlv1.txt에 보존.
+- docs/CAMERA_SETUP은 이미 제거된 snapshot/HLS 엔티티 설치 설명을 현재 브라우저 영상 방식으로 정리.
+  기존 카메라·차계부 실행 코드/자료 변경 없음. 튜너 수신 시각 설명을 완전한 한국어로 정리.
+- 실제 초기화/장기 주행 검증 및 HA Core 재시작은 사용자 영역으로 남음. 최종 Linux CI/릴리즈 발행 대기.
+
 ## 2026-10-14 — Linux 전체 통과 및 생략된 연결 검사 보완
 
 - Linux CI 38577408742 성공: HA 47 suites + 차계부 62건 = Python 412건 중 409통과/3생략,

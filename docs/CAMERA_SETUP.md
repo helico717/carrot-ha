@@ -1,77 +1,40 @@
-> 현재 설치·연결은 [초기화 복구 안내](CLEAN_INSTALL_RECOVERY.md)를 따릅니다. 아래 과거 서버 관련 절차는 폐기되었습니다.
+# 주차 카메라 설치·복구
 
-# 주차 카메라 — Git 기반 설치 및 업데이트
+현재 영상은 **Comma → HA → 브라우저**로 직접 전달합니다. 자체 수신 앱은
+연결 정보/차량 기록을 보관하며 실시간 영상은 그 앱을 거치지 않습니다.
+외부 접속 프로그램은 HA 영상 주소의 WebSocket 연결을 허용해야 합니다.
 
-영상 경로는 콤마 → HA의 `/api/carrot_ha/v1/camera/…` WebSocket → HA HLS다.
-집 서버의 차량 수신 앱 대시보드 API와 별개이며, 기존 HTTPS 프록시에서 WebSocket upgrade를 허용해야 한다.
+## 설치 또는 초기화 후 복구
 
-## 저장소별 배포
+1. [쉬운 초기화 복구 안내](CLEAN_INSTALL_RECOVERY.md)에서 HA/Comma 상황을 고릅니다.
+2. Comma는 `helico717/openpilot:carrot-wip-model_selector-ha`를 설치합니다.
+3. HA Carrot HA 구성에서 주차 카메라를 켜고 별도의 카메라 키를 넣습니다.
+4. 복구 안내의 **8번**으로 같은 HA 외부 기본 주소·기존 차량 ID·카메라 키를 Comma에 입력합니다.
+   Windows/Mac 연결 명령을 각각 제공합니다. 기존 설정을 복원했다면 다시 입력하지 않습니다.
+5. 사용자가 Comma를 재부팅한 뒤 주차 상태에서 대시보드의 카메라 버튼을 엽니다.
 
-- HA 통합과 카메라 릴레이: `helico717/carrot-ha`, `main`.
-- 콤마 카메라 서비스: `helico717/openpilot`, `carrot-wip-model_selector-ha`의
-  `openpilot/selfdrive/carrot/ha/camera/`. manager가 `carrot_camera` 프로세스를 관리한다.
-- 설정과 활성화 상태: `/data/carrot_ha/camera/`. Git 트리 안에 설정이나 로그를 저장하지 않는다.
+프로그램은 Git Pull로만 설치합니다. ZIP/SCP/continue.sh 수정으로 차량 코드를 복사하지 않습니다.
+개인 설정은 `/data/carrot_ha/camera/`에 저장하며 Git 저장소에 넣지 않습니다.
+기존 `/data/carrot-camera`의 설정/활성화 상태는 Git 서비스가 자동 이관합니다.
+기존에 꺼 둔 카메라를 이관만으로 켜지는 않게 합니다.
 
-콤마에는 ZIP/SCP로 프로그램을 덮어쓰거나 `continue.sh`를 수정하지 않는다.
-커밋·push 후 주차 상태에서 원격 터미널의 Git Pull과 기기 재부팅으로 적용한다.
+## 화면과 안전 동작
 
-## 기존 카메라 설치의 자동 전환
+- 브라우저 영상은 WLV1 형식과 WebCodecs를 사용합니다. 최신 브라우저의 영상 기능이 필요합니다.
+- 광각/실내 영상·360° 보기·화면 이동/PTZ·가운데 복귀는 기존대로 유지합니다.
+- 주차 상태에서만 촬영하며 영상 요청이 없으면 촬영하지 않습니다.
+- 주행 전환·권한 취소·세션 시간/연결 확인 제한에서는 촬영을 중단합니다.
+  대시보드는 주행 전환 시 영상 창을 닫고 카메라 버튼을 숨깁니다.
+- 예전 snapshot/image/camera 엔티티와 MPEG-TS/HLS 설치 설명은 현재 설치 방법이 아닙니다.
+  별도 camera.turn_on 또는 Preload stream 설정을 하지 않습니다.
 
-이전 `/data/carrot-camera/camera.json`과 `enabled`가 있으면 최초 주차 상태에서:
+## 문제 확인
 
-1. 기존 HA 주소, device ID, 카메라 토큰을 새 상태 디렉터리로 원자적으로 보존한다(파일 권한 600).
-2. 기존 `enabled` 런타임 마커를 해제한다. 이전 프로그램과 `continue.sh`는 수정하지 않는다.
-3. 이전 supervisor/agent가 종료해 `supervisor.lock`을 놓을 때까지 기다린다.
-4. Git으로 관리되는 새 서비스가 연결한다. 새 설정이 이미 있으면 덮어쓰지 않는다.
+차량은 켜져 있고 인터넷에 연결되어 있어야 합니다. HA가 다시 시작하는 중에는
+영상이 잠시 끊깁니다. 영상만 안 되면 차량/HA 카메라 키·차량 ID·주차 상태·HA 외부 주소와
+외부 접속 프로그램의 WebSocket 설정을 먼저 확인합니다.
+발생 시각의 HA 카메라 로그와 Comma 카메라 프로그램 로그를 비교합니다.
+수신 앱 로그만으로 영상 촬영/재생 성공을 판단하지 않습니다.
 
-이전 서비스가 DNS 재시도 중이면 전환에 약 1~2분이 걸릴 수 있다.
-기존에 비활성화한 설치는 자동 활성화하지 않는다. HA 토큰 재발급이나 통합 재설정은 필요 없다.
-기존 `/data/carrot-camera/agent.log`는 이전 서비스 기록이며, 전환 후에는 manager의
-`carrot_camera` 프로세스 출력을 확인한다.
-
-## 신규 설정
-
-주차 상태의 원격 터미널에서 Git에 포함된 설정 도구를 실행한다:
-
-```bash
-cd /data/openpilot
-python -m openpilot.selfdrive.carrot.ha.camera.configure
-python -m openpilot.selfdrive.carrot.ha.camera.configure --enable
-```
-
-도구는 HTTPS HA 주소, 기존 Carrot HA device ID와 전용 카메라 토큰을 입력받는다.
-생성된 토큰은 HA 통합 옵션의 카메라 토큰에 입력한다. 토큰이나 설정 파일 전체를 공유하지 않는다.
-설정 도구는 프로그램 파일을 수정하지 않는다. 비활성화는 같은 도구의 `--disable`을 사용한다.
-
-## 호환성 및 동작
-
-커밋 SHA 허용 목록은 사용하지 않는다. 촬영 전에 실행 파일, GNU timeout,
-PyAV remux API, 세 카메라 메시지의 header/data/timestampSof 필드를 검사한다.
-필수 기능이 사라지면 구체적인 오류로 중단한다. 이는 모든 미래의 openpilot API 변경이나
-실기기 동작을 보장하는 검사가 아니며, 단순한 커밋 변경 때문에 촬영을 거부하지 않도록 한다.
-
-명시적 offroad/onroad 상태, 다른 카메라 프로세스와 소유권 확인, 12초 lease,
-최대 5분 세션, 자식 프로세스 종료 및 상태 복원은 유지된다. 영상 요청이 없으면 촬영하지 않는다.
-H.264 입력은 `conflate=False`로 받으며, HA의 제한된 재시도 정책도 유지한다.
-
-HA의 카메라 엔터티에서 **Preload stream을 끈다**. 기본 안내 이미지는 실시간 영상이 아니다.
-`camera.turn_on` 후 상세창으로 영상을 열고, `camera.turn_off`로 종료할 수 있다.
-오류가 나면 같은 시간대의 HA 로그, manager의 카메라 출력과 엔터티 `last_stop_reason`을 확인한다.
-
-## 개발 검증
-
-openpilot 저장소:
-
-```bash
-python -m unittest discover -s openpilot/selfdrive/carrot/ha/tests -p 'test_camera*.py'
-```
-
-carrot-ha 저장소:
-
-```bash
-python -m unittest discover -s tests -p 'test_camera*.py'
-python scripts/build_camera_bundle.py
-```
-
-테스트에는 Python 3.11 이상, aiohttp, PyAV가 필요하다. 빌드 스크립트는 HA ZIP만 생성한다.
-콤마용 ZIP은 생성하지 않는다. 데스크톱 테스트는 실기기 영상 재생 검증을 대신하지 않는다.
+카메라의 실행 파일·영상 API·메시지 형식 확인은 기존대로 유지합니다.
+새로운 모든 기기/브랜치의 호환성을 보장하는 것은 아닙니다.

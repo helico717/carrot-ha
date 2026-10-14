@@ -356,7 +356,7 @@ class CarrotParamsCard extends HTMLElement {
     const received = Date.parse(this._updatedAt || '');
     const stale = Number.isFinite(received) && Date.now() - received > 360000;
     host.innerHTML = `<span class="sync-badge" data-tone="${status.tone}" title="${this._escapeHtml(status.detail || status.text)}">${this._escapeHtml(status.text)}</span>
-      <span class="sync-time" title="Vehicle receiver가 차량 파라미터 데이터를 마지막으로 수신한 시각입니다. HA 조회 시각이 아닙니다. HA 시간대 기준입니다.">마지막 수신: ${this._escapeHtml(this._formatTimestamp(this._updatedAt))}</span>
+      <span class="sync-time" title="차량 수신기가 차량 파라미터 데이터를 마지막으로 수신한 시각입니다. HA 조회 시각이 아닙니다. HA 시간대 기준입니다.">마지막 수신: ${this._escapeHtml(this._formatTimestamp(this._updatedAt))}</span>
       ${stale || this._error ? `<span class="sync-warning">${this._error ? '최신 데이터 조회 실패' : '최근 수신 없음 · 차량 연결 확인'}</span>` : ''}`;
   }
 

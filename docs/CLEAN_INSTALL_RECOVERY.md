@@ -88,7 +88,7 @@ log_level: INFO
 debug_minutes: 15
 ```
 
-5. 저장 후 **자동 시작**, **Watchdog**를 켜고 **시작**을 누릅니다.
+5. 저장 후 **자동 시작**, **Watchdog(앱이 멈추면 다시 시작)**를 켜고 **시작**을 누릅니다.
    로그에 `receiver_started`가 보이면 앱이 시작된 것입니다.
 6. 기존 외부 주소가 이 집 서버를 가리키도록 Duck DNS와 공유기 설정을 복구합니다.
    공유기의 외부 443 포트는 사용 중인 HTTPS 프록시로 연결합니다.
@@ -102,7 +102,7 @@ debug_minutes: 15
 이 부분은 외부에서 들어온 `/carrot-receiver/` 요청을 수신 앱에 전달하는 설정입니다.
 백업에 이미 들어 있다면 다시 만들 필요가 없습니다.
 
-1. 앱 정보에서 수신 앱의 **Hostname**을 확인합니다. 현재 설치 값은
+1. 앱 정보에서 수신 앱의 **Hostname(앱 내부 이름)**을 확인합니다. 현재 설치 값은
    `874ccb4c-carrot-receiver`입니다. 다른 설치에서는 앞부분이 달라질 수 있습니다.
    값을 확인할 수 없다면 HA 웹 화면의 Terminal & SSH 앱에서 아래 명령으로 정보만 확인하세요.
    이 명령은 Windows/Mac 컴퓨터 터미널이 아니라 HA 웹 터미널에 입력합니다.
@@ -221,7 +221,7 @@ Comma를 완전히 지우면 차량에만 남아 있던 미전송 자료는 잃�
 1. 차량은 주차 상태로 둡니다.
 2. 컴퓨터와 Comma를 같은 Wi-Fi에 연결하고 Comma 화면에서 IP 주소를 확인합니다.
    `192.168.43.1`은 Comma 핫스팟을 사용할 때의 예시일 뿐입니다.
-3. Comma 설정에서 SSH를 켜고 본인 GitHub 사용자 이름을 입력합니다.
+3. Comma 설정에서 SSH(컴퓨터에서 기기 명령창에 접속하는 기능)를 켜고 본인 GitHub 사용자 이름을 입력합니다.
    GitHub에는 아래에서 만든 **공개키(.pub)**를 등록합니다.
    [Comma 공식 SSH 안내](https://github.com/commaai/openpilot/blob/master/docs/how-to/connect-to-comma.md).
 4. 컴퓨터에 Git, Python 3, SSH가 필요합니다. Windows는 PowerShell을, Mac은 터미널 앱을 엽니다.
