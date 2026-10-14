@@ -87,3 +87,57 @@
 - 다음 사용자 작업: 리소스를 `/carrot_ha_static/carrot-logs-card.js`로 바꾸고 8번
   대시보드 카드 타입을 `custom:carrot-logs-card`로 변경, 기존 device_id 유지, 강력 새로고침.
 - 실제 대시보드 목록·영상 재생·시간 이동·다운로드와 장시간 용량 회전은 후속 검증 대기.
+
+## 2026-10-14 — 사용자 실재생 확인 및 화면 누락 보정 중
+
+- 사용자 스크린샷과 보고로 실제 운영 HA의 영상 재생 확인. 목록·구간 목록 썸네일은
+  자리표시자이며 주행 리플레이는 모듈 미연결로 동작하지 않는 상태가 드러났다.
+- 리플레이의 “이 브라우저에서는 사용할 수 없음”은 원본 런타임 미로딩 안내였다.
+  브라우저 미지원으로 확인된 것이 아니다. 원본 worker·재생 화면 연결을 진행한다.
+- 구간 목록 누락 원인: 원본 CSS wide media query와 HA 브리지의 축약된
+  `isCompactLandscapeMode` 조건 불일치. 넓은 화면에서 DOM 내용을 만들지 않았는데
+  CSS는 펼침 컨트롤을 숨겼다. 원본과 같은 media query로 수정했다.
+- 썸네일: `ha_log_thumbnails.js`에서 HA 저장 MP4의 보이는 항목만 단일 디코더로
+  프레임 추출, 최대 48개·각 128KiB JPEG 메모리 캐시. 숨김 시 중단, 종료 시 해제.
+  HA 디스크/Comma/Cloudflare 변경 없음. 원본 bridge HTML·빌드 스크립트에 연결.
+- 검사: 합성 영상 실제 Chromium 디코딩으로 썸네일 480px 생성, 목록·선택·정렬·영상
+  창·모바일 검사 통과. wide 구간 목록 가시성 회귀 검사를 추가해 재검증 예정.
+- HA FFmpeg 확인을 위한 Docker 읽기는 SSH 앱 protection mode 때문에 불가했다.
+  보호 설정은 변경하지 않았다. 썸네일 구현은 브라우저 영상 디코딩을 사용한다.
+- 관련 파일: `frontend/carrot_logs/ha_log_thumbnails.js`, `ha_logs_bridge.js`, `logs.html`,
+  `scripts/build_logs_port.py`, `tests/driving-logs-port-browser.cjs`.
+- 배포: 이번 보정은 아직 로컬 작업 중. 리플레이 연결과 관련 검증 후 SSH 직접 반영한다.
+
+## 2026-10-14 — 원본 리플레이 연결 및 실로그 검증
+
+- `driving_logs/http.py`에 장치 범위·기존 조회 세션을 사용하는 replay-source 설명과
+  rlog/영상 파일 응답 추가. API 인증·Range·원본 바이트 보존 검사 통과.
+- 같은 원본 커밋의 replay client, 압축/Cap'n Proto 해석 워커, 이벤트·그래프·전방·
+  분석 모듈, 리플레이 HTML·CSS를 이식. worker 경로와 입력 URL을 HA로 연결하고
+  전용 runtime 등록 이름으로 분리한다. 원본 계산·해석 로직은 재작성하지 않는다.
+- `ha_replay_loader.js`에서 클릭 시에만 리플레이 자산을 로드하고 저장된 자료로 재생한다.
+  라이브 WebSocket이나 기기 설정 쓰기는 없다. 재생/정지/배속/시간 이동/구간 선택은
+  원본 모듈을 사용한다. 기록 속도·가속도·Lead 수치 HUD를 HA 상태 어댑터로 연결한다.
+- 원본 drive workspace 스타일과 stream-ready 상태도 필요했다. 이를 연결하고
+  실제 영상 표시·닫기 버튼 위치를 Chromium에서 확인했다.
+- 원본 Carrot Vision의 GPU 차선/AR 오버레이 전체는 이번 어댑터에 포함되지 않는다.
+  레이더 검증 상세 화면·지도·외부 전송과 함께 남은 범위를 별도로 추적한다.
+- 운영 HA의 실제 한 구간 rlog/MP4를 임시 비공개 파일로 읽어 원본 worker 해석,
+  재생 진행·정지·seek 후 기록 상태, SVG 그래프, 모바일 폭, 닫기 검증 통과.
+  테스트 자료·GPS 원문·영상은 Git에 포함하지 않았다.
+- 썸네일 디코더는 리플레이/숨김 시 중단하고 제거된 DOM 관찰·큐를 정리한다.
+- `scripts/build_logs_port.py`에 재현 가능한 리플레이 자산/페이지 생성도 추가했다.
+- Git 게시·HA 직접 반영은 아래 후속 배포 결과를 기준으로 한다. HA 재시작 후 운영
+  대시보드의 새 리플레이는 사용자 확인 대기이며, 로컬 실로그 검증과 구분한다.
+
+## 2026-10-14 — 썸네일·목록·리플레이 SSH 반영 완료
+
+- 수정 파일 23개를 기존 파일 백업 후 HA에 직접 설치하고 SHA-256 일치 확인.
+- 백업: `/config/carrot_ha/deployment-backups/driving-logs-replay-20261014/before`.
+- 외부 DuckDNS에서 제공되는 `ha_replay_loader.js`도 로컬 SHA-256 일치 확인.
+- 최종 검사: 실제 수신 rlog/MP4로 재생 진행·일시정지·seek 기록 갱신, SVG 그래프,
+  모바일 크기, 닫기 및 목록·썸네일·선택 검사 통과. API/저장/전송 통합 6건 및
+  기존 dashboard live/lazy/view-state 회귀 통과.
+- Comma·Worker·D1/KV·manifest 변경 없음. 버전 상승·태그·Release 발행 없음.
+- 새 replay-source API 활성화를 위해 사용자 HA 재시작 1회와 강력 새로고침이 필요하다.
+  운영 8번 대시보드에서 수정 리플레이를 확인한 것은 아직 아니다.

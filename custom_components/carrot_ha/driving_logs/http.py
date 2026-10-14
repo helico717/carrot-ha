@@ -178,6 +178,22 @@ class BrowserView(HomeAssistantView):
                     value = runtime.get('driving_log_read_state', {'recentSegment': ''})
                 elif action == 'recent':
                     value = {'segments': [n for r in page['routes'] for n in r['segmentFolders']][:limit]}
+                elif action == 'replay-source' and segment:
+                    rlog = await self.hass.async_add_executor_job(store.file, segment, 'rlog')
+                    video = await self.hass.async_add_executor_job(store.file, segment, 'qcamera')
+                    base = f'/api/carrot_ha/v1/driving_logs/{entry_id}/dashcam/replay-source/{segment}'
+                    if kind:
+                        path = rlog if kind == 'rlog' else video if kind == 'video' else None
+                        if path is None:
+                            raise web.HTTPNotFound()
+                        return web.FileResponse(path, headers={'Cache-Control':'private, no-store'})
+                    value = {'ok':True, 'mode':'client', 'segment':segment,
+                             'segmentIndex':int(segment.rsplit('--',1)[1]),
+                             'rlog':{'name':rlog.name, 'size':rlog.stat().st_size,
+                                     'compression':'zstd' if rlog.name.endswith('.zst') else 'bzip2' if rlog.name.endswith('.bz2') else 'none',
+                                     'url':base+'/rlog'},
+                             'video':{'name':video.name, 'size':video.stat().st_size,
+                                      'container':'mp4' if video.name.endswith('.mp4') else 'mpegts', 'url':base+'/video'}}
                 elif action in {'video', 'download'} and segment:
                     path = await self.hass.async_add_executor_job(store.file, segment, kind or 'qcamera')
                     headers = {'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer'}

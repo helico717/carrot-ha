@@ -11,7 +11,9 @@ function getUIText(key, fallback = '', values = {}) {
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 }
-function isCompactLandscapeMode() { return innerWidth > innerHeight * 1.3 && innerHeight < 650; }
+function isCompactLandscapeMode() {
+  return window.matchMedia('(min-aspect-ratio: 13/10), (horizontal-viewport-segments: 2), (vertical-viewport-segments: 2), (min-width: 640px) and (min-height: 650px)').matches;
+}
 function setDashcamHeaderStatus() {}
 function showAppToast(message) { document.getElementById('haLogsStatus').textContent = message; }
 window.carrotLogsURL = function(url) {
@@ -24,12 +26,12 @@ async function getJson(url) {
   const data = await response.json();
   if (data.storage) {
     const bytes = data.storage.used;
-    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / 5.00 GB · 최신 로그부터 보관 · 분석·외부 전송·지도는 다음 단계`;
+    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / 5.00 GB · 최신 로그부터 보관 · 레이더 검증·외부 전송·지도는 다음 단계`;
   }
   return data;
 }
 async function postJson(url, body) {
-  if (url !== '/api/dashcam/read-state') throw new Error('로그 서버 전송·리플레이 분석은 다음 단계에서 연결됩니다. 원본 다운로드와 영상 재생을 이용해 주세요.');
+  if (url !== '/api/dashcam/read-state') throw new Error('로그 서버 전송은 다음 단계에서 연결됩니다. 원본 다운로드와 리플레이를 이용해 주세요.');
   const response = await fetch(window.carrotLogsURL(url), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
   if (!response.ok) throw new Error('HA 로그 상태 저장 실패');
   return response.json();

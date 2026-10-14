@@ -1,0 +1,242 @@
+    <div id="pageCarrot" class="page page--full page--drive" hidden style="display:none;">
+      <div class="page-header page-header--hidden" aria-hidden="true">
+        <h2 id="carrotTitle" class="page-title">Home</h2>
+      </div>
+
+      <div id="carrotDriveWorkspace" class="drive-workspace">
+        <div id="carrotStage" class="carrot-stage" data-drive-workspace-slot="primary">
+        <canvas id="carrotAmbientCanvas" class="carrot-stage__ambient" aria-hidden="true"></canvas>
+        <div id="carrotReplayViewport" class="carrot-stage__replayViewport" aria-hidden="true"></div>
+        <video id="carrotRoadVideo" class="carrot-stage__video" autoplay playsinline muted disablepictureinpicture></video>
+        <canvas id="carrotLastFrameCanvas" class="carrot-stage__videoHold" aria-hidden="true"></canvas>
+        <canvas id="carrotPerformanceCanvas" class="carrot-stage__canvas carrot-stage__canvas--performance" aria-hidden="true"></canvas>
+        <canvas id="carrotOverlayCanvas" class="carrot-stage__canvas"></canvas>
+        <canvas id="carrotHudCanvas" class="carrot-stage__hud"></canvas>
+        <div id="carrotOnroadAlert" class="carrot-stage__alert" hidden aria-live="polite" aria-atomic="true">
+          <div id="carrotOnroadAlertBox" class="carrot-stage__alert-box">
+            <div id="carrotOnroadAlertText1" class="carrot-stage__alert-text carrot-stage__alert-text--primary"></div>
+            <div id="carrotOnroadAlertText2" class="carrot-stage__alert-text carrot-stage__alert-text--secondary" hidden></div>
+          </div>
+        </div>
+
+        <div id="visionStartOverlay" class="vision-start-overlay">
+          <button id="btnStartVision" class="btn btn--filled" type="button" style="font-size:1.2rem; padding: 16px 32px; border-radius: 99px;">
+            ▶ 주행 비전 시작
+          </button>
+          <div id="visionDisabledMessage" class="vision-start-overlay__message" hidden></div>
+        </div>
+
+        <div id="carrotStageLoading" class="carrot-stage__loading" hidden aria-live="polite" aria-busy="true">
+          <div class="carrot-stage__loadingPanel">
+            <div class="carrot-stage__spinner" aria-hidden="true"></div>
+            <div id="carrotStageLoadingText" class="carrot-stage__loadingText"></div>
+            <div id="carrotStageLoadingDetail" class="carrot-stage__loadingDetail"></div>
+            <div class="carrot-stage__loadingActions" role="group" aria-label="Vision connection actions">
+              <button id="btnVisionStop" class="smallBtn carrot-stage__loadingAction" type="button">중지</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="carrotReplayControls" class="carrot-replay-controls" hidden aria-label="Drive replay controls">
+          <div class="carrot-replay-controls__header">
+            <div class="carrot-replay-controls__heading">
+              <label id="carrotReplaySegmentPicker" class="carrot-replay-controls__segmentPicker carrot-replay-controls__segmentPicker--title" hidden>
+                <select id="carrotReplaySegmentSelect" class="carrot-replay-controls__segmentSelect smallBtn" aria-label="Replay record time"></select>
+              </label>
+            </div>
+            <div class="carrot-replay-controls__headerActions">
+              <button id="btnCarrotReplayClose" class="carrot-replay-controls__close smallBtn" type="button" aria-label="Close replay">닫기</button>
+            </div>
+          </div>
+          <div id="carrotReplaySegmentNav" class="carrot-replay-controls__segmentNav carrot-media-action-group" role="group" aria-label="Replay playback controls" hidden>
+            <button id="btnCarrotReplayPrevious" class="carrot-replay-controls__segmentBtn carrot-media-action-button carrot-media-action-button--previous" type="button" aria-label="Previous segment">
+              <svg viewBox="0 0 36 36" aria-hidden="true"><path d="M11 10h3v16h-3zm4 8 12-8v16z"></path></svg>
+            </button>
+            <button id="btnCarrotReplayPlay" class="carrot-replay-controls__play carrot-media-action-button carrot-media-action-button--play" type="button" aria-label="Play replay" data-state="play">
+              <svg viewBox="0 0 36 36" aria-hidden="true"><path d="M13 9v18l14-9z"></path></svg>
+            </button>
+            <button id="btnCarrotReplayNext" class="carrot-replay-controls__segmentBtn carrot-media-action-button carrot-media-action-button--next" type="button" aria-label="Next segment">
+              <svg viewBox="0 0 36 36" aria-hidden="true"><path d="M22 10h3v16h-3zM9 10l12 8-12 8z"></path></svg>
+            </button>
+          </div>
+          <div class="carrot-replay-controls__transport">
+            <div id="carrotReplayEventSummary" class="carrot-replay-insights__summary" hidden>
+              <span id="carrotReplayEventSummaryIcon" class="carrot-replay-insights__summaryIcon" aria-hidden="true"></span>
+              <strong id="carrotReplayEventSummaryTitle"></strong>
+              <span id="carrotReplayEventSummaryMeta"></span>
+            </div>
+            <div class="carrot-replay-controls__timeline">
+              <div id="carrotReplayEventRail" class="carrot-replay-insights__rail" aria-label="Replay events"></div>
+              <div id="carrotReplayEventCluster" class="carrot-replay-insights__cluster" hidden>
+                <strong id="carrotReplayEventClusterTitle"></strong>
+                <div id="carrotReplayEventClusterItems"></div>
+              </div>
+              <div id="carrotReplayFilmstrip" class="carrot-replay-controls__filmstrip" aria-hidden="true">
+                <img id="carrotReplayThumbnail" class="carrot-replay-controls__thumbnail" alt="" draggable="false">
+              </div>
+              <div class="carrot-replay-controls__timelineShade" aria-hidden="true"></div>
+              <input id="carrotReplaySeek" class="carrot-replay-controls__seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Replay position">
+              <div id="carrotReplayScrubPreview" class="carrot-replay-controls__scrubPreview" hidden aria-hidden="true">
+                <div id="carrotReplayScrubEventInfo" class="carrot-replay-controls__scrubEventInfo" hidden>
+                  <span id="carrotReplayScrubEventIcon" class="carrot-replay-controls__scrubEventIcon" aria-hidden="true"></span>
+                  <strong id="carrotReplayScrubEventTitle"></strong>
+                  <span id="carrotReplayScrubEventMeta"></span>
+                </div>
+                <img id="carrotReplayScrubImage" alt="" draggable="false">
+                <div id="carrotReplayScrubEvents" class="carrot-replay-controls__scrubEvents" hidden aria-label="Nearby replay events">
+                  <canvas id="carrotReplayScrubEventsCanvas" aria-hidden="true"></canvas>
+                </div>
+                <span id="carrotReplayScrubTime">0:00</span>
+              </div>
+            </div>
+          </div>
+          <div class="carrot-replay-controls__timeOverlay" aria-live="off">
+            <div class="carrot-replay-controls__timeGroup">
+              <span id="carrotReplayCurrentTime" class="carrot-replay-controls__time carrot-replay-controls__time--current">0:00</span>
+              <span class="carrot-replay-controls__timeSeparator" aria-hidden="true">/</span>
+              <span id="carrotReplayDuration" class="carrot-replay-controls__time">0:00</span>
+            </div>
+          </div>
+        </div>
+        <aside id="carrotReplayInsights" class="carrot-replay-insights" aria-label="Replay details" aria-hidden="true">
+          <div class="carrot-replay-insights__tabbar">
+            <div class="carrot-replay-insights__tabs c-segmented-control" role="tablist" aria-label="Replay detail type">
+              <button id="carrotReplayInsightsEventsTab" class="carrot-replay-insights__tab c-segmented-control__item smallBtn is-active" type="button" role="tab" aria-selected="true" aria-controls="carrotReplayInsightsEventsPanel" tabindex="0" data-replay-insights-tab="events">Events</button>
+              <button id="carrotReplayInsightsGraphsTab" class="carrot-replay-insights__tab c-segmented-control__item smallBtn" type="button" role="tab" aria-selected="false" aria-controls="carrotReplayInsightsGraphsPanel" tabindex="-1" data-replay-insights-tab="graphs">Graphs</button>
+              <button id="carrotReplayInsightsSensorsTab" class="carrot-replay-insights__tab c-segmented-control__item smallBtn" type="button" role="tab" aria-selected="false" aria-controls="carrotReplayInsightsSensorsPanel" tabindex="-1" data-replay-insights-tab="sensors">Forward</button>
+              <button id="carrotReplayInsightsAdvancedTab" class="carrot-replay-insights__tab c-segmented-control__item smallBtn" type="button" role="tab" aria-selected="false" aria-controls="carrotReplayInsightsAdvancedPanel" tabindex="-1" data-replay-insights-tab="advanced">Analysis</button>
+            </div>
+          </div>
+          <div class="carrot-replay-insights__body">
+            <section id="carrotReplayInsightsEventsPanel" class="carrot-replay-insights__panel is-active" role="tabpanel" aria-labelledby="carrotReplayInsightsEventsTab" aria-hidden="false" tabindex="0" data-replay-insights-panel="events">
+              <p id="carrotReplayEventDegraded" class="carrot-replay-insights__degraded" role="status" hidden></p>
+              <ol id="carrotReplayEventList" class="carrot-replay-insights__eventList"></ol>
+              <div id="carrotReplayEventEmpty" class="carrot-replay-insights__empty">No major events.</div>
+              <button id="btnCarrotReplayEventFollow" class="carrot-replay-insights__follow smallBtn" type="button" hidden>Jump to current</button>
+            </section>
+            <section id="carrotReplayInsightsGraphsPanel" class="carrot-replay-insights__panel" role="tabpanel" aria-labelledby="carrotReplayInsightsGraphsTab" aria-hidden="true" tabindex="0" data-replay-insights-panel="graphs">
+              <div class="carrot-replay-insights__graphs telemetry-graphs">
+                  <div class="carrot-replay-insights__graph telemetry-graph" data-replay-graph="speed" data-telemetry-metric="speed" data-telemetry-tone="info" aria-label="Speed graph">
+                    <div class="carrot-replay-insights__graphHead telemetry-graph__head"><strong id="carrotReplaySpeedGraphLabel">Speed</strong><output>--.- km/h</output></div>
+                    <svg class="telemetry-graph__plot" viewBox="0 0 600 90" preserveAspectRatio="none" aria-hidden="true"><polyline points="" fill="none" stroke-width="1.8"></polyline></svg>
+                    <i class="carrot-replay-insights__cursor telemetry-graph__cursor" aria-hidden="true"></i>
+                  </div>
+                  <div class="carrot-replay-insights__graph telemetry-graph" data-replay-graph="steer" data-telemetry-metric="steering" data-telemetry-tone="primary" aria-label="Steering angle graph">
+                    <div class="carrot-replay-insights__graphHead telemetry-graph__head"><strong id="carrotReplaySteerGraphLabel">Steering</strong><output>--.--°</output></div>
+                    <svg class="telemetry-graph__plot" viewBox="0 0 600 90" preserveAspectRatio="none" aria-hidden="true"><polyline points="" fill="none" stroke-width="1.6"></polyline></svg>
+                    <i class="carrot-replay-insights__cursor telemetry-graph__cursor" aria-hidden="true"></i>
+                  </div>
+                  <div class="carrot-replay-insights__graph telemetry-graph" data-replay-graph="accel" data-telemetry-metric="acceleration" data-telemetry-tone="success" aria-label="Acceleration graph">
+                    <div class="carrot-replay-insights__graphHead telemetry-graph__head"><strong id="carrotReplayAccelGraphLabel">Acceleration</strong><output>--.-- m/s²</output></div>
+                    <svg class="telemetry-graph__plot" viewBox="0 0 600 90" preserveAspectRatio="none" aria-hidden="true"><polyline points="" fill="none" stroke-width="1.6"></polyline></svg>
+                    <i class="carrot-replay-insights__cursor telemetry-graph__cursor" aria-hidden="true"></i>
+                  </div>
+                  <div class="carrot-replay-insights__graph telemetry-graph" data-replay-graph="lead" data-telemetry-metric="lead_distance" data-telemetry-tone="warning" aria-label="Lead distance graph">
+                    <div class="carrot-replay-insights__graphHead telemetry-graph__head"><strong id="carrotReplayLeadGraphLabel">Lead distance</strong><output>--.- m</output></div>
+                    <svg class="telemetry-graph__plot" viewBox="0 0 600 90" preserveAspectRatio="none" aria-hidden="true"><polyline points="" fill="none" stroke-width="1.6"></polyline></svg>
+                    <i class="carrot-replay-insights__cursor telemetry-graph__cursor" aria-hidden="true"></i>
+                  </div>
+              </div>
+            </section>
+            <section id="carrotReplayInsightsSensorsPanel" class="carrot-replay-insights__panel carrot-replay-insights__panel--sensors" role="tabpanel" aria-labelledby="carrotReplayInsightsSensorsTab" aria-hidden="true" tabindex="0" data-replay-insights-panel="sensors">
+              <div id="carrotReplaySensorTopview" class="carrot-replay-sensor telemetry-forward" aria-labelledby="carrotReplaySensorTitle">
+                <div class="carrot-replay-sensor__head telemetry-forward__head">
+                  <strong id="carrotReplaySensorTitle">Forward perception</strong>
+                  <span id="carrotReplaySensorStatus">--</span>
+                </div>
+                <div id="carrotReplaySensorLegend" class="carrot-replay-sensor__legend telemetry-forward__legend" aria-label="Sensor sources"></div>
+                <div id="carrotReplaySensorViewport" class="carrot-replay-sensor__viewport telemetry-forward__viewport" role="region" tabindex="0" aria-labelledby="carrotReplaySensorTitle">
+                  <div id="carrotReplaySensorPlot" class="carrot-replay-sensor__plot telemetry-forward__plot">
+                    <canvas id="carrotReplaySensorCanvas" class="telemetry-forward__canvas" aria-label="Forward perception"></canvas>
+                    <svg id="carrotReplaySensorEgo" class="carrot-replay-sensor__ego telemetry-forward__ego" viewBox="0 0 24 40" aria-hidden="true" focusable="false">
+                      <rect class="carrot-replay-sensor__egoMirror telemetry-forward__ego-mirror" x="1.4" y="11.4" width="2.9" height="3.2" rx="1.1" />
+                      <rect class="carrot-replay-sensor__egoMirror telemetry-forward__ego-mirror" x="19.7" y="11.4" width="2.9" height="3.2" rx="1.1" />
+                      <path d="M12 1.6c2.2 0 3.6.5 4.4 1.5l2.3 2.9c1 1.3 1.5 2.9 1.5 4.7v20.1c0 2.4-.6 4.1-1.9 5.2l-1.7 1.5c-1.2 1-2.8 1.4-4.6 1.4s-3.4-.4-4.6-1.4l-1.7-1.5c-1.3-1.1-1.9-2.8-1.9-5.2V10.7c0-1.8.5-3.4 1.5-4.7l2.3-2.9C8.4 2.1 9.8 1.6 12 1.6z" />
+                      <path class="carrot-replay-sensor__egoGlass telemetry-forward__ego-glass" d="M8.8 10.4h6.4l1.5 4.4H7.3z" />
+                      <path class="carrot-replay-sensor__egoGlass telemetry-forward__ego-glass" d="M7.7 28h8.6l-1.1 3.6H8.8z" />
+                    </svg>
+                    <div id="carrotReplaySensorTooltip" class="carrot-replay-sensor__tooltip telemetry-forward__tooltip" hidden>
+                      <span class="carrot-replay-sensor__tooltipIcon telemetry-forward__tooltip-icon" aria-hidden="true"></span>
+                      <strong class="carrot-replay-sensor__tooltipTitle telemetry-forward__tooltip-title"></strong>
+                      <span class="carrot-replay-sensor__tooltipState telemetry-forward__tooltip-state"></span>
+                      <dl class="carrot-replay-sensor__tooltipRows telemetry-forward__tooltip-rows"></dl>
+                    </div>
+                  </div>
+                </div>
+                <div id="carrotReplaySensorMessage" class="carrot-replay-sensor__message telemetry-forward__message" role="status">LOADING</div>
+              </div>
+            </section>
+            <section id="carrotReplayInsightsAdvancedPanel" class="carrot-replay-insights__panel" role="tabpanel" aria-labelledby="carrotReplayInsightsAdvancedTab" aria-hidden="true" tabindex="0" data-replay-insights-panel="advanced">
+              <div class="carrot-replay-insights__advanced">
+                <div class="carrot-replay-insights__advancedSelectors">
+                  <label>
+                    <span id="carrotReplayAdvancedServiceLabel">Data type</span>
+                    <select id="carrotReplayAdvancedService"></select>
+                  </label>
+                  <label>
+                    <span id="carrotReplayAdvancedFieldLabel">Measurement</span>
+                    <select id="carrotReplayAdvancedField"></select>
+                  </label>
+                </div>
+                <div class="carrot-replay-insights__advancedContext">
+                  <code id="carrotReplayAdvancedTechnicalPath">--</code>
+                  <div id="carrotReplayAdvancedStatus" class="carrot-replay-insights__advancedStatus" role="status" aria-live="polite" data-state="idle">Select a field.</div>
+                </div>
+                <div class="carrot-replay-insights__advancedMetrics">
+                  <article class="carrot-replay-insights__advancedMetric--current"><strong id="carrotReplayAdvancedCurrent">--</strong><span id="carrotReplayAdvancedCurrentLabel">Current value</span></article>
+                  <article><strong id="carrotReplayAdvancedMin">--</strong><span id="carrotReplayAdvancedMinLabel">Minimum</span></article>
+                  <article><strong id="carrotReplayAdvancedMax">--</strong><span id="carrotReplayAdvancedMaxLabel">Maximum</span></article>
+                  <article><strong id="carrotReplayAdvancedAverage">--</strong><span id="carrotReplayAdvancedAverageLabel">Average</span></article>
+                </div>
+                <div id="carrotReplayAdvancedTrack" class="carrot-replay-insights__advancedTrack" data-kind="empty">
+                  <canvas id="carrotReplayAdvancedCanvas" aria-hidden="true"></canvas>
+                  <i id="carrotReplayAdvancedCursor" class="carrot-replay-insights__cursor" aria-hidden="true"></i>
+                </div>
+                <div class="carrot-replay-insights__advancedActions">
+                  <button id="btnCarrotReplayAdvancedSnapshot" class="carrot-replay-insights__snapshotButton smallBtn" type="button" hidden>View current raw values</button>
+                  <p id="carrotReplayAdvancedHelp">Only the selected field is analyzed locally when needed.</p>
+                </div>
+                <div id="carrotReplayAdvancedSnapshot" class="carrot-replay-insights__snapshot" hidden></div>
+                <details id="carrotReplayAdvancedStatisticsDetails" class="carrot-replay-insights__advancedDisclosure" hidden>
+                  <summary><span id="carrotReplayAdvancedStatisticsTitle">Detailed statistics</span><small id="carrotReplayAdvancedStatisticsHint">Distribution and data quality</small></summary>
+                  <div id="carrotReplayAdvancedStatistics" class="carrot-replay-insights__advancedStatistics" hidden></div>
+                </details>
+                <details id="carrotReplayAdvancedSourceDetails" class="carrot-replay-insights__advancedDisclosure">
+                  <summary><span id="carrotReplayAdvancedSourceTitle">Recording information</span><small id="carrotReplayAdvancedSourceHint">Coverage and available data</small></summary>
+                  <div class="carrot-replay-insights__advancedDisclosureBody">
+                    <div class="carrot-replay-insights__advancedMeta">
+                      <span><b id="carrotReplayInsightsRecordCount">0</b><small id="carrotReplayInsightsRecordCountLabel">Records</small></span>
+                      <span><b id="carrotReplayInsightsServiceCount">0</b><small id="carrotReplayInsightsServiceCountLabel">Services</small></span>
+                      <span><b id="carrotReplayInsightsEventCount">0</b><small id="carrotReplayInsightsEventCountLabel">Events</small></span>
+                      <span><b id="carrotReplayInsightsGraphCount">0</b><small id="carrotReplayInsightsGraphCountLabel">Samples</small></span>
+                      <span><b id="carrotReplayInsightsInvalidCount">0</b><small id="carrotReplayInsightsInvalidCountLabel">Invalid</small></span>
+                    </div>
+                    <div id="carrotReplayAdvancedCatalog" class="carrot-replay-insights__catalog"></div>
+                  </div>
+                </details>
+              </div>
+            </section>
+          </div>
+        </aside>
+        <div class="carrot-stage__controls" role="group" aria-label="Sound, HUD and display controls">
+          <label id="carrotReplayHudControl" class="carrot-stage__controlBtn carrot-stage__controlBtn--hud carrot-replay-controls__hudToggle" for="carrotReplayHudToggle" hidden>
+            <input id="carrotReplayHudToggle" type="checkbox">
+            <span id="carrotReplayHudToggleLabel">HUD</span>
+          </label>
+          <button id="btnWebSound" class="carrot-stage__controlBtn carrot-stage__controlBtn--sound" type="button" aria-label="Web sound">Sound</button>
+          <button id="btnCarrotReplaySpeed" class="carrot-stage__controlBtn carrot-stage__controlBtn--replay-speed" type="button" aria-label="Replay speed" hidden>1×</button>
+          <button id="btnDisplayModeCycle" class="carrot-stage__controlBtn carrot-stage__controlBtn--display" type="button" aria-label="Display mode">Normal</button>
+        </div>
+        </div>
+        <div id="carrotNaviDivider" class="carrot-navi-divider" data-drive-workspace-divider role="separator" aria-orientation="vertical" aria-label="Resize Carrot Navi" aria-valuemin="30" aria-valuemax="70" aria-valuenow="70" tabindex="0" hidden>
+          <span aria-hidden="true"></span>
+        </div>
+        <aside id="carrotNaviPane" class="carrot-navi-pane" data-drive-workspace-slot="secondary" aria-label="Carrot Navi" aria-hidden="true">
+          <video id="carrotNaviVideo" class="carrot-navi-pane__video" muted autoplay playsinline webkit-playsinline disableremoteplayback preload="auto" aria-hidden="true"></video>
+          <canvas id="carrotNaviCanvas" class="carrot-navi-pane__canvas" aria-label="Carrot Navi map"></canvas>
+          <canvas id="carrotNaviOverlayCanvas" class="carrot-navi-pane__overlay" aria-label="Carrot Navi guidance"></canvas>
+          <div id="carrotNaviStatus" class="carrot-navi-pane__status" hidden></div>
+        </aside>
+      </div>
+      <div id="carrotDriveAuxPane" class="drive-workspace__aux"></div>
+    </div>

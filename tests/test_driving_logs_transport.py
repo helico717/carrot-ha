@@ -80,6 +80,12 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(response.cookies['carrot_logs']['httponly'])
         async with self.client.get(str(browse)+'/dashcam/routes') as response:
             self.assertEqual((await response.json())['routes'][0]['segmentFolders'],[segment])
+        async with self.client.get(str(browse)+'/dashcam/replay-source/'+segment) as response:
+            source=await response.json()
+            self.assertEqual(source['mode'],'client')
+            self.assertEqual(source['rlog']['compression'],'zstd')
+        async with self.client.get(self.server.make_url(source['rlog']['url'])) as response:
+            self.assertEqual(await response.read(),b'log!')
         async with self.client.get(str(browse)+'/dashcam/video/'+segment,headers={'Range':'bytes=2-5'}) as response:
             self.assertEqual(response.status,206)
             self.assertEqual(await response.read(),b'deo1')
