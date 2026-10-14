@@ -104,7 +104,8 @@ debug_minutes: 15
 
 1. 앱 정보에서 수신 앱의 **Hostname**을 확인합니다. 현재 설치 값은
    `874ccb4c-carrot-receiver`입니다. 다른 설치에서는 앞부분이 달라질 수 있습니다.
-   값을 확인할 수 없다면 Terminal & SSH 앱에서 아래 명령으로 정보만 확인하세요.
+   값을 확인할 수 없다면 HA 웹 화면의 Terminal & SSH 앱에서 아래 명령으로 정보만 확인하세요.
+   이 명령은 Windows/Mac 컴퓨터 터미널이 아니라 HA 웹 터미널에 입력합니다.
 
 ```sh
 ha addons info 874ccb4c_carrot_receiver
@@ -333,7 +334,20 @@ python3 tools/receiver-recovery.py --host "$COMMA_IP" --identity "$HOME/.ssh/car
 ## 8. 카메라 설정과 재부팅
 
 카메라 설정을 복원했고 키·주소가 같다면 다시 입력하지 않습니다.
-초기화로 지워졌다면 7번에서 사용한 SSH 명령으로 다시 연결합니다.
+초기화로 지워졌다면 먼저 컴퓨터에서 다시 연결합니다.
+
+Windows PowerShell:
+
+```powershell
+ssh -i "$env:USERPROFILE\.ssh\carrot_recovery" "comma@$commaIP"
+```
+
+Mac:
+
+```sh
+ssh -i "$HOME/.ssh/carrot_recovery" "comma@$COMMA_IP"
+```
+
 Windows와 Mac 모두 **Comma에 연결된 창**에서 다음을 실행합니다.
 
 ```sh

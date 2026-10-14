@@ -1,3 +1,10 @@
+## 2026-10-14 — vehicle-journal: 수신 앱 적용과 누적 검증 상태
+
+- 수신 앱 0.1.3 운영 시작/health/상태 수신/HA ACK 확인. 차계부 실행 코드·자료 변경 없음.
+- 전체 HA 검사 확장 중 테스트 namespace의 누락 복원 함수 연결 보완, 기존 cloud_sync 8건 통과.
+  Windows archive DB 잠금 제약은 Linux 재검사와 구분 기록. 차계부 Linux 전체 검사 및 릴리즈 확인 대기.
+- 쉬운 초기화 복구 안내의 카메라 연결 Windows/Mac 명령을 각각 보완하고 문서/누적 노트 대조.
+
 ## 2026-10-14 — vehicle-journal: Linux 단위 검사 환경과 배포 준비 기록
 
 - docs/CI 준비 main 커밋 ceeb00c 확인. 새 CI는 HA 미설치 상태에서 통합 시작을 호출해 중단.

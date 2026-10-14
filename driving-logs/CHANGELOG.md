@@ -1,3 +1,15 @@
+## 2026-10-14 — 운영 진단 앱 적용 및 기존 검사 대조
+
+- 공식 Supervisor 백업 포함 update로 수신 앱 0.1.3 설치/started 확인.
+  외부 health 200/0.1.3, 새 traffic_summary에서 상태 업로드·HA archive ACK·설정·터미널 게시/조회 200 확인.
+  HA Core/Comma 재부팅 없음. HA 화면/옵션 변경은 HACS 설치 후 사용자 재시작 대기.
+- Windows 전체 47개 HA 단위 검사 파일 중 46개 통과. archive_compression은 기존 SQLite
+  임시 파일 정리의 Windows 잠금 2건 실패. 운영 Linux 검사로 구분 확인 예정.
+- Linux 재실행 38576921798: 이전 cloud_sync 검사가 압축 복원 함수를 namespace에 제공하지 않아 실패.
+  tests/test_cloud_sync.py에 실제 cloud_archive.restore_page를 연결; 8건 로컬 통과.
+  사업 로직/기존 fallback 동작 변경 없음. Linux 전체 재검사와 베타 발행은 아직 대기.
+- 관련: tools/run-unit-suite.py, 테스트 연결부, 새 복구 안내·감사 목록·릴리즈 노트.
+
 ## 2026-10-14 — 배포 전 Linux 검사 실행 환경 보완
 
 - main 게시 ceeb00c, Comma 게시 d5879396da460d8fde85171f88d90cfde0d721d4 확인.
