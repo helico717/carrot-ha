@@ -2452,24 +2452,38 @@ async function handleTelemetryHistory(request,env) {
   if (!authorize(request,env,false)) return json({error:"unauthorized"},401);
   const params=new URL(request.url).searchParams;
   const after=Math.max(0,Number.parseInt(params.get("after")||"0",10)||0);
-  const limit=boundedLimit(params.get("limit"),20,100);
+  const encoding = params.get('encoding');
+  if (encoding && encoding !== 'carrot-cloud-archive-v1') return json({error:'unsupported_archive_encoding'},400);
+  // Measured legacy decompression cost: 73-78ms for 100 records. New HA
+  // restores bounded compressed pages locally; old clients keep original JSON.
+  const compact = encoding === 'carrot-cloud-archive-v1';
+  const limit=boundedLimit(params.get("limit"),compact ? 20 : 8,compact ? 100 : 8);
   const device = params.get('device_id');
   const result = env.ARCHIVE_STORAGE_V1 === '0'
     ? (device
       ? await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE device_id=? AND sequence>? ORDER BY sequence LIMIT ?').bind(device,after,limit+1).all()
       : await env.DB.prepare('SELECT sequence,device_id,updated_at,raw_json FROM telemetry_history WHERE sequence>? ORDER BY sequence LIMIT ?').bind(after,limit+1).all())
     : device
-    ? await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,c.raw_json AS context_json
+    ? await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,h.context_hash,c.raw_json AS context_json
         FROM telemetry_history h LEFT JOIN telemetry_contexts c ON c.device_id=h.device_id AND c.hash=h.context_hash
         WHERE h.device_id=? AND h.sequence>? ORDER BY h.sequence LIMIT ?`).bind(device,after,limit+1).all()
-    : await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,c.raw_json AS context_json
+    : await env.DB.prepare(`SELECT h.sequence,h.device_id,h.updated_at,h.raw_json,h.context_hash,c.raw_json AS context_json
         FROM telemetry_history h LEFT JOIN telemetry_contexts c ON c.device_id=h.device_id AND c.hash=h.context_hash
         WHERE h.sequence>? ORDER BY h.sequence LIMIT ?`).bind(after,limit+1).all();
   const rows=result.results||[];
+  if (compact) {
+    const contexts = {};
+    const events = rows.slice(0,limit).map(row => {
+      const {context_json, ...event} = row;
+      if (row.context_hash && context_json) contexts[row.context_hash] = context_json;
+      return event;
+    });
+    return json({encoding:'carrot-cloud-archive-v1',events,contexts,has_more:rows.length>limit});
+  }
   const events = [];
   const contexts = new Map();
   for (const row of rows.slice(0,limit)) {
-    const {context_json, ...event} = row;
+    const {context_json, context_hash, ...event} = row;
     if (context_json && !contexts.has(context_json)) contexts.set(context_json,await decoded(context_json));
     event.raw_json = await unpackTelemetry(row.raw_json,contexts.get(context_json) || null);
     events.push(event);
@@ -2760,7 +2774,7 @@ export default {
       if (request.method === "POST" && pathname === "/api/params/ack") return handleParamsAck(request, env);
       if (request.method === "GET" && pathname === "/api/params/status") return handleParamsStatus(request, env);
       if (request.method === "POST" && pathname === "/api/cleanup") return handleCleanup(request, env);
-      if (request.method === "GET" && pathname === "/api/telemetry-history") return handleTelemetryHistory(request,env);
+      if (request.method === "GET" && pathname === "/api/telemetry-history") return await handleTelemetryHistory(request,env);
       if (request.method === "POST" && pathname === "/api/telemetry") return await handleArchivedTelemetry(request, env);
       if (request.method === "POST" && pathname === "/api/archive-ack") {
         if (!authorize(request,env,false)) return json({error:'unauthorized'},401);

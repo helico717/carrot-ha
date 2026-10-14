@@ -31,6 +31,14 @@ queries=0;
 let feed=await call('/api/telemetry-history?device_id=car');
 assert.equal(queries,1,'one indexed joined history query, no per-row lookup');
 assert.deepEqual(JSON.parse(feed.body.events[0].raw_json),payload);
+queries=0;
+const transport=await call('/api/telemetry-history?device_id=car&encoding=carrot-cloud-archive-v1');
+assert.equal(queries,1);
+assert.equal(transport.body.encoding,'carrot-cloud-archive-v1');
+assert.equal(Object.keys(transport.body.contexts).length,1,'shared contexts are sent once per page');
+assert.deepEqual(JSON.parse(await unpackTelemetry(transport.body.events[0].raw_json,
+  transport.body.contexts[transport.body.events[0].context_hash])),payload);
+assert.equal((await call('/api/telemetry-history?encoding=invalid')).status,400);
 assert.equal((await call('/api/telemetry-history?device_id=other')).body.events.length,0);
 const second=feed.body.events[1].sequence;
 await maintainArchive(env,Date.parse('2026-10-14'));

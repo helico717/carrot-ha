@@ -8,6 +8,7 @@ from aiohttp import ClientTimeout
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .cloud_feed import parse_feed
+from .cloud_archive import restore_page
 from .charge_costs import refresh_runtime_costs
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,7 +122,9 @@ async def sync(hass, runtime):
         cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
         for _ in range(10):
             try:
-                history = await get('/api/telemetry-history?' + urlencode({'after': cursor, 'limit': 100, 'device_id': entry.data['device_id']}))
+                history = await get('/api/telemetry-history?' + urlencode({'after': cursor, 'limit': 100,
+                    'device_id': entry.data['device_id'], 'encoding': 'carrot-cloud-archive-v1'}))
+                history = await hass.async_add_executor_job(restore_page, history)
             except CloudHTTPError as error:
                 if error.status == 404:
                     runtime['history_supported'] = False
