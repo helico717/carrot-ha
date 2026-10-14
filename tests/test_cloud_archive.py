@@ -23,6 +23,8 @@ class CloudArchiveTests(unittest.TestCase):
               'events':[{'device_id':'car','sequence':7,'context_hash':'hash','raw_json':packed(compact)}]}
         restored=module.restore_page(feed)
         self.assertEqual(json.loads(restored['events'][0]['raw_json']),original)
+        feed['events'][0]['raw_json']=json.dumps(compact)
+        self.assertEqual(json.loads(module.restore_page(feed)['events'][0]['raw_json']),original)
         self.assertEqual(module.restore_page({'events':[]}),{'events':[]})
         feed['contexts']={}
         with self.assertRaises(ValueError):module.restore_page(feed)

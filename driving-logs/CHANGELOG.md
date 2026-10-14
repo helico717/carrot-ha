@@ -236,6 +236,23 @@
   telemetry 송신9~13ms. 작은 snapshot 나머지는 JSON+immutable context 참조로
   저장해 매건 gzip 비용을 줄이고, 큰 나머지/반복 context/기존 이력은 gzip을 유지한다.
   HA beta.7 복원기는 JSON/gzip을 이미 지원하므로 추가 HA 버전 상승은 필요 없다.
+- 최종 게시/배포: Worker ed8b0f6 코드·dff4cdad-9c35-49fc-bb79-15ca3a884e3e 배포,
+  POST telemetry4~9ms/200 표본 확인. 새 JSON 경로의 missing-context 회귀가 검증 중
+  실패해 guard를 추가하고 storage/history/sync/benchmark 및 HA 복원·ACK·history·
+  dashboard 검사를 다시 통과했다. 민감 자료 없는 일시 tail은 모두 종료했다.
+- 최적화 후 운영 수치: DB280,555,520 bytes, telemetry/context172,071,968/250MB,
+  trips9,641,263/75MB, context391개, durable consumer1개. 현재 잔존/신규 자료와
+  최초 압축 직후 크기를 구분한다. 미수신 이력을 용량 때문에 임의 삭제하지 않는다.
+- 자동 심사는 원문 유래 해시를 HA에 보내는 추가 대조를 거절했다. 동일 PC/동일
+  사용자 허용 백업 폴더에 after 백업을 받아 전후 로컬 전체 대조로 대체 완료:
+  기존54,965건 중54,765건 모든 원문 값 일치, 정상 ACK/14일 초과 정리200건,
+  미설명 손실0·after SQLite integrity_check 통과. 민감 원문/해시 서버 전송 없음.
+- 실제 Chromium 대시보드 오늘 주행 탭에서 오후04:06·101km·1시간43분 카드,
+  오늘180.37km 요약과 오전 병합 카드 확인. 초기 캐시 표시와 비동기 갱신 후를 구분했다.
+- HA 최종beta.7 Release/Actions38558241866 success 확인. HA HACS 설치/사용자
+  재시작 및 Comma b2260cf0ae2812d872bcb1228bb9441b0dcea001 Pull/재부팅 대기.
+  lane 인덱스/재시도보존/param polling5건 추가검사 통과. docs 검토에최종결과추가.
+  실제 첫cron/24시간계정전체쿼터/보관주기안정화/새송신기실차검증은미완료다.
 
 - 장기 개선 검토: docs/cloudflare-storage-review-2026-10-14.md 작성.
   최근 날짜별 본문 집계에서 평균 크기 10/1 8.2KB→10/13 15.6KB 증가 확인.
