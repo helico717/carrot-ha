@@ -1,3 +1,12 @@
+## 2026-10-14 — 양방향 결제 배포 검증 및 기존 지출 분류 보존
+
+- 커밋 제목: `vehicle-journal: preserve reclassified expenses during payment recovery`.
+- 변경·이유: 이전에 다른 지출 분류로 바꾼 차계부 보정은 충전 결제로 재분류하지 않도록 복구 대상에서 제외. 충전 분류인 자동 결제만 연동한다.
+- 관련 파일: `vehicle_journal/payment_sync.py`, `vehicle-journal/tests/test_payment_sync.py`, CHANGELOG 및 beta.5 릴리즈 노트.
+- 검증: 첫 구현 `0f7f367`의 차계부 61개, 결제 Python 35개, 스키마 9개, 금액 표시 8개, 대시보드 10개, cloud live/증분/캐시 12개, Comma 파라미터 4개 회귀 및 Worker 증분·벤치마크 통과. 추가 분류 보존 회귀 포함 차계부 전체 재검증. 기존 이벤트 루프 경고 외 실패 없음. Python 문법 검증의 Mac 캐시 쓰기 제한은 임시 캐시 경로로 해결.
+- 배포: `0f7f367` main 및 기존 beta.5 태그 원격 일치, HA Python 파일 5개 백업/설치 SHA-256 일치. 기존 Release ID 411761651 유지·pre-release=true·새 노트 확인, HACS Release Actions https://github.com/helico717/carrot-ha/actions/runs/38494539873 성공. GitHub API 캐시 응답은 갱신 전 노트를 반환해 별도 요청으로 최신 노트를 검증했다. 이번 추가 보호도 검증·푸시·HA 파일 반영·동일 beta.5 태그 갱신 예정.
+- 운영 적용: HA 재시작 및 실제 양쪽 화면 확인은 사용자 대기. HA 코드 백업은 `/config/carrot_ha/deployment-backups/0f7f367/`. Cloudflare·D1·Comma 변경 없음.
+
 ## 2026-10-14 — 자동 충전 결제 양방향 동기화
 
 - 커밋 제목: `vehicle-journal: synchronize charge payments in both dashboards`.

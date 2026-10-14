@@ -84,3 +84,13 @@ class PaymentSyncTests(unittest.TestCase):
             with self.assertRaises(OSError):sync(self.archive,self.journal)
         restarted=Journal(self.journal.path,'entry','car','Asia/Seoul');sync(self.archive,restarted)
         self.assertEqual(self.archive.charge_history('car')[0]['data']['actual_cost_krw'],8455)
+
+    def test_legacy_reclassified_expense_is_not_changed_back_to_charging(self):
+        row=self.record()
+        with self.journal.connect() as db:
+            extra={'journal_override':True,'input':{'kind':'expense','date':row['accounting_date'],'category':'parking','actual_krw':100}}
+            db.execute('UPDATE records SET extra_json=? WHERE id=?',(json.dumps(extra),row['id']))
+            db.execute("UPDATE expenses SET category='parking',actual_krw=100,payment_owner='journal',payment_id=NULL,payment_version=NULL WHERE record_id=?",(row['id'],))
+        sync(self.archive,self.journal)
+        current=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertEqual(current['category'],'parking');self.assertEqual(current['actual_krw'],100)

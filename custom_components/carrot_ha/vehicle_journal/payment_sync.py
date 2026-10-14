@@ -15,6 +15,7 @@ def reconcile(archive, journal):
             extra=json.loads(body);group=groups.get(source)
             if not group or extra.get('payment_linked') or not extra.get('journal_override') or status!='active':continue
             local=extra.get('input',{})
+            if local.get('category')!='charging':continue
             # A later dashboard payment must win over an older journal override.
             if (source not in payment_times or stamp(updated)>stamp(payment_times[source])) and local.get('category')=='charging' and local.get('actual_krw') is not None:
                 db.execute('INSERT OR IGNORE INTO payment_outbox VALUES (?,?,?,?,?)',(key,source,encode(group['source_event_ids']),group['payment_version'],local['actual_krw']))
