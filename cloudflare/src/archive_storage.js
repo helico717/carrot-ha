@@ -110,7 +110,7 @@ export async function maintainArchive(env, now = Date.now()) {
   // Only a durably acknowledged consumer permits expiration. Bound each run.
   const telemetry = await env.DB.prepare(`DELETE FROM telemetry_history WHERE sequence IN (
     SELECT h.sequence FROM telemetry_history h JOIN archive_consumers a ON a.device_id=h.device_id
-    WHERE h.updated_at<? AND h.sequence<=a.telemetry_sequence ORDER BY h.updated_at LIMIT 1000)`)
+    WHERE h.updated_at<? AND h.sequence<=a.telemetry_sequence ORDER BY h.updated_at LIMIT 200)`)
     .bind(cutoff).run();
   const trips = await env.DB.prepare(`DELETE FROM trips WHERE id IN (
     SELECT t.id FROM trips t JOIN trip_sync_revision r ON r.trip_id=t.id

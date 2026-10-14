@@ -201,6 +201,22 @@
 - 합성 Worker storage/history/incremental/benchmark, HA live 6·incremental 5·history 1,
   dashboard 10건 통과. Windows에서 Comma 전체 69건 중 fcntl 부재 2·symlink 권한 1·
   기존 workflow bash 경로 1 실패. 실행 코드 배포·운영 DB 변환은 아직 진행 전이다.
+- Git 게시: HA/Worker 구현 `83ed541`, Comma 기능 `e9c9f4cd`와 동시 upstream을
+  보존한 병합 `0522a86662ecf48949dd37cb1a2aedcd573486b9` 원격 확인.
+- 운영 복구: 호환 모드 Worker dee4175f 배포 후 54,950행 무손실 본문 압축 적용.
+  DB bytes 499,998,720→274,784,256. 원문/행/커서 삭제 없음. 이어 additive
+  migration_archive_storage.sql 적용, 최종 Worker 8703ca54 배포. 크기 약276MB,
+  telemetry 본문/공유 context 예산 사용169.3MB/250MB, trips9.6MB/75MB.
+- beta.6 manifest/태그 일치·GitHub Release 생성 확인. Actions 38556238637 성공.
+  HA 수신 ACK 실행 코드는 HACS 설치·사용자 재시작 대기이다.
+- 변환 직후 D1 metadata API 7009 및 HA cloud API timeout이 일시 발생했으나 이후
+  읽기/쓰기 재개 확인. HA 실제 latest 약0.305s/history66건 약0.604s/trips 약0.307s,
+  history 원래 deviceId 포함 payload 복원 확인. 오래된 오전 미전송 trip이 서버에
+  수신되기 시작했으나 오후 주행 수신 완료는 아직 확인하지 않았다.
+- 일회성 변환/ALTER/index에서 각각54,950/54,988 rows_written 발생. 이후 D1 info
+  최근24h117,303 writes 측정. 현재 요청은 동작하지만 계정 전체/UTC 일일 한도와
+  장기 무료 플랜 보장은 미검증. 정상 유지보수 부담을 줄이도록 정리를200행/시간으로
+  제한한다(초기 오래된 자료 정리에 수일 소요 가능; 미수신 자료는 삭제하지 않음).
 
 - 장기 개선 검토: docs/cloudflare-storage-review-2026-10-14.md 작성.
   최근 날짜별 본문 집계에서 평균 크기 10/1 8.2KB→10/13 15.6KB 증가 확인.
