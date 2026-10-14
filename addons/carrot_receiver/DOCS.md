@@ -31,6 +31,13 @@ DB는 전환 검증 및 명시적 rollback을 위해 그대로 보존합니다.
 
 ## Comma 연결 변경
 
+이번 설치에서는 Git 관리 공개 URL 매핑과 기존 장치 upload 인증을 통해 신규
+설정을 자동으로 받습니다. 사용자 HA 재시작 후, Comma에서 지정 브랜치 Git Pull과
+재부팅을 하면 직접 연결 설정을 받습니다. Cloudflare API 호출 없이 자체 서버의
+`/api/provision`을 사용합니다. 초기 설정 실패 시 cloud로 자동 복귀하지 않습니다.
+기존 HA 원격 터미널이 연결되지 않으면 당근웹 또는 이미 가능한 로컬/VPN 경로에서
+첫 Git 업데이트를 실행해야 합니다. 새 코드 설치 전에는 새 연결을 사용할 수 없습니다.
+
 코드는 Git Pull로 설치합니다. Git 관리 `direct_connection` 명령이 JSON stdin을
 검증하고 `/data/carrot_ha/direct-connection.json` 영구 설정을 원자적으로 저장합니다.
 기존 connection.json과 원본 소스는 건드리지 않습니다. 사용자 토큰을 shell history에
@@ -38,6 +45,8 @@ DB는 전환 검증 및 명시적 rollback을 위해 그대로 보존합니다.
 새 url은 `https://<직접 접속 도메인>/carrot-receiver`, device는 기존 ID 그대로입니다.
 
 rollback은 이 모듈의 `--rollback`으로 직접 설정만 제거한 뒤 사용자가 재부팅합니다.
+명시적 rollback 표시를 남겨 자동 provisioning이 다시 직접 연결을 켜지 않게 합니다.
+HA 쪽 자체 수신기 주소도 비우고 사용자 재시작해야 기존 source로 돌아갑니다.
 차량 outbox·파라미터 처리 DB·HA archive/journal 기록은 지우지 않습니다.
 파라미터 queue namespace는 수신 DB identity별로 분리하여 Cloudflare 숫자 ID와 충돌하지 않습니다.
 

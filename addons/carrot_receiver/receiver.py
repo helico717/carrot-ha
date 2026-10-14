@@ -103,6 +103,24 @@ def has_location(gps):
                for key in ('latitude', 'longitude'))
 
 
+def trip_measurements(raw):
+    if not isinstance(raw, dict):
+        return None
+    def point(value):
+        if not isinstance(value, dict) or not isinstance(value.get('at'), str):
+            return None
+        try:
+            datetime.fromisoformat(value['at'].replace('Z', '+00:00'))
+        except ValueError:
+            return None
+        def bounded(key, maximum):
+            number = value.get(key)
+            return number if type(number) in (int, float) and math.isfinite(number) and 0 <= number <= maximum else None
+        wh, soc = bounded('battery_wh', 150000), bounded('soc_percent', 100)
+        return None if wh is None and soc is None else {'at': value['at'], 'battery_wh': wh, 'soc_percent': soc}
+    return {'start': point(raw.get('start')), 'end': point(raw.get('end')), 'complete': raw.get('complete') is True}
+
+
 class Store:
     def __init__(self, path, max_bytes=1073741824):
         self.path = str(path)
@@ -227,6 +245,8 @@ class Store:
                 # Same COALESCE behavior as the existing trip API.
                 if body.get('tripMeasurements') is None and old.get('tripMeasurements') is not None:
                     body = {**body, 'tripMeasurements': old['tripMeasurements']}
+                if 'partial' not in body and 'partial' in old:
+                    body = {**body, 'partial': old['partial']}
             raw = packed(body)
             if not previous or previous['raw'] != raw:
                 self.capacity()
@@ -242,18 +262,35 @@ class Store:
         result = {'id': raw['id'], 'device_id': row['device'], 'started_at': raw.get('startedAt'),
                   'ended_at': raw['endedAt'], 'duration_s': raw.get('durationS'),
                   'distance_m': raw.get('distanceM'), 'route': route, 'route_point_count': len(route),
-                  'partial': raw.get('partial'), 'trip_measurements': raw.get('tripMeasurements'),
+                  'partial': raw.get('partial') if type(raw.get('partial')) is bool else None,
+                  'trip_measurements': trip_measurements(raw.get('tripMeasurements')),
                   'distance_source': raw.get('distanceSource'), 'distance_quality': raw.get('distanceQuality'),
                   'sync_sequence': row['sequence']}
-        speeds = [point.get('speedMps', point.get('speed_mps', point.get('speed'))) for point in route]
-        speeds = [float(value) for value in speeds if type(value) in (int, float) and math.isfinite(value)]
+        speeds = []
+        for point in route:
+            if not isinstance(point, dict):
+                continue
+            missing = object()
+            value = next((point[key] for key in ('speedMps', 'speed_mps') if point.get(key) is not None),
+                         point.get('speed', missing))
+            if value is missing:
+                continue
+            try:
+                value = 0 if value is None or isinstance(value, str) and not value.strip() else float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(value):
+                speeds.append(value)
         result['max_speed_mps'] = max(speeds) if speeds else None
         start, end = route[0] if route else {}, route[-1] if route else {}
         for field, key, point in (('start_lat', 'startLat', start), ('start_lon', 'startLon', start),
                                   ('end_lat', 'endLat', end), ('end_lon', 'endLon', end)):
             result[field] = raw.get(key, point.get('latitude' if field.endswith('lat') else 'longitude'))
-        # Keep source diagnostics without repeating the route or replacing canonical fields.
-        result['receiver_raw_trip'] = {k: v for k, v in raw.items() if k != 'route'}
+        if result['distance_source'] in ('can_speed', 'odometer_gap_recovery', 'legacy_gps'):
+            quality = result['distance_quality'] or {}
+            result['distance_quality'] = {'complete': quality.get('complete') is True, 'estimated': quality.get('estimated') is True}
+        else:
+            result['distance_source'] = result['distance_quality'] = None
         return result
 
     def latest(self, device):
@@ -440,7 +477,7 @@ def create_app(config, store):
     async def handler(request):
         path = request.path
         if path == '/health' and request.method == 'GET':
-            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.1'})
+            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.2'})
         if path == '/api/source' and request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
         upload = (path in ('/api/telemetry', '/api/trips', '/api/settings/sync', '/api/params/ack') and request.method == 'POST'

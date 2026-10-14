@@ -51,8 +51,8 @@ class ReceiverTests(unittest.IsolatedAsyncioTestCase):
                 'endedAt': '2026-10-14T10:10:00Z', 'durationS': 600, 'distanceM': distance,
                 'route': [{'latitude': 37, 'longitude': 127, 'speedMps': 12}], 'partial': False,
                 'distanceSource': 'can_speed', 'distanceQuality': {'complete': True, 'estimated': False},
-                'tripMeasurements': {'start': {'at': '2026-10-14T10:00:00Z', 'battery_wh': 50000},
-                                     'end': {'at': '2026-10-14T10:10:00Z', 'battery_wh': 49000}, 'complete': True}}
+                'tripMeasurements': {'start': {'at': '2026-10-14T10:00:00Z', 'battery_wh': 50000, 'soc_percent': 50},
+                                     'end': {'at': '2026-10-14T10:10:00Z', 'battery_wh': 49000, 'soc_percent': 49}, 'complete': True}}
 
     async def test_auth_and_device_scoping(self):
         self.assertEqual((await self.request('/api/telemetry', self.telemetry(), token='v' * 32))[0], 401)

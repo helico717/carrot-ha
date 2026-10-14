@@ -30,6 +30,13 @@
   Comma 직접 설정 4/polling 4 검증 통과. 원격 기기 실행은 아직 미검증.
 - 기능 보존: 충전 74/주행 73/카메라 17(1 skip)/터미널 4/파일 로그 15(1 skip),
   Worker 기존 증분/benchmark 통과. 차계부 환경 제약은 별도 CHANGELOG에 기록.
+- 자동 설정 967beff main 게시 후 HA 최종 소스 63개 hash/문법 확인. 자체 서버
+  실제 HTTPS provisioning 200과 장치/새 credential 내부 대조 성공(원문 미출력).
+  HA 비공개 일회 source 설정 준비, 기존 terminal_enabled와 직접 HA 주소 보존 확인.
+- Comma 원격 58553e23 및 명시적 rollback 보정 b5e73218 게시·브랜치 SHA 확인.
+  기기 Pull/재부팅 미실행. 처음은 기존 터미널 불가 시 당근웹/로컬/VPN에서 설치 필요.
+- 기존 trip 측정 범위·최고속도·부분 품질 메타데이터 유지 점검을 수신기 0.1.2에 반영.
+  관련 API wire와 계산을 유지하며 UI·CAN·차계부 실행 코드 변경 없음.
 
 ## 2026-10-14 — 자체 서버 직접 통신 가능성 조사
 

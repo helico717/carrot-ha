@@ -1,3 +1,7 @@
+# 0.1.2
+
+- Preserve existing trip measurement bounds, maximum speed and missing quality metadata behavior.
+
 # 0.1.1
 
 - Authenticated setup using the previous device upload identity, without Git secrets or device file editing.
