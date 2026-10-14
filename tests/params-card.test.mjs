@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const source = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-params-card.js', 'utf8');
+const source = fs.readFileSync('custom_components/carrot_ha/frontend/carrot-parameter-tuning-card.js', 'utf8');
 const context = vm.createContext({
   HTMLElement: class {},
   customElements: {get: () => true},

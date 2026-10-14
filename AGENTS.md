@@ -18,6 +18,15 @@
 
 ---
 
+## 주행 로그 작업 기록 — 2026-10-14
+
+주행 로그(`driving_logs`) 관련 모든 작업 전 [driving-logs/AGENTS.md](driving-logs/AGENTS.md)를
+읽고, 조사·기능·UI·테스트·문서·커밋·배포·검증의 모든 작업을
+[driving-logs/CHANGELOG.md](driving-logs/CHANGELOG.md)에 즉시 기록한다.
+HA 등록부·로그 프론트엔드와 openpilot의 로그 동기화 연결부에도 적용한다.
+변경 내용·이유·관련 파일·검증 결과·배포 상태·미확인 사항을 포함하며, 로컬 검증과
+운영 반영·실차 설치를 구분한다. 저장소의 Comma SSH/SCP 수정 금지 규칙은 유지한다.
+
 ## 1. Two-Repository Architecture
 
 The Carrot HA system is strictly divided into two independent repositories:

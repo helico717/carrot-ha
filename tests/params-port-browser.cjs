@@ -12,7 +12,7 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     page.on('pageerror', e => errors.push(e.message));
     await page.route('**/*', async route => {
       const url = new URL(route.request().url());
-      if (url.pathname === '/') return route.fulfill({contentType:'text/html',body:'<body><script type="module">import "/carrot_ha_static/carrot-params-card.js";</script></body>'});
+      if (url.pathname === '/') return route.fulfill({contentType:'text/html',body:'<body><script type="module">import "/carrot_ha_static/carrot-parameter-tuning-card.js";</script></body>'});
       if (!url.pathname.startsWith('/carrot_ha_static/')) return route.fulfill({status:404,body:'fixture: unavailable'});
       const file = path.join(root, url.pathname.slice('/carrot_ha_static/'.length));
       if (!fs.existsSync(file)) return route.fulfill({status:404,body:'missing asset'});
@@ -20,14 +20,14 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     });
     await page.goto('http://localhost/');
     await page.evaluate(async () => {
-      await customElements.whenDefined('carrot-params-card');
+      await customElements.whenDefined('carrot-parameter-tuning-card');
       const items = [
         {name:'TestOffset',title:'차선 보정 테스트',descr:'설명',group:'테스트',min:0,max:100,default:0,unit:1},
         {name:'TestToggle',title:'테스트 스위치',group:'테스트',min:0,max:1,default:0,unit:1}
       ];
       window.snapshot = {updated_at:'2026-09-21T05:10:13.784Z',ok:true,param_queue_protocol:1,device_id:'car-a',values:{TestOffset:0,TestToggle:0},catalog:{groups:[{group:'테스트',egroup:'Test',count:2}],items_by_group:{테스트:items},unit_cycle:[1,2,5]}};
       window.calls = []; window.queue = []; window.failWrite = false;
-      window.card = document.createElement('carrot-params-card');
+      window.card = document.createElement('carrot-parameter-tuning-card');
       card.setConfig({device_id:'car-a'}); document.body.append(card);
       card.hass = {callApi:async (method,url,body) => {
         calls.push({method,url,body});

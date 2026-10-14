@@ -29,6 +29,8 @@ async def async_setup(hass, config):
     hass.http.register_view(SettingsView(hass))
     hass.http.register_view(ParamSetView(hass))
     hass.http.register_view(ParamStatusView(hass))
+    from .driving_logs.http import register as register_driving_logs
+    register_driving_logs(hass)
     from .camera_http import CameraDeviceView, CameraLiveView
     hass.http.register_view(CameraDeviceView(hass))
     hass.http.register_view(CameraLiveView(hass))

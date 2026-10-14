@@ -1,0 +1,68 @@
+"""Retention, upload recovery and source integrity, without HA dependencies."""
+import hashlib
+import importlib.util
+from pathlib import Path
+import tempfile
+import unittest
+
+SOURCE = Path(__file__).parents[1] / 'custom_components/carrot_ha/driving_logs/store.py'
+spec = importlib.util.spec_from_file_location('driving_log_store_test', SOURCE)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+
+class DrivingLogTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.store = module.LogStore(self.temp.name, limit=4000)
+
+    def upload(self, number, recorded, size=450):
+        name = f'00000315--4742c01c35--{number}'
+        files = {'rlog.zst': size, 'qcamera.mp4': size}
+        status = self.store.begin({'segment': name, 'recorded': recorded, 'files': files})
+        if status['accepted'] and not status['complete']:
+            for filename in files:
+                self.store.chunk(name, filename, 0, b'x' * size)
+            self.store.commit(name, {f: hashlib.sha256(b'x' * size).hexdigest() for f in files})
+        return name, status
+
+    def test_recent_suffix_not_arrival_order_and_evicted_not_reuploaded(self):
+        first, _ = self.upload(1, 100)
+        self.upload(3, 300)
+        middle, _ = self.upload(2, 200)
+        self.assertNotIn(first, self.store.state['segments'])
+        self.assertIn(middle, self.store.state['segments'])
+        self.assertFalse(self.upload(1, 100)[1]['accepted'])
+        self.assertLessEqual(self.store.usage(), self.store.limit)
+
+    def test_unfinished_files_not_listed_and_resume_after_restart(self):
+        name = '00000315--4742c01c35--9'
+        self.store.begin({'segment':name, 'recorded':500,'files':{'rlog':100,'qcamera.mp4':100}})
+        self.store.chunk(name,'rlog',0,b'a'*25)
+        restored = module.LogStore(self.temp.name, limit=1000)
+        self.assertEqual(restored.status(name)['offsets']['rlog'],25)
+        self.assertEqual(restored.routes()['routes'],[])
+        with self.assertRaises(ValueError):
+            restored.chunk(name,'rlog',0,b'b')
+
+    def test_hash_mismatch_restart_and_complete_idempotency(self):
+        name = '00000315--4742c01c35--10'
+        self.store.begin({'segment':name,'recorded':600,'files':{'rlog':10,'qcamera.mp4':10}})
+        for f in ('rlog','qcamera.mp4'): self.store.chunk(name,f,0,b'a'*10)
+        with self.assertRaises(ValueError): self.store.commit(name,{'rlog':'bad','qcamera.mp4':'bad'})
+        self.assertEqual(self.store.status(name)['offsets']['rlog'],0)
+        self.store.chunk(name,'rlog',0,b'a'*10)
+        hashes={f:hashlib.sha256(b'a'*10).hexdigest() for f in ('rlog','qcamera.mp4')}
+        self.assertTrue(self.store.commit(name,hashes)['complete'])
+        self.assertTrue(self.store.commit(name,hashes)['complete'])
+
+    def test_oversize_missing_time_and_path_traversal_rejected(self):
+        self.assertFalse(self.upload(20,1000,size=3000)[1]['accepted'])
+        for name in ('../escape--1','x/evil--1','x--1/evil'):
+            with self.assertRaises(ValueError): module.segment_name(name)
+        with self.assertRaises(ValueError):
+            self.store.begin({'segment':'x--1','files':{'rlog':10,'qcamera.mp4':10}})
+
+
+if __name__ == '__main__': unittest.main()
