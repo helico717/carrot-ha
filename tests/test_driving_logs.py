@@ -57,8 +57,8 @@ class DrivingLogTests(unittest.TestCase):
         self.assertFalse(self.upload(2, 220)[1]['accepted'])
         self.assertEqual(self.store.state['segments'], {})
 
-    def test_default_limit_is_ten_decimal_gigabytes(self):
-        self.assertEqual(module.LIMIT, 10_000_000_000)
+    def test_default_limit_is_five_decimal_gigabytes(self):
+        self.assertEqual(module.LIMIT, 5_000_000_000)
 
     def test_unfinished_files_not_listed_and_resume_after_restart(self):
         name = '00000315--4742c01c35--9'

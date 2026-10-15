@@ -1,3 +1,17 @@
+## 2026-10-15 — HA 5GB + 본인 NAS 30일 보관 작업 중
+
+- 최신 사용자 지시: 프리릴리즈/새 태그를 발행하지 않고 HA 직접 반영. 모든 조사·변경·검증·배포 상태를 이 기록에 남긴다. 이전 beta.1은 이미 발행된 별개 작업이다.
+- 대상 NAS: 기존 NFS CarrotJournalBackup 아래 /share/CarrotJournalBackup/driving-logs 전용 폴더. 차계부·surveillance 자료는 수정하지 않는다. NAS 오프라인을 관측한 것이 아니며 연결 단절 처리는 예방적 예외 정책이다.
+- 읽기 전용 운영 조사: 설치된 LIMIT=10,000,000,000. 318개 세그먼트 모두 complete, 11개 주행, 예약 5,022,909,521바이트/디스크 5,022,963,059바이트. 과거 수신 floor=1791872800.9820297(한국 10/13 15:26:40.982). Comma sender는 floor 이전을 재전송하지 않으므로 제한 증액만으로 과거 로그가 복구되지 않는다. 실제 Comma 남은 파일 전체 수량은 미확인.
+- 구현: store.py 기본 5GB, tiered.py NAS 30일/주행 종료 시각 기준 전체 묶음 만료, HA 최신 전체 묶음 캐시, 검증된 NAS 복제 전 HA 회수 금지, 동일 device_id 기반 신규 HA entry 복구, 통합 조회·NAS 파일 직접 제공. runtime.py 별도 유지 작업, 옵션 NAS 경로·한국어 오류·화면 용량 표시·외부 업로드 NAS 경로 연결.
+- scripts/seed_driving_logs_nas.py는 현재 HA index를 수정하지 않는 읽기 전용 스냅샷에서 소유 NAS로 복사하고 SHA256 읽기 재검증한다. 노트북에 원본 로그를 내보내지 않는다. 설정은 복사 성공 후 저장하며 HA 재시작은 사용자 수행.
+- 로컬 합성 검사: test_driving_logs*.py 22건 중 21 통과/1 companion 경로 미설정으로 생략. 신규 tiered 7건 포함. 실제 송신기 경로를 지정한 재검사·설정/브라우저 검사·운영 NAS 복사·직접 배포는 아직 대기. 실제 로그 삭제/이동, HA 재시작, 새 Release 발행 없음.
+- 관련 파일: driving_logs/{store,tiered,runtime,http,upload}.py, __init__.py/config_flow.py, strings/translations, ha_logs_bridge.js, tests/test_driving_logs*, tests/test_receiver_options.py, scripts/{inspect_driving_log_storage,seed_driving_logs_nas}.py. 후속 결과를 아래에 누적한다.
+- 후속 검증: companion openpilot 경로 지정 후 기존 22건 전부 통과. NAS 전용 HTTP 리플레이·영상 Range·인증·원작자 업로드 요약 1건 추가 통과. 설정 우선순위/명시 비활성 및 unload 시 실행 중 인덱스 writer 종료 대기 2건 통과. 직접 수신기 관련 18건, 기존 history_cache/incremental_sync 6건 통과. 대시보드 JS 10건 및 원본 로그 UI/HUD Chromium desktop/mobile 2개 시나리오 통과. 처음 옵션 검사는 voluptuous 미설치로 실행 실패했으며 임시 의존성 폴더 설치 후 통과(제품 의존성 변경 아님).
+- 운영 NFS dry-run: nas_mount=verified/devices=1. 사용자 소유 NAS로 318세그먼트 복사·SHA256 읽기 재검증 진행 중. 현재 HA index는 수정하지 않으며 5GB 축소는 새 코드의 사용자 재시작 후 유지 작업에서 수행한다. 새 태그/Release/Comma 소스 변경 없음.
+- 운영/복구 문서 docs/DRIVING_LOG_NAS.md 추가, CLEAN_INSTALL_RECOVERY.md/DEVELOPMENT_WORKFLOW.md에 현재 직접 반영 예외와 복구 연결 기록. HA 백업에 NAS share/media가 중복 포함되는지 사용자의 백업 설정 확인이 필요하며 자동 제외를 주장하지 않는다.
+- 최종 주행 로그 검사 25건 전부 통과(생략 없음). 복원 유지 작업은 파일시스템 복사 시 파일 단위 fsync + 전체 SHA256 commit/읽기 재검증을 사용해 HTTP 청크마다 fsync하는 수신 경로와 분리했다. 사용자 재시작/옵션 reload는 기존 executor 인덱스 쓰기 종료까지 기다려 중복 writer를 방지한다. 진행 중 초기 운영 복사 프로세스는 시작 시점 코드를 그대로 실행하며 변경된 코드로 중복 실행하지 않는다.
+
 ## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
 
 - Release: https://github.com/helico717/carrot-ha/releases/tag/v0.9.0-beta.1
@@ -72,6 +86,19 @@
 - 과거 보관 원문의 줄 끝 공백 정리. 수신 앱 0.1.3 스토어 노출 확인, 설치/릴리즈 발행은 아직 대기.
 
 # 주행 로그 변경 기록
+
+## 2026-10-15 — HA 5GB와 사용자 NAS 30일 통합 보관 작업 중
+
+- 사용자 요청: HA 전체 백업 크기를 줄이기 위해 로컬은 최근 5GB, 본인 Synology는
+  30일 보관. 주행 묶음 단위 정리 유지, 단일 대시보드 조회·직접 재생, 클린 설치 후
+  최근 5GB 복원과 신규 Comma 수신 재개를 연결한다.
+- 사용자 확인: 기존 차계부용 NFS 공유 사용. HA SSH 읽기 전용 확인에서
+  `/share/CarrotJournalBackup` 존재. 주행 로그는 이 공유의 `driving-logs` 전용
+  하위 폴더로 분리하며 차계부 백업·surveillance 자료는 변경하지 않는다.
+- 현재 코드 조사: 기존 store는 HA 10GB만 관리하며 NAS 통합 조회/복원은 없다.
+  주행 소스의 30일 아카이브와 로컬 캐시를 분리하고, NAS 복사·체크섬 검증 뒤에만
+  기존 로컬 로그를 회수하도록 구현한다. NAS 장치 키는 HA entry_id와 독립시킨다.
+- 검증·배포: 작업 중. 아직 저장 한도·운영 데이터·NAS 설정은 변경하지 않았다.
 
 ## 2026-10-14 — 자체 수신기 진단·표시·전수 문서·복구·0.9 베타 준비
 

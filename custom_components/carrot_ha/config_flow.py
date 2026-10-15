@@ -24,6 +24,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain='carrot_ha'):
 
 class BatteryOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input=None):
+        from .driving_logs.runtime import configured_path
+        nas_path = await self.hass.async_add_executor_job(configured_path, self.hass, self.config_entry)
         schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
                              vol.Optional('receiver_url', default=self.config_entry.options.get('receiver_url', '')): str,
                              vol.Optional('receiver_view_token', default=self.config_entry.options.get('receiver_view_token', '')): str,
@@ -32,11 +34,20 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                              vol.Optional('camera_token', default=self.config_entry.options.get('camera_token', '')): str,
                              vol.Optional('terminal_enabled', default=self.config_entry.options.get('terminal_enabled', False)): bool,
                              vol.Optional('terminal_ha_url', default=self.config_entry.options.get('terminal_ha_url', '')): str,
+                             vol.Optional('driving_logs_nas_path', default=nas_path): str,
 })
         errors = {}
         if user_input is not None:
             try:
                 data = {**self.config_entry.options, **schema(user_input)}
+                data['driving_logs_nas_path'] = data.get('driving_logs_nas_path', '').strip()
+                if data['driving_logs_nas_path']:
+                    from .driving_logs.tiered import network_path
+                    try:
+                        await self.hass.async_add_executor_job(network_path, data['driving_logs_nas_path'])
+                    except (ValueError, OSError):
+                        errors['base'] = 'invalid_log_archive'
+                        return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 import math
                 if not math.isfinite(data['soc_capacity_kwh']):
                     raise vol.Invalid('finite required')

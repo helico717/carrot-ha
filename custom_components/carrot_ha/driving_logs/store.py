@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 import shutil
 
-LIMIT = 10_000_000_000
+LIMIT = 5_000_000_000
 CHUNK = 256 * 1024
 FILES = {'qcamera.ts', 'qcamera.mp4', 'rlog.zst', 'rlog.bz2', 'rlog',
          'qlog.zst', 'qlog.bz2', 'qlog'}
@@ -25,10 +25,11 @@ def segment_name(value):
 
 
 class LogStore:
-    def __init__(self, root, limit=LIMIT):
+    def __init__(self, root, limit=LIMIT, max_segments=5000):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.limit = limit
+        self.max_segments = max_segments
         self.index = self.root / 'index.json'
         self.state = json.loads(self.index.read_text()) if self.index.exists() else {'segments': {}, 'floor': 0}
         self.state.setdefault('retired_routes', [])
@@ -98,13 +99,15 @@ class LogStore:
             overflow = overflow or total > budget
             if not overflow:
                 kept.update(key for key, _ in items)
-        if len(kept) > 5000:
+        if self.max_segments is not None and len(kept) > self.max_segments:
             return {'accepted': False, 'reason': 'outside_retention'}
         # Ensure storage pressure does not consume the HA system's last space.
         if name in kept and shutil.disk_usage(self.root).free < size + min(512_000_000, self.limit):
             raise OSError('Insufficient free space')
         retired = set(self.state['retired_routes'])
         retiring = {key.rsplit('--', 1)[0] for key in self.state['segments'] if key not in kept}
+        if retiring and getattr(self, 'before_retire', None):
+            self.before_retire(retiring)
         if retiring and getattr(self, 'on_retire', None):
             self.on_retire(retiring)
         for key in list(self.state['segments']):
@@ -171,6 +174,7 @@ class LogStore:
         for path, final in paths:
             path.replace(final)
         item['complete'] = True
+        item['hashes'] = hashes
         self._save()
         return self.status(name)
 
@@ -202,3 +206,10 @@ class LogStore:
         if not filenames:
             raise KeyError(kind)
         return self.root / name / filenames[0]
+
+    def segment_info(self, name):
+        return self.state['segments'][segment_name(name)]
+
+    def directory(self, name):
+        self.segment_info(name)
+        return self.root / name

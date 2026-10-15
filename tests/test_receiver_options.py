@@ -1,6 +1,9 @@
 """Exercise the actual options handler with HA UI adapters and real validation."""
 import ast
+import asyncio
 from pathlib import Path
+import sys
+import types
 from types import SimpleNamespace
 import unittest
 import voluptuous as vol
@@ -15,7 +18,11 @@ class OptionsTests(unittest.IsolatedAsyncioTestCase):
                 return kwargs
             def async_show_form(self, **kwargs):
                 return kwargs
-        namespace = {'vol': vol, 'DEFAULT_SOC_CAPACITY_KWH': 77,
+        package = types.ModuleType('options_test_component')
+        package.__path__ = [str(Path('custom_components/carrot_ha').resolve())]
+        sys.modules[package.__name__] = package
+        namespace = {'__name__': package.__name__ + '.config_flow', '__package__': package.__name__,
+                     'vol': vol, 'DEFAULT_SOC_CAPACITY_KWH': 77,
                      'config_entries': SimpleNamespace(OptionsFlow=Base)}
         exec(compile(ast.Module(body=[node], type_ignores=[]), '<actual-options>', 'exec'), namespace)
         flow = namespace['BatteryOptionsFlow']()
@@ -25,7 +32,9 @@ class OptionsTests(unittest.IsolatedAsyncioTestCase):
                     'terminal_ha_url': 'https://ha.example', 'custom_preserved_option': 42,
                     'receiver_url': 'http://874ccb4c-carrot-receiver:8099',
                     'receiver_view_token': 'r' * 32, 'receiver_upload_token': 'u' * 32}
-        flow.config_entry = SimpleNamespace(options=original.copy(), data={'token': 'd' * 32})
+        flow.config_entry = SimpleNamespace(options=original.copy(), data={'token': 'd' * 32, 'device_id': 'car'})
+        flow.hass = SimpleNamespace(async_add_executor_job=lambda fn, *args: asyncio.to_thread(fn, *args),
+                                    config=SimpleNamespace(path=lambda *parts: str(Path('/nonexistent-options-test', *parts))))
         result = await flow.async_step_init({'soc_capacity_kwh': 80})
         self.assertEqual(result['data']['soc_capacity_kwh'], 80)
         for key, value in original.items():

@@ -8,8 +8,9 @@ import time
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 
-from .store import CHUNK, LogStore
+from .store import CHUNK
 from .upload import UploadManager, request_segments
+from .runtime import store_for
 
 
 def upload_token(terminal_token):
@@ -21,13 +22,6 @@ def runtime_for(hass, entry_id):
     if not isinstance(runtime, dict) or 'entry' not in runtime:
         raise web.HTTPNotFound()
     return runtime
-
-
-async def store_for(hass, runtime):
-    if 'driving_log_store' not in runtime:
-        runtime['driving_log_store'] = await hass.async_add_executor_job(
-            LogStore, hass.config.path('carrot_ha', 'driving-logs', runtime['entry'].entry_id))
-    return runtime['driving_log_store']
 
 
 class SessionView(HomeAssistantView):
@@ -211,6 +205,8 @@ class BrowserView(HomeAssistantView):
                 raise web.HTTPNotFound()
             except ValueError:
                 raise web.HTTPBadRequest()
+            except OSError:
+                raise web.HTTPServiceUnavailable(text='NAS archive is temporarily unavailable; local logs remain accessible')
         return web.json_response(value, headers={'Cache-Control': 'no-store'})
 
     async def post(self, request, entry_id, area, action, segment=None, kind=None):

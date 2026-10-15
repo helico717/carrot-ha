@@ -27,7 +27,9 @@ async function getJson(url) {
   const data = await response.json();
   if (data.storage) {
     const bytes = data.storage.used;
-    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / ${(data.storage.limit/1e9).toFixed(2)} GB · 최신 주행부터 보관`;
+    const nas = data.storage.nas;
+    const archive = nas ? ` · NAS 30일 ${nas.segments.toLocaleString()}개 구간 · ${nas.status === 'available' ? '연결됨' : '연결 확인 필요 (HA 기록 사용 가능)'}` : '';
+    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / ${(data.storage.limit/1e9).toFixed(2)} GB · 최신 주행부터 보관${archive}`;
   }
   return data;
 }

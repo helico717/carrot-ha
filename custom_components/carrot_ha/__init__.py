@@ -113,6 +113,8 @@ async def async_setup_entry(hass, entry):
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
     await refresh_runtime_costs(hass, runtime)
+    from .driving_logs.runtime import setup as setup_driving_logs
+    setup_driving_logs(hass, entry, runtime)
     from .vehicle_journal.runtime import setup as setup_journal
     try:
         await setup_journal(hass, entry, runtime)
@@ -194,6 +196,12 @@ async def async_setup_entry(hass, entry):
 async def _options_updated(hass, entry):
     from .cloud import sync
     runtime = hass.data[DOMAIN][entry.entry_id]
+    from .driving_logs.runtime import configured_path
+    configured = await hass.async_add_executor_job(configured_path, hass, entry)
+    active_store = runtime.get('driving_log_store')
+    if active_store is not None and getattr(active_store, 'nas_root', '') != configured:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
     if runtime.get('camera_options') != (entry.options.get('camera_enabled', False), entry.options.get('camera_token', '')):
         await hass.config_entries.async_reload(entry.entry_id)
         return
@@ -210,6 +218,9 @@ async def _options_updated(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
+        if task := hass.data[DOMAIN][entry.entry_id].get('driving_log_archive_task'):
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
         if uploads := hass.data[DOMAIN][entry.entry_id].get('driving_log_upload'):
             await uploads.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('camera_relay'):

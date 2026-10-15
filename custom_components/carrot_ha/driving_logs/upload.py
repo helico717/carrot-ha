@@ -24,7 +24,7 @@ class UploadManager:
                 job['_cancel'].set()
 
     def files(self, name, include_all=False):
-        item = self.store.state['segments'][segment_name(name)]
+        item = self.store.segment_info(segment_name(name))
         if not item['complete']:
             raise ValueError('Segment is incomplete')
         names = list(item['files']) if include_all else [
@@ -117,7 +117,7 @@ class UploadManager:
                                 progress=min(97, 8 + round(89 * transferred / max(1, total_bytes))))
 
                 try:
-                    await protocol.upload_folder_to_web(str(self.store.root / name), metadata['deviceId'], name,
+                    await protocol.upload_folder_to_web(str(self.store.directory(name)), metadata['deviceId'], name,
                         self.base_url, token, job['_cancel'].is_set,
                         filenames=[f['name'] for f in summary['files']], on_progress=progress)
                     item = {**summary, 'ok': True, 'remotePath': remote_base + name}

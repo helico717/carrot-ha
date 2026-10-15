@@ -21,6 +21,7 @@ http_stub.HomeAssistantView = object
 sys.modules.setdefault('homeassistant.components.http', http_stub)
 from driving_logs_transport.http import BrowserView, DeviceView, SessionView, upload_token
 from driving_logs_transport.store import LogStore
+from driving_logs_transport.tiered import TieredLogStore
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):
@@ -116,6 +117,17 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             await sender.transfer(client,base,directory,2000,rlog,video,working)
         self.assertTrue(self.runtime['driving_log_store'].status(directory.name)['complete'])
         self.assertEqual(self.runtime['driving_log_store'].file(directory.name,'rlog').read_bytes(),rlog.read_bytes())
+
+    async def test_nas_only_replay_video_range_upload_summary_and_auth(self):
+        root = Path(self.temp.name)
+        nas = root / 'network' / 'driving-logs'
+        nas.parent.mkdir()
+        store = TieredLogStore(root / 'cache', nas, 'comma', clock=lambda: 2000, guard=Path)
+        self.runtime['driving_log_store'] = store
+        await self.test_upload_browse_range_and_auth_scope()
+        self.assertFalse(store.local.state['segments'])
+        self.assertEqual(len(store.nas.state['segments']), 1)
+        self.assertEqual(store.routes()['routes'][0]['storageSources'], ['nas'])
 
 
 if __name__=='__main__':unittest.main()
