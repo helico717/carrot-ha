@@ -647,4 +647,4 @@
 - 수정: manifest에서 외부 zstandard 필수 항목을 제거한다. 별도 radar_runner의 Python3.14 실행에 한정해 표준 compression.zstd.ZstdFile로 원본의 ZstdDecompressor.stream_reader 호출을 연결한다. HA 프로세스의 모듈/기존 패키지를 변경하지 않으며 원본 엔진 zip/실차/보관 데이터는 그대로 둔다. Python3.12 개발 경로는 기존 외부 패키지 유지. 공식 PyPI에는 musllinux cp314 wheel도 있지만 실제 HA 설치기는 거부했으므로 wheel 부재/네트워크/인덱스 원인을 추가 단정하지 않는다.
 - 검증: 로컬 Python3.14 별도 의존성 폴더에 외부 zstandard를 설치하지 않고 연속2개 zstd 프레임으로 압축한 합성 rlog→원본 엔진→캐시 정리 통과(2건). Python3.12 주행 로그 전체31건 통과. GitHub CI에 python:3.14-alpine 컨테이너·binary-only numpy/pycapnp·외부 zstandard 부재 확인·동일 실제 엔진 검사를 추가했다. 이전 Ubuntu3.12 검증만으로 운영 호환성을 판단한 검증 공백을 보완한다.
 - 다음 단계: 수정 커밋/main 푸시·직접 HA2파일 교체/백업/해시·Alpine CI 확인. 사용자 재시작 전 복구 완료를 주장하지 않는다. 로그 API401 우회/보호 모드 변경/HA 재시작/릴리즈 없음.
-
+- **수정 배포 완료/활성화 대기:** c4f59bb305c5bb7d4a51d20026e12602e9fdd615 main 푸시, HA manifest/runner2파일 충돌 검사·백업·직접 교체·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c4f59bb305c5/before. GitHub Linux 회귀 및 신규 Alpine Python3.14 실제 압축 엔진 검사38702092731 success (https://github.com/helico717/carrot-ha/actions/runs/38702092731). 실행 중 HA의 기존 setup 실패를 다시 시도하려면 사용자 재시작이 필요하다. 운영 두 대시보드 복구/실제 V2 분석은 재시작 후 확인 대상이다. 신규 릴리즈/태그 없음.
