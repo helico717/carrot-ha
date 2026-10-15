@@ -74,6 +74,8 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         browse=self.server.make_url('/api/carrot_ha/v1/driving_logs/entry')
         async with self.client.get(str(browse)+'/dashcam/routes') as response:
             self.assertEqual(response.status,401)
+        async with self.client.get(str(browse)+'/dashcam/storage') as response:
+            self.assertEqual(response.status,401)
         async with self.client.post(str(browse)+'/dashcam/upload/summary', json={'segments':[segment]}) as response:
             self.assertEqual(response.status,401)
         async with self.client.post(str(browse)+'/session') as response:
@@ -83,6 +85,14 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(response.cookies['carrot_logs']['httponly'])
         async with self.client.get(str(browse)+'/dashcam/routes') as response:
             self.assertEqual((await response.json())['routes'][0]['segmentFolders'],[segment])
+        async with self.client.get(str(browse)+'/dashcam/storage') as response:
+            storage = (await response.json())['storage']
+            self.assertEqual(response.status, 200)
+            self.assertEqual(storage['limit'], 5_000_000_000)
+            self.assertIn(storage['nas']['status'], ('available', 'not_configured'))
+        async with self.client.get(str(browse)+'/dashcam/thumbnail/'+segment) as response:
+            self.assertEqual(response.status, 204)
+            self.assertEqual(await response.read(), b'')
         async with self.client.post(str(browse)+'/dashcam/upload/summary', json={'segments':[segment]}) as response:
             summary = await response.json()
             self.assertEqual(response.status,200)
@@ -128,6 +138,10 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(store.local.state['segments'])
         self.assertEqual(len(store.nas.state['segments']), 1)
         self.assertEqual(store.routes()['routes'][0]['storageSources'], ['nas'])
+        details=store.diagnostics()
+        self.assertEqual(details['nas']['nas_only_segments'], 1)
+        self.assertEqual(details['nas']['verified_segments'], 1)
+        self.assertEqual(details['nas']['used'], 12)
 
 
 if __name__=='__main__':unittest.main()

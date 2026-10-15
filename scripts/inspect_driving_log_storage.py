@@ -27,7 +27,7 @@ if settings_path.exists():
   root=module.network_path(setting['nas_path'])
   directory=root/hashlib.sha256(device.encode()).hexdigest()
   items=json.loads((directory/'index.json').read_text())['segments']
-  print(json.dumps({'nas_mount':'verified','nas_segments':len(items),'nas_complete':sum(bool(i.get('complete')) for i in items.values()),'nas_bytes':sum(sum(i['files'].values()) for i in items.values()),'nas_routes':len({n.rsplit('--',1)[0] for n in items}),'nas_hashed_files':sum(len(i.get('hashes',{})) for i in items.values())}))
+  print(json.dumps({'nas_mount':'verified','nas_segments':len(items),'nas_complete':sum(bool(i.get('complete')) for i in items.values()),'nas_replica_verified':sum(bool(i.get('replica_verified')) for i in items.values()),'nas_bytes':sum(sum(i['files'].values()) for i in items.values()),'nas_routes':len({n.rsplit('--',1)[0] for n in items}),'nas_hashed_files':sum(len(i.get('hashes',{})) for i in items.values()),'nas_earliest_recorded':min((i['recorded'] for i in items.values() if i.get('complete')),default=None)}))
   entries=json.loads(Path('/config/.storage/core.config_entries').read_text())['data']['entries']
   for entry in entries:
    if entry['domain']!='carrot_ha' or entry['data'].get('device_id')!=device:continue
@@ -36,6 +36,10 @@ if settings_path.exists():
    local={n:i for n,i in local.items() if i.get('complete')}
    matching=sum(bool(items.get(n,{}).get('complete')) and items[n]['files']==i['files'] and items[n]['recorded']==i['recorded'] and set(items[n].get('hashes',{}))==set(i['files']) for n,i in local.items())
    print(json.dumps({'ha_complete':len(local),'matching_nas_manifests':matching,'ha_segments_missing_or_mismatched_on_nas':len(local)-matching}))
+   local_routes={n.rsplit('--',1)[0] for n in local}
+   nas_complete={n:i for n,i in items.items() if i.get('complete')}
+   mixed=sum(1 for route in local_routes if {n for n in local if n.rsplit('--',1)[0]==route}!={n for n in nas_complete if n.rsplit('--',1)[0]==route})
+   print(json.dumps({'nas_only_complete_segments':len(set(nas_complete)-set(local)),'ha_routes_missing_nas_siblings':mixed}))
 '''
 if args.core:
     core = '''

@@ -1,0 +1,50 @@
+const {chromium}=require('playwright');
+const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict');
+(async()=>{
+ const browser=await chromium.launch({channel:'chrome',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  const root=path.resolve('custom_components/carrot_ha/frontend');
+  await page.route('https://logs.test/**',async route=>{
+   const url=new URL(route.request().url());
+   if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:`<style>body{margin:0;background:#111;color:#eee;font-family:Arial;--card-background-color:#1c1c1c;--primary-text-color:#eee;--secondary-text-color:#aaa;--divider-color:#444;--secondary-background-color:#242424}</style><script type="module">import Card from '/carrot-logs-card.js';const card=document.createElement('carrot-logs-card');document.body.append(card);card.setConfig({});card.hass={locale:{language:'ko'},callApi:async(method,url)=>url.endsWith('/devices')?{devices:[{entry_id:'test',device_id:'car'}]}:{base:'/api/carrot_ha/v1/driving_logs/test',enabled:true}};window.card=card;</script>`});
+   if(url.pathname.endsWith('/logs.html'))return route.fulfill({contentType:'text/html',body:`<script>const storage={used:3733600006,limit:5000000000,nas:{status:'available',retention_days:30,segments:328,routes:12,path:'/share/CarrotJournalBackup/driving-logs',used:5197451825,verified_segments:328,nas_only_segments:90,disk_free:1900000000000,checked_at:1800000000}};let base;addEventListener('message',e=>{if(e.data.type==='carrot:logs_session'){base=e.data.base;}if(base&&(e.data.type==='carrot:logs_session'||e.data.type==='carrot:logs_storage_request'))parent.postMessage({type:'carrot:logs_storage',base,storage,maintenance:{phase:'ready'}},location.origin);});parent.postMessage({type:'carrot:logs_ready'},location.origin);</script>`});
+   const file=path.join(root,url.pathname.slice(1));
+   if(fs.existsSync(file))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(file)});
+   return route.fulfill({status:404,body:''});
+  });
+  await page.goto('https://logs.test/');
+  const card=page.locator('carrot-logs-card');
+  await card.locator('#storageSummary').filter({hasText:'3.73 / 5.00 GB'}).waitFor();
+  const title=await card.locator('.header-title').boundingBox(),summary=await card.locator('#storageSummary').boundingBox();
+  assert.ok(summary.x>title.x+title.width,'storage sits beside the title');
+  await card.getByRole('button',{name:'주행 로그 설정',exact:true}).click();
+  await card.getByRole('heading',{name:'주행 로그 설정'}).waitFor();
+  await card.getByRole('button',{name:'시놀로지 상태',exact:true}).click();
+  await card.locator('[data-log-value=nasStatus]').filter({hasText:'연결됨'}).waitFor();
+  assert.equal(await card.locator('[data-log-value=verified]').textContent(),'328');
+  assert.equal(await card.locator('[data-log-value=phase]').textContent(),'정상');
+  await card.getByRole('button',{name:'상태 새로고침',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('carrot-logs-card').shadowRoot.getElementById('refreshLogStorage').disabled);
+  await page.screenshot({path:path.join(os.tmpdir(),'carrot-logs-settings-desktop.png')});
+  await page.setViewportSize({width:390,height:844});
+  const bounds=await card.locator('#logSettings').boundingBox();
+  assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390&&bounds.height<=844);
+  assert.equal(await card.locator('.settings-nav').evaluate(e=>getComputedStyle(e).display),'grid');
+  assert.equal(await card.locator('.settings-content').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
+  await page.screenshot({path:path.join(os.tmpdir(),'carrot-logs-settings-mobile.png')});
+  await page.keyboard.press('Escape');
+  assert.equal(await card.locator('#logSettings').evaluate(e=>e.open),false);
+  const before=await card.locator('#storageSummary').textContent();
+  await page.evaluate(()=>postMessage({type:'carrot:logs_storage',base:'/api/carrot_ha/v1/driving_logs/test',storage:{used:0,limit:0}},location.origin));
+  await page.waitForTimeout(50);
+  assert.equal(await card.locator('#storageSummary').textContent(),before,'non-owner messages cannot replace storage');
+  const frame=page.frames().find(f=>f.url().endsWith('/logs.html'));
+  await frame.evaluate(()=>parent.postMessage({type:'carrot:logs_storage',base:'/api/carrot_ha/v1/driving_logs/other',storage:{used:0,limit:0}},location.origin));
+  await page.waitForTimeout(50);
+  assert.equal(await card.locator('#storageSummary').textContent(),before,'other-entry messages cannot replace storage');
+  assert.deepEqual(errors,[]);
+  console.log('PASS settings: header summary, NAS status, refresh, desktop/mobile, ESC, owner and entry isolation');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

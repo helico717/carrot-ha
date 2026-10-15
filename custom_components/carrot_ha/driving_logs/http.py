@@ -159,6 +159,14 @@ class BrowserView(HomeAssistantView):
             if area == 'screenrecord':
                 # Screen-recording ingestion belongs to the subsequent full-menu port.
                 return web.json_response({'videos': [], 'total': 0, 'hasMore': False})
+            if action == 'storage':
+                if hasattr(store, 'diagnostics'):
+                    storage = await self.hass.async_add_executor_job(store.diagnostics)
+                else:
+                    storage = {'used': await self.hass.async_add_executor_job(store.usage), 'limit': store.limit,
+                               'nas': {'status': 'not_configured'}}
+                return web.json_response({'storage': storage, 'maintenance': runtime.get('driving_log_archive_status', {})},
+                                         headers={'Cache-Control': 'no-store'})
             try:
                 offset = max(0, min(100000, int(request.query.get('offset', 0))))
                 limit = max(1, min(2000, int(request.query.get('limit', 40))))
@@ -199,7 +207,7 @@ class BrowserView(HomeAssistantView):
                         headers['Content-Disposition'] = 'attachment; filename="' + path.name + '"'
                     return web.FileResponse(path, headers=headers)
                 elif action in {'thumbnail', 'preview'}:
-                    return web.Response(text='<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#15202b"/><text x="230" y="190" fill="white">HA Driving Log</text></svg>', content_type='image/svg+xml')
+                    return web.Response(status=204, headers={'Cache-Control': 'no-store'})
                 else:
                     raise web.HTTPNotImplemented(text='This feature is scheduled for the next log migration stage')
             except (KeyError, StopIteration):

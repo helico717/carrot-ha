@@ -1,3 +1,21 @@
+## 2026-10-15 — 사용자 재시작 후 운영 확인 중
+
+- 사용자가 HA 재시작 완료를 알림. 에이전트 재시작/보호 모드 해제 없음. 읽기 전용 검사 시작.
+- 첫 조사: HA 318 complete/11주행/5,022,909,521바이트 유지, NAS 321세그먼트 중 320 complete(나머지 수신 중), 5,072,387,952바이트 예약. 기존 HA 318개 manifest 모두 NAS와 일치, 누락·불일치 0. NAS 추가 로그 수신은 실제 Core 활성화 이후 진행되는 것으로 관측.
+- 복제 재검증 marker 184개 확인. HA 초기 5.02GB는 검증 완료 전 원본을 유지하는 이행 상태이며 아직 5GB 회수 완료로 보고하지 않는다. inspector에 replica_verified 수와 NAS-only 세그먼트/HA 주행의 NAS 형제 누락 집계를 추가해 후속 확인한다. UI 실제 재생·실 클린 설치 복구는 별도 미확인.
+- **재시작 후 자동 회수 확인:** HA 10주행/238 complete/3,733,414,866바이트(디스크 3,733,600,006). NAS 12주행/329세그먼트 중328 complete/1수신중, 완료328개 replica_verified. HA 238개 전부 NAS manifest 일치, 누락·불일치0, HA에 남은 주행의 NAS 형제 누락0. NAS-only complete90개. 기존11→10주행/318→238세그먼트로 전체 묶음 회수, NAS 기록은 보존. NAS earliest 1791872115.247472로 이전 HA 수신 경계보다 오래된 기록의 실제 backfill 확인. Comma 전체 잔여 파일 수는 여전히 미확인.
+
+## 2026-10-15 — 로그 설정·시놀로지 상태 메뉴 및 원본 로딩 표시 작업 중
+
+- 사용자 요청: 상단 우측 설정, 차계부 설정의 좌측 분류/우측 내용(모바일 상단 분류) 참고, 시놀로지 상태 메뉴, HA 보관 요약을 당근웹 로그 제목 옆으로 이동. 추가 요청: HA Driving Log 임시 썸네일 대신 원본 당근웹 로딩 애니메이션 사용.
+- 차계부 구현/디자인은 읽기 참고만 하며 차계부 실행 코드·데이터·설정은 변경하지 않는다. 로그 전용 모듈 carrot-logs-settings.js와 기존 카드/iframe의 출처·프레임·entry base 검증 메시지로 연결한다. 보관 정책/시놀로지 상태·수동 새로고침·오류·닫기/ESC·기기 전환 초기화를 추가한다.
+- 기존 로그 인증 범위의 GET dashcam/storage: 실제 NAS 연결 확인·경로·보관량/주행/세그먼트/검증수·NAS 여유 공간·확인 시각·유지 단계 제공. NAS IO는 executor/로그 lock 아래 수행하며 화면에서 파일을 임의 이동·삭제하거나 설정을 변경하지 않는다.
+- 임시 SVG 텍스트 썸네일 응답 제거(204). 실제 영상 프레임이 준비되기 전에는 원본 dashcam-segment-thumb/is-thumb-loading의 logsThumbSweep 애니메이션을 그대로 재사용한다. 준비된 실제 영상 프레임 캐시·표시와 가시성 제한은 유지하며 원본 generated JS/CSS는 수정하지 않는다.
+- 관련: driving_logs/{http,tiered}.py, frontend/carrot-logs-{card,settings}.js, carrot_logs/{ha_logs_bridge,ha_log_thumbnails}.js/ha_layout.css, 테스트/inspect. 로컬·브라우저 검증 및 직접 배포 대기. 새 Release/태그 없음.
+- 로컬 Python 주행 로그 28건 통과. 인증 없는 storage 조회401, NAS-only 상태/보관량/검증수/공간, thumbnail204 및 빈 응답 검증 추가. NAS 연결 단절 상태는 NAS 미연결로 표시하고 HA 캐시 조회를 유지한다.
+- Chromium 설정 검사 통과: 제목 옆 용량·분류 전환·NAS 상태·수동 새로고침·ESC·desktop/mobile 경계·가로 overflow 없음·다른 frame/entry 메시지 거부. 원본 로그 UI 검사도 통과하며 지연된 영상 응답에서 실제 원본 logsThumbSweep 애니메이션 확인, HA Driving Log 표시 없음, 영상 프레임 준비 후 실제 썸네일 표시 확인. 스크린샷 작업 임시 폴더 보관, 개인 원본 영상/GPS 내보내기 없음.
+- 최종 재검사: Python 28건, 원본 UI/로딩·HUD GPU Chromium 2개 시나리오, 기존 dashboard live/lazy/view-state JS 10건 통과. 설정 창 스크린샷 desktop/mobile 직접 검토: 제목/행/긴 경로/스크롤 정상. HA ha-icon(mdi) 사용이며 테스트용 독립 페이지에는 HA 아이콘 구현이 없어 아이콘 버튼 내부 렌더는 실 HA 확인 대상으로 구분한다.
+
 ## 2026-10-15 — HA 5GB + 본인 NAS 30일 보관 작업 중
 
 - 최신 사용자 지시: 프리릴리즈/새 태그를 발행하지 않고 HA 직접 반영. 모든 조사·변경·검증·배포 상태를 이 기록에 남긴다. 이전 beta.1은 이미 발행된 별개 작업이다.

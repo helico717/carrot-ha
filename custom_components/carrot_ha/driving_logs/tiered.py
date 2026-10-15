@@ -226,6 +226,26 @@ class TieredLogStore:
             'segments': sum(bool(i.get('complete')) for i in self.catalog['segments'].values())}
         return result
 
+    def diagnostics(self):
+        nas = self._connect()
+        items = self.catalog['segments']
+        complete = {n: i for n, i in items.items() if i.get('complete')}
+        local = {n: i for n, i in self.local.state['segments'].items() if i.get('complete')}
+        try:
+            disk = shutil.disk_usage(nas.root) if nas else None
+        except OSError:
+            self.nas_status = 'unavailable'
+            disk = None
+        return {'used': self.usage(), 'limit': self.limit,
+                'local_segments': len(local), 'local_routes': len({n.rsplit('--', 1)[0] for n in local}),
+                'nas': {'status': self.nas_status, 'path': self.nas_root, 'retention_days': 30,
+                        'segments': len(complete), 'routes': len({n.rsplit('--', 1)[0] for n in complete}),
+                        'used': sum(sum(i['files'].values()) for i in complete.values()),
+                        'verified_segments': sum(bool(i.get('replica_verified')) for i in complete.values()),
+                        'nas_only_segments': len(set(complete) - set(local)),
+                        'disk_total': disk.total if disk else None, 'disk_free': disk.free if disk else None,
+                        'checked_at': self.clock()}}
+
     def _copy(self, source, target, name):
         item = source.segment_info(name)
         hashes = item.get('hashes') or {f: digest(source.directory(name) / f) for f in item['files']}

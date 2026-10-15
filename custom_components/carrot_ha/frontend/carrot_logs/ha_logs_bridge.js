@@ -16,7 +16,10 @@ function isCompactLandscapeMode() {
 }
 function setDashcamHeaderStatus() {}
 function waitMs(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-function showAppToast(message) { document.getElementById('haLogsStatus').textContent = message; }
+function showAppToast(message) {
+  document.getElementById('haLogsStatus').textContent = message;
+  window.parent.postMessage({type:'carrot:logs_notice', base:logsBase, message:String(message)}, location.origin);
+}
 window.carrotLogsURL = function(url) {
   if (!logsBase || !/^\/api\/(dashcam|screenrecord)\//.test(url)) throw new Error('HA 로그 주소를 확인해 주세요.');
   return logsBase + url.slice(4);
@@ -26,10 +29,8 @@ async function getJson(url) {
   if (!response.ok) throw new Error(response.status === 401 ? 'HA 로그 인증이 만료되었습니다. 새로고침해 주세요.' : `로그 조회 실패 (${response.status})`);
   const data = await response.json();
   if (data.storage) {
-    const bytes = data.storage.used;
-    const nas = data.storage.nas;
-    const archive = nas ? ` · NAS 30일 ${nas.segments.toLocaleString()}개 구간 · ${nas.status === 'available' ? '연결됨' : '연결 확인 필요 (HA 기록 사용 가능)'}` : '';
-    document.getElementById('haLogsStatus').textContent = `HA 보관 ${(bytes/1e9).toFixed(2)} / ${(data.storage.limit/1e9).toFixed(2)} GB · 최신 주행부터 보관${archive}`;
+    document.getElementById('haLogsStatus').textContent = '';
+    window.parent.postMessage({type:'carrot:logs_storage', base:logsBase, storage:data.storage, maintenance:data.maintenance}, location.origin);
   }
   return data;
 }
@@ -44,7 +45,14 @@ async function postJson(url, body) {
   return data;
 }
 window.addEventListener('message', event => {
-  if (event.origin !== location.origin || event.source !== window.parent || event.data?.type !== 'carrot:logs_session') return;
+  if (event.origin !== location.origin || event.source !== window.parent) return;
+  if (event.data?.type === 'carrot:logs_storage_request' && logsBase) {
+    getJson('/api/dashcam/storage').catch(() => getJson('/api/dashcam/routes?limit=1')).catch(error => {
+      window.parent.postMessage({type:'carrot:logs_storage_error', base:logsBase, message:error.message}, location.origin);
+    });
+    return;
+  }
+  if (event.data?.type !== 'carrot:logs_session') return;
   const data = event.data;
   if (!/^\/api\/carrot_ha\/v1\/driving_logs\/[A-Za-z0-9_-]+$/.test(data.base)) return;
   logsBase = data.base;

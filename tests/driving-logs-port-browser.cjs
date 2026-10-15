@@ -6,6 +6,7 @@ const root=path.resolve('custom_components/carrot_ha/frontend/carrot_logs');
 const segment='00000315--4742c01c35--133';
 const uploadedFiles=[{kind:'qcamera',name:'qcamera.ts',size:800},{kind:'rlog',name:'rlog.zst',size:400}];
 let uploadStarts=0;
+let videoRequests=0;
 let fixtureVideo;
 const replayRoot=process.env.CARROT_REPLAY_FIXTURE;
 const replayMeta=replayRoot?JSON.parse(fs.readFileSync(path.join(replayRoot,'meta.json'),'utf8')):null;
@@ -24,8 +25,8 @@ await page.route('**/*',async route=>{const u=new URL(route.request().url());
     }
     return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,mode:'client',segment,segmentIndex:replayMeta.segmentIndex,rlog:{url:u.pathname+'/rlog',compression:replayMeta.logName.endsWith('.zst')?'zstd':replayMeta.logName.endsWith('.bz2')?'bzip2':'none'},video:{url:u.pathname+'/video',container:'mp4'}})});
   }
-  if(u.pathname.includes('/video/')) return route.fulfill({contentType:'video/webm',body:Buffer.from(fixtureVideo)});
-  if(/thumbnail|preview/.test(u.pathname)) return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#334455"/></svg>'});
+  if(u.pathname.includes('/video/')) {if(!videoRequests++)await new Promise(resolve=>setTimeout(resolve,700));return route.fulfill({contentType:'video/webm',body:Buffer.from(fixtureVideo)});}
+  if(/thumbnail|preview/.test(u.pathname)) return route.fulfill({status:204,body:''});
   return route.fulfill({contentType:'application/json',body:JSON.stringify(u.pathname.includes('routes')?{routes:[{route:'00000315--4742c01c35',segmentFolders:[segment],segmentCount:1,segmentTimes:{[segment]:{startEpoch:1791949800,endEpoch:1791949860}},routeStartEpoch:1791949800,routeEndEpoch:1791949860,latestModifiedEpoch:1791949860}],total:1,hasMore:false,storage:{used:12800000,limit:5000000000}}:{recentSegment:''})});
  }
  const file=path.join(root,u.pathname.replace(/^\/(?:logs|carrot_ha_static\/carrot_logs)\//,''));
@@ -46,6 +47,10 @@ fixtureVideo = await page.evaluate(async () => {
 // Only the owning parent can initialize the scope.
 await page.evaluate(()=>window.postMessage({type:'carrot:logs_session',base:'/api/carrot_ha/v1/driving_logs/test',enabled:true},location.origin));
 await page.locator('[data-route-card]').waitFor();
+await page.locator('.dashcam-route-preview .ha-thumb-loading').first().waitFor();
+assert.equal(await page.locator('.dashcam-route-preview .ha-thumb-loading').first().evaluate(e=>getComputedStyle(e,'::after').animationName),'logsThumbSweep','reuse the original Carrot loading animation');
+assert.equal(await page.getByText('HA Driving Log',{exact:true}).count(),0);
+await page.screenshot({path:path.join(os.tmpdir(),'carrot-logs-original-loading.png')});
 const shellWidth=await page.locator('.logs-shell').evaluate(e=>e.getBoundingClientRect().width);
 assert.equal(Math.round(shellWidth),1300,'log shell fills available width on first render');
 assert.ok(await page.locator('.dashcam-segment-tile').first().isVisible(), 'wide-layout segment list must be visible');

@@ -92,6 +92,8 @@ class TieredTests(unittest.TestCase):
         self.settle()
         self.online = False
         self.assertTrue(self.store.file('cached--0', 'rlog').exists())
+        self.assertEqual(self.store.diagnostics()['nas']['status'], 'unavailable')
+        self.assertIsNone(self.store.diagnostics()['nas']['disk_free'])
         self.upload('offline--0', self.now + 10, 800_000)
         with self.assertRaises(OSError):
             self.upload('newer--0', self.now + 20, 800_000)
