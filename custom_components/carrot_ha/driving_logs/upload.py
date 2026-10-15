@@ -117,7 +117,9 @@ class UploadManager:
                                 progress=min(97, 8 + round(89 * transferred / max(1, total_bytes))))
 
                 try:
-                    await protocol.upload_folder_to_web(str(self.store.directory(name)), metadata['deviceId'], name,
+                    async with self.runtime.setdefault('driving_log_lock', asyncio.Lock()):
+                        directory = await self.hass.async_add_executor_job(self.store.directory, name)
+                    await protocol.upload_folder_to_web(str(directory), metadata['deviceId'], name,
                         self.base_url, token, job['_cancel'].is_set,
                         filenames=[f['name'] for f in summary['files']], on_progress=progress)
                     item = {**summary, 'ok': True, 'remotePath': remote_base + name}

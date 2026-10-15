@@ -184,12 +184,13 @@ class BrowserView(HomeAssistantView):
                         if path is None:
                             raise web.HTTPNotFound()
                         return web.FileResponse(path, headers={'Cache-Control':'private, no-store'})
+                    sizes = store.segment_info(segment)['files']
                     value = {'ok':True, 'mode':'client', 'segment':segment,
                              'segmentIndex':int(segment.rsplit('--',1)[1]),
-                             'rlog':{'name':rlog.name, 'size':rlog.stat().st_size,
+                             'rlog':{'name':rlog.name, 'size':sizes[rlog.name],
                                      'compression':'zstd' if rlog.name.endswith('.zst') else 'bzip2' if rlog.name.endswith('.bz2') else 'none',
                                      'url':base+'/rlog'},
-                             'video':{'name':video.name, 'size':video.stat().st_size,
+                             'video':{'name':video.name, 'size':sizes[video.name],
                                       'container':'mp4' if video.name.endswith('.mp4') else 'mpegts', 'url':base+'/video'}}
                 elif action in {'video', 'download'} and segment:
                     path = await self.hass.async_add_executor_job(store.file, segment, kind or 'qcamera')

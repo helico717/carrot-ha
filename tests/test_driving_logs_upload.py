@@ -62,7 +62,8 @@ class UploadTests(unittest.IsolatedAsyncioTestCase):
         await self.server.start_server()
         self.addAsyncCleanup(self.server.close)
         runtime = {'entry': types.SimpleNamespace(data={'device_id': 'test-device'})}
-        hass = types.SimpleNamespace(async_create_background_task=lambda coro, name: asyncio.create_task(coro))
+        hass = types.SimpleNamespace(async_create_background_task=lambda coro, name: asyncio.create_task(coro),
+                                     async_add_executor_job=lambda fn, *args: asyncio.to_thread(fn, *args))
         self.manager = upload_module.UploadManager(hass, runtime, self.store, str(self.server.make_url('')).rstrip('/'))
         self.addAsyncCleanup(self.manager.close)
 
@@ -90,6 +91,18 @@ class UploadTests(unittest.IsolatedAsyncioTestCase):
         job = next(iter(self.manager.jobs.values()))
         await job['_task']
         self.assertEqual({c[1] for c in self.calls if c[0] == 'file'}, set(self.contents))
+
+    async def test_nas_only_files_use_original_upstream_protocol(self):
+        tiered = importlib.import_module(package.__name__ + '.tiered')
+        root = Path(self.temp.name)
+        nas = root / 'network' / 'driving-logs'
+        nas.parent.mkdir()
+        store = tiered.TieredLogStore(root / 'empty-cache', nas, 'test-device', clock=lambda: 1000, guard=Path)
+        store._copy(self.store, store.nas, self.name)
+        store._catalog()
+        self.manager.store = store
+        self.assertFalse(store.local.state['segments'])
+        await self.test_original_protocol_and_default_source_selection()
 
     async def test_server_size_mismatch_is_failure_with_original_retry(self):
         self.mismatch = True

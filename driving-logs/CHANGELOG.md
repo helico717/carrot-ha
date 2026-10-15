@@ -11,6 +11,8 @@
 - 운영 NFS dry-run: nas_mount=verified/devices=1. 사용자 소유 NAS로 318세그먼트 복사·SHA256 읽기 재검증 진행 중. 현재 HA index는 수정하지 않으며 5GB 축소는 새 코드의 사용자 재시작 후 유지 작업에서 수행한다. 새 태그/Release/Comma 소스 변경 없음.
 - 운영/복구 문서 docs/DRIVING_LOG_NAS.md 추가, CLEAN_INSTALL_RECOVERY.md/DEVELOPMENT_WORKFLOW.md에 현재 직접 반영 예외와 복구 연결 기록. HA 백업에 NAS share/media가 중복 포함되는지 사용자의 백업 설정 확인이 필요하며 자동 제외를 주장하지 않는다.
 - 최종 주행 로그 검사 25건 전부 통과(생략 없음). 복원 유지 작업은 파일시스템 복사 시 파일 단위 fsync + 전체 SHA256 commit/읽기 재검증을 사용해 HTTP 청크마다 fsync하는 수신 경로와 분리했다. 사용자 재시작/옵션 reload는 기존 executor 인덱스 쓰기 종료까지 기다려 중복 writer를 방지한다. 진행 중 초기 운영 복사 프로세스는 시작 시점 코드를 그대로 실행하며 변경된 코드로 중복 실행하지 않는다.
+- c68bb6b 커밋/main 푸시 완료. HA base 4efda17 비교 preflight 통과, 변경 10파일 백업·직접 설치·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c68bb6b5c385/before. 재시작하지 않았으므로 실행 활성화 대기. CI 38671493431 진행 중.
+- 설치 후 최종 코드 재검토에서 NAS 경로 확인/파일 stat의 이벤트 루프 blocking 가능성을 발견해 보완 중: 업로드 경로 확인은 entry 로그 lock 아래 executor, replay 크기는 검증 manifest를 사용한다. NAS-only 파일→합성 원작자 프로토콜 서버 전송 회귀 검사를 추가한다. 실제 원작자 서버로 시험 로그를 전송하지 않는다.
 
 ## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
 
