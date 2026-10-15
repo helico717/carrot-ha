@@ -15,6 +15,9 @@
 - 로컬 Python 주행 로그 28건 통과. 인증 없는 storage 조회401, NAS-only 상태/보관량/검증수/공간, thumbnail204 및 빈 응답 검증 추가. NAS 연결 단절 상태는 NAS 미연결로 표시하고 HA 캐시 조회를 유지한다.
 - Chromium 설정 검사 통과: 제목 옆 용량·분류 전환·NAS 상태·수동 새로고침·ESC·desktop/mobile 경계·가로 overflow 없음·다른 frame/entry 메시지 거부. 원본 로그 UI 검사도 통과하며 지연된 영상 응답에서 실제 원본 logsThumbSweep 애니메이션 확인, HA Driving Log 표시 없음, 영상 프레임 준비 후 실제 썸네일 표시 확인. 스크린샷 작업 임시 폴더 보관, 개인 원본 영상/GPS 내보내기 없음.
 - 최종 재검사: Python 28건, 원본 UI/로딩·HUD GPU Chromium 2개 시나리오, 기존 dashboard live/lazy/view-state JS 10건 통과. 설정 창 스크린샷 desktop/mobile 직접 검토: 제목/행/긴 경로/스크롤 정상. HA ha-icon(mdi) 사용이며 테스트용 독립 페이지에는 HA 아이콘 구현이 없어 아이콘 버튼 내부 렌더는 실 HA 확인 대상으로 구분한다.
+- **커밋/배포 완료:** 9e79eff76c506ed99274b6a1eac494b796dbb4df main 푸시. 기존 설치 기준 58db756 대비 변경7파일 preflight 통과·백업·직접 설치·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-9e79eff76c50/before. 정적5파일(card/settings/ha_layout/bridge/thumbnails) 실제 HA HTTP 경로200 확인. 기존 데이터·NAS 설정·차계부·Comma 수정 없음.
+- **CI:** 최종 실행 코드 Linux 전체 Direct receiver validation 38674294274 success (https://github.com/helico717/carrot-ha/actions/runs/38674294274). 새 버전/태그/Release 발행 없음.
+- **사용자 활성화 단계:** 새 화면은 강력 새로고침(Ctrl+F5). 이번 추가 NAS 상세 storage API와 빈 thumbnail 응답은 Python 변경이므로 사용자 HA 재시작1회가 필요하다. 재시작 전 설정은 기존 routes 응답으로 기본 상태만 표시하고 상세 정보 재시작 필요를 안내한다. 에이전트는 HA를 재시작하지 않았다. 실제 운영 설정 메뉴/상세값/원본 로딩 표시 확인은 새로고침 및 사용자 재시작 후 대기. 이번 전 단계의 5GB 전체 주행 회수/추가 과거 로그 수신은 실제 확인 완료 상태다.
 
 ## 2026-10-15 — HA 5GB + 본인 NAS 30일 보관 작업 중
 
