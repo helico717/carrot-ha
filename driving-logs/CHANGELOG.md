@@ -16,6 +16,12 @@
 - 보완 완료: defbf47 커밋/main 푸시, 주행 로그 26건 전부 통과. HA c68bb6b 대비 보완 2파일 직접 설치·해시 일치, 백업 driving-logs-hud-defbf47dfff9/before. HA 재시작 없음. 첫 코드 c68bb6b의 Linux 전체 CI 38671493431 success 확인(https://github.com/helico717/carrot-ha/actions/runs/38671493431). defbf47 최종 CI는 후속 확인한다. NAS 복사 145/318, 2,269,381,593바이트 검증 시점까지 오류 없음.
 - defbf47 Linux 전체 CI 38671747018 success 확인(https://github.com/helico717/carrot-ha/actions/runs/38671747018).
 - 마지막 안전성 보완: NAS 복제의 수신 complete와 HA 원본 회수 허용 replica_verified를 별도 영속 기록한다. 읽기 재검증 실패 후 다른 파일의 catalog 갱신으로 실패한 복제까지 회수 허용되는 위험을 막는다. 기존 marker 없는 복제는 유지 작업에서 다시 읽어 검증한다. 현재 실행 중 초기 seed는 이전 코드라 marker가 없고, HA 재시작 후 안전 재검증을 거친 뒤에만 5GB로 줄어든다. 재검증 실패/기존 marker 이행 회귀 검사 추가.
+- 743b75c 커밋/main 푸시 완료, 28개 주행 로그 검사 전부 통과. HA tiered.py 1파일 추가 직접 반영·해시 일치, 백업 driving-logs-hud-743b75c769d5/before. HA Core 내부 마운트 추가 확인을 위한 docker ps 읽기 검사는 SSH 앱 Protection mode로 거절됨. 보호 모드를 끄거나 우회하지 않았다. SSH 앱에서 NFS 실제 마운트 검증 및 NAS 복사 정상과 구분하며, Core 새 코드 활성화/마운트·혼합 목록 운영 확인은 사용자 재시작 후 대기한다.
+- 최종 실행 코드 743b75c Linux 전체 CI 38672082538 success 확인(https://github.com/helico717/carrot-ha/actions/runs/38672082538). 프리릴리즈/버전/태그 변경 없음. inspect 도구에 읽기 전용 NAS 개수·용량·파일 해시 개수 집계를 추가해 초기 복사 후 독립 대조에 사용한다.
+- **운영 NAS 초기 복사 완료:** 1,170초, 11주행/318세그먼트/5,022,909,521바이트, 954파일 SHA256 검증 및 NAS 게시본 읽기 재검증 성공. /share/CarrotJournalBackup/driving-logs 전용 소유 NAS에만 복제. seed 종료 코드 0, settings=saved, ha_index=untouched. 기존 차계부·surveillance와 원작자 서버는 변경하지 않았다.
+- **독립 대조:** inspect 실행 종료 0. HA 318 complete/0 incomplete/11주행, NAS 318 complete/11주행/동일 5,022,909,521바이트/954개 파일 해시. HA complete와 NAS manifest 318개 전부 일치, 누락·불일치 0. HA index/floor 및 원본 파일을 초기 복사 도구가 변경하지 않았고 현재 디스크 5,022,963,059바이트 유지. 설치 소스 LIMIT=5,000,000,000 확인. 기존 HA 사용량이 아직 5GB보다 큰 것은 재시작 전 원본을 유지한 의도된 상태다.
+- **현재 설치/활성화 구분:** 실행 코드 최종 커밋 743b75c. 첫 10파일 설치 후 defbf47 2파일·743b75c 1파일 보완 모두 백업/해시 일치. 초기 base 4efda17 대비 최종 10파일 preflight도 통과. /config/carrot_ha/driving-logs-settings.json에 기기별 NAS 경로 저장 완료. 사용자 HA 재시작 후 유지 작업이 legacy replica를 안전 재검증한 뒤 최신 전체 주행 묶음만 5GB 이내 캐시로 남긴다. 오래된 묶음은 NAS 30일 보관 창에서 계속 조회한다.
+- **미확인/사용자 단계:** HA Core 재시작은 수행하지 않았다. Core 내 실제 NFS 접근, 혼합 목록/실제 NAS 리플레이, 5GB 자동 회수, 신규 Comma 전송·과거 30일 backfill 및 실 클린 설치 복구는 사용자 재시작 후 운영 확인 대상이다. 합성 검사 통과와 실운영 완료를 혼동하지 않는다. NAS 공유 내용의 HA 백업 포함 여부는 별도 백업 설정 확인 항목이다. Comma Git/source 변경·기기 접속/재부팅 없음. 새 Release/태그/버전 발행 없음.
 
 ## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
 
