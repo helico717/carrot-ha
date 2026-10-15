@@ -41,6 +41,7 @@ const fs=require('fs'),path=require('path'),os=require('os'),assert=require('ass
  await page.screenshot({path:path.join(os.tmpdir(),'carrot-log-map-desktop.png')});
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
  assert.ok(await page.locator('#haRouteExplorer').evaluate(e=>e.scrollWidth<=e.clientWidth));
+ assert.ok(await page.locator('#haRouteExplorer').evaluate(e=>e.querySelector('footer').getBoundingClientRect().bottom<=e.getBoundingClientRect().bottom+1),'map status fits mobile panel');
  await page.screenshot({path:path.join(os.tmpdir(),'carrot-log-map-mobile.png')});
  await page.locator('#haMapSegment').selectOption('first--1');
  const workers=await page.evaluate(()=>window.testWorkers);

@@ -48,3 +48,11 @@
   #haRecordedReplay .carrot-replay-controls__segmentPicker--title { max-width: none; }
   #haRecordedReplay #carrotStage { --carrot-replay-titlebar-height: 104px; }
 }
+@media(max-width:760px){
+  #logsDashcamPanel #haRouteExplorer{height:320px;min-height:320px}
+  #haRouteExplorer header{padding:8px 12px;flex:none}
+  #haRouteExplorer .ha-map-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 40px;padding:6px 12px;flex:none}
+  #haRouteExplorer .ha-map-toolbar select{width:100%;flex-basis:auto}
+  #haRouteExplorer #haRouteMap{min-height:120px}
+  #haRouteExplorer footer{padding:6px 12px;flex:none;font-size:11px}
+}
