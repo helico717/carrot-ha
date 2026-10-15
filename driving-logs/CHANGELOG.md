@@ -10,6 +10,9 @@
 - 반복 지도 파일 조회가 전체 목록/용량 rglob를 매번 수행하지 않도록 BrowserView는 routes/recent에서만 페이지를 만든다. 기존 파일 인증/범위 응답/보관 정책은 유지한다. GPS worker Node 회귀를 기존 Linux CI에 추가. docs/DRIVING_LOG_NAS.md·SOURCE.md에 데이터 경로/외부 타일/기록 분석과 서버 재계산 차이를 기록한다.
 - 최종 로컬 검증: Python29건, JS13건(기존 dashboard12 + GPS worker), 탐색/설정/HUD Chromium 3시나리오 모두 통과. 원본 UI/로딩 시나리오도 앞서 통과. GPS worker 검사는 stub 선택서비스 검사 외 실제 raw_capnp schema에 합성 Event/GpsLocationData wire(위도37.5/경도127/hasFix)를 넣어 builder 전체 decoding을 통과시켰다. 운영 원본 GPS가 아니라 합성 좌표이며 실제 로그 공개/추출 없음.
 - 아직 운영 표시/실제 영상 분석/실제 GPS 자료의 신호 유무는 미확인. 합성 지도 타일 이미지로 기본 vector 위치·비어 있지 않음·모바일 배치를 검증했으며 실제 외부 지도 서비스의 연결 성공과 구분한다. 달력·기간 필터 Python 새 코드 활성화에는 사용자 HA 재시작 필요. 에이전트 재시작 없음.
+- **배포 완료:** 실행 코드 6f6a69444d01b4663b84d777d1124a004848668c main 푸시. 기존0d6d2e0 대비 HA 변경10파일 충돌 검사 통과·백업·직접 설치·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-6f6a69444d01/before. HTML/explorer/bridge/replay-loader/GPS-worker/Leaflet JS/CSS 실제 HA HTTP 경로7개 모두200 확인. 원본 로그/NAS index·보관 설정·차계부·Comma 변경 없음.
+- **Linux CI 성공:** Direct receiver validation 38695754426 success (https://github.com/helico717/carrot-ha/actions/runs/38695754426), 기존 전체 Python 회귀와 새 GPS wire Node 검사를 포함한 JS13건 실행. 로컬 브라우저 검사와 구분한다. 프리릴리즈/새 태그/버전 발행 없음.
+- **활성화/미확인:** 사용자 HA 재시작 후 Ctrl+F5 필요. 날짜 API 활성화·운영 rlog GPS 존재/지도 타일 연결·실제 NAS-only 주행 분석 화면 재생은 이후 운영 확인 대상이다. 원본 리플레이 HUD/기록 분석 연결은 구현했지만 첨부 Carrot Routes 서버 production 레이더 재계산 엔진 이식은 별도 미구현으로 명확히 남긴다. 사용자 동의 없는 서버 접근/시험 업로드 없음.
 
 ## 2026-10-15 — 사용자 재시작 후 운영 확인 중
 
