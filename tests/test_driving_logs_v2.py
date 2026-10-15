@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from types import SimpleNamespace
 from aiohttp import web
 
@@ -19,16 +20,23 @@ spec.loader.exec_module(v2)
 
 
 class ReplayV2Tests(unittest.TestCase):
-    @unittest.skipUnless(sys.version_info >= (3,14) and sys.platform.startswith('linux'),'Linux native fallback')
+    @unittest.skipUnless(sys.version_info >= (3,14),'Python 3.14 native fallback')
     def test_missing_python_zstd_extension(self):
         import io
         from compression import zstd
         runner_spec=importlib.util.spec_from_file_location('radar_runner_test',v2.ROOT/'radar_runner.py')
         runner=importlib.util.module_from_spec(runner_spec);runner_spec.loader.exec_module(runner)
+        if sys.platform == 'win32':
+            library=Path('C:/Program Files/Git/mingw64/bin/libzstd.dll')
+            if not library.exists():self.skipTest('Native libzstd unavailable')
+            override=patch('ctypes.util.find_library',return_value=str(library));override.start();self.addCleanup(override.stop)
         raw=b'raw synthetic log'*100000
         compressed=zstd.compress(raw[:700000])+zstd.compress(raw[700000:])
         with runner.native_zstd_reader(io.BytesIO(compressed)) as result:
             self.assertEqual(result.read(),raw)
+        for raw_case in (b'a'*131072,b'a'*262144,os.urandom(2*1024**2+19)):
+            with runner.native_zstd_reader(io.BytesIO(zstd.compress(raw_case))) as result:
+                self.assertEqual(result.read(),raw_case)
         with self.assertRaises(ValueError):
             runner.native_zstd_reader(io.BytesIO(compressed[:-1]))
         runner.install_stdlib_zstd(force_native=True)

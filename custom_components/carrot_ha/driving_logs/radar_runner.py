@@ -46,10 +46,10 @@ def native_zstd_reader(source):
                 if result.tell() + outgoing.pos > 512 * 1024**2:
                     raise ValueError('Decompressed log exceeds limit')
                 result.write(output_data.raw[:outgoing.pos])
+                if incoming.pos == incoming.size and (remaining == 0 or outgoing.pos < len(output_data)):
+                    break
                 if incoming.pos == previous and outgoing.pos == 0:
                     raise ValueError('Zstandard stream made no progress')
-                if incoming.pos == incoming.size and outgoing.pos < len(output_data):
-                    break
         if remaining:
             raise ValueError('Truncated Zstandard frame')
         result.seek(0)
