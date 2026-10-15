@@ -25,9 +25,14 @@ window.carrotLogsURL = function(url) {
   return logsBase + url.slice(4);
 };
 async function getJson(url) {
+  url = window.CarrotLogExplorer?.scopeURL(url) || url;
   const response = await fetch(window.carrotLogsURL(url), {cache:'no-store', credentials:'same-origin'});
-  if (!response.ok) throw new Error(response.status === 401 ? 'HA 로그 인증이 만료되었습니다. 새로고침해 주세요.' : `로그 조회 실패 (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? 'HA 로그 인증이 만료되었습니다. 새로고침해 주세요.' : `로그 조회 실패 (${response.status})`);
+    error.status = response.status; throw error;
+  }
   const data = await response.json();
+  window.CarrotLogExplorer?.acceptPage(data);
   if (data.storage) {
     document.getElementById('haLogsStatus').textContent = '';
     window.parent.postMessage({type:'carrot:logs_storage', base:logsBase, storage:data.storage, maintenance:data.maintenance}, location.origin);
@@ -60,6 +65,7 @@ window.addEventListener('message', event => {
   if (!logsStarted) {
     logsStarted = true;
     window.CarrotLogsRuntime.init();
+    window.CarrotLogExplorer?.init();
   }
   if (!data.enabled) document.getElementById('haLogsStatus').textContent = '원격 터미널의 기존 HA 연결 설정을 활성화해야 Comma 로그를 자동 수신할 수 있습니다.';
 });

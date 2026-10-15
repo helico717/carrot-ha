@@ -25,6 +25,9 @@
       style.textContent = '#haRecordedReplay{position:fixed;inset:0;z-index:1000;background:#080d11;overflow:auto}#haRecordedReplay[hidden]{display:none}#haRecordedReplay .page{position:relative;inset:auto;transform:none!important;opacity:1!important;visibility:visible!important;width:100%;max-width:none;display:flex!important;min-height:100%;height:100%;padding:0}#carrotStage{min-height:320px}#visionStartOverlay,#carrotNaviPane,#btnWebSound{display:none!important}';
       document.head.append(style);
       const heading = root.querySelector('.carrot-replay-controls__heading');
+      const mapButton = document.createElement('button');mapButton.type='button';mapButton.className='smallBtn ha-replay-map';mapButton.textContent='지도';mapButton.title='기록된 실제 GPS 지도';
+      mapButton.onclick=()=>window.CarrotLogExplorer?.openForReplay().catch(error=>showAppToast(error.message));
+      heading.append(mapButton);
       for (const [direction, originalId, label] of [
         ['Previous', 'btnCarrotReplayPrevious', CURRENT_LANG === 'en' ? 'Previous' : '이전'],
         ['Next', 'btnCarrotReplayNext', CURRENT_LANG === 'en' ? 'Next' : '다음'],

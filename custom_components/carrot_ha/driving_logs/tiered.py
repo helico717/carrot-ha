@@ -213,10 +213,10 @@ class TieredLogStore:
             raise OSError('NAS archive is offline')
         return nas.file(name, kind)
 
-    def routes(self, offset=0, limit=40, sort='desc'):
+    def routes(self, offset=0, limit=40, sort='desc', start=None, end=None):
         view = object.__new__(LogStore)
         view.state, view.root, view.limit = self.state, self.root, self.limit
-        result = view.routes(offset, limit, sort)
+        result = view.routes(offset, limit, sort, start, end)
         for route in result['routes']:
             names = route['segmentFolders']
             sources = [('ha', self.local.state['segments']), ('nas', self.catalog['segments'])]

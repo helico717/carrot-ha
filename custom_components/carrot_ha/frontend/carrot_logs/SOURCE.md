@@ -15,5 +15,12 @@ openpilot commit: `baf47a6facfe692bf27b1084931b7dd04ea39f40`
 기록 데이터를 원본 렌더러에 연결해 모델 경로·차선·도로 경계·선행 차량 및 HUD를 표시한다.
 라이브 소켓·실차 설정 쓰기는 비활성화한다. 별도 AR 내비게이션 표지 활성화는 이번 범위 밖이다.
 
+2026-10-15: replay_log_worker.js에 선택적 gpsOnly 모드를 추가했다. 기존 replay 기본값은
+유지하며 HA 지도에서는 gpsLocationExternal/qRoadEncodeIdx만 해석한다. 원본 framing·압축·
+타임라인 기준을 재사용하고 invalid 이벤트/미확인 fix 좌표는 지도에서 제외한다.
+ha_log_explorer.js는 기존 Leaflet 번들과 HA 인증 파일 URL만 사용한다.
+첨부 Carrot Routes의 서버 production radar_web_export 재계산 엔진은 이 이식에 포함되지 않으며,
+분석/전방 센서 버튼은 원본 기록 데이터의 replay insights에 연결한다.
+
 `scripts/build_logs_upload_port.py`는 같은 커밋의 `web_upload.py`와 서버 결과 포매터를
 `driving_logs/upstream_upload*.py`로 가져온다. HA 작업 수명·인증·보관 파일 선택만 어댑터에서 담당한다.

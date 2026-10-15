@@ -1,3 +1,16 @@
+## 2026-10-15 — 날짜 탐색·실제 GPS 지도·분석 연결 작업 중
+
+- 사용자 요청: 날짜 선택기, 해당 실제 주행 지도 구간, 로그 분석 화면 연결. 첨부 Carrot Routes 레이더 검증 화면은 참고이며 임의 외부 서버 접근·로그 공개 권한이 아니다.
+- 원본 조사: carrot_logs replay에는 이벤트/그래프/전방 센서/상세 분석과 별도 sensor/advanced worker가 있다. openpilot/tools/carrot_route_vault/radar_view.js는 production radar_web_export 서버 재계산 결과를 요구한다. HA에 이 엔진이 없는데 재계산한 것처럼 표시하지 않으며 이번 연결은 기록된 로그의 원본 분석 화면으로 명확히 구분한다.
+- 구현 방향: HA+NAS union catalog에 기간 필터/달력 메타데이터 추가. 목록의 날짜/주행 선택 상태와 스크롤 보존. Leaflet 기존 번들로 선택 주행의 rlog GPS 실제 좌표 표시, 세그먼트별 선택과 영상 시점/원본 분석 연결. 원본 decoder GPS 전용 모드로 필요한 로그만 순차 처리하며 숨김·닫기 시 중단, 원본 로그/GPS 외부 업로드 없음. 지도 타일은 기존 대시보드와 같은 OSM이며 타일 요청은 외부 지도 서비스에 전송됨.
+- 관련 예정: driving_logs/{store,tiered,http}.py, carrot_logs HA 탐색 연결부·원본 replay worker, 합성 테스트·복구 문서. 아직 검증·배포 대기. 프리릴리즈/태그/Comma 변경 없음.
+- 구현/검증: 기간 필터는 주행의 시작/종료 겹침을 페이지 나누기 전에 적용하고 NaN/음수/역순 구간을 거부한다. 달력 메타데이터도 기존 entry 세션 인증 유지. Python 주행 로그29건 통과, GPS 전용 worker 선택서비스/invalid 이벤트/빈 GPS/기본 replay 유지 Node 검사 통과.
+- Chromium: 현지 자정 날짜 범위·기록일 이동·실제 Leaflet 좌표 vector canvas 비어 있지 않음·Worker 중단·desktop/mobile overflow·선택 세그먼트의 원본 분석 연결·라이브 소켓0 통과. 지도 테스트는 합성 GPS/테스트 타일이며 운영 GPS 내보내기 없음. 기존 로그 UI/로딩 및 HUD GPU 두 회귀 시나리오 통과. 스크린샷 직접 확인.
+- 구현 보완: 점 상한 약60,000/화면 및8세그먼트 메모리 캐시, GPS 시간/경도/위도/fix 검증, 공백5초/도약250m 분리. 지도에서 GPS 없는 구간 선택 시 이전 구간 마커를 남기지 않는다. replay에서 지도 열면 영상 일시정지·현재 구간/시점 유지. 기본 calendar API 미활성 시 잘못된 필터 표시 대신 비활성/재시작 안내.
+- 반복 지도 파일 조회가 전체 목록/용량 rglob를 매번 수행하지 않도록 BrowserView는 routes/recent에서만 페이지를 만든다. 기존 파일 인증/범위 응답/보관 정책은 유지한다. GPS worker Node 회귀를 기존 Linux CI에 추가. docs/DRIVING_LOG_NAS.md·SOURCE.md에 데이터 경로/외부 타일/기록 분석과 서버 재계산 차이를 기록한다.
+- 최종 로컬 검증: Python29건, JS13건(기존 dashboard12 + GPS worker), 탐색/설정/HUD Chromium 3시나리오 모두 통과. 원본 UI/로딩 시나리오도 앞서 통과. GPS worker 검사는 stub 선택서비스 검사 외 실제 raw_capnp schema에 합성 Event/GpsLocationData wire(위도37.5/경도127/hasFix)를 넣어 builder 전체 decoding을 통과시켰다. 운영 원본 GPS가 아니라 합성 좌표이며 실제 로그 공개/추출 없음.
+- 아직 운영 표시/실제 영상 분석/실제 GPS 자료의 신호 유무는 미확인. 합성 지도 타일 이미지로 기본 vector 위치·비어 있지 않음·모바일 배치를 검증했으며 실제 외부 지도 서비스의 연결 성공과 구분한다. 달력·기간 필터 Python 새 코드 활성화에는 사용자 HA 재시작 필요. 에이전트 재시작 없음.
+
 ## 2026-10-15 — 사용자 재시작 후 운영 확인 중
 
 - 사용자가 HA 재시작 완료를 알림. 에이전트 재시작/보호 모드 해제 없음. 읽기 전용 검사 시작.
@@ -598,3 +611,10 @@
 - 검증: 운영 색인·DB·클라우드의 제한된 시각/집계/커서만 조회. GPS·영상·토큰 미출력.
   광범위 진단 필드 출력은 자동 승인 심사에서 거절되어 수행하지 않고 안전한 집계로 제한했다.
 - 배포: 실행 코드·설정·운영 DB 변경 및 재시작 없음. Worker/D1/KV 배포 없음.
+
+## 2026-10-15 — 로그 분석 링크 화면 설명을 위한 읽기 전용 조사
+
+- 요청: 첨부 화면의 Cabana/PlotJuggler/JotPluggler, API_HOST 명령, 세그먼트/파일과 레이더 검증 역할을 비개발자 관점에서 설명.
+- 확인: companion openpilot의 tools/carrot_route_vault/viewer.py 명령 생성, radar_view.js 화면/분석 범위, openpilot/tools/cabana 및 plotjuggler README와 jotpluggler 소스. 화면 명령은 PC 도구에 공유 범위 로그를 연결하며 차량 설정 명령이 아님. 레이더 재계산과 기록된 Lead를 구분.
+- 검증: 소스 읽기 비교만 수행. 첨부 주행의 원본 로그, 실제 외부 도구 실행 및 서버 접속 성공 여부는 확인하지 않음.
+- 배포: 설명 요청으로 실행 코드 변경·기기 접속·설치·재시작·태그/Release 없음. 조사 기록만 추가.

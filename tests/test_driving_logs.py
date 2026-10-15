@@ -12,6 +12,16 @@ spec.loader.exec_module(module)
 
 
 class DrivingLogTests(unittest.TestCase):
+    def test_date_filter_overlaps_whole_drives_before_pagination(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = module.LogStore(directory, limit=8000)
+            store.state['segments'] = {
+                'night--0': {'recorded':200,'duration':100,'complete':True,'files':{'rlog':1}},
+                'day--0': {'recorded':400,'duration':100,'complete':True,'files':{'rlog':1}}}
+            self.assertEqual(store.routes(start=200,end=350)['total'],2)
+            self.assertEqual(store.routes(start=201,end=500)['total'],1)
+            self.assertEqual(store.routes(end=100)['total'],0)
+            self.assertEqual(store.routes(offset=1,limit=1,start=200,end=500)['routes'][0]['route'],'night')
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

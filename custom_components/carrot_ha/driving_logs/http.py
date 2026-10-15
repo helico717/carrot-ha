@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import hmac
+import math
 import secrets
 import time
 
@@ -170,9 +171,18 @@ class BrowserView(HomeAssistantView):
             try:
                 offset = max(0, min(100000, int(request.query.get('offset', 0))))
                 limit = max(1, min(2000, int(request.query.get('limit', 40))))
-                page = await self.hass.async_add_executor_job(store.routes, offset, limit, request.query.get('sort', 'desc'))
+                start = float(request.query['from']) if 'from' in request.query else None
+                end = float(request.query['to']) if 'to' in request.query else None
+                if any(value is not None and (not math.isfinite(value) or value < 0) for value in (start, end)) or (start is not None and end is not None and start >= end):
+                    raise ValueError('Invalid date interval')
+                page = None
+                if action in {'routes', 'recent'}:
+                    page = await self.hass.async_add_executor_job(store.routes, offset, limit, request.query.get('sort', 'desc'), start, end)
                 if action == 'routes':
                     value = page
+                elif action == 'calendar':
+                    catalog = await self.hass.async_add_executor_job(store.routes, 0, 100000)
+                    value = {'intervals': [{'start': r['routeStartEpoch'], 'end': r['routeEndEpoch']} for r in catalog['routes']]}
                 elif action == 'segments' and segment:
                     all_routes = await self.hass.async_add_executor_job(store.routes, 0, 2000, request.query.get('sort', 'desc'))
                     route = next(r for r in all_routes['routes'] if r['route'] == segment)

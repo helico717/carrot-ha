@@ -178,7 +178,7 @@ class LogStore:
         self._save()
         return self.status(name)
 
-    def routes(self, offset=0, limit=40, sort='desc'):
+    def routes(self, offset=0, limit=40, sort='desc', start=None, end=None):
         groups = {}
         for name, item in self.state['segments'].items():
             if item['complete']:
@@ -193,6 +193,10 @@ class LogStore:
                            'routeStartEpoch': min(i['recorded'] - (i.get('duration') or 0) for _, i in items), 'routeEndEpoch': max(epochs),
                            'latestModifiedEpoch': max(epochs), 'segmentsHasMore': False})
         result.sort(key=lambda item: item['routeEndEpoch'], reverse=True)
+        if start is not None:
+            result = [item for item in result if item['routeEndEpoch'] >= start]
+        if end is not None:
+            result = [item for item in result if item['routeStartEpoch'] < end]
         return {'routes': result[offset:offset + limit], 'total': len(result),
                 'nextOffset': offset + limit, 'hasMore': offset + limit < len(result),
                 'storage': {'used': self.usage(), 'limit': self.limit}}

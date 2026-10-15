@@ -1,6 +1,17 @@
 /* HA supplies the viewport; media loading must never determine its width. */
 #pageLogs { width: 100%; min-width: 0; box-sizing: border-box; }
 #haLogsStatus:empty { display: none; }
+.ha-log-datebar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 16px 8px;flex:none}
+.ha-log-datebar input{color:var(--md-on-surface);background:var(--md-surface-cont);border:1px solid var(--md-outline-var);border-radius:6px;padding:6px 8px;font:inherit;min-width:0;color-scheme:dark}
+.ha-log-datebar .smallBtn{min-height:36px}.ha-log-datebar>span{font-size:12px;color:var(--md-on-surface-var)}
+.ha-route-explore{margin-top:8px;position:relative;z-index:3}
+#haRouteExplorer{box-sizing:border-box;width:min(1200px,calc(100vw - 20px));height:min(820px,calc(100dvh - 24px));max-width:none;max-height:none;border:1px solid var(--md-outline-var);border-radius:8px;padding:0;background:var(--md-surface);color:var(--md-on-surface);overflow:hidden}
+#haRouteExplorer[open]{display:flex;flex-direction:column}#haRouteExplorer::backdrop{background:#000a}
+#haRouteExplorer header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--md-outline-var)}
+#haRouteExplorer h2{font-size:16px;line-height:1.5;margin:0;min-width:0;overflow-wrap:anywhere}
+.ha-map-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 16px}.ha-map-toolbar select{min-width:0;max-width:100%;background:var(--md-surface-cont);color:var(--md-on-surface);border:1px solid var(--md-outline-var);border-radius:6px;min-height:36px;padding:4px 8px}
+#haRouteMap{flex:1;min-height:200px;min-width:0;background:#1a2525}#haRouteExplorer footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;font-size:12px}
+@media(max-width:600px){.ha-log-datebar{gap:6px;padding-inline:12px}.ha-map-toolbar{padding:8px 12px}.ha-map-toolbar select{flex-basis:100%}#haRouteExplorer header{padding:10px 12px}}
 .ha-thumb-loading.dashcam-segment-thumb { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; border: 0; border-radius: 0; pointer-events: none; }
 #pageLogs .logs-shell { width: 100%; max-width: none; min-width: 0; margin: 0; box-sizing: border-box; }
 #haRecordedReplay .carrot-replay-controls__heading { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
@@ -9,7 +20,7 @@
 .ha-replay-step { flex: 0 0 auto; min-width: 52px; height: 44px; padding: 0 12px; border-radius: var(--r-sm); }
 @media (max-width: 600px) {
   #haRecordedReplay .carrot-replay-controls__header { flex-wrap: wrap; gap: 6px; }
-  #haRecordedReplay .carrot-replay-controls__heading { flex-basis: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 52px 52px; gap: 6px; }
+  #haRecordedReplay .carrot-replay-controls__heading { flex-basis: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 44px 52px 52px; gap: 6px; }
   #haRecordedReplay .carrot-replay-controls__headerActions { margin-left: auto; }
   #haRecordedReplay .carrot-replay-controls__segmentPicker--title { max-width: none; }
   #haRecordedReplay #carrotStage { --carrot-replay-titlebar-height: 104px; }

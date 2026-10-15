@@ -76,6 +76,8 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status,401)
         async with self.client.get(str(browse)+'/dashcam/storage') as response:
             self.assertEqual(response.status,401)
+        async with self.client.get(str(browse)+'/dashcam/calendar') as response:
+            self.assertEqual(response.status,401)
         async with self.client.post(str(browse)+'/dashcam/upload/summary', json={'segments':[segment]}) as response:
             self.assertEqual(response.status,401)
         async with self.client.post(str(browse)+'/session') as response:
@@ -90,6 +92,15 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status, 200)
             self.assertEqual(storage['limit'], 5_000_000_000)
             self.assertIn(storage['nas']['status'], ('available', 'not_configured'))
+        async with self.client.get(str(browse)+'/dashcam/calendar') as response:
+            self.assertEqual((await response.json())['intervals'], [{'start':1000,'end':1000}])
+        async with self.client.get(str(browse)+'/dashcam/routes?from=1001&to=2000') as response:
+            self.assertEqual((await response.json())['total'], 0)
+        async with self.client.get(str(browse)+'/dashcam/routes?from=900&to=1001') as response:
+            self.assertEqual((await response.json())['total'], 1)
+        for query in ('from=nan','from=-1','from=2000&to=1000','to=inf'):
+            async with self.client.get(str(browse)+'/dashcam/routes?'+query) as response:
+                self.assertEqual(response.status, 400)
         async with self.client.get(str(browse)+'/dashcam/thumbnail/'+segment) as response:
             self.assertEqual(response.status, 204)
             self.assertEqual(await response.read(), b'')
