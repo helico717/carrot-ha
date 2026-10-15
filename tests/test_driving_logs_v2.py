@@ -19,10 +19,14 @@ spec.loader.exec_module(v2)
 
 
 class ReplayV2Tests(unittest.TestCase):
+    def test_core_manifest_has_no_external_zstandard_requirement(self):
+        manifest=json.loads((ROOT/'custom_components/carrot_ha/manifest.json').read_text())
+        self.assertFalse(any(item.split('=')[0].startswith('zstandard') for item in manifest['requirements']))
+
     def test_original_engine_runner(self):
         engine = v2.engine_root()
         with tempfile.TemporaryDirectory() as directory:
-            source, output = Path(directory)/'rlog', Path(directory)/'output.json'
+            source, output = Path(directory)/'rlog.zst', Path(directory)/'output.json'
             fixture = '''
 import sys
 from pathlib import Path
@@ -45,7 +49,15 @@ for i in range(3):
     model.position.y=[0.0]*21
     model.position.z=[0.0]*21
     model.position.t=[x/15 for x in range(0,101,5)]
-Path(sys.argv[2]).write_bytes(b''.join(e.to_bytes() for e in events))
+raw=b''.join(e.to_bytes() for e in events)
+if sys.version_info >= (3,14):
+    from compression import zstd
+    compress=zstd.compress
+else:
+    import zstandard
+    compress=zstandard.ZstdCompressor().compress
+half=len(raw)//2
+Path(sys.argv[2]).write_bytes(compress(raw[:half])+compress(raw[half:]))
 '''
             environment = {**os.environ,'PYTHONPATH':os.pathsep.join(sys.path),'OPENBLAS_NUM_THREADS':'1'}
             result = subprocess.run([sys.executable,'-c',fixture,str(engine),str(source)],env=environment,capture_output=True,text=True,timeout=30)

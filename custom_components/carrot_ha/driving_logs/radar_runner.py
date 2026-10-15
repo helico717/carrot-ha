@@ -5,6 +5,22 @@ from pathlib import Path
 import sys
 import traceback
 
+
+def install_stdlib_zstd():
+    """Adapt the original engine's streaming API to HA's Python 3.14 stdlib."""
+    if sys.version_info < (3, 14):
+        return
+    from compression import zstd
+    from types import ModuleType
+
+    class ZstdDecompressor:
+        def stream_reader(self, source):
+            return zstd.ZstdFile(source, 'rb')
+
+    adapter = ModuleType('zstandard')
+    adapter.ZstdDecompressor = ZstdDecompressor
+    sys.modules['zstandard'] = adapter
+
 if __name__ == '__main__':
     try:
         if os.name == 'posix':
@@ -13,6 +29,7 @@ if __name__ == '__main__':
             resource.setrlimit(resource.RLIMIT_AS, (1536 * 1024**2, 1536 * 1024**2))
         engine, source, output, sensor, flip = sys.argv[1:]
         sys.path.insert(0, engine)
+        install_stdlib_zstd()
         from openpilot.selfdrive.carrot.radar.tools.radar_web_export import export_frames
         from openpilot.selfdrive.carrot.radar.tools.radar_validation_replay import load_frames
         frames = load_frames(Path(source), radar_track_flip={'recorded':None,'normal':False,'flipped':True}[flip])

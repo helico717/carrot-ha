@@ -71,7 +71,10 @@ Carrot Routes 원본 영상/레이더 검증/시계열 그래프/분석 도구/�
 HA와 분리된 자식 프로세스에서 실제 재계산한다. 원본 기록 Lead와 재계산 Lead를 구분한다.
 차량 레이더 설정이나 Comma 파일을 변경하지 않는다. 원작자 서버를 조회/업로드하지 않는다.
 
-V2 첫 활성화에는 HA 재시작과 manifest의 numpy/pycapnp/zstandard 설치가 필요하다.
+V2 첫 활성화에는 HA 재시작과 manifest의 numpy/pycapnp 설치가 필요하다.
+Python3.14 HA에서는 Zstandard 압축을 표준 `compression.zstd`로 읽으며 외부 zstandard 패키지를
+통합의 필수 설치 항목으로 요구하지 않는다. 이전 직접 배포에서 이 패키지 설치 실패가 통합 전체를
+막은 장애를 수정했다. Python3.12 개발 테스트만 외부 zstandard를 사용한다.
 동시 실행 1개/대기 포함 최대4개, 300초 제한, POSIX 주소 공간 1.5GiB 제한을 적용한다.
 완료 분석은 OS 임시 영역에 gzip으로 최대128MiB 캐시하며 원본5GB 보관량/HA 백업에 넣지 않는다.
 실패하면 화면에 실패 상태와 다시 불러오기를 제공한다. HA 로그에는 engine error_type과

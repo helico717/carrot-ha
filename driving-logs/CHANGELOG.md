@@ -639,3 +639,12 @@
 - 확인: companion openpilot의 tools/carrot_route_vault/viewer.py 명령 생성, radar_view.js 화면/분석 범위, openpilot/tools/cabana 및 plotjuggler README와 jotpluggler 소스. 화면 명령은 PC 도구에 공유 범위 로그를 연결하며 차량 설정 명령이 아님. 레이더 재계산과 기록된 Lead를 구분.
 - 검증: 소스 읽기 비교만 수행. 첨부 주행의 원본 로그, 실제 외부 도구 실행 및 서버 접속 성공 여부는 확인하지 않음.
 - 배포: 설명 요청으로 실행 코드 변경·기기 접속·설치·재시작·태그/Release 없음. 조사 기록만 추가.
+## 2026-10-15 — 재시작 후 차량/로그 대시보드 구성 오류 조사
+
+- 사용자가 재시작·강력 새로고침 후 로그뿐 아니라 차량 대시보드도 구성 오류라고 보고했다. 직전 V2 공통 manifest 의존성 설치/통합 시작 실패 가능성과 실제 시작 오류를 조사한다. 로그 확인 없이 원인을 단정하지 않는다. HA 재시작/보호 모드 해제/Comma 수정/릴리즈 없음.
+- 첫 읽기 전용 `ha core logs`는401 Unauthorized로 접근 실패. 파일 로그와 사용자가 로그인한 HA 화면에서 진단을 이어간다. 아직 원인·수정·복구 미확인.
+- 실제 HA 시스템 로그 확인: 16:46:25 carrot_ha setup failed, Requirements not found ['zstandard==0.25.0']; 설치기는 cp314 ABI wheel을 찾지 못했다고 기록했다. 이어진 dashboard version API404가 차량/로그 구성 오류를 유발한다. 공식 PyPI에 wheel이 있다는 사실은 실제 HA 설치 성공을 보장하지 않았으며 앞선 검증 한계이다. 기존 서비스 전체를 선택적 분석 압축 의존성이 막도록 한 변경을 수정한다.
+- 수정: manifest에서 외부 zstandard 필수 항목을 제거한다. 별도 radar_runner의 Python3.14 실행에 한정해 표준 compression.zstd.ZstdFile로 원본의 ZstdDecompressor.stream_reader 호출을 연결한다. HA 프로세스의 모듈/기존 패키지를 변경하지 않으며 원본 엔진 zip/실차/보관 데이터는 그대로 둔다. Python3.12 개발 경로는 기존 외부 패키지 유지. 공식 PyPI에는 musllinux cp314 wheel도 있지만 실제 HA 설치기는 거부했으므로 wheel 부재/네트워크/인덱스 원인을 추가 단정하지 않는다.
+- 검증: 로컬 Python3.14 별도 의존성 폴더에 외부 zstandard를 설치하지 않고 연속2개 zstd 프레임으로 압축한 합성 rlog→원본 엔진→캐시 정리 통과(2건). Python3.12 주행 로그 전체31건 통과. GitHub CI에 python:3.14-alpine 컨테이너·binary-only numpy/pycapnp·외부 zstandard 부재 확인·동일 실제 엔진 검사를 추가했다. 이전 Ubuntu3.12 검증만으로 운영 호환성을 판단한 검증 공백을 보완한다.
+- 다음 단계: 수정 커밋/main 푸시·직접 HA2파일 교체/백업/해시·Alpine CI 확인. 사용자 재시작 전 복구 완료를 주장하지 않는다. 로그 API401 우회/보호 모드 변경/HA 재시작/릴리즈 없음.
+
