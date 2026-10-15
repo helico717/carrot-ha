@@ -1,3 +1,17 @@
+## 2026-10-15 — 사용자 정정: 왼쪽 상시 지도와 원본 Carrot Routes 리플레이 V2
+
+- 사용자가 이전 구현의 요구 해석 차이를 정정함. 지도 팝업이 아니라 왼쪽 상시 한반도 전체 idle 지도. 주행/세그먼트 선택 시 해당 전체 주행 경로, 세그먼트 선택은 경로 유지+위치 점 표시. 세그먼트 점3개 메뉴의 리플레이 아래 리플레이 V2 추가, 첨부 Carrot Routes 원본 화면으로 이동.
+- 원본 확인: openpilot tools/carrot_route_vault/{viewer.py,radar_view.js,radar.py}, production radar_web_export.py/radar_validation_replay.py. 단순 원본 replay insights 연결로 대체한 이전 작업은 이번 명시 요구를 충족하지 않았음을 기록한다.
+- 직접 반영/프리릴리즈 금지/운영 원본 공개 금지/Comma 소스 직접 수정 금지 유지. 원본 화면·실제 재계산 엔진을 고정 Git 소스로 가져오고 HA 인증/NAS 파일 경로에 어댑터로 연결한다. 엔진은 HA 라이브 처리와 분리한 제한된 자식 프로세스로 실행, 분석 파생물은 임시 디렉터리/용량 제한. 의존성·보관 정책·재시작 요구와 검증 결과를 후속 기록한다.
+- 구현: 왼쪽 상시 Leaflet 지도(초기33~43N/124~132E), 모바일 목록 위280px. 주행 미리보기/제목/경로 선택, 세그먼트 행 선택은 지도 선택으로 처리하며 영상은 메뉴에서 재생한다. 같은 주행 선택은 경로를 다시 내려받거나 제거하지 않고 위치 점만 이동한다. 다른 주행 선택/종료 시 이전 Worker 중단. 원본 wide CSS의 고정 높이와 지도 z-index가 목록/메뉴를 가리는 문제도 범위 한정 CSS로 보완했다.
+- V2: 원본 Git 5d69d6ae6904be65f00858a79bc861269291ce53에서404개 소스/스키마/DBC/LICENSE를1,838,188byte zip으로 재현 포장. SHA256 검증 추출 후 실제 production 엔진을 별도 프로세스로 실행한다. numpy>=2.0.0/pycapnp2.2.2/zstandard0.25.0 manifest 추가, 버전 불변. 작업1개/최대4개/300초/주소공간1.5GiB, 임시gzip128MiB 캐시·원자적 게시·통합 unload 정리. 라이브 HA log lock은 분석 완료를 기다리지 않는다.
+- 인증: V2 페이지/manifest/레이더/파일은 기존 entry 세션 인증, 파일 이름과 선택 세그먼트 번호 검증. 원본 분석 도구 명령은 선택 세그먼트만 허용하는15분 읽기 capability(최대8/entry/메모리)를 발급하며 전체 HA 토큰을 내보내지 않는다. 원작자 서버 연결/실제 전송 없음. 원본 코드·생성기·HTTP/runner/jobs·문서·테스트/CI가 관련 파일이다.
+- 로컬 검증: Python 주행 로그30건 통과. 실제 합성 Cap'n Proto 로그→원본 load_frames→ProductionDPathSelector→export_frames→별도 runner→gzip 캐시/정리 통과. HTTP 소켓은 HA/NAS-only 파일 Range, V2 인증/선택 번호/파일 whitelist, 도구 다른 route/entry 차단 및 만료401 통과. 기존 dashboard/GPS Node13건 통과.
+- Chromium: 상시 idle 지도/현지 날짜/실제 Leaflet vector canvas/경로 유지·점 이동/메뉴 V2 위치/모바일 overflow/외부 라이브 소켓0 통과. 원본 V2는 합성 영상의 실제 픽셀·영상/레이더 seek·센서 변경·canvas/그래프·분석 도구3종 표시·desktop/mobile 통과. 기존 원본 로그 UI/전송/플레이어 및 HUD GPU 회귀 통과. MediaRecorder 테스트 영상은 HTTP Range 없는 mock의 seek 제한으로 Blob URL fixture를 사용했으며 운영 HTTP Range는 별도 소켓 테스트로 검증했다.
+- 아직 운영 반영/HA 새 의존성 설치·재시작 후 실제 레이더 데이터/실제 외부 분석 도구 실행은 미확인. 다음 단계는 커밋·main push·HA 변경파일 백업/직접 설치/해시 검증·Linux CI 확인이다. 신규 릴리즈/태그 없음.
+- 배포 전 공식 PyPI 메타데이터에서 원본 pycapnp2.2.2의 cp314 Linux wheel 부재를 발견했다. HA에서 소스 빌드를 요구하지 않도록 cp314 manylinux2_28 x86_64/aarch64 wheel이 있는2.2.4로 manifest/CI를 변경하고 같은 엔진 테스트를 재수행한다. zstandard0.25.0 cp314 Linux2개 빌드도 확인. 로컬 테스트는 Python3.12이며 실제 HA3.14 의존성 설치 성공은 사용자 재시작 후 별도 확인 대상이다.
+- pycapnp2.2.4 재검증: Python30건 전부 통과. 설정/NAS 상태 Chromium도 통과. V2 영상 seek 검증은 영상 Blob fixture에서1.5초와 렌더링 픽셀 확인. 원본 HTTP Range는 NAS-only 포함별도206 검사 유지. 기본 보관5GB/30일 및 저장 데이터에는 이번 변경 없음.
+
 ## 2026-10-15 — 날짜 탐색·실제 GPS 지도·분석 연결 작업 중
 
 - 사용자 요청: 날짜 선택기, 해당 실제 주행 지도 구간, 로그 분석 화면 연결. 첨부 Carrot Routes 레이더 검증 화면은 참고이며 임의 외부 서버 접근·로그 공개 권한이 아니다.

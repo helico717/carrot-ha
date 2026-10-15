@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import hmac
 import math
+from pathlib import Path
 import secrets
 import time
 
@@ -135,7 +136,8 @@ class DeviceView(HomeAssistantView):
 class BrowserView(HomeAssistantView):
     url = '/api/carrot_ha/v1/driving_logs/{entry_id}/{area}/{action}'
     extra_urls = ['/api/carrot_ha/v1/driving_logs/{entry_id}/{area}/{action}/{segment}',
-                  '/api/carrot_ha/v1/driving_logs/{entry_id}/{area}/{action}/{segment}/{kind}']
+                  '/api/carrot_ha/v1/driving_logs/{entry_id}/{area}/{action}/{segment}/{kind}',
+                  '/api/carrot_ha/v1/driving_logs/{entry_id}/{area}/{action}/{segment}/{kind}/{index}']
     name = 'api:carrot_ha:driving_logs_browser'
     requires_auth = False
 
@@ -149,8 +151,43 @@ class BrowserView(HomeAssistantView):
             raise web.HTTPUnauthorized()
         return runtime
 
-    async def get(self, request, entry_id, area, action, segment=None, kind=None):
+    async def get(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'dashcam' and action == 'v2' and segment:
+            from .replay_v2 import RadarJobs, manifest, tool_commands
+            async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
+                store = await store_for(self.hass, runtime)
+                try:
+                    base = f'/api/carrot_ha/v1/driving_logs/{entry_id}/dashcam/v2/{segment}'
+                    value = await self.hass.async_add_executor_job(manifest, store, runtime['entry'], segment, base)
+                    if kind == 'file':
+                        if index not in {f['name'] for f in value['segments'][0]['files']}:
+                            raise web.HTTPNotFound()
+                        path = await self.hass.async_add_executor_job(store.directory, segment)
+                        return web.FileResponse(path / index, headers={'Cache-Control':'private, no-store', 'Referrer-Policy':'no-referrer'})
+                    if kind == 'radar':
+                        if index != str(value['firstSegment']):
+                            raise web.HTTPNotFound()
+                        source = await self.hass.async_add_executor_job(store.file, segment, 'rlog')
+                except (KeyError, ValueError, StopIteration):
+                    raise web.HTTPNotFound()
+                except OSError:
+                    raise web.HTTPServiceUnavailable()
+            if kind == 'radar':
+                async with runtime.setdefault('driving_log_v2_init_lock', asyncio.Lock()):
+                    jobs = runtime.get('driving_log_v2_jobs')
+                    if jobs is None:
+                        jobs = runtime['driving_log_v2_jobs'] = await self.hass.async_add_executor_job(RadarJobs, self.hass)
+                try:
+                    return await jobs.response(source, request.query.get('sensor', 'auto'), request.query.get('radar_track_flip', 'recorded'))
+                except OSError:
+                    raise web.HTTPServiceUnavailable()
+            if kind == 'manifest':
+                tool_commands(runtime, value, f'{request.scheme}://{request.host}', entry_id, segment)
+                return web.json_response(value, headers={'Cache-Control':'no-store'})
+            if kind is None:
+                return web.FileResponse(Path(__file__).parent.parent / 'frontend/carrot_logs/v2/route.html', headers={'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer'})
+            raise web.HTTPNotFound()
         if area == 'dashcam' and action == 'upload':
             return await self.upload(request, runtime, segment)
         if area not in {'dashcam', 'screenrecord'}:
@@ -228,8 +265,10 @@ class BrowserView(HomeAssistantView):
                 raise web.HTTPServiceUnavailable(text='NAS archive is temporarily unavailable; local logs remain accessible')
         return web.json_response(value, headers={'Cache-Control': 'no-store'})
 
-    async def post(self, request, entry_id, area, action, segment=None, kind=None):
+    async def post(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if index is not None:
+            raise web.HTTPNotFound()
         if area == 'dashcam' and action == 'upload':
             return await self.upload(request, runtime, segment)
         if area == 'dashcam' and action == 'read-state':
@@ -272,6 +311,60 @@ class BrowserView(HomeAssistantView):
         return web.json_response(value, headers={'Cache-Control': 'no-store'})
 
 
+class ToolsView(HomeAssistantView):
+    url = '/api/carrot_ha/v1/driving_logs_tools/{entry_id}/{token}/{tail:.*}'
+    name = 'api:carrot_ha:driving_logs_tools'
+    requires_auth = False
+
+    def __init__(self, hass):
+        self.hass = hass
+
+    async def get(self, request, entry_id, token, tail):
+        runtime = runtime_for(self.hass, entry_id)
+        item = runtime.get('driving_log_v2_tokens', {}).get(token)
+        if not item or item['expires'] <= time.monotonic():
+            raise web.HTTPUnauthorized()
+        name = item['segment']
+        async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
+            store = await store_for(self.hass, runtime)
+            try:
+                info = await self.hass.async_add_executor_job(store.segment_info, name)
+                if not info['complete']:
+                    raise KeyError(name)
+                prefix = f'/api/carrot_ha/v1/driving_logs_tools/{entry_id}/{token}'
+                headers = {'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer'}
+                if tail.startswith('file/'):
+                    filename = tail[5:]
+                    if filename not in info['files']:
+                        raise web.HTTPNotFound()
+                    directory = await self.hass.async_add_executor_job(store.directory, name)
+                    return web.FileResponse(directory / filename, headers=headers)
+                tail = tail.replace('api//v1/', 'api/v1/')
+                canonical = item['canonical']
+                if tail == f'api/v1/route/{canonical}/files':
+                    groups = {'logs':[],'qlogs':[],'cameras':[],'ecameras':[],'qcameras':[]}
+                    for filename in info['files']:
+                        group = {'rlog':'logs','qlog':'qlogs','fcamera':'cameras','ecamera':'ecameras','qcamera':'qcameras'}.get(filename.split('.')[0])
+                        if group:
+                            groups[group].append(f'{request.scheme}://{request.host}{prefix}/file/{filename}')
+                    value = groups
+                elif tail == f'api/v1/route/{canonical}':
+                    value = {'fullname':canonical,'maxrlog':int(name.rsplit('--',1)[1]),'maxqlog':int(name.rsplit('--',1)[1]),'segmentCount':1}
+                elif tail == 'api/v1/me/devices/':
+                    value = [{'dongle_id':item['device'],'alias':'HA selected segment','device_type':'shared'}]
+                elif tail == f"api/v1/devices/{item['device']}/routes_segments":
+                    value = [{'fullname':canonical,'maxqlog':int(name.rsplit('--',1)[1]),'start_time_utc_millis':int(info['recorded']*1000),'end_time_utc_millis':int((info['recorded']+60)*1000)}]
+                elif tail == 'api/v1/routes/preserved':
+                    value = []
+                else:
+                    raise web.HTTPNotFound()
+                return web.json_response(value, headers=headers)
+            except (KeyError, ValueError):
+                raise web.HTTPNotFound()
+            except OSError:
+                raise web.HTTPServiceUnavailable()
+
+
 def register(hass):
-    for cls in (SessionView, DeviceView, BrowserView):
+    for cls in (SessionView, DeviceView, BrowserView, ToolsView):
         hass.http.register_view(cls(hass))

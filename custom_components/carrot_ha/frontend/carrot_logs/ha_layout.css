@@ -1,4 +1,27 @@
 /* HA supplies the viewport; media loading must never determine its width. */
+#logsDashcamPanel:not([hidden]){display:grid;grid-template-columns:minmax(300px,42%) minmax(0,1fr);gap:12px;min-height:0}
+#logsDashcamPanel #haRouteExplorer{display:flex;flex-direction:column;width:auto;height:auto;min-width:0;max-width:none;margin:0;border:0;border-right:1px solid var(--md-outline-var);border-radius:0}
+#logsDashcamPanel #dashcamRoutes{min-width:0;width:100%}
+#haRouteMap{isolation:isolate;z-index:0}
+#logsDashcamPanel .dashcam-play-mark{display:none}
+#logsDashcamPanel .ha-map-selected{border-color:#ffad63;background:color-mix(in srgb,#ffad63 12%,var(--md-surface))}
+#logsDashcamPanel .dashcam-route-card{display:flex;flex-direction:column;min-width:0;height:auto;max-height:none}
+#logsDashcamPanel .dashcam-route-media{width:100%;flex:none}
+#logsDashcamPanel .dashcam-route-preview{height:auto;aspect-ratio:16/9;flex:none}
+#logsDashcamPanel .dashcam-route-media-info{display:none}
+#logsDashcamPanel .dashcam-route-main{min-width:0;width:100%;height:auto;padding:12px;box-sizing:border-box}
+#logsDashcamPanel .dashcam-route-head{display:flex;justify-content:space-between}
+#logsDashcamPanel .dashcam-route-titleblock{display:block;min-width:0;overflow-wrap:anywhere}
+#logsDashcamPanel .dashcam-segments{display:flex;flex-direction:column;margin-top:12px}
+#logsDashcamPanel .dashcam-segments.is-collapsed{display:none}
+#logsDashcamPanel .dashcam-selection-row{flex-direction:row;height:auto;flex-wrap:wrap;justify-content:flex-start}
+#logsDashcamPanel .dashcam-selection-row .smallBtn{width:auto;min-width:0}
+#logsDashcamPanel .dashcam-segment-list{height:auto;max-height:320px;min-height:0}
+@media(min-width:761px){#logsDashcamPanel .dashcam-segments.is-collapsed{display:flex}#logsDashcamPanel .dashcam-expand-btn{display:none}}
+@media(min-width:1100px){#logsDashcamPanel .dashcam-route-card{display:grid;grid-template-columns:minmax(160px,.8fr) minmax(0,1.2fr);align-items:start}#logsDashcamPanel .dashcam-route-main{padding:10px}#logsDashcamPanel .dashcam-route-title{font-size:13px}#logsDashcamPanel .dashcam-route-subtitle{font-size:11px}}
+#haReplayV2{padding:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;background:#080c0e;color:#eee}
+#haReplayV2[open]{display:flex;flex-direction:column}#haReplayV2 header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #39424b}#haReplayV2 iframe{flex:1;width:100%;min-height:0;border:0}
+@media(max-width:760px){#logsDashcamPanel:not([hidden]){display:flex;flex-direction:column}#logsDashcamPanel #haRouteExplorer{height:280px;min-height:280px;border-right:0;border-bottom:1px solid var(--md-outline-var)}#logsDashcamPanel #dashcamRoutes{flex:1;min-height:0}}
 #pageLogs { width: 100%; min-width: 0; box-sizing: border-box; }
 #haLogsStatus:empty { display: none; }
 .ha-log-datebar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 16px 8px;flex:none}

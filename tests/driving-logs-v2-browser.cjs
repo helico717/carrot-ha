@@ -1,0 +1,47 @@
+const {chromium}=require('playwright');
+const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],requests=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ const root=path.resolve('custom_components/carrot_ha/frontend/carrot_logs/v2');
+ const videoBytes=Buffer.from(await page.evaluate(async()=>{
+  const c=document.createElement('canvas');c.width=640;c.height=360;const context=c.getContext('2d');
+  const stream=c.captureStream(20),recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'}),chunks=[];
+  recorder.ondataavailable=e=>chunks.push(e.data);const done=new Promise(resolve=>recorder.onstop=resolve);recorder.start();
+  const timer=setInterval(()=>{context.fillStyle='#287b58';context.fillRect(0,0,640,360);},50);
+  await new Promise(resolve=>setTimeout(resolve,3200));clearInterval(timer);recorder.stop();await done;stream.getTracks().forEach(t=>t.stop());
+  return Array.from(new Uint8Array(await new Blob(chunks,{type:'video/webm'}).arrayBuffer()));
+ }));
+ const base='/api/carrot_ha/v1/driving_logs/test/dashcam/v2/00000220--c5d837c81f--0';
+ const frames=Array.from({length:61},(_,i)=>({time_s:i/20,video_time_s:i/20,path:[[0,0],[130,0]],lane_lines:[[[0,-1.8],[130,-1.8]],[[0,1.8],[130,1.8]]],lane_probs:[1,1],points:[{track_id:32,d_rel:30+i/3,y_rel:1,source:'front'}],model_leads:[],v_ego:15,steering_angle_deg:0,selection:{lead_one:{track_id:32,d_rel:30+i/3,y_rel:1,v_lead:14},cutin_diagnostics:[]}}));
+ await page.route('**/*',async route=>{
+  const url=new URL(route.request().url());requests.push(url.pathname+url.search);
+  if(url.pathname===base)return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'route.html'))});
+  if(url.pathname==='/synthetic.webm')return route.fulfill({contentType:'video/webm',body:videoBytes});
+  if(url.pathname.endsWith('/radar_view.js'))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'radar_view.js'))});
+  if(url.pathname===base+'/manifest')return route.fulfill({json:{route:'00000220--c5d837c81f',deviceId:'synthetic',segmentCount:1,firstSegment:0,lastSegment:0,totalSizeLabel:'18.8 MB',segments:[{name:'00000220--c5d837c81f--0',index:0,files:[],videoUrl:'/synthetic.webm'}],cabanaCommand:'API_HOST=synthetic ./cabana synthetic',plotJugglerCommand:'API_HOST=synthetic python3 -m openpilot.tools.plotjuggler.juggle synthetic',jotPlugglerCommand:'API_HOST=synthetic ./openpilot/tools/jotpluggler/jotpluggler synthetic'}});
+  if(url.pathname===base+'/radar/0')return route.fulfill({json:{schemaVersion:1,engine:'production-dpath-controller',sensor:'front',sensitivity:3,sourceVersion:'synthetic',radarToCamera:1.52,videoAligned:true,frames,graphs:{leadOne:[{color:'#f68e37',samples:frames.map(f=>[f.time_s,f.points[0].d_rel])}]}}});
+  return route.fulfill({status:404,body:''});
+ });
+ await page.goto('https://v2.test'+base);
+ await page.locator('.radar-status').filter({hasText:'61 프레임'}).waitFor();
+ await page.evaluate(async()=>{const v=document.querySelector('video');v.pause();v.src=URL.createObjectURL(await (await fetch('/synthetic.webm')).blob());v.load();});
+ assert.equal(await page.locator('#commands .tool-card').count(),3);
+ await page.waitForFunction(()=>document.querySelector('video').readyState>=2);
+ await page.evaluate(()=>{const v=document.querySelector('video');v.pause();if(!Number.isFinite(v.duration))v.currentTime=1e6;});
+ await page.waitForFunction(()=>Number.isFinite(document.querySelector('video').duration)&&!document.querySelector('video').seeking);
+ await page.locator('.radar-scrub').evaluate(s=>{s.value='1.5';s.dispatchEvent(new Event('input',{bubbles:true}));});
+ await page.waitForFunction(()=>!document.querySelector('video').seeking);
+ assert.match(await page.locator('[data-time]').textContent(),/1.50/);
+ assert.ok(await page.locator('video').evaluate(v=>{const c=document.createElement('canvas');c.width=4;c.height=4;const x=c.getContext('2d');x.drawImage(v,0,0,4,4);return x.getImageData(0,0,1,1).data[1]>80;}),'video pixels render');
+ for(const selector of ['.radar-map','.radar-graph'])assert.ok(await page.locator(selector).evaluate(c=>{const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return d.some((v,i)=>i%4===3&&v>0);}),selector+' is nonblank');
+ await page.locator('[data-sensor]').selectOption('corner');
+ await page.waitForFunction(()=>document.querySelector('.radar-status').textContent.includes('61 프레임'));
+ assert.ok(requests.some(url=>url.includes('sensor=corner')));
+ await page.screenshot({path:path.join(os.tmpdir(),'carrot-replay-v2-desktop.png'),fullPage:true});
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile no horizontal overflow');
+ await page.screenshot({path:path.join(os.tmpdir(),'carrot-replay-v2-mobile.png'),fullPage:true});
+ assert.deepEqual(errors,[]);
+ console.log('PASS original V2: radar map, timeline graph, scrub, sensor option, tool commands, desktop/mobile, no external requests');
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exit(1);});

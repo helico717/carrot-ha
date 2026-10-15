@@ -218,6 +218,8 @@ async def _options_updated(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
+        if jobs := hass.data[DOMAIN][entry.entry_id].get('driving_log_v2_jobs'):
+            await jobs.close()
         if task := hass.data[DOMAIN][entry.entry_id].get('driving_log_archive_task'):
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)

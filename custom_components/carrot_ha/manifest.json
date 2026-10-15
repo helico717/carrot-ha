@@ -15,7 +15,10 @@
   ],
   "requirements": [
     "Pillow>=10.0.0",
-    "xlrd==2.0.2"
+    "xlrd==2.0.2",
+    "numpy>=2.0.0",
+    "pycapnp==2.2.4",
+    "zstandard==0.25.0"
   ],
   "iot_class": "cloud_polling",
   "documentation": "https://github.com/helico717/carrot-ha",

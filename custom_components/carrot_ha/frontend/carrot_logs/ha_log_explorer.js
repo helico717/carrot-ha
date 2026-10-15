@@ -17,8 +17,8 @@
     for(const card of document.querySelectorAll('[data-route-card]')){
       if(card.querySelector('.ha-route-explore'))continue;
       const button=document.createElement('button');button.type='button';button.className='smallBtn ha-route-explore';button.textContent='지도 · 분석';
-      button.onclick=event=>{event.stopPropagation();open(card.dataset.routeCard).catch(error=>showAppToast(error.message));};
-      (card.querySelector('.dashcam-route-media-info') || card).append(button);
+      button.textContent='경로';button.onclick=event=>{event.stopPropagation();open(card.dataset.routeCard).catch(error=>showAppToast(error.message));};
+      (card.querySelector('.dashcam-route-titleblock') || card).append(button);
     }
   }
   async function calendarLoad(){
@@ -83,6 +83,7 @@
     if(point){if(!marker)marker=L.circleMarker([point.lat,point.lon],{radius:6,color:'#fff',weight:2,fillColor:'#ffad63',fillOpacity:1}).addTo(map);else marker.setLatLng([point.lat,point.lon]);}
     else{marker?.remove();marker=null;}
     $('haMapPosition').textContent=`${segment.split('--').at(-1)} · ${time.toFixed(1)}초`;
+    for(const tile of document.querySelectorAll('.dashcam-segment-tile'))tile.classList.toggle('ha-map-selected',tile.dataset.segment===segment);
   }
   function addSegment(segment,points){
     active.points.set(segment,points);let chunk=[];
@@ -112,29 +113,60 @@
     $('haMapStatus').textContent=count?`실제 GPS ${count.toLocaleString()}개 · ${done-failures} / ${done}개 구간${failures?` · 읽기 실패 ${failures}개`:''}${partial?` · 부분 로그 ${partial}개`:''}`:`유효한 GPS 기록 없음${failures?` · 읽기 실패 ${failures}개`:''}`;
   }
   async function open(routeId,segment,time=0){
+    if(active?.route===routeId){choose(segment||active.segment,time);return;}
     stop();const request=generation;let route=routes.get(routeId);
     if(window.CarrotVisionReplay?.isActive())$('carrotRoadVideo')?.pause();
-    if(!route){route=await getJson(`/api/dashcam/segments/${encodeURIComponent(routeId)}?limit=2000&sort=asc`);routes.set(routeId,route);}
+    if(!route || (route.segmentCount||0)>(route.segmentFolders||[]).length){route=await getJson(`/api/dashcam/segments/${encodeURIComponent(routeId)}?limit=2000&sort=asc`);routes.set(routeId,route);}
     if(request!==generation)return;
     const segments=sorted(route.segmentFolders || route.segments || []);if(!segments.length)throw Error('주행 세그먼트가 없습니다.');
     active={route:routeId,segments,segment:segments.includes(segment)?segment:segments[0],time,points:new Map(),controller:null};
     $('haMapTitle').textContent=routeId;
     const select=$('haMapSegment');select.replaceChildren();for(const name of segments){const option=document.createElement('option');option.value=name;const times=route.segmentTimes?.[name];option.textContent=`구간 ${name.split('--').at(-1)}${times?.endEpoch?' · '+new Date((times.startEpoch||times.endEpoch)*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):''}`;select.append(option);}select.value=active.segment;
-    const dialog=$('haRouteExplorer');if(!dialog.open)dialog.showModal();$('haMapStatus').textContent='지도 불러오는 중';
+    $('haMapStatus').textContent='지도 불러오는 중';
     const token=generation;
-    try{await leafletLoad();if(token!==generation||!dialog.open)return;if(!map){map=L.map('haRouteMap',{preferCanvas:true}).setView([0,0],2);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);map.on('movestart',()=>{if(!fitting)mapTouched=true;});}map.invalidateSize();await pathLoad();}catch(error){if(token===generation)$('haMapStatus').textContent=error.message;}
+    try{await initMap();if(token!==generation)return;map.invalidateSize();await pathLoad();}catch(error){if(token===generation)$('haMapStatus').textContent=error.message;}
+  }
+  async function initMap(){
+    await leafletLoad();if(map)return;
+    map=L.map('haRouteMap',{preferCanvas:true});
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
+    fitting=true;map.fitBounds([[33,124],[43,132]],{padding:[12,12],animate:false});fitting=false;
+    map.on('movestart',()=>{if(!fitting)mapTouched=true;});
+    new ResizeObserver(()=>map.invalidateSize()).observe($('haRouteMap'));
+  }
+  function openV2(segment){
+    if(!segment)return;const dialog=$('haReplayV2');
+    $('haReplayV2Frame').src=`${logsBase}/dashcam/v2/${encodeURIComponent(segment)}`;
+    if(!dialog.open)dialog.showModal();
   }
   async function replay(tab){
     if(!active)return;const {route,segment,segments,time}=active;
-    $('haRouteExplorer').close();
     try{await window.CarrotVisionReplay.start({route,segment,segments,title:route,titleForSegment:value=>value});const video=$('carrotRoadVideo');const seek=()=>{if(time>0&&Number.isFinite(video.duration))video.currentTime=Math.min(time,video.duration);};if(video.readyState>=1)seek();else video.addEventListener('loadedmetadata',seek,{once:true});if(tab)$(`carrotReplayInsights${tab}Tab`)?.click();}catch(error){showAppToast(error.message);}
   }
   function init(){
     if(started||!logsBase)return;started=true;
     const bar=document.createElement('div');bar.className='ha-log-datebar';bar.innerHTML='<button id="haLogDatePrevious" class="smallBtn" type="button" aria-label="이전 기록 날짜" title="이전 기록 날짜">‹</button><input id="haLogDate" type="date" aria-label="주행 로그 날짜"><button id="haLogDateNext" class="smallBtn" type="button" aria-label="다음 기록 날짜" title="다음 기록 날짜">›</button><button id="haLogAllDates" class="smallBtn" type="button" aria-pressed="true">전체 날짜</button><span id="haLogDateStatus" role="status"></span>';
     document.querySelector('.logs-tabbar').after(bar);
-    const dialog=document.createElement('dialog');dialog.id='haRouteExplorer';dialog.innerHTML='<header><h2 id="haMapTitle"></h2><button id="haMapClose" class="smallBtn" type="button" aria-label="주행 지도 닫기">닫기</button></header><div class="ha-map-toolbar"><select id="haMapSegment" aria-label="지도 주행 구간"></select><button id="haMapReload" class="smallBtn" type="button">경로 다시 불러오기</button><button id="haMapReplay" class="smallBtn" type="button">리플레이</button><button id="haMapAnalysis" class="smallBtn" type="button">로그 분석</button><button id="haMapSensors" class="smallBtn" type="button">전방 센서</button></div><div id="haRouteMap" aria-label="기록된 실제 주행 GPS 지도"></div><footer><span id="haMapStatus" role="status"></span><span id="haMapPosition"></span></footer>';
-    document.body.append(dialog);dialog.addEventListener('close',stop);dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});$('haMapClose').onclick=()=>dialog.close();$('haMapReload').onclick=()=>pathLoad().catch(error=>$('haMapStatus').textContent=error.message);$('haMapSegment').onchange=event=>choose(event.target.value);$('haMapReplay').onclick=()=>replay();$('haMapAnalysis').onclick=()=>replay('Advanced');$('haMapSensors').onclick=()=>replay('Sensors');
+    const panel=document.createElement('aside');panel.id='haRouteExplorer';panel.innerHTML='<header><h2 id="haMapTitle">주행 지도</h2></header><div class="ha-map-toolbar"><select id="haMapSegment" aria-label="지도 주행 구간"><option>주행 선택</option></select><button id="haMapReload" class="smallBtn" type="button" aria-label="경로 새로고침" title="경로 새로고침">↻</button></div><div id="haRouteMap" aria-label="기록된 실제 주행 GPS 지도"></div><footer><span id="haMapStatus" role="status"></span><span id="haMapPosition"></span></footer>';
+    $('logsDashcamPanel').prepend(panel);
+    $('haMapReload').onclick=()=>active&&pathLoad().catch(error=>$('haMapStatus').textContent=error.message);$('haMapSegment').onchange=event=>active&&choose(event.target.value);
+    initMap().catch(error=>$('haMapStatus').textContent=error.message);
+    const dialog=document.createElement('dialog');dialog.id='haReplayV2';dialog.innerHTML='<header><strong>리플레이 V2</strong><button class="smallBtn" type="button" aria-label="리플레이 V2 닫기">닫기</button></header><iframe id="haReplayV2Frame" title="Carrot Routes 리플레이 V2" referrerpolicy="no-referrer"></iframe>';document.body.append(dialog);
+    dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>$('haReplayV2Frame').src='about:blank');
+    let menuSegment='';
+    document.addEventListener('click',event=>{
+      const item=event.target.closest('[data-action]');if(!item)return;
+      if(item.dataset.action==='segment-menu'){menuSegment=item.dataset.segment;return;}
+      if(item.closest('#dashcamRoutes')&&item.dataset.route&&['play','toggle-route','select-route'].includes(item.dataset.action)){
+        if(item.dataset.action==='play'){event.preventDefault();event.stopImmediatePropagation();}
+        open(item.dataset.route,item.dataset.segment).catch(error=>showAppToast(error.message));
+      }
+    },true);
+    new MutationObserver(()=>{
+      const choices=$('appDialogChoices');if(!menuSegment||choices.hidden||choices.querySelector('.ha-replay-v2-choice'))return;
+      const original=[...choices.querySelectorAll('button')].find(button=>/^(리플레이|Replay)$/.test(button.textContent.trim()));if(!original)return;
+      const button=original.cloneNode(true),segment=menuSegment;button.classList.add('ha-replay-v2-choice');button.textContent='리플레이 V2';button.onclick=()=>{$('appDialogCancel')?.click();$('appDialog')?.close?.();openV2(segment);};original.after(button);
+    }).observe($('appDialogChoices'),{childList:true,attributes:true,subtree:true});
     $('haLogDate').onchange=event=>selectDate(event.target.value);$('haLogAllDates').onclick=()=>selectDate('');
     $('haLogDatePrevious').onclick=()=>selectDate(calendar.filter(day=>!selectedDate||day<selectedDate).at(-1)||selectedDate);
     $('haLogDateNext').onclick=()=>selectDate(calendar.find(day=>day>selectedDate)||selectedDate);
@@ -142,10 +174,10 @@
     for(const id of ['haLogDate','haLogDatePrevious','haLogDateNext','haLogAllDates'])$(id).disabled=true;
     calendarLoad().then(()=>window.CarrotLogsRuntime.dashcam.load({silent:true})).catch(error=>$('haLogDateStatus').textContent=[404,501].includes(error.status)?'날짜 검색은 HA 재시작 후 사용할 수 있습니다.':error.message);
     new MutationObserver(buttons).observe($('dashcamRoutes'),{childList:true,subtree:true});buttons();
-    document.addEventListener('visibilitychange',()=>{if(document.hidden&&dialog.open){stop();$('haMapStatus').textContent='경로 읽기 일시중지';}if(!document.hidden)calendarLoad().catch(()=>{});});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)calendarLoad().catch(()=>{});});
     window.addEventListener('pagehide',stop);
-    document.addEventListener('timeupdate',event=>{if(event.target.id!=='carrotRoadVideo'||!dialog.open)return;const status=window.CarrotVisionReplay.status();if(active?.points.has(status.segment))choose(status.segment,event.target.currentTime);},true);
+    document.addEventListener('timeupdate',event=>{if(event.target.id!=='carrotRoadVideo')return;const status=window.CarrotVisionReplay.status();if(active?.points.has(status.segment))choose(status.segment,event.target.currentTime);},true);
   }
-  window.CarrotLogExplorer={init,scopeURL,acceptPage,open,openForReplay:()=>{const status=window.CarrotVisionReplay.status();return open(status.route,status.segment,status.currentTime);}};
+  window.CarrotLogExplorer={init,scopeURL,acceptPage,open,openV2,openForReplay:()=>{const status=window.CarrotVisionReplay.status();$('btnCarrotReplayClose')?.click();return open(status.route,status.segment,status.currentTime);}};
   if(typeof logsStarted!=='undefined'&&logsStarted)init();
 })();

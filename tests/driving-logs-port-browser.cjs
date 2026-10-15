@@ -68,7 +68,8 @@ assert.equal(uploadStarts,1,'original confirmation/progress/result UI connects t
 await page.locator('#appDialogCancel').click();
 await page.locator('#logsMenuButton').click(); await page.getByText('내림차순', {exact:false}).waitFor();
 await page.keyboard.press('Escape');
-await page.locator('[data-action="play"]').first().click();
+await page.locator('[data-action="segment-menu"]').first().click();
+await page.locator('#appDialogChoices').getByText('재생',{exact:true}).click();
 await page.locator('.dashcam-player-close').waitFor();
 await page.waitForTimeout(300);
 assert.equal(await page.locator('video').getAttribute('src'), '/api/carrot_ha/v1/driving_logs/test/dashcam/video/'+segment);
