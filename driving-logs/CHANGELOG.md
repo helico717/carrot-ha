@@ -13,6 +13,9 @@
 - 최종 주행 로그 검사 25건 전부 통과(생략 없음). 복원 유지 작업은 파일시스템 복사 시 파일 단위 fsync + 전체 SHA256 commit/읽기 재검증을 사용해 HTTP 청크마다 fsync하는 수신 경로와 분리했다. 사용자 재시작/옵션 reload는 기존 executor 인덱스 쓰기 종료까지 기다려 중복 writer를 방지한다. 진행 중 초기 운영 복사 프로세스는 시작 시점 코드를 그대로 실행하며 변경된 코드로 중복 실행하지 않는다.
 - c68bb6b 커밋/main 푸시 완료. HA base 4efda17 비교 preflight 통과, 변경 10파일 백업·직접 설치·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c68bb6b5c385/before. 재시작하지 않았으므로 실행 활성화 대기. CI 38671493431 진행 중.
 - 설치 후 최종 코드 재검토에서 NAS 경로 확인/파일 stat의 이벤트 루프 blocking 가능성을 발견해 보완 중: 업로드 경로 확인은 entry 로그 lock 아래 executor, replay 크기는 검증 manifest를 사용한다. NAS-only 파일→합성 원작자 프로토콜 서버 전송 회귀 검사를 추가한다. 실제 원작자 서버로 시험 로그를 전송하지 않는다.
+- 보완 완료: defbf47 커밋/main 푸시, 주행 로그 26건 전부 통과. HA c68bb6b 대비 보완 2파일 직접 설치·해시 일치, 백업 driving-logs-hud-defbf47dfff9/before. HA 재시작 없음. 첫 코드 c68bb6b의 Linux 전체 CI 38671493431 success 확인(https://github.com/helico717/carrot-ha/actions/runs/38671493431). defbf47 최종 CI는 후속 확인한다. NAS 복사 145/318, 2,269,381,593바이트 검증 시점까지 오류 없음.
+- defbf47 Linux 전체 CI 38671747018 success 확인(https://github.com/helico717/carrot-ha/actions/runs/38671747018).
+- 마지막 안전성 보완: NAS 복제의 수신 complete와 HA 원본 회수 허용 replica_verified를 별도 영속 기록한다. 읽기 재검증 실패 후 다른 파일의 catalog 갱신으로 실패한 복제까지 회수 허용되는 위험을 막는다. 기존 marker 없는 복제는 유지 작업에서 다시 읽어 검증한다. 현재 실행 중 초기 seed는 이전 코드라 marker가 없고, HA 재시작 후 안전 재검증을 거친 뒤에만 5GB로 줄어든다. 재검증 실패/기존 marker 이행 회귀 검사 추가.
 
 ## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
 

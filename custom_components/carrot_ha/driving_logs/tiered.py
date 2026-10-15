@@ -127,7 +127,7 @@ class TieredLogStore:
             if name.rsplit('--', 1)[0] in expired:
                 continue
             archived = self.catalog['segments'].get(name, {})
-            if (not archived.get('complete') or not archived.get('hashes')
+            if (not archived.get('complete') or not archived.get('replica_verified') or not archived.get('hashes')
                     or archived.get('files') != item['files'] or archived.get('recorded') != item['recorded']
                     or (item.get('hashes') and item['hashes'] != archived['hashes'])):
                 raise OSError('NAS copy is not verified; local recording retained')
@@ -177,6 +177,8 @@ class TieredLogStore:
         backend = self._backend(name)
         result = backend.commit(name, hashes)
         if backend is self.nas:
+            backend.state['segments'][name]['replica_verified'] = True
+            backend._save()
             self._catalog()
         return result
 
@@ -248,7 +250,11 @@ class TieredLogStore:
         # Read back the published copy before the source may be reclaimed.
         for filename, expected in hashes.items():
             if digest(target.directory(name) / filename) != expected:
+                target.state['segments'][name]['replica_verified'] = False
+                target._save()
                 raise OSError('Replica read-back checksum mismatch')
+        target.state['segments'][name]['replica_verified'] = True
+        target._save()
 
     def maintain(self):
         """Bound each run to one migration/restore segment, independent of live telemetry."""
@@ -256,7 +262,8 @@ class TieredLogStore:
         if not nas:
             return {'phase': 'nas_unavailable'}
         for name, item in list(self.local.state['segments'].items()):
-            if item['complete'] and not nas.state['segments'].get(name, {}).get('complete'):
+            archived = nas.state['segments'].get(name, {})
+            if item['complete'] and not (archived.get('complete') and archived.get('replica_verified')):
                 route = name.rsplit('--', 1)[0]
                 if max(i['recorded'] for n, i in self.local.state['segments'].items()
                        if n.rsplit('--', 1)[0] == route) < self.clock() - RETENTION_SECONDS:

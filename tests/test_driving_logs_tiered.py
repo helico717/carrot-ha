@@ -129,3 +129,28 @@ class TieredTests(unittest.TestCase):
         store = module.TieredLogStore(self.path / 'separate', unrelated, 'car', clock=lambda: self.now, guard=self.guard)
         self.assertEqual(store.nas_status, 'unavailable')
         self.assertEqual((unrelated / 'keep.txt').read_text(), 'unrelated backup')
+
+    def test_failed_readback_never_authorizes_local_eviction_after_catalog_refresh(self):
+        self.online = False
+        self.upload('protected--0')
+        self.online = True
+        with patch.object(module, 'digest', return_value='incorrect'):
+            with self.assertRaisesRegex(OSError, 'checksum'):
+                self.store.maintain()
+        self.store._catalog()
+        with self.assertRaises(OSError):
+            self.store.protect({'protected'})
+        self.assertTrue(self.store.local.file('protected--0', 'rlog').exists())
+        self.assertEqual(self.store.maintain()['phase'], 'archiving')
+        self.store.protect({'protected'})
+
+    def test_legacy_replica_without_verified_marker_is_read_back_again(self):
+        self.upload('existing--0')
+        self.settle()
+        self.store.nas.state['segments']['existing--0'].pop('replica_verified')
+        self.store.nas._save()
+        self.store._catalog()
+        with self.assertRaises(OSError):
+            self.store.protect({'existing'})
+        self.assertEqual(self.store.maintain()['phase'], 'archiving')
+        self.store.protect({'existing'})
