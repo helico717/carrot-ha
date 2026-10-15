@@ -13,6 +13,8 @@
 - pycapnp2.2.4 재검증: Python30건 전부 통과. 설정/NAS 상태 Chromium도 통과. V2 영상 seek 검증은 영상 Blob fixture에서1.5초와 렌더링 픽셀 확인. 원본 HTTP Range는 NAS-only 포함별도206 검사 유지. 기본 보관5GB/30일 및 저장 데이터에는 이번 변경 없음.
 - 실행 코드57d5a6a79459c2127c2050247c1df13414de9f19 main 푸시 후 HA13파일 충돌검사·백업·직접 설치·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-57d5a6a79459/before. HA HTTP 지도JS/CSS/V2 HTML/JS4개200 확인. Linux 전체 회귀38700280073 success (https://github.com/helico717/carrot-ha/actions/runs/38700280073), 새 원본엔진 subprocess 검사도 포함. 아직 사용자 재시작 전이며 backend 활성화/운영 분석 완료로 보고하지 않는다.
 - 마지막 스크린샷 점검에서 모바일 지도 toolbar 줄바꿈으로 상태 footer가320px 패널 밖에 숨을 수 있는 문제를 보완했다. toolbar를 한 줄로 고정하고 지도 최소 높이를120px로 조정, footer가패널 안에 들어오는 assertion 추가. 이 좁은 화면 보완을 추가검증·커밋 후 재반영한다. 앞선 모바일 검증은 가로 overflow 중심이었고 세로 footer를 놓친 한계를 기록한다.
+- **최종 직접 반영:** 모바일 보완 c2560c4c123a32633477cedc60b320180d35eb33 main 푸시, Chromium 지도 재검증 통과·스크린샷 footer 직접 확인. HA CSS1파일 충돌검사/백업/설치/SHA256 일치, 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c2560c4c123a/before. 실제 HA HTTP200 및320px/toolbar 보완 문자열 확인. Linux 전체 회귀38700585160 success (https://github.com/helico717/carrot-ha/actions/runs/38700585160).
+- **사용자 단계/미확인:** 새 분석 의존성과 HTTP 경로 활성화를 위해 사용자 HA 재시작 후 브라우저 강력 새로고침 필요. 에이전트 재시작·Comma 수정·외부 원작자 서버 접근·릴리즈/태그 발행 없음. 실 운영 rlog의 GPS/레이더 신호와60초 전체 분석 시간, HA 의존성 설치·실제 외부 도구 실행은 아직 검증하지 않았다. 파일 배포/합성 검증/실운영 검증을 구분한다.
 
 ## 2026-10-15 — 날짜 탐색·실제 GPS 지도·분석 연결 작업 중
 
