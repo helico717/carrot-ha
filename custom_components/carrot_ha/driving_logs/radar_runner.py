@@ -6,16 +6,77 @@ import sys
 import traceback
 
 
-def install_stdlib_zstd():
+def native_zstd_reader(source):
+    """Bounded libzstd fallback for HA Python builds without the optional _zstd."""
+    import ctypes as c
+    import ctypes.util
+    import io
+    library = ctypes.util.find_library('zstd') or 'libzstd.so.1'
+    lib = c.CDLL(library)
+
+    class Buffer(c.Structure):
+        _fields_ = [('data', c.c_void_p), ('size', c.c_size_t), ('pos', c.c_size_t)]
+
+    lib.ZSTD_createDStream.restype = c.c_void_p
+    lib.ZSTD_freeDStream.argtypes = [c.c_void_p]
+    lib.ZSTD_initDStream.argtypes = [c.c_void_p]
+    lib.ZSTD_initDStream.restype = c.c_size_t
+    lib.ZSTD_decompressStream.argtypes = [c.c_void_p, c.POINTER(Buffer), c.POINTER(Buffer)]
+    lib.ZSTD_decompressStream.restype = c.c_size_t
+    lib.ZSTD_isError.argtypes = [c.c_size_t]
+    lib.ZSTD_isError.restype = c.c_uint
+    stream = lib.ZSTD_createDStream()
+    if not stream:
+        raise MemoryError('Zstandard stream allocation failed')
+    result = io.BytesIO()
+    output_data = c.create_string_buffer(131072)
+    try:
+        if lib.ZSTD_isError(lib.ZSTD_initDStream(stream)):
+            raise ValueError('Zstandard initialization failed')
+        remaining = 0
+        while chunk := source.read(131072):
+            input_data = c.create_string_buffer(chunk)
+            incoming = Buffer(c.cast(input_data, c.c_void_p), len(chunk), 0)
+            while True:
+                outgoing = Buffer(c.cast(output_data, c.c_void_p), len(output_data), 0)
+                previous = incoming.pos
+                remaining = lib.ZSTD_decompressStream(stream, c.byref(outgoing), c.byref(incoming))
+                if lib.ZSTD_isError(remaining):
+                    raise ValueError('Invalid Zstandard frame')
+                if result.tell() + outgoing.pos > 512 * 1024**2:
+                    raise ValueError('Decompressed log exceeds limit')
+                result.write(output_data.raw[:outgoing.pos])
+                if incoming.pos == previous and outgoing.pos == 0:
+                    raise ValueError('Zstandard stream made no progress')
+                if incoming.pos == incoming.size and outgoing.pos < len(output_data):
+                    break
+        if remaining:
+            raise ValueError('Truncated Zstandard frame')
+        result.seek(0)
+        return result
+    except BaseException:
+        result.close()
+        raise
+    finally:
+        lib.ZSTD_freeDStream(stream)
+
+
+def install_stdlib_zstd(force_native=False):
     """Adapt the original engine's streaming API to HA's Python 3.14 stdlib."""
     if sys.version_info < (3, 14):
         return
-    from compression import zstd
     from types import ModuleType
+    try:
+        if force_native:
+            raise ImportError('Native fallback test')
+        from compression import zstd
+        reader = lambda source: zstd.ZstdFile(source, 'rb')
+    except ImportError:
+        reader = native_zstd_reader
 
     class ZstdDecompressor:
         def stream_reader(self, source):
-            return zstd.ZstdFile(source, 'rb')
+            return reader(source)
 
     adapter = ModuleType('zstandard')
     adapter.ZstdDecompressor = ZstdDecompressor

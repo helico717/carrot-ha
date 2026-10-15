@@ -19,6 +19,22 @@ spec.loader.exec_module(v2)
 
 
 class ReplayV2Tests(unittest.TestCase):
+    @unittest.skipUnless(sys.version_info >= (3,14) and sys.platform.startswith('linux'),'Linux native fallback')
+    def test_missing_python_zstd_extension(self):
+        import io
+        from compression import zstd
+        runner_spec=importlib.util.spec_from_file_location('radar_runner_test',v2.ROOT/'radar_runner.py')
+        runner=importlib.util.module_from_spec(runner_spec);runner_spec.loader.exec_module(runner)
+        raw=b'raw synthetic log'*100000
+        compressed=zstd.compress(raw[:700000])+zstd.compress(raw[700000:])
+        with runner.native_zstd_reader(io.BytesIO(compressed)) as result:
+            self.assertEqual(result.read(),raw)
+        with self.assertRaises(ValueError):
+            runner.native_zstd_reader(io.BytesIO(compressed[:-1]))
+        runner.install_stdlib_zstd(force_native=True)
+        import zstandard
+        with zstandard.ZstdDecompressor().stream_reader(io.BytesIO(compressed)) as result:
+            self.assertEqual(result.read(),raw)
     def test_core_manifest_has_no_external_zstandard_requirement(self):
         manifest=json.loads((ROOT/'custom_components/carrot_ha/manifest.json').read_text())
         self.assertFalse(any(item.split('=')[0].startswith('zstandard') for item in manifest['requirements']))
@@ -70,6 +86,11 @@ Path(sys.argv[2]).write_bytes(compress(raw[:half])+compress(raw[half:]))
             self.assertEqual(len(data['frames']),3)
             self.assertIn('leadOne',data['graphs'])
             self.assertTrue(data['sourceVersion'])
+            if sys.version_info >= (3,14) and sys.platform.startswith('linux'):
+                blocked="import sys,runpy;sys.modules['compression.zstd']=None;sys.argv=sys.argv[1:];runpy.run_path(sys.argv[0],run_name='__main__')"
+                result=subprocess.run([sys.executable,'-c',blocked,str(v2.ROOT/'radar_runner.py'),str(engine),str(source),str(output),'auto','recorded'],env=environment,capture_output=True,text=True,timeout=60)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(json.loads(output.read_text())['engine'],'production-dpath-controller')
             async def verify_jobs():
                 async def executor(function,*args):
                     return await asyncio.to_thread(function,*args)

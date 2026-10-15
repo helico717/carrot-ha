@@ -1,58 +1,22 @@
 /* HA supplies the viewport; media loading must never determine its width. */
-#logsDashcamPanel:not([hidden]){display:grid;grid-template-columns:minmax(300px,42%) minmax(0,1fr);gap:12px;min-height:0}
-#logsDashcamPanel #haRouteExplorer{display:flex;flex-direction:column;width:auto;height:auto;min-width:0;max-width:none;margin:0;border:0;border-right:1px solid var(--md-outline-var);border-radius:0}
-#logsDashcamPanel #dashcamRoutes{min-width:0;width:100%}
-#haRouteMap{isolation:isolate;z-index:0}
-#logsDashcamPanel .dashcam-play-mark{display:none}
-#logsDashcamPanel .ha-map-selected{border-color:#ffad63;background:color-mix(in srgb,#ffad63 12%,var(--md-surface))}
-#logsDashcamPanel .dashcam-route-card{display:flex;flex-direction:column;min-width:0;height:auto;max-height:none}
-#logsDashcamPanel .dashcam-route-media{width:100%;flex:none}
-#logsDashcamPanel .dashcam-route-preview{height:auto;aspect-ratio:16/9;flex:none}
-#logsDashcamPanel .dashcam-route-media-info{display:none}
-#logsDashcamPanel .dashcam-route-main{min-width:0;width:100%;height:auto;padding:12px;box-sizing:border-box}
-#logsDashcamPanel .dashcam-route-head{display:flex;justify-content:space-between}
-#logsDashcamPanel .dashcam-route-titleblock{display:block;min-width:0;overflow-wrap:anywhere}
-#logsDashcamPanel .dashcam-segments{display:flex;flex-direction:column;margin-top:12px}
-#logsDashcamPanel .dashcam-segments.is-collapsed{display:none}
-#logsDashcamPanel .dashcam-selection-row{flex-direction:row;height:auto;flex-wrap:wrap;justify-content:flex-start}
-#logsDashcamPanel .dashcam-selection-row .smallBtn{width:auto;min-width:0}
-#logsDashcamPanel .dashcam-segment-list{height:auto;max-height:320px;min-height:0}
-@media(min-width:761px){#logsDashcamPanel .dashcam-segments.is-collapsed{display:flex}#logsDashcamPanel .dashcam-expand-btn{display:none}}
-@media(min-width:1100px){#logsDashcamPanel .dashcam-route-card{display:grid;grid-template-columns:minmax(160px,.8fr) minmax(0,1.2fr);align-items:start}#logsDashcamPanel .dashcam-route-main{padding:10px}#logsDashcamPanel .dashcam-route-title{font-size:13px}#logsDashcamPanel .dashcam-route-subtitle{font-size:11px}}
-#haReplayV2{padding:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;background:#080c0e;color:#eee}
-#haReplayV2[open]{display:flex;flex-direction:column}#haReplayV2 header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #39424b}#haReplayV2 iframe{flex:1;width:100%;min-height:0;border:0}
-@media(max-width:760px){#logsDashcamPanel:not([hidden]){display:flex;flex-direction:column}#logsDashcamPanel #haRouteExplorer{height:280px;min-height:280px;border-right:0;border-bottom:1px solid var(--md-outline-var)}#logsDashcamPanel #dashcamRoutes{flex:1;min-height:0}}
-#pageLogs { width: 100%; min-width: 0; box-sizing: border-box; }
-#haLogsStatus:empty { display: none; }
+#pageLogs{width:100%;min-width:0;box-sizing:border-box}
+#haLogsStatus:empty{display:none}
 .ha-log-datebar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 16px 8px;flex:none}
 .ha-log-datebar input{color:var(--md-on-surface);background:var(--md-surface-cont);border:1px solid var(--md-outline-var);border-radius:6px;padding:6px 8px;font:inherit;min-width:0;color-scheme:dark}
 .ha-log-datebar .smallBtn{min-height:36px}.ha-log-datebar>span{font-size:12px;color:var(--md-on-surface-var)}
-.ha-route-explore{margin-top:8px;position:relative;z-index:3}
-#haRouteExplorer{box-sizing:border-box;width:min(1200px,calc(100vw - 20px));height:min(820px,calc(100dvh - 24px));max-width:none;max-height:none;border:1px solid var(--md-outline-var);border-radius:8px;padding:0;background:var(--md-surface);color:var(--md-on-surface);overflow:hidden}
-#haRouteExplorer[open]{display:flex;flex-direction:column}#haRouteExplorer::backdrop{background:#000a}
-#haRouteExplorer header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--md-outline-var)}
-#haRouteExplorer h2{font-size:16px;line-height:1.5;margin:0;min-width:0;overflow-wrap:anywhere}
-.ha-map-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 16px}.ha-map-toolbar select{min-width:0;max-width:100%;background:var(--md-surface-cont);color:var(--md-on-surface);border:1px solid var(--md-outline-var);border-radius:6px;min-height:36px;padding:4px 8px}
-#haRouteMap{flex:1;min-height:200px;min-width:0;background:#1a2525}#haRouteExplorer footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 16px;font-size:12px}
-@media(max-width:600px){.ha-log-datebar{gap:6px;padding-inline:12px}.ha-map-toolbar{padding:8px 12px}.ha-map-toolbar select{flex-basis:100%}#haRouteExplorer header{padding:10px 12px}}
-.ha-thumb-loading.dashcam-segment-thumb { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; border: 0; border-radius: 0; pointer-events: none; }
-#pageLogs .logs-shell { width: 100%; max-width: none; min-width: 0; margin: 0; box-sizing: border-box; }
-#haRecordedReplay .carrot-replay-controls__heading { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-#haRecordedReplay .carrot-replay-controls__segmentPicker--title { flex: 1; min-width: 0; max-width: 600px; }
-#haRecordedReplay .carrot-replay-controls__segmentSelect { width: 100%; min-width: 0; text-overflow: ellipsis; }
-.ha-replay-step { flex: 0 0 auto; min-width: 52px; height: 44px; padding: 0 12px; border-radius: var(--r-sm); }
-@media (max-width: 600px) {
-  #haRecordedReplay .carrot-replay-controls__header { flex-wrap: wrap; gap: 6px; }
-  #haRecordedReplay .carrot-replay-controls__heading { flex-basis: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 44px 52px 52px; gap: 6px; }
-  #haRecordedReplay .carrot-replay-controls__headerActions { margin-left: auto; }
-  #haRecordedReplay .carrot-replay-controls__segmentPicker--title { max-width: none; }
-  #haRecordedReplay #carrotStage { --carrot-replay-titlebar-height: 104px; }
-}
-@media(max-width:760px){
-  #logsDashcamPanel #haRouteExplorer{height:320px;min-height:320px}
-  #haRouteExplorer header{padding:8px 12px;flex:none}
-  #haRouteExplorer .ha-map-toolbar{display:grid;grid-template-columns:minmax(0,1fr) 40px;padding:6px 12px;flex:none}
-  #haRouteExplorer .ha-map-toolbar select{width:100%;flex-basis:auto}
-  #haRouteExplorer #haRouteMap{min-height:120px}
-  #haRouteExplorer footer{padding:6px 12px;flex:none;font-size:11px}
+#haReplayV2{padding:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;background:#080c0e;color:#eee}
+#haReplayV2[open]{display:flex;flex-direction:column}#haReplayV2 header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #39424b}#haReplayV2 iframe{flex:1;width:100%;min-height:0;border:0}
+.ha-thumb-loading.dashcam-segment-thumb{position:absolute;inset:0;z-index:0;width:100%;height:100%;border:0;border-radius:0;pointer-events:none}
+#pageLogs .logs-shell{width:100%;max-width:none;min-width:0;margin:0;box-sizing:border-box}
+#haRecordedReplay .carrot-replay-controls__heading{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+#haRecordedReplay .carrot-replay-controls__segmentPicker--title{flex:1;min-width:0;max-width:600px}
+#haRecordedReplay .carrot-replay-controls__segmentSelect{width:100%;min-width:0;text-overflow:ellipsis}
+.ha-replay-step{flex:0 0 auto;min-width:52px;height:44px;padding:0 12px;border-radius:var(--r-sm)}
+@media(max-width:600px){
+ .ha-log-datebar{gap:6px;padding-inline:12px}
+ #haRecordedReplay .carrot-replay-controls__header{flex-wrap:wrap;gap:6px}
+ #haRecordedReplay .carrot-replay-controls__heading{flex-basis:100%;display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:6px}
+ #haRecordedReplay .carrot-replay-controls__headerActions{margin-left:auto}
+ #haRecordedReplay .carrot-replay-controls__segmentPicker--title{max-width:none}
+ #haRecordedReplay #carrotStage{--carrot-replay-titlebar-height:104px}
 }

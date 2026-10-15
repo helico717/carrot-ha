@@ -15,12 +15,10 @@ openpilot commit: `baf47a6facfe692bf27b1084931b7dd04ea39f40`
 기록 데이터를 원본 렌더러에 연결해 모델 경로·차선·도로 경계·선행 차량 및 HUD를 표시한다.
 라이브 소켓·실차 설정 쓰기는 비활성화한다. 별도 AR 내비게이션 표지 활성화는 이번 범위 밖이다.
 
-2026-10-15: replay_log_worker.js에 선택적 gpsOnly 모드를 추가했다. 기존 replay 기본값은
-유지하며 HA 지도에서는 gpsLocationExternal/qRoadEncodeIdx만 해석한다. 원본 framing·압축·
-타임라인 기준을 재사용하고 invalid 이벤트/미확인 fix 좌표는 지도에서 제외한다.
-ha_log_explorer.js는 기존 Leaflet 번들과 HA 인증 파일 URL만 사용한다.
-2026-10-15 사용자 정정 후 지도는 왼쪽 상시 패널로 변경했으며 선택 세그먼트의 위치 점과 전체
-주행 경로를 함께 유지한다. 기존 replay insights와 별도로 아래 V2를 제공한다.
+2026-10-15 최신 사용자 요청으로 주행 로그 지도를 폐기했다. 지도 패널/버튼/Leaflet 로드와
+gpsOnly 모드를 제거했다. ha_log_explorer.js는 날짜 검색/V2 메뉴만 담당하며 원본 영상 행 동작을 유지한다.
+기존 replay insights와 별도로 아래 V2를 제공한다. v2/navigation.js는 인증된 같은 주행 목록으로
+이전/다음·세그먼트 드롭다운을 연결하며 원본 radar_view의 화면/재생 수명은 그대로 사용한다.
 
 리플레이 V2 원본: openpilot `5d69d6ae6904be65f00858a79bc861269291ce53`의
 `tools/carrot_route_vault/{viewer.py,radar_view.js}`와 원본 bundle SOURCES의 production 엔진.

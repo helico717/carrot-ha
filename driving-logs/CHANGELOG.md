@@ -648,3 +648,10 @@
 - 검증: 로컬 Python3.14 별도 의존성 폴더에 외부 zstandard를 설치하지 않고 연속2개 zstd 프레임으로 압축한 합성 rlog→원본 엔진→캐시 정리 통과(2건). Python3.12 주행 로그 전체31건 통과. GitHub CI에 python:3.14-alpine 컨테이너·binary-only numpy/pycapnp·외부 zstandard 부재 확인·동일 실제 엔진 검사를 추가했다. 이전 Ubuntu3.12 검증만으로 운영 호환성을 판단한 검증 공백을 보완한다.
 - 다음 단계: 수정 커밋/main 푸시·직접 HA2파일 교체/백업/해시·Alpine CI 확인. 사용자 재시작 전 복구 완료를 주장하지 않는다. 로그 API401 우회/보호 모드 변경/HA 재시작/릴리즈 없음.
 - **수정 배포 완료/활성화 대기:** c4f59bb305c5bb7d4a51d20026e12602e9fdd615 main 푸시, HA manifest/runner2파일 충돌 검사·백업·직접 교체·SHA256 전부 일치. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c4f59bb305c5/before. GitHub Linux 회귀 및 신규 Alpine Python3.14 실제 압축 엔진 검사38702092731 success (https://github.com/helico717/carrot-ha/actions/runs/38702092731). 실행 중 HA의 기존 setup 실패를 다시 시도하려면 사용자 재시작이 필요하다. 운영 두 대시보드 복구/실제 V2 분석은 재시작 후 확인 대상이다. 신규 릴리즈/태그 없음.
+## 2026-10-15 — V2 분석 실패 수정·세그먼트 탐색·지도 폐기 요청
+
+- 사용자: V2 레이더 분석 실패 및 하단 그래프 미표시, V2 내부 이전/다음·드롭다운 세그먼트 탐색 요청. 주행 지도 시스템은 폐기/삭제한다. 날짜 검색과 기존 차량 대시보드의 지도는 제거 대상이 아니다. 원인 로그 확인과 V2 데이터 경로를 조사하며 운영 반영/실제 성공은 별도 기록한다. 릴리즈 금지·직접 HA 반영·사용자 재시작 유지.
+- 운영 원인 확인: HA Replay V2 engine code1/ModuleNotFoundError, radar_runner.py install_stdlib_zstd→compression.zstd __init__.py29에서 실패. 이전 Python3.14-Alpine 검증에는 _zstd가 있지만 HA 빌드에는 선택 확장이 없다는 차이를 놓쳤다. 레이더 결과가 없으므로 동일 응답을 쓰는 아래 그래프도 비어 있다.
+- 수정: 별도 자식 프로세스 안에서 표준 압축 모듈이 없을 때 시스템 libzstd streaming API를 ctypes로 호출하는 제한 크기 fallback. 연속 프레임/손상·잘림/무진행/해제512MiB 상한·native context 해제를 처리한다. HA 필수 패키지를 다시 늘리지 않는다. 원본 엔진과 private 로그는 변경/내보내지 않는다.
+- 지도 폐기: 주행 로그의 Leaflet/타일/상시 지도·경로 선택·V1 지도 버튼·gpsOnly Worker 모드·해당 테스트 제거, 원본 전체 폭 목록/영상 클릭 동작 복구. 날짜와 기존 차량 지도는 보존. V2 navigation.js가 같은 주행 세그먼트 메타데이터를 페이지 조회해 정렬·현재 구간·이전/다음 경계·드롭다운을 제공하며 선택한 세그먼트만 읽는다. 새 backend 경로는 필요 없다.
+- 로컬 검증: 주행 로그 Python32건(31통과/Linux-only native1 skip), Python3.14 원본 압축 엔진2통과/native1 skip. Chromium 날짜/지도 DOM·Leaflet 요청0·GPS Worker0/전체 너비/V2 메뉴, V2 실제 합성 영상 픽셀·seek·하단 그래프·센서 변경·이전/다음/드롭다운/처음·끝 경계·현재 구간 표시·모바일 가로 overflow 통과. 기존 원본 전송/영상 UI 및 HUD GPU 회귀 통과. native fallback은 Linux CI와 실제 HA 검증 전까지 완료로 보지 않는다.

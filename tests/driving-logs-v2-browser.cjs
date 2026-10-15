@@ -16,11 +16,13 @@ const fs=require('fs'),path=require('path'),os=require('os'),assert=require('ass
  const frames=Array.from({length:61},(_,i)=>({time_s:i/20,video_time_s:i/20,path:[[0,0],[130,0]],lane_lines:[[[0,-1.8],[130,-1.8]],[[0,1.8],[130,1.8]]],lane_probs:[1,1],points:[{track_id:32,d_rel:30+i/3,y_rel:1,source:'front'}],model_leads:[],v_ego:15,steering_angle_deg:0,selection:{lead_one:{track_id:32,d_rel:30+i/3,y_rel:1,v_lead:14},cutin_diagnostics:[]}}));
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url());requests.push(url.pathname+url.search);
-  if(url.pathname===base)return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'route.html'))});
+  if(/\/dashcam\/v2\/00000220--c5d837c81f--[012]$/.test(url.pathname))return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'route.html'))});
+  if(url.pathname.endsWith('/navigation.js'))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'navigation.js'))});
+  if(url.pathname.includes('/dashcam/segments/'))return route.fulfill({json:{segments:[0,1,2].map(i=>'00000220--c5d837c81f--'+i),hasMore:false}});
   if(url.pathname==='/synthetic.webm')return route.fulfill({contentType:'video/webm',body:videoBytes});
   if(url.pathname.endsWith('/radar_view.js'))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'radar_view.js'))});
-  if(url.pathname===base+'/manifest')return route.fulfill({json:{route:'00000220--c5d837c81f',deviceId:'synthetic',segmentCount:1,firstSegment:0,lastSegment:0,totalSizeLabel:'18.8 MB',segments:[{name:'00000220--c5d837c81f--0',index:0,files:[],videoUrl:'/synthetic.webm'}],cabanaCommand:'API_HOST=synthetic ./cabana synthetic',plotJugglerCommand:'API_HOST=synthetic python3 -m openpilot.tools.plotjuggler.juggle synthetic',jotPlugglerCommand:'API_HOST=synthetic ./openpilot/tools/jotpluggler/jotpluggler synthetic'}});
-  if(url.pathname===base+'/radar/0')return route.fulfill({json:{schemaVersion:1,engine:'production-dpath-controller',sensor:'front',sensitivity:3,sourceVersion:'synthetic',radarToCamera:1.52,videoAligned:true,frames,graphs:{leadOne:[{color:'#f68e37',samples:frames.map(f=>[f.time_s,f.points[0].d_rel])}]}}});
+  if(url.pathname.endsWith('/manifest')){const index=Number(url.pathname.split('/').at(-2).split('--').at(-1));return route.fulfill({json:{route:'00000220--c5d837c81f',deviceId:'synthetic',segmentCount:1,firstSegment:index,lastSegment:index,totalSizeLabel:'18.8 MB',segments:[{name:'00000220--c5d837c81f--'+index,index,files:[],videoUrl:'/synthetic.webm'}],cabanaCommand:'API_HOST=synthetic ./cabana synthetic',plotJugglerCommand:'API_HOST=synthetic python3 -m openpilot.tools.plotjuggler.juggle synthetic',jotPlugglerCommand:'API_HOST=synthetic ./openpilot/tools/jotpluggler/jotpluggler synthetic'}});}
+  if(/\/radar\/[012]$/.test(url.pathname))return route.fulfill({json:{schemaVersion:1,engine:'production-dpath-controller',sensor:'front',sensitivity:3,sourceVersion:'synthetic',radarToCamera:1.52,videoAligned:true,frames,graphs:{leadOne:[{color:'#f68e37',samples:frames.map(f=>[f.time_s,f.points[0].d_rel])}]}}});
   return route.fulfill({status:404,body:''});
  });
  await page.goto('https://v2.test'+base);
@@ -42,6 +44,13 @@ const fs=require('fs'),path=require('path'),os=require('os'),assert=require('ass
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(150);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile no horizontal overflow');
  await page.screenshot({path:path.join(os.tmpdir(),'carrot-replay-v2-mobile.png'),fullPage:true});
+ assert.ok(await page.locator('[data-previous]').isEnabled()===false);
+ await page.locator('[data-next]').click();await page.waitForURL(/--1$/);
+ await page.locator('.radar-status').filter({hasText:'61 프레임'}).waitFor();
+ assert.match(await page.locator('.v2-segment-nav option[aria-current]').textContent(),/--1/);
+ await page.locator('.v2-segment-nav select').selectOption('00000220--c5d837c81f--2');await page.waitForURL(/--2$/);
+ assert.ok(await page.locator('[data-next]').isEnabled()===false);
+ await page.locator('[data-previous]').click();await page.waitForURL(/--1$/);
  assert.deepEqual(errors,[]);
  console.log('PASS original V2: radar map, timeline graph, scrub, sensor option, tool commands, desktop/mobile, no external requests');
 }finally{await browser.close();}})().catch(error=>{console.error(error);process.exit(1);});

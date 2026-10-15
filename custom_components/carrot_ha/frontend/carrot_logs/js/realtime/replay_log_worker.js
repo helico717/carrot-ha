@@ -3,7 +3,6 @@
 self.importScripts("/carrot_ha_static/carrot_logs/js/vendor/fzstd.js?v=0.1.1", "/carrot_ha_static/carrot_logs/js/realtime/raw_capnp.js?v=2607-07");
 
 const rawCapnp = self.CarrotRawCapnp;
-const gpsOnlyServices = new Set(['gpsLocationExternal', 'qRoadEncodeIdx']);
 const replayHudServices = new Set(rawCapnp?.HUD_SERVICES || []);
 const compactServices = new Set([
   ...replayHudServices,
@@ -589,8 +588,7 @@ function appendBytes(left, right) {
 }
 
 class ReplayLogBuilder {
-  constructor(expectedSegment, gpsOnly = false) {
-    this.gpsOnly = gpsOnly;
+  constructor(expectedSegment) {
     this.expectedSegment = Number(expectedSegment) || 0;
     this.pending = new Uint8Array(0);
     this.selected = new Map();
@@ -633,13 +631,12 @@ class ReplayLogBuilder {
     try {
       // Raw radar tracks are intentionally deferred to the sensor worker so
       // the first replay load does not decode and clone thousands of points.
-      event = rawCapnp.decodeReplayEvent(message, "", "liveTracks", this.gpsOnly ? gpsOnlyServices : null);
+      event = rawCapnp.decodeReplayEvent(message, "", "liveTracks");
     } catch {
       this.decodeErrorCount += 1;
       return;
     }
     if (!event?.service || !Number.isFinite(event.logMonoTime) || event.logMonoTime <= 0) return;
-    if (this.gpsOnly && !event.valid) return;
     if (event.service === "qRoadEncodeIdx") {
       const value = event.decoded || {};
       this.cameraIndexes.push({
@@ -681,7 +678,6 @@ class ReplayLogBuilder {
     for (const serviceBuckets of this.selected.values()) events.push(...serviceBuckets.values());
     events.sort((left, right) => left.logMonoTime - right.logMonoTime);
     if (!indexes.length && !events.length) {
-      if (this.gpsOnly) return {durationMs:0, records:[], metadata:{services:{}}};
       throw new Error("Recorded log has no Carrot Vision display data");
     }
 
@@ -851,7 +847,7 @@ function decodeBzipToBuilder(compressed, builder) {
 
 async function buildReplay(options) {
   if (!rawCapnp) throw new Error("Client Cap'n Proto decoder is unavailable");
-  const builder = new ReplayLogBuilder(options.expectedSegment, options.gpsOnly === true);
+  const builder = new ReplayLogBuilder(options.expectedSegment);
   const compression = String(options.compression || "");
   const controller = new AbortController();
   self.replayAbortController = controller;
