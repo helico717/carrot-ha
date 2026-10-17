@@ -1,3 +1,17 @@
+## 2026-10-17 — vehicle-journal: 상단 탭 코닉 빔 및 플로팅 트리플 펄스 닷 로딩 인디케이터 적용
+
+- 이유: 사용자가 선택한 후보 1(트리플 펄스 닷, Triple Pulsing Dots) 로딩 인디케이터 스타일을 차계부 및 차량 대시보드에 반영하도록 요청함. 탭 바 테두리에 코닉 그라디언트 회전 빔을 적용하고, 스크롤 다운으로 상단 메뉴가 시야에서 벗어날 경우 화면 최상단 중앙에 3단 바운스 닷 플로팅 버블이 표시되도록 구현.
+- 변경 내용:
+  1. `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`:
+     - `@property --carrot-beam-angle` 및 `:host([data-loading="true"]) .tabs` 코닉 빔 회전 애니메이션(`carrotTabBeamSpin`, 1.35s) 추가.
+     - 차계부 고유 민트 틸 테마 포인트 색상 토큰 정의 (`--c-load-accent: #81e6c5; --c-load-accent-soft: rgba(129, 230, 197, 0.28); --c-load-ring: rgba(129, 230, 197, 0.42); --c-load-glow: 0 0 14px rgba(129, 230, 197, 0.35);`).
+     - 플로팅 버블 `.carrot-floating-bubble` 마크업 및 트리플 펄스 닷 CSS (`carrotBubbleDotBounce` 1.2s, 딜레이 -0.32s, -0.16s, 0s) 추가.
+     - `IntersectionObserver`를 활용하여 `.tabs`가 화면 밖으로 스크롤 아웃될 때만 버블이 부드럽게 노출되는 감지 로직 구현.
+     - `load()` 시작 시 `data-loading="true"` 설정 및 완료 시 제거.
+  2. 접근성: `prefers-reduced-motion: reduce` 지원으로 모션 최소화 환경에서 애니메이션 비활성화.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/CHANGELOG.md`, `driving-logs/CHANGELOG.md`.
+- 검증 및 배포 상태: Node 단위 테스트(12건) 통과. 사용자 지침에 따라 GitHub 릴리즈/태그 발행 없이 커밋 및 `main` 브랜치 푸시만 수행(다음 프리 릴리즈 발행 시 일괄 반영 예정).
+
 ## 2026-10-17 — vehicle-journal: UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 문서화
 
 - 이유: 사용자가 대시보드·차계부·주행 로그의 UI 변경 요청 시 실제 프로덕션 코드 반영 전에 전체 기능 구현 및 합성 더미 데이터 기반의 로컬 인터랙티브 HTML 프리뷰를 먼저 제시하도록 지침 추가를 요청함.
