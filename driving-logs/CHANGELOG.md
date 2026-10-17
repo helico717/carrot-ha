@@ -1,3 +1,10 @@
+## 2026-10-17 — UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 문서화
+
+- 이유: 사용자가 UI 변경 요청 시 실제 반영 전에 전체 기능 구현 및 더미 데이터 기반의 인터랙티브 HTML 프리뷰를 먼저 보여주는 프로세스를 AGENTS 문서에 추가하도록 요청함.
+- 변경 내용: `AGENTS.md`, `driving-logs/AGENTS.md`, `vehicle-journal/AGENTS.md`, `.agents/rules/vehicle-journal.md`에 실제 프로덕션 모듈 100% 미러링 + 합성 더미 데이터 기반 로컬 HTML 프리뷰 생성 및 테마 색상·둥근 모서리(`border-radius`)·카드 경계(`overflow`) 사전 검증 지침 추가.
+- 관련 파일: `AGENTS.md`, `driving-logs/AGENTS.md`, `driving-logs/CHANGELOG.md`, `vehicle-journal/AGENTS.md`, `.agents/rules/vehicle-journal.md`, `vehicle-journal/CHANGELOG.md`.
+- 검증 및 배포 상태: 지침 문서만 변경되었으며 주행 로그·대시보드·차계부 실행 코드는 변경하지 않음.
+
 ## 2026-10-15 — 사용자 정정: 왼쪽 상시 지도와 원본 Carrot Routes 리플레이 V2
 
 - 사용자가 이전 구현의 요구 해석 차이를 정정함. 지도 팝업이 아니라 왼쪽 상시 한반도 전체 idle 지도. 주행/세그먼트 선택 시 해당 전체 주행 경로, 세그먼트 선택은 경로 유지+위치 점 표시. 세그먼트 점3개 메뉴의 리플레이 아래 리플레이 V2 추가, 첨부 Carrot Routes 원본 화면으로 이동.

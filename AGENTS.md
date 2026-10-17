@@ -282,6 +282,20 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 
 ## 7. Version Management & HACS Release Policy
 
+### 모든 대시보드 UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 — 2026-10-17
+
+사용자가 차량 대시보드(`carrot-dashboard-ko.js`, `carrot-dashboard-en.js`, `carrot-dashboard-debug.js`), 차계부(`carrot-vehicle-journal.js`, `carrot-journal-design.js`), 주행 로그(`carrot_logs/`) 등 **UI·레이아웃·애니메이션·인디케이터·디자인 변경**을 요청할 경우, **실제 프로덕션 파일을 수정하기 전에 반드시 아래 기준을 충족하는 로컬 인터랙티브 HTML 프리뷰를 먼저 생성하여 사용자에게 시연하고 승인**을 받아야 한다.
+
+1. **실제 대시보드 100% 미러링 (축약·누락 없는 전체 기능 구현)**:
+   - 단순 요약 목업이나 일부 영역만 떼어낸 정적 샘플 HTML로 대체하지 않는다.
+   - 실제 프로덕션 프론트엔드 모듈 전체(`carrot-vehicle-journal.js`, `carrot-dashboard-ko.js`, `carrot-journal-design.js`, `carrot-view-state.js`, `carrot-trip-days.js`, `carrot-charge-payment.js`, `carrot-receipt-ocr.js`, `carrot-camera-360.js`, `leaflet.js`/`leaflet.css` 등)를 기능 누락 없이 번들링하여 실제 Custom Element가 그대로 렌더링·동작하도록 구성한다.
+2. **합성 더미 데이터(`mockHass`) 기반의 실제 조작 환경 제공**:
+   - 다중 차량(전기차·내연기관), 일/월/연도 기간 전환, 모든 하위 탭 이동, Leaflet 지도 마커·경로, SVG 차트·도넛, 원장 필터·정렬·페이지네이션, 모달 창, 다크/라이트 테마 및 차량 상태(주차/충전/주행) 변경이 **실제 대시보드를 조작하는 것처럼 100% 동작**하도록 `mockHass` 더미 데이터를 연결한다.
+   - 비교 가능한 디자인/모션 옵션이 있을 경우 상단 시뮬레이터 컨트롤 바를 통해 실시간으로 전환·비교할 수 있게 제공한다.
+3. **대시보드별 고유 테마 색상 및 기하학적 경계(Border Radius / Overflow) 준수**:
+   - 각 대시보드의 고유 테마 팔레트(차계부 `--j-bg`/`--j-surface`/`--j-raised`/`--j-border`/`--j-accent`, 차량 대시보드 다크/라이트 모드 및 상태별 블루/그린/오렌지 토큰)를 존중하며, 기존 UI에 자연스럽게 스며드는 절제된 모션을 사용한다.
+   - 둥근 모서리(`border-radius`)가 적용된 버튼·셀렉트·필(Pill)·테이블 요소에 각진 하이라이트가 생기는 현상이나, 로딩 애니메이션·오버레이가 카드 경계 밖으로 이탈(`overflow` 누출)하는 현상이 없는지 프리뷰 단계에서 반드시 검증한다.
+
 ### 모든 대시보드 화폐 표기 공통 규칙 — 2026-10-09
 
 - 한국어·영어·디버그 차량 대시보드와 차계부 등 모든 화면의 화폐 금액은 정수부에

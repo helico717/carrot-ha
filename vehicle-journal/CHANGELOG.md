@@ -1,3 +1,12 @@
+## 2026-10-17 — vehicle-journal: UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 문서화
+
+- 이유: 사용자가 대시보드·차계부·주행 로그의 UI 변경 요청 시 실제 프로덕션 코드 반영 전에 전체 기능 구현 및 합성 더미 데이터 기반의 로컬 인터랙티브 HTML 프리뷰를 먼저 제시하도록 지침 추가를 요청함.
+- 변경 내용:
+  1. 실제 프로덕션 프론트엔드 모듈 전체를 누락 없이 번들링하고 `mockHass` 더미 데이터를 연결해 실제 대시보드와 동일하게 모든 탭·지도·차트·원장·모달을 조작할 수 있는 사전 HTML 프리뷰 절차를 명문화.
+  2. 각 대시보드의 고유 테마 팔레트 준수, 절제된 모션 적용, 버튼·필(Pill)의 둥근 모서리(`border-radius`) 일치 및 카드 경계 밖 애니메이션 이탈(`overflow`) 방지 검증 기준 추가.
+- 관련 파일: `AGENTS.md`, `vehicle-journal/AGENTS.md`, `.agents/rules/vehicle-journal.md`, `driving-logs/AGENTS.md`, `vehicle-journal/CHANGELOG.md`, `driving-logs/CHANGELOG.md`.
+- 검증 및 배포 상태: 지침·문서만 변경되었으며 프론트엔드/백엔드 실행 코드는 수정하지 않음(로컬 HTML 아티팩트에서 로딩 인디케이터 모션·테마·모서리/경계 클리핑 개선 시연 진행). 실행 코드 변경이 없으므로 버전 상승·HACS 릴리즈·HA 서버 배포 없음.
+
 ## 2026-10-14 — v0.9.0-beta.1 실제 발행 확인
 
 - Release: https://github.com/helico717/carrot-ha/releases/tag/v0.9.0-beta.1
