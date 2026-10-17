@@ -9,8 +9,13 @@
      - `IntersectionObserver`를 활용하여 `.tabs`가 화면 밖으로 스크롤 아웃될 때만 버블이 부드럽게 노출되는 감지 로직 구현.
      - `load()` 시작 시 `data-loading="true"` 설정 및 완료 시 제거.
   2. 접근성: `prefers-reduced-motion: reduce` 지원으로 모션 최소화 환경에서 애니메이션 비활성화.
-- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/CHANGELOG.md`, `driving-logs/CHANGELOG.md`.
-- 검증 및 배포 상태: Node 단위 테스트(12건) 통과. 사용자 지침에 따라 GitHub 릴리즈/태그 발행 없이 커밋 및 `main` 브랜치 푸시만 수행(다음 프리 릴리즈 발행 시 일괄 반영 예정).
+- 검증 및 배포 상태: Node 단위 테스트(12건) 통과. 사용자 지시(태그/릴리즈 없이 HA 직접 반영)에 따라 SSH/SCP를 통해 HA 서버(`hassio@192.168.0.140`)의 `/config/custom_components/carrot_ha/frontend/` 경로로 직접 동기화 완료.
+  - HA 백업 디렉터리: `/config/carrot_ha/deployment-backups/loading-indicators-42489a3/`
+  - SHA-256 검증 결과 (로컬과 원격 100% 일치):
+    * `carrot-vehicle-journal.js`: `f330ea7868a161ef678a6ff1f65f82e8da2e559e2ec565f64412d322e6459c46`
+    * `carrot-dashboard-ko.js`: `b7aa567f78805af835fb6631d1f2b7e9348e60c60c91e950addc37d4f05d95f6`
+    * `carrot-dashboard-en.js`: `5911a3c2567bbf8da1d18e9bf29d177b8ace30a43706e95200e9aa4303118c8c`
+  - GitHub 릴리즈/태그는 정책에 따라 발행하지 않음 (다음 프리 릴리즈 발행 시 일괄 포함 예정). 브라우저 강력 새로고침(`Ctrl + F5`) 시 즉시 반영됨.
 
 ## 2026-10-17 — vehicle-journal: UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 문서화
 
