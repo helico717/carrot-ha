@@ -35,43 +35,64 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                 if key not in excluded_ids:
                     retained_windows.append((datetime.fromisoformat(a.replace('Z','+00:00')).timestamp(),
                                              datetime.fromisoformat(b.replace('Z','+00:00')).timestamp()+300))
+    valid_samples = []
     with archive.connect() as db:
-        rows=db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? ORDER BY observed",(device,datetime.fromtimestamp(start-300,timezone.utc).isoformat().replace('+00:00','Z')))
+        rows = db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? ORDER BY observed", (device, datetime.fromtimestamp(start-300, timezone.utc).isoformat().replace('+00:00', 'Z')))
         for (body,) in rows:
-            e=archive_codec.calculation_event(body);v=e.get('data',{})
+            e = archive_codec.calculation_event(body)
+            v = e.get('data', {})
             try:
-                received=datetime.fromisoformat(e['observed_at'].replace('Z','+00:00')).astimezone(tz)
-                rd=days.get(str(received.date()))
+                obs_dt = datetime.fromisoformat(e['observed_at'].replace('Z', '+00:00'))
+                received = obs_dt.astimezone(tz)
+                rd = days.get(str(received.date()))
                 if rd is not None:
-                    rd['received_samples']+=1
-                    if v.get('stale'):rd['stale_samples']+=1
-                stamp=(v.get('field_measured_at') or {}).get('battery_wh') or v.get('measured_at') or e['observed_at']
-                t=datetime.fromisoformat(stamp.replace('Z','+00:00')).timestamp()
-                energy=float(v['battery_wh']);soc=energy/(float(capacity)*1000)*100
-                if not math.isfinite(soc) or not 0<=soc<=110 or v.get('stale') or t>now.timestamp():continue
-            except (ValueError,TypeError,KeyError):continue
-            charging=v.get('charging') in (True, 1)
-            if charging and any(a<=t<=b for a,b in excluded_windows) and not any(a<=t<=b for a,b in retained_windows):
-                charging=False
-            local=datetime.fromtimestamp(t,tz);day=days.get(str(local.date()))
-            if day is not None:
-                day['valid_samples']+=1
-                if charging:day['charge_hours'][local.hour]=True
-                day['hours'][local.hour]={'soc':min(100,soc),'charging':charging,'driving':v.get('driving',v.get('onroad')) in (True, 1)}
-            if previous and t>previous[0] and t-previous[0]<=300:
-                pt,ps,pv=previous;dt=t-pt
-                cursor=max(pt,start)
-                while cursor<t:
-                    local_start=datetime.fromtimestamp(cursor,tz)
-                    midnight=datetime.combine(local_start.date()+timedelta(days=1),datetime.min.time(),tzinfo=tz).timestamp()
-                    end=min(t,midnight);d=days.get(str(local_start.date()));seconds=end-cursor
-                    if d is not None:
-                        d['used']=(d['used'] or 0)+max(0,ps-soc)*seconds/dt
-                        d['covered_s']+=seconds
-                        # Session records determine driving duration independently of SOC.
-                        # Session records determine charging duration independently of SOC.
-                    cursor=end
-            if previous is None or t>previous[0]:previous=(t,soc,v)
+                    rd['received_samples'] += 1
+                    if v.get('stale'):
+                        rd['stale_samples'] += 1
+                stamp = (v.get('field_measured_at') or {}).get('battery_wh') or v.get('measured_at') or e['observed_at']
+                t = datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp()
+                # Reject samples timestamped >5 minutes ahead of observation or beyond now
+                if t > obs_dt.timestamp() + 300 or t > now.timestamp():
+                    continue
+                energy = float(v['battery_wh'])
+                soc = energy / (float(capacity) * 1000) * 100
+                if not math.isfinite(soc) or not 0 <= soc <= 110 or v.get('stale'):
+                    continue
+            except (ValueError, TypeError, KeyError):
+                continue
+            charging = v.get('charging') in (True, 1)
+            if charging and any(a <= t <= b for a, b in excluded_windows) and not any(a <= t <= b for a, b in retained_windows):
+                charging = False
+            driving = v.get('driving', v.get('onroad')) in (True, 1)
+            valid_samples.append((t, soc, charging, driving, v))
+
+    valid_samples.sort(key=lambda s: s[0])
+
+    previous = None
+    for t, soc, charging, driving, v in valid_samples:
+        local = datetime.fromtimestamp(t, tz)
+        day = days.get(str(local.date()))
+        if day is not None:
+            day['valid_samples'] += 1
+            if charging:
+                day['charge_hours'][local.hour] = True
+            day['hours'][local.hour] = {'soc': min(100, soc), 'charging': charging, 'driving': driving}
+        if previous and t > previous[0] and t - previous[0] <= 300:
+            pt, ps, pv = previous
+            dt = t - pt
+            cursor = max(pt, start)
+            while cursor < t:
+                local_start = datetime.fromtimestamp(cursor, tz)
+                midnight = datetime.combine(local_start.date() + timedelta(days=1), datetime.min.time(), tzinfo=tz).timestamp()
+                end = min(t, midnight)
+                d = days.get(str(local_start.date()))
+                seconds = end - cursor
+                if d is not None:
+                    d['used'] = (d['used'] or 0) + max(0, ps - soc) * seconds / dt
+                    d['covered_s'] += seconds
+                cursor = end
+        if previous is None or t > previous[0]:
+            previous = (t, soc, v)
     for d in days.values():
         if d['used'] is not None:d['used']=round(d['used'],1)
     # Carry the last measured value only into elapsed, unmeasured hours.
