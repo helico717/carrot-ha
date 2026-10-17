@@ -1,3 +1,17 @@
+## 2026-10-17 — vehicle-journal: 모바일 다이나믹 아일랜드 세이프 에어리어 대응 및 순수 CSS 정적 탭 빔 회전 수정
+
+- 이유: 모바일(아이폰 16 Pro Max 등)에서 플로팅 로딩 버블이 다이나믹 아일랜드 캡슐에 가려지는 문제, 상단 탭이 보이는 상태에서도 플로팅 버블이 노출되거나 렌더링 후 observer가 끊기는 문제, Houdini `@property` 미지원으로 모바일 WebKit에서 애니메이션이 멈추거나 상단 탭 전체가 회전하는 오류를 해결함.
+- 변경 내용:
+  1. 플로팅 버블 위치 전 기종 대응: `top: max(72px, calc(env(safe-area-inset-top, 0px) + 64px));`로 다이나믹 아일랜드/노치 영역과 겹치지 않도록 충분한 여유 공간 확보.
+  2. 순수 CSS 회전 빔 적용: CSS Houdini `@property`를 완전히 제거하고, `.tabs`는 정적(stationary)으로 유지하면서 가상 요소 `::before`에만 `transform: rotate(360deg)`를 적용해 상단바 전체가 도는 버그 방지 및 iOS WebKit Safari 100% 하드웨어 가속 회전 지원.
+  3. 스크롤 아웃 정밀 감지 및 Observer 재연결: `rect.bottom <= 10` 기준으로 탭 바가 완전히 화면 상단 밖으로 사라졌을 때만 플로팅 버블이 나타나도록 보정하고, `updateView()` / `renderContent()` 시 detached된 노드를 다시 감지하도록 재연결 로직 보강.
+- 검증 및 배포 상태: Node 단위 테스트(12건) 통과. SSH/SCP를 통해 HA 서버(`hassio@192.168.0.140`)의 `/config/custom_components/carrot_ha/frontend/` 경로로 직접 배포 완료.
+  - 최신 SHA-256 검증 결과 (로컬과 원격 100% 일치):
+    * `carrot-vehicle-journal.js`: `f627cec45fb84468ec65613ae0b765fec0f1eca80bd0cafb82617bf527f5bed7`
+    * `carrot-dashboard-ko.js`: `56c7c53aa5c18b355c1db23906a0059821ca407013918187ca0a81981fa4c103`
+    * `carrot-dashboard-en.js`: `c968035b8e4e4dc7b23b4be0e994023a25e7e9ef942715a28720602c979ae5cd`
+  - GitHub 릴리즈/태그는 정책에 따라 발행하지 않음 (추후 통합 프리 릴리즈 발행 예정).
+
 ## 2026-10-17 — vehicle-journal: 상단 탭 코닉 빔 및 플로팅 트리플 펄스 닷 로딩 인디케이터 적용
 
 - 이유: 사용자가 선택한 후보 1(트리플 펄스 닷, Triple Pulsing Dots) 로딩 인디케이터 스타일을 차계부 및 차량 대시보드에 반영하도록 요청함. 탭 바 테두리에 코닉 그라디언트 회전 빔을 적용하고, 스크롤 다운으로 상단 메뉴가 시야에서 벗어날 경우 화면 최상단 중앙에 3단 바운스 닷 플로팅 버블이 표시되도록 구현.

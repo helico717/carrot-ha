@@ -127,17 +127,28 @@ class CarrotDashboard extends HTMLElement {
   }
   disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   setupTabsObserver(){
-    if(this._tabsObserver||typeof IntersectionObserver==='undefined')return;
+    this._tabsObserver?.disconnect();
+    this._tabsObserver=null;
     const target=this.shadowRoot?.querySelector('.nav');
     if(!target)return;
-    this._tabsObserver=new IntersectionObserver((entries)=>{
-      for(const entry of entries){
-        const outOfView=!entry.isIntersecting&&entry.boundingClientRect.bottom<60;
-        if(outOfView)this.setAttribute('data-tabs-scrolled-out','true');
-        else this.removeAttribute('data-tabs-scrolled-out');
-      }
-    },{threshold:[0,0.1,0.5,1.0]});
-    this._tabsObserver.observe(target);
+    const check=()=>{
+      const rect=target.getBoundingClientRect();
+      if(rect.height===0&&rect.width===0)return;
+      const outOfView=rect.bottom<=10;
+      if(outOfView)this.setAttribute('data-tabs-scrolled-out','true');
+      else this.removeAttribute('data-tabs-scrolled-out');
+    };
+    if(typeof IntersectionObserver!=='undefined'){
+      this._tabsObserver=new IntersectionObserver((entries)=>{
+        for(const entry of entries)check();
+      },{threshold:[0,0.1,0.5,1.0]});
+      this._tabsObserver.observe(target);
+    }
+    if(!this._boundScrollSync){
+      this._boundScrollSync=()=>check();
+      window.addEventListener('scroll',this._boundScrollSync,{passive:true});
+    }
+    requestAnimationFrame(check);
   }
   getCardSize(){return 8;}
   getGridOptions(){return {columns:36,rows:"auto",min_columns:6};}
@@ -324,11 +335,6 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
 
-@property --carrot-beam-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
 :host{
   --c-load-accent:#60a5fa;
   --c-load-accent-soft:rgba(96,165,250,0.28);
@@ -341,24 +347,48 @@ class CarrotDashboard extends HTMLElement {
   --c-load-ring:rgba(37,99,235,0.38);
   --c-load-glow:0 0 12px rgba(37,99,235,0.25);
 }
-@keyframes carrotTabBeamSpin{to{--carrot-beam-angle:360deg;}}
-.nav{border:2px solid transparent;position:relative;transition:border-color 0.2s ease,box-shadow 0.2s ease}
+@keyframes carrotBorderBeamSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+@-webkit-keyframes carrotBorderBeamSpin{from{-webkit-transform:rotate(0deg);}to{-webkit-transform:rotate(360deg);}}
+.nav{border:2px solid transparent;position:relative;border-radius:14px;transition:border-color 0.2s ease,box-shadow 0.2s ease}
+.nav>*{position:relative!important;z-index:2!important}
 :host([data-loading="true"]) .nav{
-  background-image:linear-gradient(#181b1d,#181b1d),
-    conic-gradient(from var(--carrot-beam-angle,0deg),transparent 0deg,var(--c-load-accent-soft) 45deg,var(--c-load-accent) 90deg,var(--c-load-accent-soft) 135deg,transparent 180deg,transparent 360deg)!important;
-  background-origin:border-box!important;
-  background-clip:padding-box,border-box!important;
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  border-radius:14px!important;
   border:2px solid transparent!important;
   box-shadow:var(--c-load-glow)!important;
-  animation:carrotTabBeamSpin 1.35s linear infinite;
 }
-:host([data-theme="light"][data-loading="true"]) .nav{
-  background-image:linear-gradient(#e9eef0,#e9eef0),
-    conic-gradient(from var(--carrot-beam-angle,0deg),transparent 0deg,var(--c-load-accent-soft) 45deg,var(--c-load-accent) 90deg,var(--c-load-accent-soft) 135deg,transparent 180deg,transparent 360deg)!important;
+:host([data-loading="true"]) .nav::before{
+  content:""!important;
+  position:absolute!important;
+  top:50%!important;
+  left:50%!important;
+  width:1400px!important;
+  height:1400px!important;
+  margin-top:-700px!important;
+  margin-left:-700px!important;
+  background:conic-gradient(from 0deg,transparent 0deg,transparent 260deg,var(--c-load-accent-soft) 310deg,var(--c-load-accent) 360deg)!important;
+  animation:carrotBorderBeamSpin 1.4s linear infinite!important;
+  -webkit-animation:carrotBorderBeamSpin 1.4s linear infinite!important;
+  z-index:0!important;
+  pointer-events:none!important;
+}
+:host([data-loading="true"]) .nav::after{
+  content:""!important;
+  position:absolute!important;
+  inset:2px!important;
+  background:#181b1d!important;
+  border-radius:12px!important;
+  z-index:1!important;
+  pointer-events:none!important;
+}
+:host([data-theme="light"][data-loading="true"]) .nav::after{
+  background:#e9eef0!important;
 }
 .carrot-floating-bubble{
   position:fixed;
-  top:14px;
+  top:max(72px,calc(env(safe-area-inset-top,0px) + 64px));
   left:50%;
   transform:translate(-50%,-24px) scale(0.92);
   z-index:99998;
@@ -370,9 +400,9 @@ class CarrotDashboard extends HTMLElement {
   height:38px;
   padding:0 18px;
   border-radius:999px;
-  background:rgba(15,23,31,0.88);
-  backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px);
+  background:rgba(15,23,31,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
   border:1.5px solid var(--c-load-ring);
   box-shadow:0 10px 28px rgba(0,0,0,0.55),0 0 16px var(--c-load-accent-soft);
   pointer-events:none;
@@ -397,21 +427,27 @@ class CarrotDashboard extends HTMLElement {
   box-shadow:0 0 8px var(--c-load-accent);
   display:inline-block;
   animation:carrotBubbleDotBounce 1.2s ease-in-out infinite;
+  -webkit-animation:carrotBubbleDotBounce 1.2s ease-in-out infinite;
 }
-.carrot-floating-bubble .bubble-dot:nth-child(1){animation-delay:-0.32s;}
-.carrot-floating-bubble .bubble-dot:nth-child(2){animation-delay:-0.16s;}
-.carrot-floating-bubble .bubble-dot:nth-child(3){animation-delay:0s;}
+.carrot-floating-bubble .bubble-dot:nth-child(1){animation-delay:-0.32s;-webkit-animation-delay:-0.32s;}
+.carrot-floating-bubble .bubble-dot:nth-child(2){animation-delay:-0.16s;-webkit-animation-delay:-0.16s;}
+.carrot-floating-bubble .bubble-dot:nth-child(3){animation-delay:0s;-webkit-animation-delay:0s;}
 @keyframes carrotBubbleDotBounce{
   0%,80%,100%{transform:scale(0.7);opacity:0.45;}
   40%{transform:scale(1.22);opacity:1;}
 }
+@-webkit-keyframes carrotBubbleDotBounce{
+  0%,80%,100%{-webkit-transform:scale(0.7);opacity:0.45;}
+  40%{-webkit-transform:scale(1.22);opacity:1;}
+}
 @media(prefers-reduced-motion:reduce){
-  :host([data-loading="true"]) .nav{animation:none!important;}
+  :host([data-loading="true"]) .nav::before{animation:none!important;}
   .carrot-floating-bubble .bubble-dot{animation:none!important;opacity:1;}
 }
 .trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
 </style><div class="carrot-floating-bubble" aria-hidden="true"><span class="bubble-dot"></span><span class="bubble-dot"></span><span class="bubble-dot"></span></div><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>차량 수신기 · ${esc(v.live_status||v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>최신 확인 ${time(v.live_checked_at||v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`);
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.setupTabsObserver();
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
