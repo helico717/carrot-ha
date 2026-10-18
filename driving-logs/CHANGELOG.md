@@ -4,16 +4,20 @@
 - 원본 확인 완료: `autotuner/ai_client.js:analyzeWithBuiltinEngine`에 API키 없는 규칙 기반 분석/추천이 실제 존재한다. `server/features/autotune.py`는 전체 선택이어도4개 초과 시 대표4구간만 추출한다. HA 구현에서는 대표4구간 샘플링 없이 마지막 주행의 저장된 전체 완료 구간(최대720개)을 순차 분석·캐시하고, 주행 종료 및 업로드 안정(3분/10분) 후 백그라운드에서 무료 자동 분석을 수행하도록 확장했다.
 - 서버 구현 (`custom_components/carrot_ha/driving_logs/local_rules.py`, `local_analysis.py`, `http.py`, `runtime.py`, `ai.py`, `ai_summary.py`, `custom_components/carrot_ha/__init__.py`):
   - `local_rules.py`: 외부 API 호출이나 파라미터 자동 변경 없이 활성 제어 구간(`enabled`)의 저속 가속 상승(`CruiseMaxVals1`), 정차 감속(`StoppingAccel`), 정차 후 출발, 조향각 차이를 요약하고 실제 차량 파라미터 카탈로그·범위·반복 근거를 충족하는 후보만 제안한다.
-  - `local_analysis.py`: 전 구간 순차 요약 및 세그먼트별 SHA256 캐시(`segments/*.json`), 주행 전체 리포트 저장(`reports/*.json`), 늦게 도착한 세그먼트 감지 시 재분석, 주행 종료·업로드 안정 대기 자동 스케줄러(`auto_tick`, `loop`), `/local/{status,config,job,result,start,cancel}` 엔드포인트 및 언로드 정리 구현.
+  - `local_analysis.py`: 전 구간 순차 요약 및 세그먼트별 SHA256 캐시(`segments/*.json`), 주행 전체 리포트 저장(`reports/*.json`), 늦게 도착한 세그먼트 감지 시 재분석, 주행 종료·업로드 안정 대기 자동 스케줄러(`auto_tick`, `loop`; 부팅 직후 `time.monotonic() < 180` 환경에서도 `driving_log_last_commit` 미수신 시 음수 대기시간이 발생하지 않도록 보정), `/local/{status,config,job,result,start,cancel}` 엔드포인트 및 언로드 정리 구현.
 - 프리뷰 및 프로덕션 프론트엔드 구현 (`custom_components/carrot_ha/frontend/carrot-logs-card.js`, `carrot-logs-ai.js`, `carrot_logs/ha_log_explorer.js`, `carrot_logs/ha_layout.css`, `carrot_logs/logs.html`, `carrot_logs/js/generated/logs.js`):
   - 프리뷰(`http://127.0.0.1:8769/`)와 프로덕션 양쪽 모두 임의 버튼 스타일을 제거하고 기존 당근웹 로그의 `.smallBtn`, `.smallBtn.btn--filled`, `.c-segmented-control`, `.c-segmented-control__item`, `.chip.chip--accent`, `.app-progress__track` 및 `--md-*` 디자인 토큰을 100% 동일하게 적용했다.
   - `logs.js`의 `CarrotLogsRuntime.dashcam`에 `selectedForRoute`를 노출해 가상 스크롤된 주행에서도 체크된 전체 세그먼트를 정확히 읽도록 연결했다.
   - `ha_log_explorer.js`: 상단 `#freeAnalysisBanner`에서 `/local/status`를 표시·폴링하고, 주행 썸네일(`route-menu`) 및 세그먼트(`segment-menu`)의 `⋮` 메뉴에 원본 메뉴 버튼을 복제한 `이 구간 무료 분석…` / `무료 분석 결과 / 다시 분석…`, `AI 분석…` 항목을 주입했다.
   - `carrot-logs-card.js` & `carrot-logs-ai.js`: 상단 우측 아이콘 버튼(`#logAiButton`, `mdi:tune-vertical`)으로 분석 설정 모달을 열고, `⋮` 메뉴 및 배너 클릭 시 `이 구간을 분석하시겠습니까?` / `이 주행을 분석하시겠습니까?` 확인 팝업(현재 구간 / 주행 전체 / 체크한 구간 라디오, 무료 분석 / Gemini AI 분석 세그먼트 탭), API 키 없는 무료 분석 실행·결과·리플레이 V2 근거 이동, 마지막 주행 자동 무료 분석 토글(`auto_latest`) 및 Gemini 수동 분석을 통합했다.
 - 로컬 검증 완료:
-  - Python 3.14 단위 테스트 48건(신규 `test_driving_logs_local.py` 7건 포함, 47 passed / 1 skipped) 통과. 33개 전 구간 순차 분석·캐시 재사용, 늦은 세그먼트 도착 시 완료 표시 방지 및 재분석, 주행 중/수신 중 대기 게이트, 외부 AI 호출 0회 검증.
+  - Python 3.12 / 3.14 단위 테스트 48건(신규 `test_driving_logs_local.py` 7건 포함, 47 passed / 1 skipped) 통과. 33개 전 구간 순차 분석·캐시 재사용, 늦은 세그먼트 도착 시 완료 표시 방지 및 재분석, 주행 중/수신 중 대기 게이트, 외부 AI 호출 0회 검증.
   - Chromium 브라우저 테스트 7종(`driving-logs-ai-browser.cjs`, `driving-logs-explorer-browser.cjs`, `driving-logs-port-browser.cjs`, `driving-logs-settings-browser.cjs`, `driving-logs-v2-browser.cjs`, `driving-logs-renderer-browser.cjs`, 프리뷰 `verify.cjs`) 모두 PASS.
-- 배포 상태: Git `main` 커밋·푸시 및 HA 서버(`hassio@192.168.0.140`) SSH 직접 반영 진행 중. 새 Python 엔드포인트(`/local/*`)와 백그라운드 자동 분석 루프 활성화는 파일 배포 후 사용자의 HA 재시작이 필요하며, 정적 프론트엔드 자산은 브라우저 새로고침으로 반영된다. 버전/태그/Release 변경 및 Comma 기기 수정은 수행하지 않는다.
+- 배포 및 운영 검증 완료:
+  - Git `main` 커밋·푸시 및 HA 서버(`hassio@192.168.0.140`) `/homeassistant/custom_components/carrot_ha/`에 13개 수정/신규 파일 직접 배포 완료.
+  - HA 백업 경로: `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-8aa46579eb87/before`
+  - 원격 설치본 13개 파일 SHA-256 해시 100% 일치, `python3 -m py_compile` 통과, HA 정적 HTTP 엔드포인트(`carrot-logs-card.js`, `carrot-logs-ai.js`, `ha_log_explorer.js`, `ha_layout.css`, `logs.html`, `logs.js`) 응답 `200` 및 SHA-256 일치 확인.
+  - 새 Python 엔드포인트(`/local/*`)와 백그라운드 자동 분석 루프 활성화는 사용자의 HA 재시작 후 적용되며, 정적 프론트엔드 자산은 브라우저 새로고침으로 반영된다. 버전/태그/Release 변경 및 Comma 기기 수정은 수행하지 않았다.
 
 ## 2026-10-19 — 전체 주행 분석 가능 여부 문의 확인
 

@@ -219,7 +219,9 @@ class LocalAnalysis:
         active=data.get('driving',data.get('onroad'))
         try:age=time.time()-datetime.fromisoformat(latest['observed_at'].replace('Z','+00:00')).timestamp()
         except (KeyError,ValueError,TypeError):age=float('inf')
-        quiet=now-max(self.stable_since,self.runtime.get('driving_log_last_commit',0))
+        last_commit=self.runtime.get('driving_log_last_commit')
+        since=self.stable_since if last_commit is None else max(self.stable_since,last_commit)
+        quiet=now-since
         if active is True and age<=180:
             self.status={'phase':'driving','message':'주행 중 · 종료 후 무료 분석'};return
         required=180 if active is False and age<=600 else 600
