@@ -96,7 +96,7 @@ def update_config(current, body):
     config.update(model=model,monthly_budget_usd=budget,daily_requests=daily)
     if 'api_key' in body:
         key = body['api_key']
-        if not isinstance(key,str) or not re.fullmatch(r'[A-Za-z0-9_-]{15,512}',key):
+        if not isinstance(key,str) or not re.fullmatch(r'[A-Za-z0-9_.-]{15,512}',key):
             raise ValueError('invalid_api_key')
         config['api_key'] = key
     if body.get('clear_key') is True:

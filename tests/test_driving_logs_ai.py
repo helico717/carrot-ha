@@ -23,7 +23,7 @@ class Rules(unittest.TestCase):
     def test_budget_survives_reload_key_replacement_and_failure(self):
         with tempfile.TemporaryDirectory() as temp:
             path=Path(temp)/'config.json';config=ai.read_config(path)
-            config=ai.update_config(config,{'api_key':'test-key-000000000','daily_requests':1})
+            config=ai.update_config(config,{'api_key':'AQ.synthetic-auth-key-000000000','daily_requests':1})
             self.assertGreater(ai.reserve(config,5000),0)
             ai.atomic_json(path,config)
             config=ai.update_config(ai.read_config(path),{'api_key':'replacement-key-000','monthly_budget_usd':5})

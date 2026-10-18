@@ -52,9 +52,14 @@ API 프로젝트 지출 제한과 청구 화면을 함께 확인한다.
 별도 Openpilot AI Commit Notifier 앱의 표시된 서버 코드는 `@google/genai`의
 `GoogleGenAI`에 `process.env.GEMINI_API_KEY`를 전달한다. AI Studio가 관리하는
 서버 환경변수 방식이다. **편집 Chat**에는 Pro 구독을 사용한다는 표시가 있었다.
-Secrets/키 목록 조회 권한 오류 때문에 실행 키의 정확한 프로젝트·과금 계정은
-확인하지 못했다. Chat의 Pro 표시만으로 봇 실행 API도 Pro 무제한이라고 판단하지 않는다.
+게시 설정의 관리 키와 Cloud Run 컨테이너의 `GEMINI_API_KEY`가 연결된 것을 확인했다.
+배포는 기존 Generative Language Client와 다른 **Google 관리 Starter 프로젝트**다.
+일반 Credentials 목록은 비어 있고 서비스 계정 목록은 권한 오류이므로 실행 키의
+API 과금 계정·정확한 한도까지 확인한 것은 아니다. Chat의 Pro 표시만으로 봇 실행
+API도 Pro 무제한이라고 판단하지 않는다. Starter는 결제 계정 없이 관리 배포를
+제공하는 별도 환경이다.
 [AI Studio 서버 키 관리](https://ai.google.dev/gemini-api/docs/aistudio-build-mode#api-key-management)
+및 [공식 Starter 설명](https://cloud.google.com/blog/topics/developers-practitioners/the-starter-tier-for-google-ai-studio-explained)
 
 ## HA에 연결하기
 
