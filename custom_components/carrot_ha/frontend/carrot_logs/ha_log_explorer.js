@@ -20,5 +20,9 @@
     }).observe($('appDialogChoices'),{childList:true,attributes:true,subtree:true});
   }
   window.CarrotLogExplorer={init,scopeURL,acceptPage(){},openV2};
+  window.addEventListener('message',event=>{
+    if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='carrot:ai_evidence'||event.data.base!==logsBase)return;
+    if(typeof event.data.segment==='string'&&/^[A-Za-z0-9_|.-]{1,96}--[0-9]{1,6}$/.test(event.data.segment)&&!event.data.segment.includes('..'))openV2(event.data.segment);
+  });
   if(typeof logsStarted!=='undefined'&&logsStarted)init();
 })();

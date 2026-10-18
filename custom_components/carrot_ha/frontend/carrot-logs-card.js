@@ -20,6 +20,7 @@ class CarrotLogsCard extends HTMLElement {
     const changed = this._config.device_id !== config?.device_id;
     this._config = config || {};
     if (changed) {
+      this._detachAi?.(); this._aiBinding=null;
       this._closeLogSettings?.(); this._storage=null; this._maintenance=null;
       this._resetLogSettings?.();
       const summary=this.shadowRoot.getElementById('storageSummary');if(summary)summary.textContent='';
@@ -38,6 +39,7 @@ class CarrotLogsCard extends HTMLElement {
     this._renew = setInterval(() => { if (!document.hidden) this._connect(); }, 45 * 60 * 1000);
   }
   disconnectedCallback() {
+    this._detachAi?.(); this._aiBinding=null;
     this._closeLogSettings?.();
     window.removeEventListener('message', this._onMessage);
     document.removeEventListener('visibilitychange', this._visible);
@@ -51,6 +53,19 @@ class CarrotLogsCard extends HTMLElement {
     if (this.shadowRoot.querySelector('iframe')) return;
     this.shadowRoot.innerHTML = `<style>:host{display:block;width:100%;min-width:0;max-width:100%}ha-card{display:block;width:100%;min-width:0;overflow:hidden;box-sizing:border-box}#error{color:var(--error-color);padding:0 16px}iframe{display:block;width:100%;height:calc(100dvh - 120px);min-height:360px;border:0}${logsSettingsStyles}</style><ha-card><div class="header"><div class="header-copy"><span class="header-title">당근웹 로그</span><span id="storageSummary" class="storage-summary" role="status"></span></div><button id="logSettingsButton" class="icon-button" type="button" title="주행 로그 설정" aria-label="주행 로그 설정"><ha-icon icon="mdi:cog-outline"></ha-icon></button></div><div id="error" role="status"></div><iframe title="당근웹 로그" src="/carrot_ha_static/carrot_logs/logs.html" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups" allow="fullscreen"></iframe>${logsSettingsMarkup}</ha-card>`;
     bindLogSettings(this);
+    const aiButton=document.createElement('button');aiButton.id='logAiButton';aiButton.type='button';
+    aiButton.textContent='✦ AI 주행 분석';aiButton.className='ai-launch';
+    const style=document.createElement('style');style.textContent='.ai-launch{flex:none;border:1px solid var(--divider-color,#49413a);border-radius:8px;background:var(--secondary-background-color,#24282f);color:var(--primary-text-color,#eee);padding:9px 12px;font:inherit;font-size:13px;cursor:pointer}.ai-launch:disabled{opacity:.5}@media(max-width:500px){.header{flex-wrap:wrap}.header-copy{flex-basis:calc(100% - 55px)}.ai-launch{order:3;width:100%}}';
+    this.shadowRoot.append(style);this.shadowRoot.getElementById('logSettingsButton').before(aiButton);
+    aiButton.onclick=async()=>{
+      aiButton.disabled=true;
+      try{
+        const module=await import('./carrot-logs-ai.js?v=20261019-ai');
+        if(!this._aiBinding)this._aiBinding=module.bindDrivingAi(this);
+        await this._aiBinding.open();
+      }catch{this.shadowRoot.getElementById('error').textContent='AI 분석 화면을 열지 못했습니다. 새로고침 후 다시 시도해 주세요.';}
+      finally{aiButton.disabled=false;}
+    };
   }
   _send() {
     if (this._ready && this._session) this.shadowRoot.querySelector('iframe').contentWindow.postMessage(

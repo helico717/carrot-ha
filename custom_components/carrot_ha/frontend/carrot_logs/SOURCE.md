@@ -29,5 +29,11 @@ gpsOnly 모드를 제거했다. 2026-10-18 사용자 요청으로 날짜 선택�
 HA 어댑터는 인증 경로/선택 파일/임시 작업 수명/도구 전용15분 키만 담당한다.
 원본 공개 링크는 사용하지 않으며 원작자 서버에 요청하지 않는다.
 
+2026-10-19 AI 주행 분석은 HA 카드의 별도 모듈 `../carrot-logs-ai.js`와 HA의
+`driving_logs/ai*.py`에서 수행한다. 원본 엔진의 전체 cereal 스키마로 저장 로그를
+로컬 요약하고 수치·상대 시각만 Gemini API로 수동 전송한다. GPS/영상/기기 ID는
+제외하며 자동 파라미터 변경은 없다. `ha_log_explorer.js`는 검증된 부모 카드 메시지의
+근거 세그먼트를 기존 V2로 연다. 표시된 상대 시각의 seek는 사용자가 수행한다.
+
 `scripts/build_logs_upload_port.py`는 같은 커밋의 `web_upload.py`와 서버 결과 포매터를
 `driving_logs/upstream_upload*.py`로 가져온다. HA 작업 수명·인증·보관 파일 선택만 어댑터에서 담당한다.

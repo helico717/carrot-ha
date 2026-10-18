@@ -22,7 +22,8 @@ jobs:
           docker run --rm -v "$PWD:/workspace" -w /workspace python:3.14-alpine sh -c '
             python -m pip install --only-binary=:all: aiohttp numpy pycapnp==2.2.4 &&
             python -c "import importlib.util; assert importlib.util.find_spec(\"zstandard\") is None" &&
-            python -m unittest discover -s tests -p test_driving_logs_v2.py -v
+            python -m unittest discover -s tests -p test_driving_logs_v2.py -v &&
+            python -m unittest discover -s tests -p test_driving_logs_ai.py -v
           '
   regression:
     runs-on: ubuntu-latest

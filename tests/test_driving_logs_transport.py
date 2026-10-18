@@ -33,6 +33,8 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         async def executor(function, *args):
             return await asyncio.to_thread(function,*args)
         self.hass = types.SimpleNamespace(data={'carrot_ha':{'entry':self.runtime}}, async_add_executor_job=executor)
+        self.hass.config=types.SimpleNamespace(path=lambda *parts:str(Path(self.temp.name).joinpath(*parts)))
+        self.hass.async_create_background_task=lambda coro,name:asyncio.create_task(coro,name=name)
         @web.middleware
         async def user(request, handler):
             request['hass_user'] = types.SimpleNamespace(is_admin=request.headers.get('X-Test-Admin') == 'yes')
@@ -57,7 +59,27 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         self.client=ClientSession(cookie_jar=CookieJar(unsafe=True))
 
     async def asyncTearDown(self):
+        if manager:=self.runtime.get('driving_ai'):await manager.close()
         await self.client.close();await self.server.close();self.temp.cleanup()
+
+    async def test_ai_configuration_requires_admin_issued_entry_session(self):
+        base=str(self.server.make_url('/api/carrot_ha/v1/driving_logs/entry'))
+        async with self.client.get(base+'/ai/config') as response:self.assertEqual(response.status,401)
+        async with self.client.post(base+'/ai/config',json={'api_key':'fake-test-key-000000'}) as response:self.assertEqual(response.status,401)
+        async with self.client.post(base+'/session') as response:self.assertEqual(response.status,403)
+        async with self.client.post(base+'/session',headers={'X-Test-Admin':'yes'}) as response:self.assertEqual(response.status,200)
+        async with self.client.post(base+'/ai/config',json={'api_key':'fake-test-key-000000'}) as response:
+            self.assertEqual(response.status,200);data=await response.json();self.assertTrue(data['configured']);self.assertNotIn('api_key',data)
+            self.assertEqual(response.headers['Cache-Control'],'no-store')
+        async with self.client.get(base+'/ai/config') as response:self.assertNotIn('fake-test-key',await response.text())
+        async with self.client.post(base+'/ai/config',json=[]) as response:self.assertEqual(response.status,400)
+        async with self.client.post(base+'/ai/config',data='api_key=bad') as response:self.assertEqual(response.status,415)
+        async with self.client.post(base+'/ai/start',json={'segments':['a--0']}) as response:self.assertEqual(response.status,400)
+        async with self.client.get(base+'/ai/job?id=missing') as response:self.assertEqual(response.status,404)
+        other=types.SimpleNamespace(entry_id='other',options={},data={'device_id':'second'})
+        self.hass.data['carrot_ha']['other']={'entry':other}
+        async with self.client.get(base.replace('/entry','/other')+'/ai/config') as response:self.assertEqual(response.status,401)
+        async with self.client.post(base+'/ai/config',json={'clear_key':True}) as response:self.assertFalse((await response.json())['configured'])
 
     async def test_upload_browse_range_and_auth_scope(self):
         base=self.server.make_url('/api/carrot_ha/v1/driving_logs_upload/comma')

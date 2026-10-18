@@ -153,6 +153,8 @@ class BrowserView(HomeAssistantView):
 
     async def get(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'ai' and segment is None:
+            return await self.ai(request, runtime, action)
         if area == 'dashcam' and action == 'v2' and segment:
             from .replay_v2 import RadarJobs, manifest, tool_commands
             async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
@@ -267,6 +269,8 @@ class BrowserView(HomeAssistantView):
 
     async def post(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'ai' and segment is None:
+            return await self.ai(request, runtime, action)
         if index is not None:
             raise web.HTTPNotFound()
         if area == 'dashcam' and action == 'upload':
@@ -279,6 +283,40 @@ class BrowserView(HomeAssistantView):
             runtime['driving_log_read_state'] = {'recentSegment': value}
             return web.json_response({'ok': True, 'recentSegment': value})
         raise web.HTTPNotImplemented(text='로그 서버 전송과 분석은 다음 단계에서 연결됩니다.')
+
+    async def ai(self, request, runtime, action):
+        from .ai import AiManager, AnalysisError
+        headers = {'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer'}
+        async with runtime.setdefault('driving_ai_init_lock', asyncio.Lock()):
+            if 'driving_ai' not in runtime:
+                runtime['driving_ai'] = AiManager(self.hass, runtime)
+            manager = runtime['driving_ai']
+        try:
+            if request.method == 'GET' and action == 'config':
+                value = await manager.config()
+            elif request.method == 'GET' and action == 'models':
+                value = await manager.models()
+            elif request.method == 'GET' and action == 'job':
+                value = manager.snapshot(request.query.get('id',''))
+            elif request.method == 'POST':
+                if request.content_type != 'application/json':
+                    raise web.HTTPUnsupportedMediaType()
+                if request.content_length is None or request.content_length > 16*1024:
+                    raise web.HTTPRequestEntityTooLarge(max_size=16*1024, actual_size=request.content_length or 0)
+                body = await request.json()
+                if not isinstance(body,dict):raise ValueError('invalid_request')
+                if action == 'config':value = await manager.config(body)
+                elif action == 'start':value = await manager.start(body)
+                elif action == 'cancel':value = manager.cancel(str(body.get('id','')))
+                else:raise web.HTTPNotFound()
+            else:raise web.HTTPNotFound()
+        except AnalysisError as error:
+            return web.json_response({'error':error.message,'code':error.code},status=error.status,headers=headers)
+        except (ValueError,TypeError,KeyError):
+            return web.json_response({'error':'요청 값 또는 선택한 로그를 확인해 주세요.'},status=400,headers=headers)
+        except OSError:
+            return web.json_response({'error':'분석 설정 파일을 읽거나 저장하지 못했습니다.'},status=503,headers=headers)
+        return web.json_response(value,headers=headers)
 
     async def upload(self, request, runtime, action):
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
