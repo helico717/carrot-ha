@@ -5,11 +5,15 @@
 #haReplayV2[open]{display:flex;flex-direction:column}#haReplayV2 header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #39424b}#haReplayV2 iframe{flex:1;width:100%;min-height:0;border:0}
 .ha-thumb-loading.dashcam-segment-thumb{position:absolute;inset:0;z-index:0;width:100%;height:100%;border:0;border-radius:0;pointer-events:none}
 #pageLogs .logs-shell{width:100%;max-width:none;min-width:0;margin:0;box-sizing:border-box}
+#freeAnalysisBanner{flex:0 0 auto;width:calc(100% - var(--logs-content-inline, 24px) * 2);margin:4px var(--logs-content-inline, 24px) 6px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;min-height:44px;box-sizing:border-box}
+#freeAnalysisBanner[hidden]{display:none!important}
+.ha-free-analysis-banner__text{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #haRecordedReplay .carrot-replay-controls__heading{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 #haRecordedReplay .carrot-replay-controls__segmentPicker--title{flex:1;min-width:0;max-width:600px}
 #haRecordedReplay .carrot-replay-controls__segmentSelect{width:100%;min-width:0;text-overflow:ellipsis}
 .ha-replay-step{flex:0 0 auto;min-width:52px;height:44px;padding:0 12px;border-radius:var(--r-sm)}
 @media(max-width:600px){
+ #freeAnalysisBanner{gap:8px;padding-inline:12px}
  #haRecordedReplay .carrot-replay-controls__header{flex-wrap:wrap;gap:6px}
  #haRecordedReplay .carrot-replay-controls__heading{flex-basis:100%;display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:6px}
  #haRecordedReplay .carrot-replay-controls__headerActions{margin-left:auto}

@@ -206,7 +206,8 @@ class AiManager:
         self.hass,self.runtime=hass,runtime
         self.path=Path(hass.config.path('carrot_ha','ai-driving',runtime['entry'].entry_id+'.json'))
         self.lock=asyncio.Lock();self.jobs={};self.last_start=0
-        self.gate=hass.data['carrot_ha'].setdefault('driving_ai_gate',asyncio.Semaphore(1))
+        # DOMAIN values are vehicle runtimes; keep service-wide primitives outside them.
+        self.gate=hass.data.setdefault('carrot_ha_driving_ai_gate',asyncio.Semaphore(1))
 
     async def save(self,config):
         worker=asyncio.ensure_future(self.hass.async_add_executor_job(atomic_json,self.path,config))

@@ -64,3 +64,10 @@ def setup(hass, entry, runtime):
     task = hass.async_create_background_task(maintain(hass, runtime), 'carrot log archive')
     runtime['driving_log_archive_task'] = task
     entry.async_on_unload(task.cancel)
+    async def analyze_latest():
+        from .local_analysis import manager_for
+        manager=await manager_for(hass,runtime)
+        await manager.loop()
+    analysis=hass.async_create_background_task(analyze_latest(),'carrot last-drive free analysis')
+    runtime['driving_local_task']=analysis
+    entry.async_on_unload(analysis.cancel)

@@ -105,6 +105,7 @@ class DeviceView(HomeAssistantView):
                     value = await self.hass.async_add_executor_job(store.begin, data)
                 elif action == 'commit':
                     value = await self.hass.async_add_executor_job(store.commit, data.get('segment'), data.get('hashes'))
+                    runtime['driving_log_last_commit']=time.monotonic()
                 else:
                     raise web.HTTPNotFound()
             except (ValueError, KeyError):
@@ -153,6 +154,8 @@ class BrowserView(HomeAssistantView):
 
     async def get(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'local' and segment is None:
+            return await self.local(request,runtime,action)
         if area == 'ai' and segment is None:
             return await self.ai(request, runtime, action)
         if area == 'dashcam' and action == 'v2' and segment:
@@ -269,6 +272,8 @@ class BrowserView(HomeAssistantView):
 
     async def post(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'local' and segment is None:
+            return await self.local(request,runtime,action)
         if area == 'ai' and segment is None:
             return await self.ai(request, runtime, action)
         if index is not None:
@@ -316,6 +321,38 @@ class BrowserView(HomeAssistantView):
             return web.json_response({'error':'요청 값 또는 선택한 로그를 확인해 주세요.'},status=400,headers=headers)
         except OSError:
             return web.json_response({'error':'분석 설정 파일을 읽거나 저장하지 못했습니다.'},status=503,headers=headers)
+        return web.json_response(value,headers=headers)
+
+    async def local(self,request,runtime,action):
+        from .local_analysis import manager_for
+        from .ai import AnalysisError
+        manager=await manager_for(self.hass,runtime)
+        headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}
+        try:
+            if request.method=='GET':
+                if action=='status':value=await manager.public_status()
+                elif action=='config':value=await manager.config()
+                elif action=='job':value=manager.snapshot(request.query.get('id',''))
+                elif action=='result':value=await manager.result({'route':request.query.get('route','latest')})
+                else:raise web.HTTPNotFound()
+            elif request.method=='POST':
+                if request.content_type!='application/json':raise web.HTTPUnsupportedMediaType()
+                if request.content_length is None or request.content_length>128*1024:
+                    raise web.HTTPRequestEntityTooLarge(max_size=128*1024,actual_size=request.content_length or 0)
+                body=await request.json()
+                if not isinstance(body,dict):raise ValueError('invalid_request')
+                if action=='config':value=await manager.config(body)
+                elif action=='start':value=await manager.start(body)
+                elif action=='result':value=await manager.result(body)
+                elif action=='cancel':value=manager.cancel(str(body.get('id','')))
+                else:raise web.HTTPNotFound()
+            else:raise web.HTTPNotFound()
+        except AnalysisError as error:
+            return web.json_response({'error':error.message,'code':error.code},status=error.status,headers=headers)
+        except (ValueError,KeyError,TypeError):
+            return web.json_response({'error':'분석 범위 또는 설정 값을 확인해 주세요.'},status=400,headers=headers)
+        except OSError:
+            return web.json_response({'error':'저장 로그 또는 분석 캐시에 접근하지 못했습니다.'},status=503,headers=headers)
         return web.json_response(value,headers=headers)
 
     async def upload(self, request, runtime, action):

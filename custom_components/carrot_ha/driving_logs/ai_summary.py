@@ -43,6 +43,7 @@ def summarize(frames, alias, include_overrides=False):
             events.append({'kind': kind, 'title': title, 'alias': alias, 'sec': round(t, 2),
                            'measurements': {k: frame[k] for k in ('speed_kph','accel','target_accel','command_accel','lead_distance','lead_speed_kph','angle','desired_angle','desired_speed','speed_source') if frame.get(k) is not None}})
         previous = frame
+    event_counts={kind:sum(event['kind']==kind for event in events) for kind in {event['kind'] for event in events}}
     # Evenly sample the whole selection, rather than silently dropping late events.
     if len(events) > 16:
         events = [events[round(i * (len(events)-1)/15)] for i in range(16)]
@@ -58,4 +59,4 @@ def summarize(frames, alias, include_overrides=False):
             'min_accel': min(accelerations, default=None), 'max_target_accel': max(targets, default=None),
             'control_state_known_frames': sum(type(f.get('enabled')) is bool for f in frames),
             'overrides': overrides if include_overrides else None,
-            'events': events, 'sample': points}
+            'events': events, 'event_counts':event_counts, 'sample': points}

@@ -1,3 +1,20 @@
+## 2026-10-19 — 마지막 주행 무료 자동 분석·추천 및 기존 메뉴 통합 구현 완료
+
+- 사용자 명시: 마지막 주행 전체를 원본처럼 무료 분석하고 파라미터 변경 후보까지 제안해야 한다. Gemini는 사용자가 버튼으로 시작한다. 별도 구간 선택 화면 대신 기존 주행 썸네일/세그먼트의 점3개 메뉴와 목록 체크박스를 사용하고 “이 구간을 분석하시겠습니까?” 확인을 거친다. 새로 추가되는 버튼·탭·뱃지·진행률 바는 기존 당근웹 로그 디자인 시스템(`smallBtn`, `btn--filled`, `c-segmented-control`, `chip`, `app-progress__track`)과 100% 동일한 스타일을 사용한다.
+- 원본 확인 완료: `autotuner/ai_client.js:analyzeWithBuiltinEngine`에 API키 없는 규칙 기반 분석/추천이 실제 존재한다. `server/features/autotune.py`는 전체 선택이어도4개 초과 시 대표4구간만 추출한다. HA 구현에서는 대표4구간 샘플링 없이 마지막 주행의 저장된 전체 완료 구간(최대720개)을 순차 분석·캐시하고, 주행 종료 및 업로드 안정(3분/10분) 후 백그라운드에서 무료 자동 분석을 수행하도록 확장했다.
+- 서버 구현 (`custom_components/carrot_ha/driving_logs/local_rules.py`, `local_analysis.py`, `http.py`, `runtime.py`, `ai.py`, `ai_summary.py`, `custom_components/carrot_ha/__init__.py`):
+  - `local_rules.py`: 외부 API 호출이나 파라미터 자동 변경 없이 활성 제어 구간(`enabled`)의 저속 가속 상승(`CruiseMaxVals1`), 정차 감속(`StoppingAccel`), 정차 후 출발, 조향각 차이를 요약하고 실제 차량 파라미터 카탈로그·범위·반복 근거를 충족하는 후보만 제안한다.
+  - `local_analysis.py`: 전 구간 순차 요약 및 세그먼트별 SHA256 캐시(`segments/*.json`), 주행 전체 리포트 저장(`reports/*.json`), 늦게 도착한 세그먼트 감지 시 재분석, 주행 종료·업로드 안정 대기 자동 스케줄러(`auto_tick`, `loop`), `/local/{status,config,job,result,start,cancel}` 엔드포인트 및 언로드 정리 구현.
+- 프리뷰 및 프로덕션 프론트엔드 구현 (`custom_components/carrot_ha/frontend/carrot-logs-card.js`, `carrot-logs-ai.js`, `carrot_logs/ha_log_explorer.js`, `carrot_logs/ha_layout.css`, `carrot_logs/logs.html`, `carrot_logs/js/generated/logs.js`):
+  - 프리뷰(`http://127.0.0.1:8769/`)와 프로덕션 양쪽 모두 임의 버튼 스타일을 제거하고 기존 당근웹 로그의 `.smallBtn`, `.smallBtn.btn--filled`, `.c-segmented-control`, `.c-segmented-control__item`, `.chip.chip--accent`, `.app-progress__track` 및 `--md-*` 디자인 토큰을 100% 동일하게 적용했다.
+  - `logs.js`의 `CarrotLogsRuntime.dashcam`에 `selectedForRoute`를 노출해 가상 스크롤된 주행에서도 체크된 전체 세그먼트를 정확히 읽도록 연결했다.
+  - `ha_log_explorer.js`: 상단 `#freeAnalysisBanner`에서 `/local/status`를 표시·폴링하고, 주행 썸네일(`route-menu`) 및 세그먼트(`segment-menu`)의 `⋮` 메뉴에 원본 메뉴 버튼을 복제한 `이 구간 무료 분석…` / `무료 분석 결과 / 다시 분석…`, `AI 분석…` 항목을 주입했다.
+  - `carrot-logs-card.js` & `carrot-logs-ai.js`: 상단 우측 아이콘 버튼(`#logAiButton`, `mdi:tune-vertical`)으로 분석 설정 모달을 열고, `⋮` 메뉴 및 배너 클릭 시 `이 구간을 분석하시겠습니까?` / `이 주행을 분석하시겠습니까?` 확인 팝업(현재 구간 / 주행 전체 / 체크한 구간 라디오, 무료 분석 / Gemini AI 분석 세그먼트 탭), API 키 없는 무료 분석 실행·결과·리플레이 V2 근거 이동, 마지막 주행 자동 무료 분석 토글(`auto_latest`) 및 Gemini 수동 분석을 통합했다.
+- 로컬 검증 완료:
+  - Python 3.14 단위 테스트 48건(신규 `test_driving_logs_local.py` 7건 포함, 47 passed / 1 skipped) 통과. 33개 전 구간 순차 분석·캐시 재사용, 늦은 세그먼트 도착 시 완료 표시 방지 및 재분석, 주행 중/수신 중 대기 게이트, 외부 AI 호출 0회 검증.
+  - Chromium 브라우저 테스트 7종(`driving-logs-ai-browser.cjs`, `driving-logs-explorer-browser.cjs`, `driving-logs-port-browser.cjs`, `driving-logs-settings-browser.cjs`, `driving-logs-v2-browser.cjs`, `driving-logs-renderer-browser.cjs`, 프리뷰 `verify.cjs`) 모두 PASS.
+- 배포 상태: Git `main` 커밋·푸시 및 HA 서버(`hassio@192.168.0.140`) SSH 직접 반영 진행 중. 새 Python 엔드포인트(`/local/*`)와 백그라운드 자동 분석 루프 활성화는 파일 배포 후 사용자의 HA 재시작이 필요하며, 정적 프론트엔드 자산은 브라우저 새로고침으로 반영된다. 버전/태그/Release 변경 및 Comma 기기 수정은 수행하지 않는다.
+
 ## 2026-10-19 — 전체 주행 분석 가능 여부 문의 확인
 
 - 사용자 문의에 현재 AI 선택/추출/전송 코드를 읽기 전용으로 대조했다. 현재는 세그먼트 최대8개 수동 선택이며 한 주행의 모든 세그먼트를 자동 순차 처리·종합하는 기능은 없다. 선택한 파일 전체를 해석하되 차량 신호는 약0.25초 간격, AI 입력은 구간별 최대32개 표본과 제한된 관찰(구간별16/전체40개 근거)로 요약한다. 전체 시간 범위를 읽는 것과 모든 원본 신호를 AI가 정밀 검토하는 것을 구분한다.
@@ -755,3 +772,10 @@
 - **운영 분석 성공 확인:** 경계 보완5ab94b59751f337ee013b0560586ffa0ef2668cf main 푸시·HA runner/HTML2파일 백업/직접 설치/해시 일치. Linux/Alpine CI38705602425 success (https://github.com/helico717/carrot-ha/actions/runs/38705602425). 실제 HA 세그먼트에서1095프레임·영상 동기화 완료 문구, 영상과 레이더 차선/비전 표시, 하단 거리·속도·가속도 유색 시계열을 스크린샷으로 직접 확인했다. 원본 로그/분석 결과 파일을 로컬로 내보내지 않았다. 초기 분석에는 준비 시간이 있으며 완료 전 빈 그래프와 완료 후 결과를 구분한다.
 - 실제 V2의 다음 버튼으로 같은 주행2번째 세그먼트 선택·현재 구간 드롭다운/시각 갱신·분석 준비 진입을 확인했다. 처음/끝 버튼 및 드롭다운 왕복은 합성 브라우저에서도 통과. 오래된 JS/CSS 캐시가 지도 UI를 남기지 않도록 로그 HTML의 adapter JS/CSS 참조에 기능 revision query를 부여한다. HA 새 경로/의존성 변경은 없고 runner는 자식 실행 때 새 파일을 읽으므로 이번 단계에 HA 재시작은 필요하지 않다. 강력 새로고침 후 목록 지도 제거를 최종 확인한다.
 - **최종 운영 검증:** 실제2번째 세그먼트458프레임·영상 동기화 완료 확인, 드롭다운으로 첫 구간 복귀·현재 구간 표시 확인. HA 로그 목록 복귀 후 지도 DOM0/실제 주행 카드10개와 전체 너비 배치를 스크린샷으로 직접 확인. 날짜/설정/저장량 표시 유지. 최종 코드 c23d4a83ff02efc645638b52c0e53c981c60dd02의 HTML1파일 백업/직접 설치/해시 일치, 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-c23d4a83ff02/before. 최종 Linux/Alpine CI38706020630 success (https://github.com/helico717/carrot-ha/actions/runs/38706020630). 기존 차량 대시보드 Node12건도 통과. 원작자 서버 접근·HA/Comma 재시작·태그/릴리즈 없음. 모든 보관 세그먼트의 신호 품질/분석 성능까지 검증한 것은 아니다.
+## 2026-10-18 — ID.4 00000210--faec156cd8 3·4구간 조향 한도 경고 조사
+
+- 사용자 첨부 “핸들을 잡아주세요 / 회전이 조향 한도를 초과함”의 원인 분석. HA를 통해 NAS 보관 원본 rlog 두 구간을 읽고 full cereal 스키마로 해석, 사건 커밋 33bdf084의 조향/경고 코드와 대조했다.
+- 결과: steerSaturated/warning 표시 3구간58.712초부터4구간1.144초까지 약2.43초. 실제 이벤트는3구간58.712–59.142초에서 관측되고4구간 신규 이벤트는 없으며2초 표시 유지로 이어짐. 최초 속도35.39km/h, 목표/실제 핸들 각도 차이4.50°, 경고용 요구/실제 횡가속도1.081/0.871m/s², angleState.saturated=true. EPS 임시/영구 오류는 두 구간 모두 없음.
+- 관련 파일: `driving-logs/analysis-20261018-id4-steer-saturation.md`, openpilot `selfdrived.py`, `controlsd.py`, `latcontrol_angle.py`, VW MEB controller. 실제 HCA_03 송신도 확인. 공통 앵글 경고와 실제 MEB 곡률 PID 피드백 기준의 차이를 확인했으나 물리적 토크 한계/완전한 오경보까지 단정하지 않음.
+- 검증/배포 상태: 원본 로그 수신·전체 디코딩·기록 이벤트 및 표시 상태 대조 완료. 원본 GPS/로그·인증정보 공개 없음. 실행 코드·서버 설정·Comma 파일 변경, 배포·재시작·실차 설치 없음. 분석 기록만 로컬 작성.
+
