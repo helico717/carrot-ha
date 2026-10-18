@@ -7,6 +7,7 @@
 - 프리뷰 보존 검증: 스냅샷 원본 카드·날짜 탐색·합성 영상 썸네일·설정, 신규 AI 수동 분석·취소·추천·근거 구간·키 미설정/한도 상태, desktop/mobile/light 및 overflow 검증 통과. 실제 AI·외부 네트워크·라이브 소켓 호출은 없었다.
 - 운영 반영: 실행 코드 `68bf37df44ddc36bf1c79ebf349faaabb07ae17e`를 main에 푸시하고 원격 커밋 일치를 확인했다. HA 설치4파일 충돌 검사·원본 백업·직접 설치·SHA-256 전부 일치. 백업: `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-68bf37df44dd/before` (`/config`의 실제 경로).
 - 운영 검증: HA가 제공하는 `ha_log_explorer.js`, `ha_layout.css`, `logs.html` HTTP200 응답의 SHA-256이 실행 커밋과 모두 일치한다. 제공 JS의 날짜 DOM/달력 로직 제거 및 HTML의 `20261018-no-date` 캐시 버전을 확인했다. 정적 파일 변경이므로 사용자 브라우저 새로고침으로 적용되며 HA/Comma 재시작·태그/릴리즈·실차 소스 수정은 수행하지 않았다. Linux `Direct receiver validation` CI 39137247044 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/39137247044 .
+- 사용자 화면 확인: 사용자가 날짜 선택기가 남아 있다고 보고해 일반/gzip 정적 응답·압축 형제 파일·카드 iframe 경로를 재조사했다. 설치본과 HTTP 응답은 최신이며 날짜 컨트롤은 없었고, 확인 도중 사용자가 “이제 없어졌다”고 실제 화면 반영을 확인했다. 사용자 브라우저 내부 캐시는 직접 계측하지 않았으므로 확정 원인으로 보고하지 않으며 추가 실행 코드 변경은 하지 않았다.
 
 ## 2026-10-17 — 대시보드: 배터리 사용량 계산 엔진 미래 타임스탬프 오염 차단 및 측정 시각 정렬 보정
 
