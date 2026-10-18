@@ -1,9 +1,6 @@
 /* HA supplies the viewport; media loading must never determine its width. */
 #pageLogs{width:100%;min-width:0;box-sizing:border-box}
 #haLogsStatus:empty{display:none}
-.ha-log-datebar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 16px 8px;flex:none}
-.ha-log-datebar input{color:var(--md-on-surface);background:var(--md-surface-cont);border:1px solid var(--md-outline-var);border-radius:6px;padding:6px 8px;font:inherit;min-width:0;color-scheme:dark}
-.ha-log-datebar .smallBtn{min-height:36px}.ha-log-datebar>span{font-size:12px;color:var(--md-on-surface-var)}
 #haReplayV2{padding:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;background:#080c0e;color:#eee}
 #haReplayV2[open]{display:flex;flex-direction:column}#haReplayV2 header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid #39424b}#haReplayV2 iframe{flex:1;width:100%;min-height:0;border:0}
 .ha-thumb-loading.dashcam-segment-thumb{position:absolute;inset:0;z-index:0;width:100%;height:100%;border:0;border-radius:0;pointer-events:none}
@@ -13,7 +10,6 @@
 #haRecordedReplay .carrot-replay-controls__segmentSelect{width:100%;min-width:0;text-overflow:ellipsis}
 .ha-replay-step{flex:0 0 auto;min-width:52px;height:44px;padding:0 12px;border-radius:var(--r-sm)}
 @media(max-width:600px){
- .ha-log-datebar{gap:6px;padding-inline:12px}
  #haRecordedReplay .carrot-replay-controls__header{flex-wrap:wrap;gap:6px}
  #haRecordedReplay .carrot-replay-controls__heading{flex-basis:100%;display:grid;grid-template-columns:minmax(0,1fr) 52px 52px;gap:6px}
  #haRecordedReplay .carrot-replay-controls__headerActions{margin-left:auto}
