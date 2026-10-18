@@ -5,7 +5,8 @@
 - AI 프리뷰 보존: 운영 UI 변경 전 현재 프론트엔드 전체를 대화 전용 프리뷰 폴더의 `frontend-snapshot/`으로 복사하고 프리뷰 서버를 이 스냅샷에 고정한다. 날짜 선택기는 기존 AI 프리뷰에 그대로 유지한다.
 - 로컬 검증: 날짜 컨트롤 DOM 제거, 과거 세션 날짜가 있어도 전체 주행 표시, calendar/from/to 요청 제거, visibility 복귀 후 목록 유지와 V2 메뉴·모바일 너비를 Chromium에서 통과했다. 기존 로그 목록·선택·정렬·영상 플레이어·닫기 및 저장 설정/NAS 상태·소유자 격리 브라우저 회귀도 모두 통과했다. 실제 HA SSH 연결과 설치 JS/CSS/HTML 원본 해시를 읽기 전용으로 확인했다.
 - 프리뷰 보존 검증: 스냅샷 원본 카드·날짜 탐색·합성 영상 썸네일·설정, 신규 AI 수동 분석·취소·추천·근거 구간·키 미설정/한도 상태, desktop/mobile/light 및 overflow 검증 통과. 실제 AI·외부 네트워크·라이브 소켓 호출은 없었다.
-- 배포 상태: 커밋·main 푸시와 HA 백업·변경파일 충돌 검사·설치 해시/정적 HTTP 확인 대기. HA/Comma 재시작·태그/릴리즈·실차 소스 수정은 실행하지 않는다.
+- 운영 반영: 실행 코드 `68bf37df44ddc36bf1c79ebf349faaabb07ae17e`를 main에 푸시하고 원격 커밋 일치를 확인했다. HA 설치4파일 충돌 검사·원본 백업·직접 설치·SHA-256 전부 일치. 백업: `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-68bf37df44dd/before` (`/config`의 실제 경로).
+- 운영 검증: HA가 제공하는 `ha_log_explorer.js`, `ha_layout.css`, `logs.html` HTTP200 응답의 SHA-256이 실행 커밋과 모두 일치한다. 제공 JS의 날짜 DOM/달력 로직 제거 및 HTML의 `20261018-no-date` 캐시 버전을 확인했다. 정적 파일 변경이므로 사용자 브라우저 새로고침으로 적용되며 HA/Comma 재시작·태그/릴리즈·실차 소스 수정은 수행하지 않았다. Linux `Direct receiver validation` CI 39137247044 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/39137247044 .
 
 ## 2026-10-17 — 대시보드: 배터리 사용량 계산 엔진 미래 타임스탬프 오염 차단 및 측정 시각 정렬 보정
 
