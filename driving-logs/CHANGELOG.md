@@ -10,6 +10,8 @@
 - HA 직접 설치 완료: `985d60af088da1b52816912f84c1bee654c43303` main 푸시. SSH preflight10파일 충돌 없음→기존 파일 백업→설치10파일 SHA256 전부 일치. 백업 `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-985d60af088d/before` (`/config` 실제 경로). 사용자 HA 재시작·키 입력 대기이며 실행 중 API 활성화/실제 Gemini 생성 성공은 아직 검증하지 않았다. Linux CI39139867781 진행 중.
 - 운영 파일 검증: 설치 Python5파일 구문 해석 통과, HA 정적 HTTP의 카드/AI모듈/탐색기/HTML4파일 모두200·실행 커밋 SHA256 일치. Linux/AlpinePython3.14 CI39139867781 success 확인 (https://github.com/helico717/carrot-ha/actions/runs/39139867781).
 - 알리미 추가 조사: Publish의 마스킹 관리 키와 실제 Cloud Run 컨테이너의 `GEMINI_API_KEY` 연결 확인. 배포는 일반 API 프로젝트와 다른 Google 관리 Starter 환경이며 Credentials 목록은 비어 있고 서비스 계정 조회 권한은 없다. 무료 API 프로젝트 관측을 이 별도 배포 키의 등급으로 일반화하지 않는다. 정확한 과금 계정/키 한도는 여전히 미확인. 신규 키의 점 포함 형식을 지원하도록 HA 키 입력 검증을 보완하고 합성 키로 회귀한다. 실제 키를 코드·문서·Git에 넣지 않는다.
+- 최종 키 형식 보완: `ae1c4dce167383ad7451a73e2bf5667f7a12ade0` main 푸시, Python3.14 신규AI8건 재통과. HA1파일 preflight/백업/설치·SHA256 일치. 백업 `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-ae1c4dce1673/before`. 최종CI39140215571 진행 중이며 이전 전체 구현 CI는 성공했다. 사용자 재시작·HA 전용 키 입력·실제 Gemini 분석은 대기 상태를 유지한다.
+- 최종 원격 검증: CI39140215571의 regression 및 radar-ha-python 두 작업 모두 success. https://github.com/helico717/carrot-ha/actions/runs/39140215571 . HA 직접 설치·백업·정적 응답/구문·Git 원격 검증을 마쳤으며, 운영 활성화/외부 API 결과는 사용자 재시작·키 연결 후 확인 대상이다. 버전/태그/Release/Comma 소스 변경과 HA 재시작은 수행하지 않았다.
 
 ## 2026-10-18 — 사용자 요청: 로그 날짜 선택기 제거 및 HA 직접 반영
 
