@@ -837,3 +837,10 @@
 - 출처 확인: 최초 당근ID4 #427 커밋01bd6c1b(원본f24623f3)에 if2 MEB 기반 포팅 명시. 현재 원본master2bea717d와 연결opendbc4a3acff8을 고정해 실제 활성 소스 비교.
 - 결과: Power50·abs 토크·기본 게인 동일, 전용곡률타입/VM피드백·약한 개입unwind·옵션CurvatureD·진단 및 최종jerk3.5886 대5 차이. 과거 주석 백업은 실행 코드에서 제외. 기본OFF 학습을 성능 보장으로 설명하지 않음.
 - 산출물: `comparison-2026-10-19-infinitecable2-id4-steering.md`. 소스 대조 검증 완료, 실제 원본실차/동일조건 폐루프 미검증. 문서만 게시, 주행코드/설정/기기 변경 없음.
+
+## 2026-10-19 — IQ.Pilot 이주와 코너 성공 가능성 조사
+
+- 사용자 요청: ID4 gateway 롱컨 지원, 당근 대비 기능 손익, 코너 통과 가능성. 공개busyfritz4e4cbcb5 기준 조사; README 본가IQLvbs는 접근/인증 오류로 소스 미확인.
+- 확인: gateway 레이더 유지·alpha_long 롱컨 경로 및 ALLOW_DEBUG 펌웨어 조건. 현재 Carrot HA 공급 데몬 미포함, IQ 대체옵션의 존재/기본값과 지역·실차 미검증 구분.
+- 성공 가능성은 있으나 우위/성공률 산출 불가. Power차이와 동일곡률한계 구분, 저속turn desire 기본OFF 및 약30.6km/h 게이트로86 자동해결 주장 배제.
+- 관련 문서: `assessment-2026-10-19-iqpilot-migration.md`. 소스 확인 완료, 본가·실차·한국 서비스·폐루프 미검증. 문서만 게시, 코드·설정·기기 변경 없음.
