@@ -37,3 +37,7 @@
 예시 계산: 목표곡률 0.0196에서 횡가속도 3m/s²를 가정하면 약 44.5km/h, 2.5m/s²라면 약 40.7km/h다. 이는 조건부 계산이며 권장 운행속도나 통과 보장이 아니다. 보정 중 74도는 이탈 회복 동작도 포함하므로 정상 경로의 필요각으로 사용하지 않는다.
 
 검증: 60초 rlog의 carState/carControl/carOutput/controlsState/modelV2/lateralPlan/carrotMan/longitudinalPlan 및 sendcan/can 교차 분석, 영상 시간별 프레임 확인. 폐루프 재현·정확한 이탈거리·EPS 내부 제한 원인·감속 변경 후 통과 여부는 미검증. 코드/설정 변경·HA/Comma 재시작·Worker/D1 배포 없음.
+
+## 사용자 확인에 따른 페달 해석 보완
+
+사용자는 문제 코너에서 가속페달을 밟지 않았다고 확인했다. 원본 carState 역시 21.75초부터 문제 구간이 끝날 때까지 gasPressed=false다. 29–33초의 desiredSource=gas는 현재 페달 입력을 뜻하지 않고 유지된 소프트웨어 속도 하한이다. 그 이전 gasPressed=true는 Motor_51.Accel_Pedal_Pressure>0으로 계산되지만, 이를 사용자 의도 또는 문제 코너에서의 페달 입력으로 서술하면 안 된다. MEB 구현은 gas 수치 필드를 채우지 않아 gas=0만으로 이전 플래그를 반증할 수도 없다. 사용자 조작 탓이라는 결론은 성립하지 않는다.
