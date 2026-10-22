@@ -24,7 +24,7 @@ const path=require('path');
  const root=page.locator('carrot-vehicle-journal');
  await root.locator('#headline').filter({hasText:'42km'}).waitFor();
  if(await root.locator('#records .ledger-place-name').textContent()!=='시험 <장소>')throw Error('place name missing or escaped incorrectly');
- if(await root.locator('#records .ledger-place-name').evaluate(el=>getComputedStyle(el).fontWeight)!=='400')throw Error('place name bold');
+ if(!['600','700','750'].includes(await root.locator('#records .ledger-place-name').evaluate(el=>getComputedStyle(el).fontWeight)))throw Error('place name medium bold');
  if(await root.locator('#records img').count())throw Error('memo HTML executed');
  // Exercise the reported three-sector seam and combustion legend with synthetic data.
  await page.evaluate(()=>{

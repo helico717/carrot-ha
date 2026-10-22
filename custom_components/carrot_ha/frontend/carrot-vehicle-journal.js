@@ -161,7 +161,7 @@ const styles=`
   :host([data-loading="true"]) .tabs::before{animation:none!important;}
   .carrot-floating-bubble .bubble-dot{animation:none!important;opacity:1;}
 }
-@media(max-width:850px){.wide,.narrow,.half{grid-column:span 12}.shell{padding:24px 20px}}@media(max-width:520px){.shell{padding:20px 12px}.panel,.hero{padding:20px}.stats{grid-template-columns:1fr 1fr}.fields{grid-template-columns:1fr}.controls{width:100%}.controls label{flex:1}.controls input{width:100%}.mast h2{font-size:23px}.table th,.table td{padding:10px 4px}.cost-layout{justify-content:center}.stat strong{font-size:18px}.stat-unit{font-size:11.5px}.stat-empty{font-size:13.5px}.stat small:first-child{min-height:26px}}
+@media(max-width:850px){.wide,.narrow,.half{grid-column:span 12}.shell{padding:24px 20px}}@media(max-width:600px){.shell{padding:10px 8px 32px}.panel,.hero{padding:16px 12px}.stats{grid-template-columns:1fr 1fr}.fields{grid-template-columns:1fr}.controls{width:100%}.controls label{flex:1}.controls input{width:100%}.mast h2{font-size:23px}.table th,.table td{padding:10px 4px}.cost-layout{justify-content:center}.stat strong{font-size:18px}.stat-unit{font-size:11.5px}.stat-empty{font-size:13.5px}.stat small:first-child{min-height:26px}}
 `;
 
 export class VehicleJournal extends HTMLElement {
@@ -783,7 +783,21 @@ export class VehicleJournal extends HTMLElement {
       }
 
       const placeName=r.location?.name?.trim()||r.location?.address?.trim()||'';
-      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col"><div class="ledger-category-location"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span>${placeName?`<span class="ledger-place-name">${esc(placeName)}</span>`:''}</div>${r.subcategory?`<span class="recent-item-title">${esc(r.subcategory)}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
+      let mainTitle='',subTitle='';
+      if(r.subcategory){
+        mainTitle=esc(r.subcategory);
+        const subParts=[];
+        if(placeName)subParts.push(esc(placeName));
+        if(r.odometer_km!=null&&r.kind!=='trip')subParts.push(`${numeric(r.odometer_km,0)}km`);
+        subTitle=subParts.join(' · ');
+      }else if(placeName){
+        mainTitle=esc(placeName);
+        if(r.odometer_km!=null&&r.kind!=='trip')subTitle=`${numeric(r.odometer_km,0)}km`;
+      }else if(r.odometer_km!=null&&r.kind!=='trip'){
+        mainTitle=`${numeric(r.odometer_km,0)}km`;
+      }
+      const pillHtml=`<div class="ledger-pill-wrap"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span></div>`;
+      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col">${pillHtml}${mainTitle?`<span class="ledger-main-title ${!r.subcategory&&placeName?'ledger-place-name':''}">${mainTitle}</span>`:''}${subTitle?`<span class="ledger-sub-title ${r.subcategory&&placeName?'ledger-place-name':''}">${subTitle}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">📷</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
 
       return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.import_source?'마이클 이관':r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td>${r.kind==='trip'&&r.odometer_km!=null?`${numeric(r.odometer_km,1)}km · 누적`:money(r.actual_krw??r.estimated_krw)}</td><td>${actionButtons}</td></tr>`;
     }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
@@ -1263,7 +1277,7 @@ export class VehicleJournal extends HTMLElement {
   }
   formFields(){const mode=this.recordMode||'maintenance',kind=this.$('kind').value||'expense',form=this.$('recordForm'),dedicated=mode!=='maintenance';
     const visible=new Set(['dateField','memoField','recordPhotoField','importSourceDetails']);
-    if(!dedicated){for(const id of ['categoryField','subcategoryField','amountField','recordLocationField'])visible.add(id);if(this.isCombustion())visible.add('odometerField');}
+    if(!dedicated){for(const id of ['categoryField','subcategoryField','amountField','odometerField','recordLocationField'])visible.add(id);}
     if(['washing','accident','refueling','charging'].includes(mode)){visible.add('amountField');visible.add('recordLocationField');}
     if(mode==='washing')visible.add('odometerField');
     if(mode==='refueling')for(const id of ['odometerField','fuelTypeField','unitPriceField','fuelLitersField','tankModeField','washCostField'])visible.add(id);
@@ -1480,7 +1494,7 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('receiptOcrOverlay'))this.$('receiptOcrOverlay').hidden=true;
     this.editing=record||null;this.pendingId=record?.id||uuid();this.$('recordForm').reset();this.recordMode=mode||(record?.kind==='trip'?'trip':['washing','accident','refueling','charging'].includes(record?.category)?record.category:'maintenance');this.fuelLitersEdited=!!record;this.fuelQuantitySource=record?.input?.fuel_quantity_source||'reported';this.unitPriceEdited=!!record;this.unitPriceSource=record?.input?.unit_price_source||'manual';this.unitPriceObserved=record?.input?.unit_price_observed_at;this.$('recordDialog').dataset.mode=this.recordMode;this.draftLocation=record?.location?{...record.location}:null;this.selectedPhotos=[];this.removedPhotoIds=new Set();this.renderSelectedPhotos();this.setDraftDirty(false);
     const form=this.$('recordForm');form.elements.date.value=isReceipt?'':new Date().toLocaleDateString('sv-SE');
-    const input=record&&(record.input||{kind:record.kind,date:record.accounting_date,category:record.category,subcategory:record.subcategory,memo:record.memo,actual_krw:record.actual_krw??record.estimated_krw});
+    const input=record&&{...(record.input||{}),kind:record.input?.kind||record.kind,date:record.input?.date||record.accounting_date,category:record.input?.category||record.category,subcategory:record.input?.subcategory||record.subcategory,memo:record.input?.memo||record.memo,odometer_km:record.input?.odometer_km??record.odometer_km??'',actual_krw:record.input?.actual_krw??(record.actual_krw??record.estimated_krw)};
     if(input)for(const [key,value] of Object.entries(input))if(form.elements[key]){let text=value??'';if(value&&['started_at','ended_at'].includes(key)){const time=new Date(value);text=new Date(time.getTime()-time.getTimezoneOffset()*60000).toISOString().slice(0,16);}if(key==='actual_krw'&&value!=null){text=Number(value).toLocaleString('ko-KR');}form.elements[key].value=text;}
     if(!record){form.elements.kind.value=this.recordMode==='trip'?'trip':'expense';form.elements.category.value=this.recordMode==='trip'?'maintenance':this.recordMode;}
     const fields=record?.import_source?.fields||{};for(const [source,target] of Object.entries({'주유량':'fuel_liters','단가':'unit_price_krw','누적주행거리':'odometer_km','충전량':'billed_charge_kwh'})){if(fields[source]!==undefined&&!form.elements[target].value)form.elements[target].value=String(fields[source]).replaceAll(',','');}
@@ -1492,7 +1506,7 @@ export class VehicleJournal extends HTMLElement {
   }
   async saveRecord(event){
     event.preventDefault();if(this.draftLocation)this.draftLocation={...this.draftLocation,name:this.$('locationName').value.trim()};const form=this.$('recordForm'),payload={kind:this.$('kind').value||'expense',date:form.elements.date.value,memo:form.elements.memo.value,location:this.draftLocation&&(this.draftLocation.name||this.draftLocation.latitude!=null)?this.draftLocation:null};
-    if(!this.$('odometerField').hidden&&form.elements.odometer_km.value!=='')payload.odometer_km=Number(form.elements.odometer_km.value);
+    if(!this.$('odometerField').hidden)payload.odometer_km=form.elements.odometer_km.value!==''?Number(form.elements.odometer_km.value):null;
     if(payload.kind==='expense'){payload.category=['refueling','charging','washing','accident'].includes(this.recordMode)?this.recordMode:form.elements.category.value;payload.subcategory=form.elements.subcategory.value;}
     if(this.recordMode==='refueling'){for(const key of ['fuel_liters','unit_price_krw','wash_cost_krw']){const raw=form.elements[key].value.replaceAll(',','');if(raw!=='')payload[key]=Number(raw);}payload.fuel_quantity_source=this.fuelQuantitySource||'reported';payload.unit_price_source=this.unitPriceSource||'manual';if(this.unitPriceSource==='opinet'&&this.unitPriceObserved)payload.unit_price_observed_at=this.unitPriceObserved;payload.full_tank=form.elements.tank_mode.value==='full';payload.fuel_type=form.elements.fuel_type.value;}
     if(this.recordMode==='charging'){for(const key of ['billed_charge_kwh','unit_price_krw']){const raw=form.elements[key].value.replaceAll(',','');if(raw!=='')payload[key]=Number(raw);}}

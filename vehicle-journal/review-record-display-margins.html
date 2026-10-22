@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>차계부 원장 정보 계층·줄바꿈 및 모바일 여백 개선 프리뷰</title>
+<style>
+:root {
+  --j-bg: #0b1014;
+  --j-surface: #161e25;
+  --j-raised: #202c36;
+  --j-card-bg: #101820;
+  --j-border: #2a3945;
+  --j-ink: #f1f6fa;
+  --j-sub: #a8bdca;
+  --j-accent: #81e6c5;
+  --cat-charging: #81e6c5;
+  --cat-maintenance: #f59e0b;
+  --cat-washing: #60a5fa;
+  --cat-tuning: #c084fc;
+  --cat-other: #94a3b8;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0;
+  background: #05080b;
+  color: var(--j-ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.control-bar {
+  background: #111820;
+  border-bottom: 1px solid var(--j-border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.control-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+.badge-pill {
+  background: rgba(129,230,197,0.15);
+  color: var(--j-accent);
+  border: 1px solid rgba(129,230,197,0.35);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.segmented {
+  display: flex;
+  background: #0b1014;
+  border: 1px solid var(--j-border);
+  border-radius: 10px;
+  padding: 2px;
+}
+.seg-btn {
+  background: transparent;
+  border: 0;
+  color: var(--j-sub);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.seg-btn.active {
+  background: var(--j-raised);
+  color: #fff;
+}
+.preview-stage {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px 12px;
+  overflow: auto;
+}
+/* 뷰포트 컨테이너 */
+.stage-container {
+  width: 100%;
+  transition: max-width 0.25s ease;
+}
+.stage-container.mode-desktop {
+  max-width: 960px;
+}
+.stage-container.mode-mobile {
+  max-width: 412px;
+}
+
+/* 폰 프레임 데코레이션 (모바일 모드일 때) */
+.stage-container.mode-mobile .mockup-wrapper {
+  background: #000;
+  border-radius: 44px;
+  border: 3.5px solid #2a3945;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.85);
+  overflow: hidden;
+  position: relative;
+}
+.dynamic-island {
+  display: none;
+  width: 110px;
+  height: 28px;
+  background: #000;
+  border-radius: 20px;
+  margin: 10px auto 4px;
+  position: relative;
+  z-index: 10;
+}
+.stage-container.mode-mobile .dynamic-island {
+  display: block;
+}
+
+/* 차계부 실제 화면 컴포넌트 */
+.mockup-main {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 모바일 모드에서의 여백 비교 */
+.mode-desktop .mockup-main {
+  padding: 16px 20px;
+}
+.mode-mobile .mockup-main.before-margins {
+  padding: 16px 20px; /* 버그: 모바일에서도 main에 20px 패딩이 남아 총 38px 여백 유발 */
+}
+.mode-mobile .mockup-main.after-margins {
+  padding: 0; /* 개선: 모바일에서는 main 패딩을 0으로 만들어 shell의 8px 패딩만 온전히 적용 */
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--j-border);
+  background: #0b1014;
+}
+.panel-header h2 {
+  font-size: 21.5px;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.btn-header-menu, .btn-header-settings {
+  background: var(--j-raised);
+  border: 1px solid var(--j-border);
+  border-radius: 10px;
+  color: var(--j-ink);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-header-menu { width: 36px; height: 36px; padding: 0; }
+
+.shell {
+  background: var(--j-bg);
+  box-sizing: border-box;
+}
+.mode-desktop .shell {
+  padding: 24px 16px;
+  border-radius: 24px;
+}
+.mode-mobile .shell.before-margins {
+  padding: 16px 18px 32px;
+}
+.mode-mobile .shell.after-margins {
+  padding: 10px 8px 32px; /* 개선: 8px 세이프 사이드 여백 */
+}
+
+/* 카드 패널 */
+.panel {
+  background: var(--j-surface);
+  border: 1px solid var(--j-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.mode-mobile .panel.before-margins {
+  padding: 18px 16px;
+  border-radius: 20px;
+}
+.mode-mobile .panel.after-margins {
+  padding: 16px 12px;
+  border-radius: 16px;
+}
+
+.card-title-row {
+  margin-bottom: 12px;
+}
+.card-title-row h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.card-title-row p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--j-sub);
+}
+
+/* 테이블 및 지출 행 */
+.table-wrap {
+  width: 100%;
+  margin-top: 14px;
+}
+.spending-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* 데스크탑 뷰 */
+.mode-desktop .spending-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--j-sub);
+  font-size: 12.5px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--j-border);
+}
+.mode-desktop .spending-table tbody tr {
+  border-bottom: 1px solid var(--j-border);
+}
+.mode-desktop .spending-table tbody td {
+  padding: 14px 10px;
+  vertical-align: middle;
+}
+.mode-desktop .col-date { width: 14%; font-size: 13px; }
+.mode-desktop .col-content { width: 52%; }
+.mode-desktop .col-amount { width: 16%; font-size: 16px; font-weight: 750; }
+.mode-desktop .col-actions { width: 18%; text-align: right; }
+
+/* 모바일 뷰 (카드형 레이아웃) */
+.mode-mobile .spending-table,
+.mode-mobile .spending-table thead,
+.mode-mobile .spending-table tbody,
+.mode-mobile .spending-table tr,
+.mode-mobile .spending-table td {
+  display: block;
+}
+.mode-mobile .spending-table thead { display: none; }
+.mode-mobile .spending-table tbody tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "memo amount" "date date" "actions actions";
+  gap: 8px 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--j-border);
+}
+.mode-mobile .spending-table td.col-date { grid-area: date; font-size: 12px; color: var(--j-sub); }
+.mode-mobile .spending-table td.col-content { grid-area: memo; min-width: 0; }
+.mode-mobile .spending-table td.col-amount {
+  grid-area: amount;
+  align-self: flex-start;
+  text-align: right;
+  font-size: 17px;
+  font-weight: 750;
+  color: var(--j-ink);
+  white-space: nowrap;
+}
+.mode-mobile .spending-table td.col-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* 알약 배지 */
+.cat-highlight-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+.pill-charging {
+  color: var(--cat-charging);
+  background: rgba(129, 230, 197, 0.14);
+  border: 1px solid rgba(129, 230, 197, 0.4);
+}
+.pill-maintenance {
+  color: var(--cat-maintenance);
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* [개선 전] 이전 타이포그래피 */
+.before-layout .ledger-category-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.before-layout .ledger-place-name {
+  font-weight: 400;
+  font-size: 13.5px;
+  color: var(--j-ink);
+}
+.before-layout .recent-item-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--j-ink);
+}
+.before-layout .memo-desc {
+  font-size: 12.5px;
+  color: var(--j-sub);
+  line-height: 1.35;
+  display: block;
+}
+
+/* [개선 후] 요청하신 새로운 타이포그래피 및 줄바꿈 계층 */
+.after-layout .memo-cell-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.after-layout .memo-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.after-layout .ledger-pill-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+.after-layout .ledger-main-title {
+  font-size: 15px;
+  font-weight: 750; /* (더 볼드체) */
+  color: #ffffff;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+  word-break: break-word;
+}
+.after-layout .ledger-sub-title {
+  font-size: 13.5px;
+  font-weight: 600; /* (중간 볼드체) */
+  color: #b0c4d4;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.after-layout .memo-desc {
+  font-size: 13px;
+  font-weight: 400; /* (볼드체 아님) */
+  color: var(--j-sub);
+  line-height: 1.45;
+  white-space: pre-wrap; /* 메모 줄바꿈 100% 반영 */
+  word-break: break-word;
+  margin-top: 2px;
+}
+
+/* 액션 버튼 */
+.btn-table-action {
+  background: var(--j-raised);
+  border: 1px solid var(--j-border);
+  color: var(--j-ink);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-photo {
+  color: var(--j-accent);
+  border-color: rgba(129,230,197,0.35);
+}
+
+/* 모달 대화상자 */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 12, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal-backdrop.open { display: flex; }
+.modal-card {
+  width: min(440px, 100%);
+  background: #141c23;
+  border: 1px solid #334454;
+  border-radius: 24px;
+  padding: 22px;
+  color: var(--j-ink);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.8);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.modal-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+.modal-close {
+  background: transparent;
+  border: 0;
+  color: var(--j-sub);
+  font-size: 18px;
+  cursor: pointer;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--j-sub);
+}
+.form-grid input, .form-grid select, .form-grid textarea {
+  background: #0d1318;
+  border: 1px solid var(--j-border);
+  border-radius: 10px;
+  padding: 8px 11px;
+  font-size: 13.5px;
+  color: var(--j-ink);
+  outline: none;
+}
+.form-grid .fullfield { grid-column: span 2; }
+.field-highlight {
+  border-color: var(--j-accent) !important;
+  box-shadow: 0 0 0 2px rgba(129,230,197,0.2);
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.btn-primary {
+  background: var(--j-accent);
+  color: #05241b;
+  border: 0;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<header class="control-bar">
+  <div class="control-title">
+    <span>차계부 원장 정보 표시 & 모바일 여백 개선 프리뷰</span>
+    <span class="badge-pill">실제 프로덕션 동기화 완료</span>
+  </div>
+  <div class="control-group">
+    <div class="segmented" id="segLayout">
+      <button class="seg-btn" data-val="before">개선 전 (Before)</button>
+      <button class="seg-btn active" data-val="after">개선 후 (After)</button>
+    </div>
+    <div class="segmented" id="segDevice">
+      <button class="seg-btn" data-val="desktop">데스크탑 (유지)</button>
+      <button class="seg-btn active" data-val="mobile">모바일 (여백 개선)</button>
+    </div>
+    <button class="btn-table-action" id="btnOpenModal" style="background:var(--j-accent);color:#06231a;border:0;font-weight:700;">
+      ＋ 정비 기록 창 열기
+    </button>
+  </div>
+</header>
+
+<main class="preview-stage">
+  <div class="stage-container mode-mobile" id="stageContainer">
+    <div class="mockup-wrapper">
+      <div class="dynamic-island"></div>
+
+      <div class="panel-header">
+        <button class="btn-header-menu">☰</button>
+        <h2>차계부</h2>
+        <button class="btn-header-settings" style="margin-left:auto;">설정</button>
+      </div>
+
+      <div class="mockup-main after-margins" id="mockupMain">
+        <div class="shell after-margins" id="shellDiv">
+          <div class="panel after-margins" id="panelDiv">
+
+            <div class="card-title-row">
+              <h3>차량 지출 내역이에요.</h3>
+              <p>자동 충전 결제와 직접 남긴 차량 지출을 함께 보여줘요.</p>
+            </div>
+
+            <div class="table-wrap">
+              <table class="spending-table">
+                <thead>
+                  <tr>
+                    <th class="col-date">날짜 / 출처</th>
+                    <th class="col-content">기록 / 메모</th>
+                    <th class="col-amount">금액</th>
+                    <th class="col-actions">관리</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody" class="after-layout">
+                  <!-- Row 1: 충전비 -->
+                  <tr>
+                    <td class="col-date">2026-10-21<br><small style="color:var(--j-sub);">자동 기록 · 보관 중</small></td>
+                    <td class="col-content">
+                      <div class="row1-container">
+                        <!-- 동적 렌더링 -->
+                      </div>
+                    </td>
+                    <td class="col-amount">10,974원</td>
+                    <td class="col-actions">
+                      <button class="btn-table-action">수정</button>
+                      <button class="btn-table-action">삭제</button>
+                    </td>
+                  </tr>
+
+                  <!-- Row 2: 정비 / 소모품 (감속기 오일 교환) -->
+                  <tr>
+                    <td class="col-date">2026-10-20<br><small style="color:var(--j-sub);">직접 기록 · 보관 중</small></td>
+                    <td class="col-content">
+                      <div class="row2-container">
+                        <!-- 동적 렌더링 -->
+                      </div>
+                    </td>
+                    <td class="col-amount">48,000원</td>
+                    <td class="col-actions">
+                      <button class="btn-table-action btn-photo">사진 5장</button>
+                      <button class="btn-table-action" onclick="openMaintenanceModal()">수정</button>
+                      <button class="btn-table-action">삭제</button>
+                    </td>
+                  </tr>
+
+                  <!-- Row 3: 충전비 -->
+                  <tr>
+                    <td class="col-date">2026-10-18<br><small style="color:var(--j-sub);">자동 기록 · 보관 중</small></td>
+                    <td class="col-content">
+                      <div class="row3-container">
+                        <!-- 동적 렌더링 -->
+                      </div>
+                    </td>
+                    <td class="col-amount">14,758원</td>
+                    <td class="col-actions">
+                      <button class="btn-table-action">수정</button>
+                      <button class="btn-table-action">삭제</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- 정비/기타 기록 모달 창 (누적 주행거리 입력 필드 시연) -->
+<div class="modal-backdrop" id="modalDialog">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modalTitle">정비/기타 기록</h3>
+      <button class="modal-close" onclick="closeMaintenanceModal()">✕</button>
+    </div>
+    <form id="recordForm" onsubmit="handleFormSubmit(event)">
+      <div class="form-grid">
+        <label>기록 날짜
+          <input type="date" value="2026-10-20" required>
+        </label>
+        <label>비용 분류
+          <select>
+            <option value="maintenance" selected>정비/소모품</option>
+            <option value="tuning">튜닝</option>
+            <option value="washing">세차</option>
+            <option value="other">기타</option>
+          </select>
+        </label>
+        <label>세부 작업
+          <input id="formSubcat" value="감속기 오일 교환" placeholder="타이어 · 와이퍼 등" required>
+        </label>
+        <label>실제 금액 · 원
+          <input id="formAmt" value="48,000" placeholder="0" required>
+        </label>
+        <!-- [사용자 요청] 누적 주행거리 입력 필드 -->
+        <label class="fullfield" style="background:rgba(129,230,197,0.06);padding:8px 10px;border-radius:12px;border:1px dashed rgba(129,230,197,0.3);">
+          <span style="color:var(--j-accent);font-weight:700;">✨ 계기판 누적거리 · km (신규 추가됨)</span>
+          <input id="formOdo" class="field-highlight" type="number" step="0.1" value="82268" placeholder="예: 82268">
+          <small style="color:var(--j-sub);font-size:11px;font-weight:400;margin-top:2px;">수정 시에도 기존 누적거리가 자동으로 불러와지며 저장이 가능합니다.</small>
+        </label>
+        <label class="fullfield">메모
+          <textarea id="formMemo" rows="3">감속기 오일 교환 등속누유 등속 교환할것
+훅스 TITAN SINTOFLUID FE SAE 75W 미션 오일 1L 오일 28,000원 (배송비 포함)</textarea>
+        </label>
+        <label class="fullfield">기록된 위치
+          <input id="formLoc" value="게러지247 화성점">
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-table-action" onclick="closeMaintenanceModal()">취소</button>
+        <button type="submit" class="btn-primary">저장하기</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+let currentMode = 'after'; // 'before' | 'after'
+let currentDevice = 'mobile'; // 'desktop' | 'mobile'
+
+let recordData = {
+  subcat: '감속기 오일 교환',
+  loc: '게러지247 화성점',
+  odo: 82268,
+  memo: '감속기 오일 교환 등속누유 등속 교환할것\n훅스 TITAN SINTOFLUID FE SAE 75W 미션 오일 1L 오일 28,000원 (배송비 포함)'
+};
+
+function renderRows() {
+  const r1 = document.querySelector('.row1-container');
+  const r2 = document.querySelector('.row2-container');
+  const r3 = document.querySelector('.row3-container');
+
+  if (currentMode === 'before') {
+    // 개선 전: 알약과 위치가 1번째 줄에 붙어있고, 세부작업이 아래, 메모 줄바꿈 미적용
+    r1.innerHTML = `
+      <div class="before-layout">
+        <div class="ledger-category-location">
+          <span class="cat-highlight-pill pill-charging">충전비</span>
+          <span class="ledger-place-name">티스테이션 의왕시청점 전기차충전소</span>
+        </div>
+      </div>
+    `;
+
+    r2.innerHTML = `
+      <div class="before-layout">
+        <div class="ledger-category-location">
+          <span class="cat-highlight-pill pill-maintenance">정비 / 소모품</span>
+          <span class="ledger-place-name">${recordData.loc}</span>
+        </div>
+        <div class="recent-item-title">${recordData.subcat}</div>
+        <small class="memo-desc" style="white-space:normal;">${recordData.memo.replace(/\n/g, ' ')} ${recordData.odo.toLocaleString()}km</small>
+      </div>
+    `;
+
+    r3.innerHTML = `
+      <div class="before-layout">
+        <div class="ledger-category-location">
+          <span class="cat-highlight-pill pill-charging">충전비</span>
+          <span class="ledger-place-name">의왕반도보라빌리지2단지B 전기차충전소</span>
+        </div>
+      </div>
+    `;
+  } else {
+    // 개선 후:
+    // 1. <카테고리 알약>
+    // 2. 중요한 내역: 감속기 오일 교환 (더 볼드체 750)
+    // 3. 2번째 중요한 내용: 게러지247 화성점 · 82,268km (중간 볼드체 600)
+    // 4. 메모: 줄바꿈 유지 (볼드체 아님 400)
+    r1.innerHTML = `
+      <div class="after-layout">
+        <div class="memo-cell-wrap">
+          <div class="memo-text-col">
+            <div class="ledger-pill-wrap"><span class="cat-highlight-pill pill-charging">충전비</span></div>
+            <span class="ledger-main-title">티스테이션 의왕시청점 전기차충전소</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const subParts = [];
+    if (recordData.loc) subParts.push(recordData.loc);
+    if (recordData.odo) subParts.push(recordData.odo.toLocaleString() + 'km');
+    const subTitle = subParts.join(' · ');
+
+    r2.innerHTML = `
+      <div class="after-layout">
+        <div class="memo-cell-wrap">
+          <div class="memo-text-col">
+            <div class="ledger-pill-wrap"><span class="cat-highlight-pill pill-maintenance">정비 / 소모품</span></div>
+            <span class="ledger-main-title">${recordData.subcat}</span>
+            ${subTitle ? `<span class="ledger-sub-title">${subTitle}</span>` : ''}
+            <small class="memo-desc">${recordData.memo}</small>
+          </div>
+        </div>
+      </div>
+    `;
+
+    r3.innerHTML = `
+      <div class="after-layout">
+        <div class="memo-cell-wrap">
+          <div class="memo-text-col">
+            <div class="ledger-pill-wrap"><span class="cat-highlight-pill pill-charging">충전비</span></div>
+            <span class="ledger-main-title">의왕반도보라빌리지2단지B 전기차충전소</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// 레이아웃 토글
+document.querySelectorAll('#segLayout .seg-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#segLayout .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.val;
+
+    const tb = document.getElementById('tableBody');
+    tb.className = currentMode === 'before' ? 'before-layout' : 'after-layout';
+
+    // 모바일 여백 토글도 연동
+    const mm = document.getElementById('mockupMain');
+    const sh = document.getElementById('shellDiv');
+    const pn = document.getElementById('panelDiv');
+    if (currentMode === 'before') {
+      mm.className = 'mockup-main before-margins';
+      sh.className = 'shell before-margins';
+      pn.className = 'panel before-margins';
+    } else {
+      mm.className = 'mockup-main after-margins';
+      sh.className = 'shell after-margins';
+      pn.className = 'panel after-margins';
+    }
+
+    renderRows();
+  };
+});
+
+// 디바이스 토글
+document.querySelectorAll('#segDevice .seg-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#segDevice .seg-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentDevice = btn.dataset.val;
+    const stage = document.getElementById('stageContainer');
+    stage.className = `stage-container mode-${currentDevice}`;
+  };
+});
+
+// 모달 제어
+function openMaintenanceModal() {
+  document.getElementById('formSubcat').value = recordData.subcat;
+  document.getElementById('formLoc').value = recordData.loc;
+  document.getElementById('formOdo').value = recordData.odo || '';
+  document.getElementById('formMemo').value = recordData.memo;
+  document.getElementById('modalDialog').classList.add('open');
+}
+function closeMaintenanceModal() {
+  document.getElementById('modalDialog').classList.remove('open');
+}
+document.getElementById('btnOpenModal').onclick = openMaintenanceModal;
+
+function handleFormSubmit(e) {
+  e.preventDefault();
+  recordData.subcat = document.getElementById('formSubcat').value.trim();
+  recordData.loc = document.getElementById('formLoc').value.trim();
+  const rawOdo = document.getElementById('formOdo').value.trim();
+  recordData.odo = rawOdo ? Number(rawOdo) : null;
+  recordData.memo = document.getElementById('formMemo').value;
+  closeMaintenanceModal();
+  renderRows();
+}
+
+renderRows();
+</script>
+
+</body>
+</html>

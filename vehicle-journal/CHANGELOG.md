@@ -1,3 +1,43 @@
+## 2026-10-23 — vehicle-journal: 원장 정보 표시 계층·줄바꿈 개선, 모바일 여백 최적화 및 정비/기타 누적 주행거리 입력 지원
+
+- 이유:
+  1. 차량 지출 내역(원장)에서 카테고리 알약과 위치가 1번째 줄에 붙어있어 세부 정비 내역(감속기 오일 교환 등)이 아래로 밀려나고, 메모에 입력한 줄바꿈이 화면에 반영되지 않아 정보 가독성이 떨어지는 문제를 해결.
+  2. 데스크탑 여백은 유지하되, 모바일 기기(아이폰 등)에서 양옆 여백이 지나치게 넓게 남아(좌우 38px 낭비) 카드가 가운데로 과도하게 좁아지는 현상 해소.
+  3. 정비/기타 기록 작성 및 수정 시 계기판 누적 주행거리(`odometer_km`)를 직접 입력하고 보존할 수 있도록 지원.
+- 변경 내용:
+  1. `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`:
+     - 원장 항목(`memoHtml`) 정보 표시 계층 및 줄바꿈 정책 개편:
+       * 1행: `<div class="ledger-pill-wrap"><span class="cat-highlight-pill">카테고리 알약</span></div>`
+       * 2행: 세부 작업명(`.ledger-main-title`, font-weight: 750, font-size: 15px, '더 볼드체') 표시 (세부 작업이 없으면 위치명 표시).
+       * 3행: 장소명 및 누적 주행거리(`.ledger-sub-title`, font-weight: 600, font-size: 13.5px, '중간 볼드체', 예: `게러지247 화성점 · 82,268km`).
+       * 4행: 메모 내용(`.memo-desc`, font-weight: 400, '볼드체 아님', `white-space: pre-wrap; word-break: break-word;` 적용으로 작성 시 줄바꿈 100% 반영).
+     - 모바일 미디어 쿼리(`@media(max-width: 600px)`): `.shell{padding: 10px 8px 32px}`, `.panel, .hero{padding: 16px 12px}`로 조정.
+     - `formFields()`: 정비/기타 기록(`mode === 'maintenance'`) 모드에서 전기차/내연기관 구분 없이 `odometerField` 항상 표시(`visible.add('odometerField')`).
+     - `openRecord()`: 기존 기록 수정 시 `record.input?.odometer_km` 및 `record.odometer_km` 자동 바인딩.
+     - `saveRecord()`: 계기판 누적거리 입력값을 `payload.odometer_km`에 정수로 안전하게 전달.
+  2. `custom_components/carrot_ha/frontend/carrot-journal-design.js`:
+     - `.ledger-pill-wrap`, `.ledger-main-title`(750 bold), `.ledger-sub-title`(600 semibold) 스타일 추가.
+     - `.memo-desc`에 `white-space: pre-wrap; word-break: break-word; font-weight: 400;` 추가.
+     - `@media(max-width: 600px)`에서 데스크탑 여백은 그대로 보존하고 모바일 `.shell` 패딩을 8px, `.panel` 패딩을 12px로 최적화하여 뷰포트 활용도 극대화.
+  3. `custom_components/carrot_ha/frontend/carrot-journal-panel-runtime.js`:
+     - `@media(max-width: 600px)`에서 `main` 요소의 불필요한 20px 패딩을 `main{padding: 0!important;}`로 제거하여 카드 사이드 여백이 38px에서 8px로 이상적으로 개선됨.
+  4. `vehicle-journal/tests/browser-check.cjs`:
+     - 장소명 폰트 굵기 단언을 새로운 세미볼드(600/700/750) 디자인 사양에 맞게 갱신.
+  5. `vehicle-journal/review-record-display-margins.html`:
+     - 개선 전/후 비교, 데스크탑/모바일 뷰포트 전환, 정비 모달 누적거리 입력을 직접 인터랙티브하게 검증할 수 있는 프리뷰 프로토타입 작성.
+- 검증 및 배포 상태:
+  * Node.js 구문 검사(`node --check`) 4개 파일 통과.
+  * DB 스키마 유효성 검사(`python vehicle-journal/schema/validate_schema.py`) 9/9건 통과.
+  * HA 서버(`hassio@192.168.0.140`) 백업 생성: `/config/carrot_ha/deployment-backups/journal-ui-layout-20261023_040500/`
+  * SSH/SCP를 통해 HA 서버의 `/config/custom_components/carrot_ha/frontend/` 경로로 3개 파일 직접 배포 완료.
+  * 최신 SHA-256 검증 결과 (로컬과 원격 서버 100% 일치):
+    - `carrot-vehicle-journal.js`: `ff0f319f80c63c49e363a39e4f168cd51ae3c8e4ea2eeee143e79ea39eeed87b`
+    - `carrot-journal-design.js`: `11f13d2006624fad5e675a44906ca5a3f9909f67c67eebc321c827a4143d19f4`
+    - `carrot-journal-panel-runtime.js`: `266ed944996e3906b650cec9ca8400aa5387df01869a4693c57b4341e045cd1f`
+  * HA Core HTTP 엔드포인트 `/api/carrot_ha/frontend-version`에서 `0.9.0-beta.1-6c9c69b226af` 응답 및 정적 파일 서빙 정상 확인.
+  * 사용자 브라우저 강력 새로고침(`Ctrl + F5`) 시 즉시 적용됨 (Python 코드 변경이 없으므로 HA Core 재시작 불필요).
+  * 사용자 지침에 따라 GitHub 릴리즈/태그는 즉시 발행하지 않고 향후 통합 프리 릴리즈 발행 예정.
+
 ## 2026-10-17 — vehicle-journal: 배터리 사용량 계산 엔진 미래 타임스탬프 오염 차단 및 측정 시각 정렬 보정
 
 - 이유: 대시보드 배터리 사용량 주간 그래프에서 특정 요일(일, 월, 화, 목, 금)의 사용량이 빈 값(`None`)으로 누락되고 수요일과 토요일 저녁 일부만 표시되는 버그 발생. 과거 클라우드 동기화 과정에서 유입된 2건의 비정상 미래 타임스탬프 데이터(10/11에 10/13 날짜, 10/14에 10/17 오후 4시 49분 날짜)가 트리거되면서, `battery_history.py`의 직전 시각(`previous[0]`)을 미래로 점프시켜 이후 유입되는 정상 주행 데이터들을 시간 역전 오류로 판단하여 대량 스킵하던 결함을 해결함.
