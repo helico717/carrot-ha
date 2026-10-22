@@ -481,7 +481,8 @@ class Journal:
             if kind=='trip' and db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]>1:raise ValueError('주행 기록 사진은 최대 1장이에요.')
             if kind=='expense':
                 count=db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]
-                if data.get('category')!='accident' and count>5:raise ValueError('사진이 5장을 초과하는 사고 기록의 분류는 바꿀 수 없어요.')
+                limit=25 if data.get('category') in ('maintenance','tuning') else 10 if data.get('category')=='accident' else 5
+                if count>limit:raise ValueError(f'사진이 {limit}장을 초과하는 기록의 분류는 바꿀 수 없어요.')
                 if linked:
                     payment=db.execute('SELECT payment_id,payment_version,estimated_krw FROM expenses WHERE vehicle_id=? AND record_id=?',(self.vehicle,key)).fetchone()
                     db.execute('INSERT OR REPLACE INTO payment_outbox VALUES (?,?,?,?,?)',(key,payment[0],encode(extra['payment_source_ids']),payment[1],data.get('actual_krw')))

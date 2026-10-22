@@ -1,3 +1,45 @@
+## 2026-10-23 — vehicle-journal: 글꼴 크기 원복, 3자리 콤마 포맷팅, 입력칸 50% 투명도 단위 접미사, 정비/소모품 사진 25장 확대 및 원장 금액 강조
+
+- 이유:
+  1. 원장 세부 내역 폰트 크기 원복: 텍스트를 "더 굵게" 표현하되 글꼴 크기는 키우지 않고 기본 크기(`inherit`)를 유지하도록 사용자 피드백 반영 (`font-weight: 750` / `600`).
+  2. 3자리 콤마 자동 포맷팅 및 타 숫자 단위 점검: 계기판 누적 주행거리(`odometer_km`) 및 거리(`distance_km`) 입력란에 실시간 3자리 콤마(`82,268`) 포맷팅을 적용하고, 네이티브 브라우저 스피너 제거(`type="text" inputmode="numeric"`), 기존 값 로드(`toLocaleString`) 및 저장(`replaceAll(',', '')`) 시 데이터 안전성 보장.
+  3. 입력란 우측 50% 투명도 회색 단위 접미사: 각 입력 필드 맨 우측에 회색 불투명도 50%(`opacity: 0.5`)로 `km`, `원`, `L`, `kWh` 등의 단위를 작게 배치하여(`82,268 km`) 깔끔하고 일관된 입력 인터페이스 구현.
+  4. 정비/소모품 사진 최대 25장 확대: 정비 내역, 부품 및 교환 과정 등 상세 기록을 위해 정비/소모품(`maintenance`, `tuning`)의 최대 사진 등록 개수를 기존 5장에서 25장으로 확대. (SQLite DB 트리거, 파이썬 백엔드 `store.py` 카테고리 전환 시 한도 검증, 프론트엔드 `getPhotoLimit()` 및 카테고리 변경 동적 카운트 전수 반영).
+  5. 원장 지출 금액 시각적 강조: 상세 기록 테이블 3번째 열(금액 `5,254원`)의 글꼴 크기를 살짝 키우고(`15px`), 볼드체(`font-weight: 750`)와 등폭 숫자(`font-variant-numeric: tabular-nums`)를 적용해 가독성 대폭 향상.
+
+- 변경 내용:
+  1. `custom_components/carrot_ha/frontend/carrot-journal-design.js`:
+     - `.ledger-main-title`, `.ledger-sub-title`의 `font-size`를 `inherit`으로 원복하고 볼드(`font-weight: 750`, `600`) 유지.
+     - `.input-unit-wrap`: 입력 필드를 상대 위치(`position: relative`)로 래핑하고 우측 48px 여백 확보.
+     - `.input-unit-suffix`: 입력칸 우측에 `position: absolute; right: 11px; opacity: 0.5; font-size: 12px; font-weight: 600;` 단위 표시 스타일 추가.
+     - `.ledger-table td:nth-child(3)`, `.ledger-amount-col`: `font-size: 15px; font-weight: 750; font-variant-numeric: tabular-nums;`로 원장 금액 열 강조.
+  2. `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`:
+     - 모달 입력 필드(`odometerField`, `amountField`, `unitPriceField`, `fuelLitersField`, `billedField`, `washCostField`, `distanceField`)를 `.input-unit-wrap`과 `<span class="input-unit-suffix">`로 래핑.
+     - `odometer_km` 및 `distance_km`의 input 속성을 `type="text" inputmode="numeric"`으로 변경하고 `formatComma` 실시간 콤마 이벤트 리스너 연결.
+     - `openRecord` 및 `import_source` 로드 시 숫자 항목에 `toLocaleString('ko-KR')` 적용.
+     - `saveRecord`에서 콤마 제거(`replaceAll(',', '')`) 후 `Number()` 변환으로 백엔드 전송 안전성 확보.
+     - `getPhotoLimit()` 메서드 신설: `trip` 1장, `accident` 10장, `maintenance`/`tuning` 25장, 기타 5장 동적 반환.
+     - `renderSelectedPhotos()` 및 `saveRecord()`의 사진 한도 검사에 `this.getPhotoLimit()` 연동, 카테고리 변경 시 즉시 한도 표시 갱신.
+     - 원장 테이블 금액 열에 `<td class="ledger-amount-col">` 클래스 부여.
+  3. `custom_components/carrot_ha/vehicle_journal/schema.sql` & `vehicle-journal/schema/001_initial.sql`:
+     - `attachments_limit_insert` 및 `attachments_limit_update` 트리거의 CASE 문에 `WHEN category IN ('maintenance','tuning') THEN 25` 추가.
+  4. `custom_components/carrot_ha/vehicle_journal/store.py`:
+     - `save_record` 시 기존 `count > 5` 검사를 새 카테고리별 한도(`limit = 25 if ... else 10 if ... else 5`)와 비교하도록 수정하여 정비 사진 25장 등록 후 수정 시 오류 차단.
+  5. `vehicle-journal/tests/test_journal.py`:
+     - `test_photo_limit_cleans_failed_file`의 5장 한도 테스트를 `other` 카테고리로 변경하고, `test_maintenance_twenty_five_photos` 신규 테스트 추가 (25장 등록 성공 및 26번째 차단 검증).
+
+- 검증 및 배포 상태:
+  * Node.js 구문 검사(`node --check`) 통과.
+  * 차계부 단위 테스트(`python -m unittest vehicle-journal.tests.test_journal.JournalTests.test_maintenance_twenty_five_photos`, `test_photo_limit_cleans_failed_file`, `test_schema_packaging_identity`) 모두 통과 (OK).
+  * HA 서버(`hassio@192.168.0.140`)의 실제 차량 SQLite DB 2개(`01M23RJD5A9H29TRSYCXV4HJ80.sqlite3`, `journal-d5ec9e6c-15ca-4521-a153-97504a955997.sqlite3`)에 25장 허용 트리거 DDL 즉시 적용 및 쿼리 검증 완료.
+  * SSH 파이프 전송을 통해 HA 서버의 해당 파일들 직접 배포 완료 및 원격 SHA-256 일치 확인:
+    - `carrot-vehicle-journal.js`: `bc43ec04646e...`
+    - `carrot-journal-design.js`: `8debeab17d75...`
+    - `schema.sql`: `599287d34580...`
+    - `store.py`: `59d9e7986354...`
+  * 사용자 브라우저 강력 새로고침(`Ctrl + F5`) 시 즉시 적용됨.
+  * 사용자 지침에 따라 GitHub 릴리즈/태그는 즉시 발행하지 않고 향후 통합 프리 릴리즈 발행 예정.
+
 ## 2026-10-23 — vehicle-journal: 원장 정보 표시 계층·줄바꿈 개선, 모바일 여백 최적화 및 정비/기타 누적 주행거리 입력 지원 (c427d21)
 
 - 커밋: `c427d21` (`vehicle-journal: improve record item hierarchy, reduce mobile margins, add maintenance odometer input`)
