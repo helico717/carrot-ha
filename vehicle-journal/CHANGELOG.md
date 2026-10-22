@@ -1,4 +1,6 @@
-## 2026-10-23 — vehicle-journal: 원장 정보 표시 계층·줄바꿈 개선, 모바일 여백 최적화 및 정비/기타 누적 주행거리 입력 지원
+## 2026-10-23 — vehicle-journal: 원장 정보 표시 계층·줄바꿈 개선, 모바일 여백 최적화 및 정비/기타 누적 주행거리 입력 지원 (c427d21)
+
+- 커밋: `c427d21` (`vehicle-journal: improve record item hierarchy, reduce mobile margins, add maintenance odometer input`)
 
 - 이유:
   1. 차량 지출 내역(원장)에서 카테고리 알약과 위치가 1번째 줄에 붙어있어 세부 정비 내역(감속기 오일 교환 등)이 아래로 밀려나고, 메모에 입력한 줄바꿈이 화면에 반영되지 않아 정보 가독성이 떨어지는 문제를 해결.
