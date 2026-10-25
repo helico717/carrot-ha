@@ -1970,5 +1970,8 @@ export const journalDesign = `:host {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
 }
+@media(min-width:851px){
+  #recordDialog .fields textarea[name="memo"]{height:180px}
+}
 `;
 
