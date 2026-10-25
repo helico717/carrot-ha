@@ -337,7 +337,14 @@ export class VehicleJournal extends HTMLElement {
     for(const id of ['add','addRecent'])if(this.$(id))this.$(id).onclick=()=>this.chooseRecordType();
     if(this.$('close'))this.$('close').onclick=()=>this.$('recordDialog')?.close();
     if(this.$('recordDialog')){
-      this.$('recordDialog').onclick=e=>{if(e.target===this.$('recordDialog'))this.$('recordDialog').close();};
+      const dialog=this.$('recordDialog');
+      let backdropStart=null,backdropClick=false;
+      const outside=e=>{const r=dialog.getBoundingClientRect();return e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom);};
+      dialog.addEventListener('pointerdown',e=>{backdropClick=false;backdropStart=e.isPrimary&&e.button===0&&outside(e)?{x:e.clientX,y:e.clientY,id:e.pointerId}:null;});
+      dialog.addEventListener('pointerup',e=>{backdropClick=!!backdropStart&&e.pointerId===backdropStart.id&&outside(e)&&Math.hypot(e.clientX-backdropStart.x,e.clientY-backdropStart.y)<=5;backdropStart=null;});
+      dialog.addEventListener('pointercancel',()=>{backdropStart=null;backdropClick=false;});
+      dialog.onclick=e=>{const close=backdropClick&&outside(e);backdropClick=false;if(close)dialog.close();};
+      dialog.addEventListener('close',()=>{backdropStart=null;backdropClick=false;});
       this.$('recordDialog').addEventListener('close',()=>{if(this.isReceiptMode)this.cancelReceiptOcr();});
     }
     if(this.$('closeRecordType'))this.$('closeRecordType').onclick=()=>this.$('recordTypeDialog').close();
