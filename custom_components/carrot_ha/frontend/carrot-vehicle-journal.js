@@ -1585,7 +1585,7 @@ export class VehicleJournal extends HTMLElement {
   }
   resetTrendsMap(){
     if(!this.trendsMapInstance)return;
-    this.trendsMapInstance.setView([36.2683,127.6358],7);
+    this.trendsMapInstance.setView([36.2683,127.6358],6.5);
   }
   showTrendsPlaceCard(p,placeName,totalKrw,visits,color){
     const card=this.$('trendsPlaceCard');
@@ -1616,7 +1616,8 @@ export class VehicleJournal extends HTMLElement {
         mapBox.replaceChildren();
         this.trendsMapInstance=L.map(mapBox,{
           center:centerPos,
-          zoom:7,
+          zoom:6.5,
+          zoomSnap:0.5,
           scrollWheelZoom:false,
           zoomControl:true
         });

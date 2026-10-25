@@ -1,3 +1,10 @@
+## 2026-10-25 — vehicle-journal: 추세 지도 기본 화면 반 단계 축소
+
+- 사용자 요청에 따라 프리뷰를 생략하고 기본 진입 및 ‘전체 보기’ 배율을 7에서 6.5로 축소했다. 중심 좌표는 유지하고 Leaflet zoomSnap을 0.5로 설정해 반 단계 배율이 적용되도록 했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`.
+- 검증: Node 구문 검사 및 `vehicle-journal/tests/browser-check.cjs` Chromium 데스크톱/모바일 회귀 통과.
+- 배포: 커밋·푸시 및 HA 백업 후 직접 반영 준비 중. 운영 브라우저 적용은 미확인. 새 릴리즈/태그 없음.
+
 # Carrot HA 변경 기록
 
 ## 2026-10-21 — 텔레포토 화면 HA 직접 반영 및 pre-release 승인 절차 재확인
