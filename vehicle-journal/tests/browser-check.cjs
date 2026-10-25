@@ -51,7 +51,7 @@ const path=require('path');
  await page.evaluate(()=>{
   const card=document.querySelector('carrot-vehicle-journal'),original=card.data;
   const trend=id=>card.shadowRoot.querySelector(`[data-trend="${id}"]`);
-  if(!trend('cost100').textContent.includes('추정'))throw Error('missing estimated cost label');
+  if(!trend('cost100').textContent.includes('100km당 충전 비용'))throw Error('missing estimated cost label');
   if(!trend('distance').querySelector('.trend-chart-avg-label').textContent.includes('42km'))throw Error('observed-day distance mean wrong');
   if(!trend('cost100').querySelector('.trend-chart-avg-label').textContent.includes('5,714원'))throw Error('cost per 100km wrong');
   if(!trend('soc100').querySelector('.trend-chart-avg-label').textContent.includes('23.8%'))throw Error('SOC per 100km wrong');
@@ -93,7 +93,7 @@ const path=require('path');
   card.data={...original,daily:[]};card.renderTrendsDashboard();
   if(!card.$('changingTrendsGrid').textContent.includes('데이터가 아직 없어요'))throw Error('missing empty trend state');
   card.scope='month';card.$('month').value='2026-10';card.data=original;card.renderTrendsDashboard();
-  const expected={efficiency:'평균 전비',charge_rate:'kWh당 충전 단가',distance:'하루 평균 주행거리',charge_kwh:'하루 평균 배터리 충전량',drive_soc:'하루 평균 주행 배터리 사용률',fast_ratio:'완속·급속 충전 중 급속 충전 비율',cost100:'100km를 달리는 데 드는 충전 비용 (추정)',total_cost:'선택한 달의 총 차량 지출',charge_count:'선택한 달의 총 충전 횟수',per_charge:'충전 1회당 평균 배터리 충전량',soc100:'100km를 달릴 때 사용한 배터리 비율'};
+  const expected={efficiency:'평균 전비',charge_rate:'충전 단가',distance:'일일 주행거리',charge_kwh:'일일 충전량',drive_soc:'일일 배터리 소모',fast_ratio:'급속 충전 비중',cost100:'100km당 충전 비용',total_cost:'총 차량 지출',charge_count:'총 충전 횟수',per_charge:'1회 평균 충전량',soc100:'100km당 배터리 소모'};
   for(const [id,title] of Object.entries(expected))if(trend(id).querySelector('.trend-metric-name').textContent!==title)throw Error('incorrect approved title: '+id);
  });
  // Date buttons follow the selected month/year, reset ledger pagination, and retain the tab.

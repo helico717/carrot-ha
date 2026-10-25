@@ -1,4 +1,4 @@
-const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261007-trends-fix-1';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261025-trends-rename-1';
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
@@ -995,11 +995,11 @@ export class VehicleJournal extends HTMLElement {
 
     const metrics=[
       createMetric('efficiency','평균 전비','⚡','#81e6c5','km/kWh',currEff,pastEff,effBars),
-      createMetric('distance','하루 평균 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
-      createMetric('charge_kwh','하루 평균 배터리 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
-      createMetric('charge_rate','kWh당 충전 단가','💳','#ffd60a','원',currRate,prevRate,rateBars),
-      createMetric('drive_soc','하루 평균 주행 배터리 사용률','🔋','#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
-      createMetric('fast_ratio','완속·급속 충전 중 급속 충전 비율','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
+      createMetric('distance','일일 주행거리','🚗','#ff9f0a','km',currDist,prevDist,distBars),
+      createMetric('charge_kwh','일일 충전량','🔌','#30b0c7','kWh',currCharge,prevCharge,chargeBars),
+      createMetric('charge_rate','충전 단가','💳','#ffd60a','원',currRate,prevRate,rateBars),
+      createMetric('drive_soc','일일 배터리 소모','🔋','#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
+      createMetric('fast_ratio','급속 충전 비중','⚡','#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
 
     const round=value=>value==null?null:Number(value.toFixed(1));
@@ -1019,16 +1019,16 @@ export class VehicleJournal extends HTMLElement {
     }
     const observed=(fn)=>bins.map((b,i)=>extraBins[i].length?fn(b,i):null);
     metrics.push(
-      createMetric('cost100','100km를 달리는 데 드는 충전 비용 (추정)','💰','#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{}),
-      createMetric('total_cost',isYear?'선택한 연도의 총 차량 지출':'선택한 달의 총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true}),
-      createMetric('charge_count',isYear?'선택한 연도의 총 충전 횟수':'선택한 달의 총 충전 횟수','🔌','#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
-      createMetric('per_charge','충전 1회당 평균 배터리 충전량','🔋','#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
-      createMetric('soc100','100km를 달릴 때 사용한 배터리 비율','🚗','#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{})
+      createMetric('cost100','100km당 충전 비용','💰','#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{}),
+      createMetric('total_cost','총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true}),
+      createMetric('charge_count','총 충전 횟수','🔌','#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
+      createMetric('per_charge','1회 평균 충전량','🔋','#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
+      createMetric('soc100','100km당 배터리 소모','🚗','#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{})
     );
     for(const [category,label] of Object.entries(categories)){
       const current=totals.categories?.[category],past=prevTotals.categories?.[category];
       if(!current&&!past)continue;
-      metrics.push(createMetric(`cost_${category}`,`선택한 ${isYear?'연도':'달'}의 ${label} 총지출`,'💳','#ffd60a','원',daily.length?current?.effective_krw??0:null,prevDaily.length?past?.effective_krw??0:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+(r.cost_categories?.[category]?.effective_krw||0),0)),{total:true}));
+      metrics.push(createMetric(`cost_${category}`,`${label} 지출`,'💳','#ffd60a','원',daily.length?current?.effective_krw??0:null,prevDaily.length?past?.effective_krw??0:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+(r.cost_categories?.[category]?.effective_krw||0),0)),{total:true}));
     }
 
     if(this.isCombustion()){
@@ -1038,14 +1038,14 @@ export class VehicleJournal extends HTMLElement {
       const sum=(rows,key)=>rows.reduce((n,r)=>n+(r[key]||0),0);
       const distanceBars=bins.map((_,i)=>{const rows=(o.daily||[]).filter(r=>(isYear?Number(r.day.slice(5,7))-1:Math.floor((Number(r.day.slice(8,10))-1)/2))===i);return rows.length?sum(rows,'distance_km'):null;});
       metrics.push(
-        createMetric('observed_distance','누적거리 기준 관측 거리','🚗','#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true}),
-        createMetric('manual_distance','구간 주행 기록 합계 (관측 거리와 중복 합산하지 않음)','🛣️','#7bb6ff','km',totals.distance_km??null,prevTotals.distance_km??null,bins.map(b=>b.day_count?b.distance_km:null),{total:true}),
-        createMetric('fuel_liters','기록된 주유량','⛽','#81e6c5','L',f.totals?.fuel_liters??null,pf.totals?.fuel_liters??null,fuelBins(rows=>rows.some(r=>r.fuel_liters!=null)?sum(rows,'fuel_liters'):null),{total:true}),
-        createMetric('fuel_price','L당 평균 주유금액','💳','#ffd60a','원',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelBins(rows=>sum(rows,'priced_liters')>0?Math.round(sum(rows,'priced_cost_krw')/sum(rows,'priced_liters')):null)),
-        createMetric('fuel_count','주유 기록 횟수','⛽','#81e6c5','회',f.totals?.fuel_count??null,pf.totals?.fuel_count??null,fuelBins(rows=>sum(rows,'fuel_count')),{total:true}),
+        createMetric('observed_distance','계기판 주행거리','🚗','#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true}),
+        createMetric('manual_distance','구간 기록 주행거리','🛣️','#7bb6ff','km',totals.distance_km??null,prevTotals.distance_km??null,bins.map(b=>b.day_count?b.distance_km:null),{total:true}),
+        createMetric('fuel_liters','총 주유량','⛽','#81e6c5','L',f.totals?.fuel_liters??null,pf.totals?.fuel_liters??null,fuelBins(rows=>rows.some(r=>r.fuel_liters!=null)?sum(rows,'fuel_liters'):null),{total:true}),
+        createMetric('fuel_price','주유 단가','💳','#ffd60a','원',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelBins(rows=>sum(rows,'priced_liters')>0?Math.round(sum(rows,'priced_cost_krw')/sum(rows,'priced_liters')):null)),
+        createMetric('fuel_count','총 주유 횟수','⛽','#81e6c5','회',f.totals?.fuel_count??null,pf.totals?.fuel_count??null,fuelBins(rows=>sum(rows,'fuel_count')),{total:true}),
         createMetric('total_cost','총 차량 지출','💸','#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+spending(r),0)),{total:true})
       );
-      for(const [key,label] of Object.entries(categories)){if(key==='charging')continue;const current=totals.categories?.[key],past=prevTotals.categories?.[key];if(!current&&!past)continue;metrics.push(createMetric(`cost_${key}`,`${label} 총지출`,'💳',this.categoryColor(key),'원',current?.effective_krw??null,past?.effective_krw??null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+(r.cost_categories?.[key]?.effective_krw||0),0)),{total:true}));}
+      for(const [key,label] of Object.entries(categories)){if(key==='charging')continue;const current=totals.categories?.[key],past=prevTotals.categories?.[key];if(!current&&!past)continue;metrics.push(createMetric(`cost_${key}`,`${label} 지출`,'💳',this.categoryColor(key),'원',current?.effective_krw??null,past?.effective_krw??null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+(r.cost_categories?.[key]?.effective_krw||0),0)),{total:true}));}
       const distanceMetric=metrics[0];distanceMetric.subDesc=`관측 구간 ${o.from||'기준 없음'} ~ ${o.to||'기록 없음'} · ${o.warning||'월 경계 밖 주행이 포함될 수 있어요.'}`;distanceMetric.changeText='';
     }
     const changingItems=metrics.filter(m=>m.isChanging);
