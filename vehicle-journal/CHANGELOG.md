@@ -36,10 +36,12 @@
   - `vehicle-journal/CHANGELOG.md`
   - `CHANGELOG.md`
 
-- 검증 상태:
+- 검증 및 배포 상태:
   - Node.js 구문 검사(`node -c`) 통과.
   - Chromium 헤드리스 회귀 테스트(`vehicle-journal/tests/browser-check.cjs`) 전수 통과 (13개 카드 지표 제목 일치 검증).
-  - HA 직접 반영 및 해시 일치 검증 준비 중.
+  - `9a817f0` main 푸시 및 HA 파일 1개 직접 반영 완료, 설치/HTTP SHA-256 일치(`9aba7231...`).
+  - 백업: `/homeassistant/carrot_ha/deployment-backups/driving-logs-hud-9a817f013e2e/before`.
+  - 운영 브라우저 화면은 미확인으로 사용자 새로고침(`Ctrl+F5`) 후 확인 필요. 새 릴리즈/태그 없음.
 
 ## 2026-10-25 — vehicle-journal: 데스크탑 및 모바일 반응형 전체 배열 개편 검토 프리뷰(review-desktop-layout.html) 생성
 
