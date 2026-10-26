@@ -8,7 +8,7 @@
 - 관련 파일: `custom_components/carrot_ha/vehicle_journal/automatic_locations.py`, `stations.py`, `vehicle-journal/tests/test_automatic_locations.py`, `test_station_backup.py`.
 - 검증: 차계부 Python 회귀 76건 및 스키마 9건 통과. 합성 데이터로 준비 지연, 장기 정차, 만료 위치, 기록 공백, 이동·속도·정확도, 차량 격리, 비전기차 제외, 재시도·수동 보정, 검색어 병합·LPG 제외·페이지 제한을 확인했다.
 - 실제 재현: 사용자 승인하에 두 충전 위치로 카카오 검색을 수행하고 운영 DB의 읽기 전용 입력과 메모리 복제본에서 설정 확인→위치 선택→장소 조회→충전/연결 지출 저장을 재현했다. 두 건 모두 주차 GPS 보완 성공. 단일 근접 후보 건은 장소가 저장되고, 복수 근접 후보 건은 확정을 보류했다. 금액 불변 확인. 개인 위치·기록 ID·키는 저장소에 포함하지 않는다.
-- 배포: 검증 완료, main 푸시 및 HA 코드 2개 백업·직접 반영 예정. Python 변경으로 사용자 HA 재시작이 필요하며 운영 자동 재처리·실차 신규 충전 검증은 대기다. 새 태그/릴리즈 없음.
+- 배포: 수정 커밋 `0ec29204e18e618bee524aafca7fa78b279b5bbd` main 푸시 확인. HA 코드 2개를 기존 코드 해시 검사 후 백업·직접 반영하고 커밋 파일과 설치 SHA-256 일치를 확인했다. 백업: `/config/carrot_ha/deployment-backups/0ec29204e18e618bee524aafca7fa78b279b5bbd/`. `automatic_locations.py`: `69a98d813a243b0d5df0dd65776bbdb95696f74734c5faf4a2544c3657ea277c`, `stations.py`: `a80f70720a8826ee903cae2350def92c1b87cd28c83b79b90662b95a07629ae5`. 운영 DB는 수정하지 않았다. Python 변경으로 사용자 HA 재시작이 필요하며 운영 자동 재처리·실차 신규 충전 검증은 대기다. 새 태그/릴리즈 없음.
 - 제한: 운영사·공식 충전소 ID 수집 경로가 없어 다중 사업자 장소에서 거리만으로 실제 운영사를 확정하지 않는다. 사용자 확인 운영사에 따른 자동 매핑·학습은 이번 변경에 포함하지 않는다. 키워드 검색만으로 전체 충전소 수록을 보장하지 않는다.
 
 ## 2026-10-25 — vehicle-journal: 데스크톱 메모 입력 기본 높이 확대
