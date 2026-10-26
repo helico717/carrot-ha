@@ -16,6 +16,16 @@ test('vehicle state maps door, trunk, low beam, speed and driving from the value
   assert.equal(state.dark, true);
 });
 
+test('charging state comes from the card status and the values it already has', () => {
+  const charging = vehicleViewState({soc_percent: 62, charge_power_kw: 50, charge_mode: 'dc_charging'}, {key: 'charging'}, false);
+  assert.deepEqual([charging.charging, charging.chargeKind, charging.chargePowerKw, charging.soc], [true, 'dc', 50, 62]);
+  const watts = vehicleViewState({soc_percent: 40, charge_power_w: 7200}, {key: 'charging'}, false);
+  assert.deepEqual([watts.chargeKind, watts.chargePowerKw], ['ac', 7.2]);
+  const parked = vehicleViewState({soc_percent: 62, charge_power_kw: 50}, {key: 'parked'}, false);
+  assert.equal(parked.charging, false, 'only the card status switches the charging scene on');
+  assert.equal(vehicleViewState({}, {key: 'charging'}, false).soc, null);
+});
+
 test('expired or unknown values never light the lamp or open a door', () => {
   const state = vehicleViewState({door_driver_open: undefined, trunk_open: 'yes', light_low_beam_requested: null, speed_kph: 'fast'}, {key: 'parked'}, false);
   assert.equal(state.doors.fl, false);

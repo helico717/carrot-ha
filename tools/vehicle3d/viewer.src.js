@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
+import {createChargeScene} from './charge-scene.js';
 
 const DOOR_CLIPS = {fl: 'Front left door', fr: 'Front right door', rl: 'Rear left door', rr: 'Rear right door', trunk: 'Tailgate and shelf'};
 const WHEEL_RE = /^YSTAD_20_(FL|FR|RL|RR)_/;
@@ -26,6 +27,13 @@ const VIEWS = {
   side: tele({pos: [-6.9, 1.2, 0], look: [0, 0.7, 0], fov: 30}, 11),
   // Driving default: elevated three-quarter view from behind, passenger side.
   drive: tele({pos: [-4.4, 2.6, -4.3], look: [0, 0.55, 0.4], fov: 30}, 13),
+  // Charging: raised three-quarter view from the charge-port side; shows the open doors, the pack, the cable and the post.
+  charge: tele({pos: [-5.6, 3.1, 3.9], look: [-0.4, 0.4, -0.5], fov: 30}, 16),
+  // Extra charging viewpoints (manual modes; the default charging view is `charge`).
+  charge_side: tele({pos: [-7.4, 1.9, -0.6], look: [-0.5, 0.4, -0.55], fov: 30}, 15),
+  charge_top: tele({pos: [-0.4, 9.0, -0.55], look: [-0.5, 0.2, -0.55], fov: 30}, 21),
+  charge_port: tele({pos: [-3.7, 1.5, 0.3], look: [-1.35, 0.8, -1.95], fov: 30}, 11),
+  charge_left: tele({pos: [4.6, 2.5, 5.2], look: [-0.45, 0.4, -0.5], fov: 30}, 15),
   rear: tele({pos: [0.0, 1.0, -5.6], look: [0, 0.74, 0], fov: 30}, 7.2),
 };
 
@@ -401,7 +409,9 @@ for (const m of mats.tail) {
   const state = {
     doors: {fl: false, fr: false, rl: false, rr: false}, trunk: false, lowBeam: false,
     driving: false, speedKph: 0, dark: false, bodyColor: options.bodyColor || DEFAULT_BODY_COLOR, mode: 'auto',
+    charging: false, chargeKind: 'ac', chargePowerKw: null, soc: null,
   };
+  const chargeScene = createChargeScene(scene, model, wheelPivots);
   let viewName = 'front';
   const camState = {pos: new THREE.Vector3(...VIEWS.front.pos), look: new THREE.Vector3(...VIEWS.front.look), fov: VIEWS.front.fov};
   let aspect = 1.6;
@@ -420,6 +430,7 @@ for (const m of mats.tail) {
   function chooseView() {
     if (state.mode !== 'auto') return state.mode;
     if (state.driving) return 'drive';
+    if (state.charging) return 'charge';
     if (state.trunk || Object.values(state.doors).some(Boolean)) return 'top';
     return 'front';
   }
@@ -479,7 +490,12 @@ for (const m of mats.tail) {
     }
     mixer.update(0);
 
-    const lampTarget = state.lowBeam ? 1 : 0;
+    // The sweep keeps frames coming while charging but is not a pending transition, so it does not
+    // prevent the view from counting as settled; only fading the scene in or out does.
+    const chargeFrames = chargeScene.update(dt, {fl: clips.fl?.value, fr: clips.fr?.value, rl: clips.rl?.value, rr: clips.rr?.value, trunk: clips.trunk?.value});
+    if (chargeScene.transitioning) busy = true;
+    // While charging the headlamps are shown on whatever the real low beam says; afterwards the real state returns.
+    const lampTarget = (state.lowBeam || chargeScene.active) ? 1 : 0;
     if (Math.abs(lampLevel - lampTarget) > 0.002) {
       lampLevel += (lampTarget - lampLevel) * (1 - Math.exp(-dt * 7));
       busy = true;
@@ -518,7 +534,7 @@ for (const m of mats.tail) {
 
     renderer.render(scene, camera);
     settled = !busy;
-    if (visible && (busy || state.driving)) raf = requestAnimationFrame(frame);
+    if (visible && (busy || state.driving || chargeFrames)) raf = requestAnimationFrame(frame);
   }
   function kick() {
     if (!raf && !disposed && visible) {
@@ -613,7 +629,8 @@ for (const m of mats.tail) {
   return {
     setState(next = {}) {
       if (next.doors) Object.assign(state.doors, next.doors);
-      for (const key of ['trunk', 'lowBeam', 'driving', 'speedKph', 'dark', 'bodyColor', 'mode']) if (key in next) state[key] = next[key];
+      for (const key of ['trunk', 'lowBeam', 'driving', 'speedKph', 'dark', 'bodyColor', 'mode', 'charging', 'chargeKind', 'chargePowerKw', 'soc']) if (key in next) state[key] = next[key];
+      chargeScene.set({on: state.charging && !state.driving, kind: state.chargeKind, powerKw: state.chargePowerKw, soc: state.soc});
       applyPaint();
       kick();
     },
@@ -629,9 +646,13 @@ for (const m of mats.tail) {
     },
     resetView() { offset.yaw = offset.pitch = 0; offset.zoom = 1; kick(); },
     get view() { return viewName; },
+    // Read-only status used by the debug simulator's checks.
+    get lamp() { return lampLevel; },
+    get charge() { return {active: chargeScene.active, period: chargeScene.period}; },
     get settled() { return settled; },
     dispose() {
       disposed = true;
+      chargeScene.dispose();
       cancelAnimationFrame(raf);
       ro.disconnect(); io.disconnect();
       document.removeEventListener('visibilitychange', onVis);

@@ -1,6 +1,7 @@
 // Debug-only synthetic scenarios; rendering and state mapping belong to the production viewer.
 export const DOORS = ['driver','passenger','rear_driver','rear_passenger','trunk'];
-const item = (id, label, expected, patch = {}) => ({id,label,expected,patch,waitMs:1800});
+const item = (id, label, expected, patch = {}, expect = {}) => ({id,label,expected,patch,expect,waitMs:1800});
+const ALL_OPEN = Object.fromEntries(DOORS.map(k=>[k,true]));
 export const SCENARIOS = [
   item('parked','주차 · 닫힘','front'),
   ...DOORS.map((door,i)=>item(door,['운전석','조수석','뒤 운전석','뒤 조수석','트렁크'][i]+' 열림','top',{doors:{[door]:true}})),
@@ -8,7 +9,19 @@ export const SCENARIOS = [
   ...[0,60,120].map(speed=>item('drive'+speed,`주행 ${speed} km/h`,'drive',{mode:'driving',speed})),
   item('drive-lights','주행 + 하향등','drive',{mode:'driving',speed:60,lowBeam:true}),
   item('night','주차 + 하향등 · 야간','front',{lowBeam:true,theme:'dark'}),
-  item('charge-door','충전 + 문 열림','top',{mode:'charging',doors:{driver:true}}),
+  item('charge-door','충전 + 문 열림','charge',{mode:'charging',doors:{driver:true}},{charging:true,lamp:1}),
+  item('charge-ac7','충전 · 완속 7kW','charge',{mode:'charging',powerKw:7,soc:62},{charging:true,lamp:1,sweep:'slow'}),
+  item('charge-ac11','충전 · 완속 11kW (경계)','charge',{mode:'charging',powerKw:11,soc:62},{charging:true,lamp:1,sweep:'slow'}),
+  item('charge-dc50','충전 · 급속 50kW','charge',{mode:'charging',powerKw:50,soc:62},{charging:true,lamp:1,sweep:'fast'}),
+  item('charge-dc150','충전 · 급속 150kW','charge',{mode:'charging',powerKw:150,soc:62},{charging:true,lamp:1,sweep:'fast'}),
+  item('charge-soc10','충전 · SOC 10%','charge',{mode:'charging',powerKw:50,soc:10},{charging:true,lamp:1}),
+  item('charge-soc95','충전 · SOC 95%','charge',{mode:'charging',powerKw:7,soc:95},{charging:true,lamp:1}),
+  item('charge-all-open','충전 + 문·트렁크 전부 열림','charge',{mode:'charging',powerKw:11,doors:ALL_OPEN},{charging:true,lamp:1}),
+  item('charge-lamp-off','충전 중 하향등 켜짐 (실제 꺼짐)','charge',{mode:'charging',powerKw:11,lowBeam:false},{charging:true,lamp:1}),
+  item('charge-lamp-real','충전 + 실제 하향등 켜짐','charge',{mode:'charging',powerKw:11,lowBeam:true},{charging:true,lamp:1}),
+  item('charge-end','충전 종료 → 하향등 원래대로 (꺼짐)','front',{mode:'parked',lowBeam:false},{charging:false,lamp:0}),
+  item('charge-end-real','충전 종료 → 실제 하향등 유지 (켜짐)','front',{mode:'parked',lowBeam:true},{charging:false,lamp:1}),
+  item('charge-to-drive','충전 중 주행 시작','drive',{mode:'driving',speed:60},{charging:false,lamp:0}),
   item('start','문 열림 → 주행 시작','drive',{mode:'driving',speed:60,doors:{driver:true}}),
   item('stop','문 열림 → 주행 종료','top',{doors:{driver:true}}),
   item('stale','데이터 지연 · 문 유지','top',{mode:'stale',doors:{driver:true},retain:true}),
@@ -52,6 +65,7 @@ export function installSimulator(host) {
   const apply=s=>{
     Object.assign(sim,{speed:0,lowBeam:false,expired:false,enabled:true,missing:false},s.patch);
     host.state.doors={...s.patch.doors};
+    host.state.powerKw=s.patch.powerKw??11;host.state.soc=s.patch.soc??74;
     host.state.mode='parked';host.applyDebugTelemetry(); // healthy snapshot for stale/offline retention
     host.state.mode=s.patch.mode||'parked';
     if(s.patch.theme)host.applyTheme(s.patch.theme);
@@ -77,10 +91,21 @@ export function installSimulator(host) {
     const visibleFallback=!!image && (!box || (!box.querySelector('canvas') && box.querySelector('.v3d-fallback')?.style.visibility!=='hidden'));
     const state=card._v3d?.pending;
     const lampOk=s.id!=='expired'||(state?.lowBeam===false && card.v.debug_raw.field_measured_at.light_low_beam_requested);
-    const pass=actual===s.expected && (fallback?visibleFallback:!!v&&(v.settled||s.expected==='drive')) && !!lampOk;
+    // Charging checks: scene on/off, headlamp level (real low beam or charging) and the sweep speed class.
+    const exp=s.expect||{},notes=[];let extra=true;
+    if(!fallback&&v){
+      if('charging' in exp&&v.charge.active!==exp.charging){extra=false;notes.push(`충전 장면 ${v.charge.active}`);}
+      if('lamp' in exp&&(exp.lamp?v.lamp<0.9:v.lamp>0.1)){extra=false;notes.push(`램프 ${v.lamp.toFixed(2)}`);}
+      if(exp.sweep){
+        const kw=card.v?.charge_power_kw,want=kw>11?2.2:4.4;
+        if(Math.abs(v.charge.period-want)>0.01||(exp.sweep==='fast')!==(want===2.2)){extra=false;notes.push(`스윕 ${v.charge.period}초 (전력 ${kw} kW)`);}
+        else notes.push(`스윕 ${v.charge.period}초 · ${kw} kW`);
+      }
+    }
+    const pass=actual===s.expected && (fallback?visibleFallback:!!v&&(v.settled||s.expected==='drive')) && !!lampOk && extra;
     const row={id:s.id,expected:s.expected,actual,pass};
     host.sim3dResults.push(row);
-    const li=document.createElement('li');li.textContent=`${pass?'통과':'실패'} · ${s.label}: 기대 ${s.expected} / 실제 ${actual}`;
+    const li=document.createElement('li');li.textContent=`${pass?'통과':'실패'} · ${s.label}: 기대 ${s.expected} / 실제 ${actual}${notes.length?' · '+notes.join(' · '):''}`;
     root.querySelector('#simResults').append(li);
     const passed=host.sim3dResults.filter(r=>r.pass).length;
     root.querySelector('#simSummary').textContent=`통과 ${passed} / 실패 ${host.sim3dResults.length-passed} / 전체 ${host.sim3dResults.length}`;

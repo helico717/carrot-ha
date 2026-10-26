@@ -113,6 +113,11 @@ export function vehicleViewState(v, status, dark) {
     driving: status?.key === 'driving',
     speedKph: Number.isFinite(v?.speed_kph) ? v.speed_kph : 0,
     dark: Boolean(dark),
+    // Charging scene: only while the card itself shows the vehicle as charging.
+    charging: status?.key === 'charging',
+    chargeKind: v?.charge_mode === 'dc_charging' ? 'dc' : 'ac',
+    chargePowerKw: Number.isFinite(v?.charge_power_kw) ? v.charge_power_kw : (Number.isFinite(v?.charge_power_w) ? v.charge_power_w / 1000 : null),
+    soc: Number.isFinite(v?.soc_percent) ? v.soc_percent : null,
   };
 }
 
