@@ -1,0 +1,21 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>파라미터 화면 복구 프리뷰</title><body style="margin:0;background:#111827;color:white;font-family:sans-serif"><div style="padding:12px">최신 당근웹 복구 프리뷰 · 합성 데이터 · 실제 차량에는 적용되지 않습니다</div><script type="module">import "/carrot_ha_static/carrot-parameter-tuning-card.js";
+      const items = [
+        {name:'TestOffset',title:'차선 보정 테스트',descr:'설명',group:'테스트',min:0,max:100,default:0,unit:1},
+        {name:'TestToggle',title:'테스트 스위치',group:'테스트',min:0,max:1,default:0,unit:1}
+      ];
+      window.snapshot = {updated_at:new Date().toISOString(),ok:true,param_queue_protocol:1,device_id:'car-a',values:{TestOffset:0,TestToggle:0},catalog:{groups:[{group:'테스트',egroup:'Test',count:2}],items_by_group:{테스트:items},unit_cycle:[1,2,5]}};
+      window.calls = []; window.queue = []; window.failWrite = false;
+      window.card = document.createElement('carrot-parameter-tuning-card');
+      card.setConfig({device_id:'car-a'}); document.body.append(card);
+      card.hass = {callApi:async (method,url,body) => {
+        calls.push({method,url,body});
+        if (url.endsWith('/devices')) return {devices:[{device_id:'car-a',entry_id:'entry-a'}]};
+        if (url.includes('/settings/')) return structuredClone(snapshot);
+        if (url.includes('/param_status/')) return {ok:true,queue:structuredClone(queue)};
+        if (url.includes('/param_set/')) {
+          if (failWrite) throw new Error('test rejection');
+          queue.push({id:77,param_name:body.name,param_value:body.value,status:'pending'}); setTimeout(async()=>{queue[queue.length-1].status='applied'; snapshot.values[body.name]=body.value; await card._checkPendingStatus();},1200);
+          return {ok:true,ids:[77]};
+        }
+        throw new Error(url);
+      }};</script></body></html>
