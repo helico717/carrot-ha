@@ -1,10 +1,10 @@
-## 2026-10-26 — 3D 차량 스와이프 스크롤 차단 제품 반영 (배포 진행)
+## 2026-10-26 — 3D 차량 스와이프 스크롤 차단 제품 반영·HA 배포 완료
 
 - 사용자 승인: 프리뷰 시연 후 “HA에 바로 반영해줘. 디버그, 메인 대시보드 둘다 포함.”으로 공통 뷰어 변경·직접 배포 승인.
 - 변경/이유: 차량 캔버스 touch-action none을 기본 및 자유시점 해제 뒤에도 유지하고, 일반 wheel도 preventDefault하여 차량 조작이 페이지 스크롤로 이어지지 않도록 함. 드래그 회전·핀치/Ctrl+휠 확대·축소와 차량 바깥 페이지 스크롤은 유지. 공통 뷰어를 사용하므로 디버그 및 ko/en 메인에 모두 적용.
 - 관련 파일: tools/vehicle3d/viewer.src.js, custom_components/carrot_ha/frontend/carrot-assets/vehicle-3d.js, tests/vehicle-3d-integration.test.mjs, docs/VEHICLE_3D_MODEL.md, frontend/carrot-vehicle-3d.js (공통 제스처 설명 및 프론트엔드 식별자 갱신).
 - 검증: 프리뷰에서 차량 위 wheel 스크롤 차단, 대각선 드래그 회전, 차량 바깥 페이지 스크롤 확인. 신규 기본/자유시점 및 wheel 이벤트 계약 테스트 포함 전체 JS 100개 중 98개 통과, 기존 motion-status·range-c3-and-fixes 2개만 실패.
-- 배포 상태: 공통 번들 재생성, main 커밋·푸시 및 백업 후 HA 직접 반영 진행. 모델·GLB·버전·태그·릴리즈 변경 없음. 프론트엔드 변경으로 HA 재시작 불필요.
+- 배포 상태: 제품 커밋 `e2d84b45529e54243c27ef6e3c8949677dafb7e9` main 푸시 후 HA 직접 반영 완료. 백업 `/homeassistant/carrot_ha/deployment-backups/vehicle-3d-swipe-e2d84b4/before`. 설치 및 HTTP 응답 SHA-256이 두 파일 모두 커밋과 일치: `carrot-vehicle-3d.js` = `3466b8df05fdad8de981169b530f4407984748f93aa8657024f619f308bb0140`, `carrot-assets/vehicle-3d.js` = `482b43936ee21b4922a36128c2544388c8925b4732a38b357cd4c94fa29561c9`. HA frontend-version `0.9.0-beta.1-5e56ec89ccf2` 확인. 디버그·ko/en 메인은 같은 공통 뷰어 사용. 모델·GLB·버전·태그·릴리즈 변경 없음. HA 재시작 불필요, 브라우저 강력 새로고침 필요.
 - 미확인: 모바일 실기 터치·핀치, 로그인된 실제 HA 화면.
 
 ## 2026-10-26 — 3D 차량 스와이프의 페이지 스크롤 차단 프리뷰 (승인 대기)
