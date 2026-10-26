@@ -155,7 +155,8 @@ export async function createVehicleViewer(container, options = {}) {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 120);
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
-  const gltf = await loader.loadAsync(modelUrl);
+  // The caller may pass the downloaded bytes (served from the local cache) instead of a URL.
+  const gltf = options.modelBuffer ? await loader.parseAsync(options.modelBuffer, '') : await loader.loadAsync(modelUrl);
 
   // ----- normalise the model: car faces +Z, centred, wheels on y=0, fixed length -----
   const car = new THREE.Group();

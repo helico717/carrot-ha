@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const frontend = new URL('../custom_components/carrot_ha/frontend/', import.meta.url);
 const read = name => fs.readFileSync(new URL(name, frontend), 'utf8');
-const {vehicleViewState, syncVehicle3d, DEFAULT_MODEL_URL} = await import(new URL('carrot-vehicle-3d.js', frontend));
+const {vehicleViewState, syncVehicle3d, loadModel, warmVehicle3d, DEFAULT_MODEL_URL} = await import(new URL('carrot-vehicle-3d.js', frontend));
 
 test('vehicle state maps door, trunk, low beam, speed and driving from the values the card already has', () => {
   const state = vehicleViewState({door_driver_open: true, door_passenger_open: false, door_rear_driver_open: true,
@@ -25,15 +25,35 @@ test('expired or unknown values never light the lamp or open a door', () => {
   assert.equal(state.driving, false);
 });
 
-test('without a model file the PNG stays and the model is not probed again on every render', async () => {
-  let probes = 0;
-  globalThis.fetch = async (url, options) => { probes += 1; assert.equal(options.method, 'HEAD'); return {ok: false}; };
+test('without a model file the PNG stays and the model is not requested again on every render', async () => {
+  let requests = 0;
+  globalThis.fetch = async url => { requests += 1; assert.equal(url, '/missing/model.glb'); return {ok: false, status: 404}; };
   const box = {isConnected: true, appendChild() { throw Error('no viewer container without a model'); }, querySelector: () => null};
   const card = {config: {vehicle_3d_model: '/missing/model.glb'}, shadowRoot: {querySelector: () => box}};
   await syncVehicle3d(card, {v: {}, status: {key: 'parked'}, dark: false});
   await syncVehicle3d(card, {v: {}, status: {key: 'parked'}, dark: false});
-  assert.equal(probes, 1);
+  assert.equal(requests, 1);
   assert.equal(card._v3d.viewer, null);
+});
+
+test('the model is downloaded once per page load, and warm-up shares that download', async () => {
+  let requests = 0;
+  const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+  globalThis.fetch = async () => { requests += 1; return {ok: true, status: 200, headers: {get: () => '"etag"'}, arrayBuffer: async () => bytes}; };
+  warmVehicle3d({vehicle_3d_model: '/warm/model.glb'});
+  const a = await loadModel('/warm/model.glb');
+  const b = await loadModel('/warm/model.glb');
+  assert.equal(requests, 1);
+  assert.equal(a, b);
+  assert.equal(a.source, 'network');
+  assert.equal(a.buffer.byteLength, 4);
+});
+
+test('warm-up is skipped when 3D is switched off', async () => {
+  let requests = 0;
+  globalThis.fetch = async () => { requests += 1; return {ok: false}; };
+  warmVehicle3d({vehicle_3d: false, vehicle_3d_model: '/off/model.glb'});
+  assert.equal(requests, 0);
 });
 
 test('3D can be switched off and the viewer is released when the container disappears', async () => {
@@ -85,12 +105,24 @@ for (const lang of ['ko', 'en']) {
   });
 }
 
-test('the 3D module adds no data requests: only a HEAD probe of the model file', () => {
+test('the 3D module adds no data requests: it only fetches the model file itself', () => {
   const source = read('carrot-vehicle-3d.js');
   assert.equal((source.match(/fetch\(/g) || []).length, 1);
-  assert.match(source, /method: 'HEAD'/);
   assert.doesNotMatch(source, /callApi|WebSocket|api\/carrot_ha/);
+  // The local copy lives in IndexedDB: localStorage cannot hold a binary model.
+  assert.match(source, /indexedDB\.open/);
+  assert.doesNotMatch(source, /localStorage\./);
 });
+
+for (const lang of ['ko', 'en']) {
+  test(`${lang}: the 3D container receives pointer events (the card style disables them on .car-image)`, () => {
+    const source = read(`carrot-dashboard-${lang}.js`);
+    const disabled = source.indexOf('.hero .car-image{position:absolute;width:100%;height:100%;object-fit:cover;inset:0 0 auto;pointer-events:none}');
+    const enabled = source.indexOf('.hero .vehicle3d,.hero .vehicle3d .v3d-stage{pointer-events:auto}');
+    assert.ok(disabled >= 0 && enabled > disabled, 'the enabling rule must come after the rule that disables pointer events');
+    assert.match(source, /warmVehicle3d\(config\)/);
+  });
+}
 
 test('view patching leaves the 3D container to its owner, like the Leaflet map', () => {
   assert.match(read('carrot-view-state.js'), /\['map','vehicle3d'\]\.some\(/);

@@ -1,3 +1,14 @@
+## 2026-10-26 — 3D 차량: 드래그 불가 수정과 로딩 속도 개선
+
+- 사용자 보고: 3D 모델은 뜨지만 돌려 볼 수 없고(고정), 대시보드 진입 뒤 3D가 나오기까지 약 10~15초가 걸린다.
+- 원인 1(조작 불가): 카드의 기존 스타일 `.hero .car-image{pointer-events:none}`가 3D 컨테이너(`class="car-image vehicle3d"`)와 그 자식 캔버스에도 상속되어 마우스·터치가 캔버스에 전달되지 않았다. 프리뷰 검증은 상태 전환만 확인했고 카드 안 드래그는 시험하지 않았다.
+- 원인 2(느린 로딩): Mac에서 HA로 측정한 전송 속도가 약 105KB/s여서 모델 3,619,416바이트에 34초, 3D 모듈 616,497바이트에 5.7초가 걸렸다. 병목은 파싱이 아니라 전송이며, 기존 흐름은 모델 존재 확인(HEAD), 모듈, 모델을 순차로 받았고 정적 경로에 캐시 헤더가 없어 재방문 최적화가 없었다.
+- 변경: ① `.hero .vehicle3d,.hero .vehicle3d .v3d-stage{pointer-events:auto}`를 기존 규칙 뒤에 추가하고 제목 영역(`.hero-copy`)은 포인터를 통과시킨다. ② 모델을 접속 기기의 IndexedDB에 저장하고 재방문 때 저장본을 바로 사용하며 ETag로 백그라운드 확인한다(변경은 다음 방문부터 적용). localStorage는 용량·바이너리 문제로 사용하지 않는다. ③ HEAD 확인을 없애고 모델과 3D 모듈을 병렬로 내려받으며, 카드 `setConfig` 시점에 미리 시작해 데이터 요청과 겹친다. ④ 모델 빌드에서 텍스처를 WebP로 압축하고 geometry는 meshopt `high`로 압축해 3,619,416바이트에서 2,023,208바이트로 줄였다(약 44% 감소, 화질 차이는 프리뷰에서 눈으로 비교했다). ⑤ 뷰어가 내려받은 바이트를 직접 받는다(`modelBuffer`).
+- 관련 파일: `custom_components/carrot_ha/frontend/{carrot-vehicle-3d.js,carrot-dashboard-ko.js,carrot-dashboard-en.js,carrot-assets/vehicle-3d.js}`, `tools/vehicle3d/{viewer.src.js,model/build_model.mjs,model/package.json}`, `docs/VEHICLE_3D_MODEL.md`, `tests/vehicle-3d-integration.test.mjs`.
+- 검증: JS 테스트 17개(포인터 이벤트 규칙 순서, 모델 1회 다운로드와 워밍업 공유, 3D 끔에서 요청 없음, 모델 없음 폴백, IndexedDB 사용·localStorage 미사용 등) 통과, 전체 JS는 기존 실패 2건 외 통과. Chromium에서 실제 한국어 카드(`legacy_id4` 설정)를 마우스로 드래그해 차가 회전함을 확인했다. IndexedDB를 비운 첫 로드는 `source: network`, 재로드는 `source: local`(다운로드 16ms)로 기록됨을 확인했다.
+- 배포 상태: 커밋 전. 푸시·HA 반영 결과는 배포 기록에 남긴다.
+- 미확인: 실제 HA 화면과 모바일에서의 체감 시간(이 환경은 HA에 로그인된 브라우저가 없다). 첫 방문의 전송 시간은 회선에 따라 여전히 길 수 있다. 모델을 바꾼 직후에는 기기에 저장본이 있으면 한 번 더 새로고침해야 새 파일이 적용된다.
+
 ## 2026-10-26 — 3D 차량: `vehicle_image_layout: legacy_id4` 카드에서 3D가 뜨지 않던 문제 수정
 
 - 사용자 보고: HA 재시작 뒤에도 3D 대신 정적 이미지가 표시됨.

@@ -108,7 +108,7 @@ class CarrotDashboard extends HTMLElement {
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
-  setConfig(config){this.config=config;this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
+  setConfig(config){this.config=config;if(config.vehicle_3d!==false)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.warmVehicle3d(config)).catch(()=>{});this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
@@ -480,6 +480,7 @@ class CarrotDashboard extends HTMLElement {
     themeStyle.textContent+=`
       .hero{background:#777b80;color:#fff;min-height:280px;display:flex;flex-direction:column;border:0;min-width:0}
       .hero-copy{padding:16px 20px 0}.hero-copy h2{font-size:28px;margin:0;max-width:none}
+      .hero .vehicle3d,.hero .vehicle3d .v3d-stage{pointer-events:auto}.hero .hero-copy{pointer-events:none}
       .vehicle3d{position:relative;overflow:hidden}.vehicle3d .v3d-fallback{display:block;width:100%;height:100%;object-fit:contain}.vehicle3d .v3d-stage{position:absolute;inset:0}
       .hero .car-image{position:static;inset:auto;width:100%;max-width:100%;height:250px;object-fit:contain;object-position:center;display:block;min-width:0;flex-shrink:0;padding:12px}
       .badge.parked{background:#363b40;color:#e0e3e5}.badge.driving{background:#133960;color:#83bdff}.badge.charging{background:#173e29;color:#83e2a4}.badge.offline{background:#483c13;color:#ffe17b}

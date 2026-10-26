@@ -3,7 +3,7 @@
 const WORK=process.env.MODEL_WORK||'./work';
 import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS,KHRMaterialsEmissiveStrength} from '@gltf-transform/extensions';
-import {prune,dedup,weld,quantize,meshopt,reorder} from '@gltf-transform/functions';
+import {prune,dedup,weld,quantize,meshopt,reorder,textureCompress} from '@gltf-transform/functions';
 import {MeshoptEncoder,MeshoptSimplifier} from 'meshoptimizer';
 import * as THREE from 'three';
 await MeshoptEncoder.ready; await MeshoptSimplifier.ready;
@@ -270,5 +270,9 @@ for(const mesh of root.listMeshes()) for(const prim of mesh.listPrimitives()){
   idx.setArray(out.length<65536*3&&count<65536?new Uint16Array(out):out); after+=out.length/3;
 }
 console.log('tris',Math.round(before),'->',Math.round(after), JSON.stringify(Object.fromEntries(Object.entries(stat).map(([k,v])=>[k,v.map(Math.round)]))));
-await doc.transform(prune(), reorder({encoder:MeshoptEncoder}), quantize(), meshopt({encoder:MeshoptEncoder,level:'medium'}));
+// Textures as WebP (about a third of the PNG size) when sharp is installed; geometry with strong meshopt.
+let sharp=null; try{ sharp=(await import('sharp')).default; }catch{ console.warn('sharp not installed: textures stay PNG'); }
+await doc.transform(prune(), reorder({encoder:MeshoptEncoder}), quantize(),
+  ...(sharp?[textureCompress({encoder:sharp,targetFormat:'webp',quality:80,resize:[512,512]})]:[]),
+  meshopt({encoder:MeshoptEncoder,level:process.env.MESHOPT_LEVEL||'high'}));
 await io.write(`${WORK}/vehicle.glb`,doc);
