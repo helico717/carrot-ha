@@ -407,6 +407,11 @@ class Journal:
             row['quality']=json.loads(row.pop('quality_json'))
         for row in records+recent_records:
             extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km');row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
+        with self.lock,self.connect() as db:
+            from .station_stats import unit_price
+            for row in records+recent_records:
+                price=unit_price(db,self.vehicle,row)
+                if price:row['unit_price']=price
         totals={key:sum(r[key] for r in daily if r[key] is not None) if any(r[key] is not None for r in daily) else None
                 for key in (*METRICS,'charge_actual_krw','charge_estimated_krw','charge_effective_krw','slow_count','fast_count','unknown_count')}
         totals['efficiency_km_kwh']=totals['energy_distance_km']/totals['drive_energy_kwh'] if totals['drive_energy_kwh'] else None

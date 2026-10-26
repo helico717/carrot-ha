@@ -3,6 +3,32 @@ import json
 from .efficiency import value
 
 
+def unit_price(db,vehicle,record):
+    """Whole-won price per kWh (charging) or litre (refuelling) for one ledger row, or None.
+
+    Quantity rule matches the place statistics: the billed/entered amount first, then the summed
+    battery energy of the linked charge sessions (an estimate, flagged approximate)."""
+    category=record.get('category')
+    if record.get('kind')!='expense' or category not in ('charging','refueling'):return None
+    cost=record.get('actual_krw');approximate=False
+    if cost is None:cost=record.get('estimated_krw');approximate=cost is not None
+    data=record.get('input') or {};fields=(record.get('import_source') or {}).get('fields',{})
+    if category=='refueling':
+        qty=value(data,fields,'fuel_liters','주유량');unit='L'
+    else:
+        qty=value(data,fields,'billed_charge_kwh','충전량');unit='kWh'
+        if qty is None:
+            members=db.execute("SELECT m.battery_charge_kwh FROM expense_members x JOIN mobility m ON m.vehicle_id=x.vehicle_id AND m.record_id=x.charge_id JOIN records r ON r.vehicle_id=m.vehicle_id AND r.id=m.record_id WHERE x.vehicle_id=? AND x.expense_id=? AND r.status='active'",(vehicle,record['id'])).fetchall()
+            qty=sum(r[0] for r in members) if members and all(r[0] is not None for r in members) else None
+            approximate=approximate or qty is not None
+    if qty is not None and qty>0 and cost is not None and cost>0:
+        return {'krw':int(cost/qty+0.5),'unit':unit,'approximate':approximate}
+    fallback=data.get('unit_price_krw')
+    if category=='refueling' and type(fallback) in (int,float) and fallback>0:
+        return {'krw':int(fallback+0.5),'unit':unit,'approximate':False}
+    return None
+
+
 def place_identity(location,rid):
     """One rule for grouping a record into a map place; the ledger's place filter must use the same one."""
     if not location or not (location.get('name') or location.get('latitude') is not None):return None

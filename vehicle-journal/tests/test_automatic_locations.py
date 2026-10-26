@@ -7,6 +7,7 @@ import sys
 import tempfile
 import types
 import unittest
+from uuid import uuid4
 from unittest.mock import patch,AsyncMock
 pkg=types.ModuleType('custom_components.carrot_ha');pkg.__path__=['custom_components/carrot_ha']
 sys.modules.setdefault('custom_components',types.ModuleType('custom_components'))
@@ -149,3 +150,17 @@ class AddressPropagationTests(unittest.TestCase):
     def test_place_filter_rejects_bad_value(self):
         for bad in ('',7,'x'*401):
             with self.assertRaises(ValueError):self.j.query('2026-10-01','2026-10-31',place=bad)
+    def test_unit_price_is_whole_won_per_kwh_or_litre(self):
+        self.test_address_only_charge_reaches_expense_and_trend_map()
+        rows={r['id']:r for r in self.j.query('2026-10-01','2026-10-31')['records']}
+        self.assertEqual(rows['x1']['unit_price'],{'krw':200,'unit':'kWh','approximate':True})
+        self.assertEqual(rows['x2']['unit_price'],{'krw':400,'unit':'kWh','approximate':True})
+        fuel=str(uuid4());wash=str(uuid4());billed=str(uuid4())
+        self.j.save_manual(fuel,0,{'kind':'expense','date':'2026-10-20','category':'refueling','actual_krw':50000,'fuel_liters':30,'unit_price_krw':1700})
+        self.j.save_manual(wash,0,{'kind':'expense','date':'2026-10-20','category':'washing','actual_krw':9000})
+        self.j.save_manual(billed,0,{'kind':'expense','date':'2026-10-20','category':'charging','actual_krw':10000,'billed_charge_kwh':32})
+        rows={r['id']:r for r in self.j.query('2026-10-01','2026-10-31')['records']}
+        self.assertEqual(rows[fuel]['unit_price'],{'krw':1667,'unit':'L','approximate':False})
+        self.assertEqual(rows[billed]['unit_price'],{'krw':313,'unit':'kWh','approximate':False})
+        self.assertNotIn('unit_price',rows[wash])
+
