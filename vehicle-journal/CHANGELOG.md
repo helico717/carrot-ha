@@ -1,3 +1,38 @@
+## 2026-10-26 — vehicle-journal: 위치 지정 UI 검토용 하네스 추가 및 지도 안내 문구 수정
+
+- 이유: 프리뷰 선행 절차(AGENTS.md)보다 프로덕션 소스 수정을 먼저 진행한 것을 바로잡고, 사용자 검토·승인 후 반영하도록 검토용 파일을 추가했다. 기존 `review-record-ui.html`(추세 화면 작업 중)은 수정하지 않았다.
+- 변경: `vehicle-journal/review-location-ui.html` 추가. 실제 `carrot-vehicle-journal.js`를 그대로 불러오고 합성 `hass`·가짜 카카오 지도·합성 검색 응답(상호명 / 도로명 주소 폴백 / 결과 없음)을 주입한다. 저장소 루트에서 `python3 -m http.server 8765` 실행 후 `http://localhost:8765/vehicle-journal/review-location-ui.html`로 연다.
+- 수정: 새 기록의 2단계 지도 아래에 옛 기록용 "장소명만 보존된 기록이에요" 안내가 나오고 장소 선택 후에도 남던 문제를 고쳤다. 새 기록은 기본 안내를, 장소 선택 후에는 핀 이동 안내를 표시한다.
+- 관련 파일: `vehicle-journal/review-location-ui.html`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`.
+- 검증: 하네스를 430px로 열어 상호명 검색→선택, 도로명 주소 검색→주소 이름 경고, 지도 눌러 핀 이동, 직접 입력 이름 상태를 확인했다. 실제 카카오 SDK·검색은 미확인.
+- 배포 상태: 사용자 검토 대기. 커밋·푸시·HA 반영 없음.
+
+## 2026-10-26 — vehicle-journal: 장소 검색에 카카오 주소 검색 폴백 추가
+
+- 이유: `location_search`가 카카오 키워드 검색만 사용해, 상호명이 아닌 도로명 주소로 검색하면 결과가 비는 경우가 있었다.
+- 변경: 키워드 검색 결과가 0건일 때만 카카오 주소 검색(`address.json`)을 한 번 더 호출한다. 결과는 도로명 주소(건물명이 있으면 건물명을 이름)로 변환하며 `station_id`는 넣지 않아 주유소·충전소 통계와 자동 선택 대상에서 제외된다. 주소 검색 실패는 오류가 아닌 빈 결과로 처리하고, 키워드 검색 오류는 기존대로 보고한다. 키워드 결과가 있으면 추가 호출은 없다. 캐시·1초 속도 제한은 기존 그대로다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/api.py`, `vehicle-journal/tests/test_location_search.py`(신규).
+- 검증: 모의 카카오 응답 단위 테스트 5건과 기존 권한 테스트 통과(Python 3.9 환경, `asyncio.timeout`은 테스트에서만 호환 처리). 실제 카카오 API 호출과 HA 실행은 미확인. 주소 검색은 REST 키 경로에만 적용되며, REST 키가 없을 때의 JS SDK 검색 경로는 변경하지 않았다.
+- 배포 상태: 로컬 수정만, 커밋·HA 반영·릴리즈 없음. 백엔드 변경이라 HA 반영 시 재시작이 필요하다.
+
+## 2026-10-26 — vehicle-journal: 위치 지정 흐름 개편(찾기→핀 확인→이름 정하기) 및 이모티콘 SVG 아이콘 교체
+
+- 이유: 상호명 검색이 안 될 때 도로명 주소로 검색하고, 핀이 다르면 지도에서 옮기고, 주소가 이름으로 저장되지 않도록 이름을 직접 입력하는 기존 기능이 화면에서 직관적으로 드러나지 않았다. 또한 이모티콘이 AI 생성물처럼 보인다는 사용자 요청이 있었다.
+- 변경(위치): 앞선 방법 탭을 번호 단계 1 장소 찾기 / 2 지도 핀 확인 / 3 장소 이름 정하기로 대체. 1단계에 도로명 주소 검색 안내와 "검색이 안 되면 지도에서 직접 찍기" 보조 버튼, 2단계에 핀 이동 안내, 3단계에 이름 상태 표시(검색된 이름 / 직접 입력 / 주소가 이름으로 저장되는 경고 / 임시 이름 경고)와 "검색된 이름으로 되돌리기" 버튼을 추가했다. 저장·검색·지도 로직과 요소 ID는 유지했다.
+- 변경(아이콘): 차계부의 이모티콘(추세 카드 지표 아이콘, 영수증 안내, 사진·위치 버튼 등)을 직접 그린 인라인 SVG(`JOURNAL_ICONS`/`jIcon`)로 교체했다. `★ ☆ ✕ ✓ ☰`은 텍스트 기호라 유지했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `custom_components/carrot_ha/frontend/carrot-journal-design.js`.
+- 검증: Node 구문 검사, 실제 모듈을 430px 폭으로 렌더링해 단계 표시·이름 상태 전환(검색 이름/주소 이름 경고/직접 입력/되돌리기)·SVG 아이콘 렌더링 확인. 카카오 키가 없는 합성 환경이라 실제 검색과 지도 핀은 미확인. `browser-check.cjs`는 playwright 미설치로 미실행. 추세 카드 SVG는 코드 치환만 확인하고 실제 추세 화면 렌더링은 별도 확인이 필요하다.
+- 미확인/후속: 백엔드 `location_search`는 카카오 키워드 검색만 사용해 도로명 주소가 안 잡힐 수 있다(주소 검색 API 보강 후보). 차계부 밖(디버그 대시보드·카메라·터미널·파라미터 카드 등)의 이모티콘은 이번에 변경하지 않았다. `review-record-ui.html`은 수정하지 않았다.
+- 배포 상태: 로컬 수정만, 커밋·HA 반영·릴리즈 없음.
+
+## 2026-10-26 — vehicle-journal: 기록 위치 지정 UI 단계형 개편
+
+- 이유: 위치 검색·지도 지정·선택 결과·이름 입력이 한 덩어리로 보여 무엇을 어떻게 해야 하는지 직관적이지 않았다.
+- 변경: 안내문과 방법 선택 탭(이름·주소로 찾기 / 지도에서 직접 찍기)을 추가하고, 선택한 방법의 입력만 표시한다. 결과 카드는 미선택(점선)/선택됨(초록) 상태를 구분하고 문구를 "선택한 위치", "기록에 표시할 이름"으로 바꿨다. 요소 ID와 저장·검색·지도 로직은 유지했다.
+- 관련 파일: `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `custom_components/carrot_ha/frontend/carrot-journal-design.js`.
+- 검증: Node 구문 검사, 실제 모듈을 모바일 폭(430px)에 렌더링해 탭 전환·선택 상태·검색 행 배치 확인. 카카오 키가 없는 합성 환경이라 실제 검색·지도 핀은 미확인. `browser-check.cjs`는 playwright 미설치로 실행하지 못했다.
+- 배포 상태: 로컬 수정만, 커밋·HA 반영·릴리즈 없음. 추세 화면용 `review-record-ui.html`은 수정하지 않았다.
+
 ## 2026-10-26 — vehicle-journal: 충전 준비 중 주차 GPS 보완 및 전기차 검색 제한
 
 - 커밋 제목: `vehicle-journal: verify parked GPS before automatic charger lookup`.

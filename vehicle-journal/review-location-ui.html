@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차계부 위치 지정 UI 검토</title>
+<!--
+  검토용 하네스: 실제 carrot-vehicle-journal.js 모듈을 그대로 불러온다.
+  ES 모듈이라 file:// 로는 열리지 않는다. 저장소 루트에서 다음을 실행한 뒤 접속한다.
+    python3 -m http.server 8765
+    http://localhost:8765/vehicle-journal/review-location-ui.html
+  카카오 지도/검색은 합성 응답으로 대체한다(실제 호출 없음).
+-->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  .bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)}
+  .bar button{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:10px;padding:7px 11px;font-size:12.5px;cursor:pointer}
+  .bar button:hover{border-color:var(--j-accent)}
+  .bar .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .bar small{color:var(--j-sub)}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>위치 UI 검토</b>
+  <div class="grp"><button id="openRefuel">주유 기록 열기</button><button id="openCharge">충전 기록 열기</button></div>
+  <div class="grp"><small>검색어 입력 예:</small>
+    <button data-q="구리제일주유소">상호명 검색(결과 있음)</button>
+    <button data-q="서해안고속도로 242">도로명 주소 검색(주소 폴백)</button>
+    <button data-q="없는장소검색어">결과 없음</button></div>
+  <small>지도는 합성 지도예요. 눌러서 핀 이동을 확인하세요.</small>
+</div>
+<main id="mount"></main>
+
+<script type="module">
+// 가짜 카카오 지도: 실제 SDK를 대신해 핀 표시와 클릭 이벤트만 흉내 낸다.
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+class LatLng{constructor(a,b){this.a=a;this.b=b}getLat(){return this.a}getLng(){return this.b}}
+class FakeMap{
+  constructor(el){this.el=el;this.listeners=[];this.center=new LatLng(37.5665,126.978);
+    el.replaceChildren();const root=document.createElement('div');root.id='fakeMap';root.style.cssText='position:relative;width:100%;height:100%;cursor:crosshair;overflow:hidden;background-color:#dfe7e2;background-image:linear-gradient(rgba(0,0,0,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.08) 1px,transparent 1px);background-size:36px 36px';root.innerHTML='<span style="position:absolute;left:8px;top:8px;font-size:11px;color:#33433b;background:rgba(255,255,255,.8);padding:2px 6px;border-radius:6px">합성 지도 · 눌러서 핀 이동</span>';el.append(root);this.root=root;
+    root.addEventListener('click',e=>{const r=root.getBoundingClientRect();const lat=this.center.getLat()+(0.5-(e.clientY-r.top)/r.height)*0.01;const lng=this.center.getLng()+((e.clientX-r.left)/r.width-0.5)*0.016;this.listeners.forEach(f=>f({latLng:new LatLng(lat,lng)}));});}
+  setCenter(p){this.center=p;this.marker?.draw()}
+}
+class Marker{
+  constructor(o){this.pos=o.position;this.map=null}
+  setPosition(p){this.pos=p;this.draw()}
+  setMap(m){this.map=m;if(m)m.marker=this;this.draw()}
+  draw(){if(!this.map)return;const root=this.map.root;let pin=root.querySelector('.pin');if(!pin){pin=document.createElement('div');pin.className='pin';pin.style.cssText='position:absolute;width:22px;height:22px;margin:-22px 0 0 -11px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#e5484d;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)';root.append(pin)}
+    const c=this.map.center;pin.style.left=clamp(50+(this.pos.getLng()-c.getLng())/0.016*100,3,97)+'%';pin.style.top=clamp(50-(this.pos.getLat()-c.getLat())/0.01*100,8,98)+'%';}
+}
+const maps={Map:FakeMap,LatLng,Marker,event:{addListener:(m,ev,fn)=>{if(ev==='click')m.listeners.push(fn)}}};
+window.__journalKakaoKey='demo';window.__journalKakao=Promise.resolve(maps);
+
+// 합성 장소 검색: 서버 location_search(키워드 → 주소 폴백)의 응답 형태를 따른다.
+const places=[
+  {name:'구리제일주유소',address:'경기 구리시 경춘로 100',latitude:37.601,longitude:127.129,provider:'kakao',station_id:'11',selection_source:'manual'},
+  {name:'구리제일주유소 세차장',address:'경기 구리시 경춘로 102',latitude:37.6012,longitude:127.1295,provider:'kakao',station_id:'12',selection_source:'manual'}
+];
+const addressPlace={name:'충남 서산시 해미면 서해안고속도로 242',address:'충남 서산시 해미면 서해안고속도로 242',latitude:36.7123,longitude:126.5461,provider:'kakao',selection_source:'manual'};
+const hass={callWS:async msg=>{
+  const t=msg.type;
+  if(t.endsWith('/entries'))return [{entry_id:'demo',title:'검토용 차량'}];
+  if(t.endsWith('/query'))return {totals:{},daily:[],records:[],record_count:0,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{}};
+  if(t.endsWith('/map/config'))return {key:'demo',rest_configured:true};
+  if(t.endsWith('/location/search')){await new Promise(r=>setTimeout(r,250));const q=(msg.query||'').trim();
+    if(q.includes('구리'))return places;
+    if(q.includes('서해안')||q.includes('도로'))return [addressPlace];
+    return [];}
+  return {};
+}};
+
+await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
+const card=document.createElement('carrot-vehicle-journal');
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
+const open=mode=>{card.openRecord(null,mode);setTimeout(()=>{const r=card.shadowRoot;r.getElementById('addLocation')?.click();r.getElementById('recordLocationField')?.scrollIntoView({block:'center'});},120)};
+document.getElementById('openRefuel').onclick=()=>open('refueling');
+document.getElementById('openCharge').onclick=()=>open('charging');
+document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{const r=card.shadowRoot;if(!r.getElementById('recordDialog')?.open)open('refueling');setTimeout(()=>{const i=r.getElementById('placeQuery');if(!i)return;i.value=b.dataset.q;r.getElementById('placeSearch').click();},260)});
+setTimeout(()=>open('refueling'),700);
+</script>
+</body>
+</html>

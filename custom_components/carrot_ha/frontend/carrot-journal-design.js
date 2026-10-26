@@ -1502,7 +1502,8 @@ export const journalDesign = `:host {
 .trend-card:hover { border-color: rgba(255, 255, 255, 0.22); transform: translateY(-2px); }
 .trend-card-top { display: flex; justify-content: space-between; align-items: center; }
 .trend-title-group { display: flex; align-items: center; gap: 8px; }
-.trend-badge-icon { font-size: 17.5px; line-height: 1; }
+.trend-badge-icon { font-size: 17.5px; line-height: 1; display:inline-flex; }
+.j-ico{width:1.1em;height:1.1em;vertical-align:-0.2em;flex-shrink:0}.btn-loc-add .j-ico,.btn-loc-pin-link .j-ico{margin-right:2px}.loc-name-state .j-ico{margin-right:2px}.photo-pick-tile .j-ico{width:26px;height:26px}.receipt-notice-banner .j-ico{width:1.2em;height:1.2em}
 .trend-metric-name { font-size: 19.5px; font-weight: 850; letter-spacing: -0.3px; overflow-wrap: anywhere; }
 .trend-arrow { color: #647b8e; font-size: 19.5px; font-weight: 600; line-height: 1; }
 .trend-card-summary { overflow-wrap: anywhere; font-size: 15.5px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
@@ -1886,6 +1887,24 @@ export const journalDesign = `:host {
   border-color: #81e6c5 !important;
   background: rgba(129, 230, 197, 0.04) !important;
 }
+
+
+/* 위치 지정 UI: 1 찾기 → 2 핀 확인 → 3 이름 정하기 */
+.loc-step{display:flex;flex-direction:column;gap:8px}
+.loc-step-head{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800;color:var(--j-ink)}
+.loc-step-no{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--j-accent);color:#0b1014;font-size:12px;font-weight:800;flex-shrink:0}
+.loc-step-hint{font-size:12px;color:var(--j-sub);line-height:1.45}.loc-step-hint b{color:var(--j-ink)}
+.btn-loc-pin-link{align-self:flex-start;background:transparent!important;border:1px dashed var(--j-border)!important;color:var(--j-blue)!important;font-size:13px!important;font-weight:700;padding:8px 12px!important;min-height:36px!important;height:auto!important;border-radius:10px!important;cursor:pointer}
+.loc-map-hint{padding:8px 10px;border-radius:8px;background:var(--j-blue-bg);color:var(--j-ink);font-size:12.5px;line-height:1.45}
+#recordDialog .loc-search-row{flex-wrap:nowrap!important}#recordDialog .loc-search-row #placeQuery{flex:1 1 0!important;min-width:0}#recordDialog .loc-search-row .btn-loc-search{flex:0 0 auto!important;min-width:64px}
+.selected-loc-section{background:var(--j-surface);border-color:var(--j-border);border-style:dashed}
+.selected-loc-section.has-loc{background:rgba(129,230,197,.07);border:1px solid rgba(129,230,197,.4)}
+.selected-loc-badge{display:flex;align-items:center;gap:6px;text-transform:none;color:var(--j-sub)}.selected-loc-section.has-loc .selected-loc-badge{color:var(--j-accent)}
+.loc-state-dot{width:8px;height:8px;border-radius:50%;background:var(--j-border)}.selected-loc-section.has-loc .loc-state-dot{background:var(--j-accent)}
+.selected-loc-name-title em{font-style:normal;font-weight:500;font-size:12px;color:var(--j-sub);margin-left:4px}
+.loc-name-state-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.loc-name-state{font-size:12.5px;line-height:1.4;color:var(--j-sub)}.loc-name-state[data-state=auto]{color:var(--j-accent)}.loc-name-state[data-state=manual]{color:var(--j-blue)}.loc-name-state[data-state=warn]{color:#ffb454}
+.btn-loc-name-reset{background:transparent!important;border:1px solid var(--j-border)!important;color:var(--j-ink)!important;font-size:12px!important;padding:4px 10px!important;min-height:28px!important;height:auto!important;border-radius:8px!important;cursor:pointer}.btn-loc-name-reset[hidden]{display:none!important}
 
 /* 영수증 업로드 대기 신규 팝업 */
 .receipt-waiting-dialog {

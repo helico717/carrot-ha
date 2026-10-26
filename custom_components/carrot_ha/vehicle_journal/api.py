@@ -268,6 +268,18 @@ async def settings(hass,connection,msg):
     connection.send_result(msg['id'],{'map_key':m.map_key,'opinet_configured':bool(m.opinet_key),'kakao_rest_configured':bool(m.kakao_rest_key),'kakao_rest_key':m.kakao_rest_key,'opinet_key':m.opinet_key,'backup_entities':backup,'nas_transfer_verified':bool(m.backup_state.get('restore_verified')),'backup_config':m.backup_config,'backup_state':m.nas.status or m.backup_state,'automatic_locations':m.automatic_locations})
 
 
+def address_places(documents):
+    """Convert Kakao address-search documents into location choices (no station_id: not a station)."""
+    places=[]
+    for d in documents[:10]:
+        road=d.get('road_address') or {};lot=d.get('address') or {}
+        address=road.get('address_name') or d.get('address_name') or lot.get('address_name') or ''
+        try:latitude,longitude=float(d['y']),float(d['x'])
+        except (KeyError,TypeError,ValueError):continue
+        places.append({'name':road.get('building_name') or address,'address':address,'latitude':latitude,'longitude':longitude,'provider':'kakao','selection_source':'manual'})
+    return places
+
+
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/location/search',vol.Required('query'):str})
 @websocket_api.async_response
 async def location_search(hass,connection,msg):
@@ -290,11 +302,16 @@ async def location_search(hass,connection,msg):
     m.search_last=now
     try:
         async with asyncio.timeout(10):
-            async with async_get_clientsession(hass).get('https://dapi.kakao.com/v2/local/search/keyword.json',params={'query':query,'size':10},headers={'Authorization':'KakaoAK '+m.kakao_rest_key}) as response:
+            session=async_get_clientsession(hass);headers={'Authorization':'KakaoAK '+m.kakao_rest_key}
+            async with session.get('https://dapi.kakao.com/v2/local/search/keyword.json',params={'query':query,'size':10},headers=headers) as response:
                 if response.status!=200:
                     connection.send_error(msg['id'],'provider_error','카카오 API 활성화·키·쿼터 설정을 확인해 주세요.');return
                 result=await response.json()
-        places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x']),'provider':'kakao','station_id':str(p['id']),'selection_source':'manual'} for p in result.get('documents',[])[:10]]
+            places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x']),'provider':'kakao','station_id':str(p['id']),'selection_source':'manual'} for p in result.get('documents',[])[:10]]
+            if not places:
+                async with session.get('https://dapi.kakao.com/v2/local/search/address.json',params={'query':query,'size':10},headers=headers) as response:
+                    # Address lookup is best-effort: a keyword miss must stay an empty result, not an error.
+                    if response.status==200:places=address_places((await response.json()).get('documents',[]))
         if len(m.search_cache)>=100:m.search_cache.clear();m.stations.cache.clear()
         m.search_cache[query]=(now,places);connection.send_result(msg['id'],places)
     except Exception:connection.send_error(msg['id'],'provider_error','장소 검색에 실패했어요. 잠시 후 다시 시도해 주세요.')
