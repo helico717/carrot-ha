@@ -7,7 +7,7 @@
 - 문서: `docs/VEHICLE_3D_MODEL.md`에 충전 표시 절을 추가했다.
 - 관련 파일: `tools/vehicle3d/{charge-scene.js,viewer.src.js}`, `custom_components/carrot_ha/frontend/{carrot-vehicle-3d.js,carrot-debug-3d.js,carrot-assets/vehicle-3d.js}`, `tests/{vehicle-3d-integration.test.mjs,debug-3d.test.mjs}`, `docs/VEHICLE_3D_MODEL.md`.
 - 검증: JS 테스트 102개 중 100개 통과, 실패 2건(`motion-status`, `range-c3-and-fixes`)은 변경 전부터 실패한다. Chromium에서 디버그 대시보드의 `전체 순회 재생`이 34개 시나리오를 **통과 34 / 실패 0**으로 마쳤다(충전 13개 포함: 완속 7·11kW는 스윕 4.4초, 급속 50kW와 표시 전력 95kW는 2.2초). 실제 한국어 카드(`legacy_id4` 설정)에서 주차 → 완속 충전 → 급속 충전 → 충전+문 열림 → 종료를 확인했다(시점 `front`/`charge`, 스윕 주기, 램프 0/1).
-- 배포 상태: 커밋 전. 푸시·HA 반영 결과는 배포 기록에 남긴다.
+- 배포 상태: `354457c`를 main에 푸시한 뒤 HA SSH(`sudo`)로 프론트엔드 파일 3개(`carrot-vehicle-3d.js`, `carrot-debug-3d.js`, `carrot-assets/vehicle-3d.js`)를 직접 반영했다. 반영 전 설치 파일이 직전 커밋과 동일함을 해시로 확인했고, 반영 후 3개 모두 커밋과 SHA-256이 일치한다. HA에서 세 경로와 모델이 200이며 `/api/carrot_ha/frontend-version`이 `0.9.0-beta.1-232978018ccf`로 바뀌어 브라우저가 새 파일을 받는다. 반영 전 파일은 `/homeassistant/carrot_ha/deployment-backups/vehicle-3d-charging-354457c/before`에 백업했다. 모델 파일은 바뀌지 않았고 HA 재시작은 필요 없다. 새 pre-release/정식 릴리즈 없음.
 - 미확인: 실제 HA 화면·모바일·저사양 기기에서의 렌더링 성능(충전 중에는 스윕 때문에 화면이 보이는 동안 계속 그린다), 실차에서 충전 신호(`charging`, `charge_power_kw`)가 이 대시보드 값으로 들어오는 경로, 충전구·팩·충전기의 실제 형상과의 차이(일반적인 형태로 만든 추정치).
 
 ## 2026-10-26 — 3D 차량 스와이프 스크롤 차단 제품 반영·HA 배포 완료
