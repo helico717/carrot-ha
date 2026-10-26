@@ -86,12 +86,12 @@ class FactsTests(unittest.TestCase):
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
     async def test_ev_nearest_and_no_station_tariff(self):
         station=Stations(types.SimpleNamespace())
-        async def cached(*args,**kw):return {'documents':[{'id':'far','place_name':'Far','x':'127','y':'37.51','distance':'1000'},{'id':'near','place_name':'Near','x':'127','y':'37.5','distance':'10'}]}
+        async def cached(*args,**kw):return {'documents':[{'category_name':'교통 > 전기차 충전소','id':'far','place_name':'Far','x':'127','y':'37.51','distance':'1000'},{'category_name':'교통 > 전기차 충전소','id':'near','place_name':'Near','x':'127','y':'37.5','distance':'10'}]}
         station.cached=cached;r=await station.nearby('charging',37.5,127);self.assertEqual(r['selected']['location']['station_id'],'near');self.assertIsNone(r['selected']['unit_price_krw']);self.assertEqual(r['selected']['price_basis'],'existing_ev_tariff')
 
     async def test_duplicate_coordinates_do_not_pick_first_station(self):
         station=Stations(types.SimpleNamespace())
-        async def cached(*args,**kw):return {'documents':[{'id':key,'place_name':key,'x':'127','y':'37.5'} for key in ['A','B']]}
+        async def cached(*args,**kw):return {'documents':[{'category_name':'교통 > 전기차 충전소','id':key,'place_name':key,'x':'127','y':'37.5'} for key in ['A','B']]}
         station.cached=cached
         result=await station.nearby('charging',37.5,127)
         self.assertIsNone(result['selected']);self.assertEqual(len(result['candidates']),2)
@@ -99,7 +99,7 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_remote_station_is_not_selected(self):
         station=Stations(types.SimpleNamespace())
-        async def cached(*args,**kw):return {'documents':[{'id':'A','place_name':'A','x':'127','y':'37.51'}]}
+        async def cached(*args,**kw):return {'documents':[{'category_name':'교통 > 전기차 충전소','id':'A','place_name':'A','x':'127','y':'37.51'}]}
         station.cached=cached
         result=await station.nearby('charging',37.5,127)
         self.assertIsNone(result['selected'])
