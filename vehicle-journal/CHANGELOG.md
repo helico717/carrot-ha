@@ -1,3 +1,16 @@
+## 2026-10-26 — vehicle-journal: 충전소 자동 위치가 잘린 카카오 응답으로 실패하던 문제 수정
+
+- 사용자 보고: 2026-10-26 충전 기록(티스테이션 의왕시청점)의 위치가 자동으로 기록되지 않았다. 같은 장소의 10-19·10-21 충전은 자동 기록됐고, 수동 검색에서도 `티스테이션 의왕시청점 전기차충전소`가 나온다.
+- 원인(HA 운영 DB 읽기 전용 조회): 충전 시작 GPS는 정상(정차 중, 정확도 약 2m, `charge_start_fresh_stationary_gps`)이었다. 조회 결과 메시지가 `Unterminated string starting at: line 1 column 2839 (char 2838)`이었다. `stations.py`가 `response.content.read(1048577)`로 본문을 읽었는데, aiohttp `StreamReader.read(n)`은 전체가 아니라 **이미 도착한 첫 조각**만 반환할 수 있다. 충전소 15개 응답이 여러 네트워크 조각으로 오면 앞부분만 해석해 JSON 오류가 났다. `JSONDecodeError`는 `ValueError`라 그대로 사용자 메시지로 저장됐고 정상 판정과 똑같이 24시간 재시도 대기가 됐다. 수동 검색(`api.py`)은 `response.json()`으로 전체를 읽어 영향이 없었다. 응답이 한 번에 오면 성공해 간헐적으로만 발생했다.
+- 변경:
+  - 새 `custom_components/carrot_ha/http_body.py`의 `read_limited`: 응답을 EOF까지 조각별로 읽고 1MB 제한을 유지한다.
+  - `stations.py`: 일시적 제공사·통신 실패용 `ProviderError(ValueError)`를 추가했다. HTTP 비정상·크기 초과·해석 실패·연결 오류에 사용하고, 해석 실패는 한국어 메시지(`제공사 응답을 끝까지 확인하지 못했어요. 잠시 뒤 다시 조회할게요.`)로 바꿨다. 키 미설정·좌표 오류 등은 기존 `ValueError`를 유지한다.
+  - `automatic_locations.py`: `ProviderError`는 조회 결과가 아닌 일시 실패로 기록한다(`failures` 횟수). 15분부터 두 배씩 최대 24시간까지 재시도한다. 정상 판정(GPS 없음·후보 없음·모호함)은 기존 24시간을 유지한다. `LOOKUP_VERSION`을 3→4로 올려 이 버그로 24시간 대기 중인 기록과 위치 없는 자동 충전 기록을 한 번 다시 조회한다(실행당 최대 3건, 이미 위치가 있거나 사용자가 지정한 기록은 제외).
+- 관련 파일: `custom_components/carrot_ha/http_body.py`(신규), `custom_components/carrot_ha/vehicle_journal/{stations.py,automatic_locations.py}`, `vehicle-journal/tests/test_automatic_locations.py`. 같은 읽기 방식의 주행 로그 AI 응답도 함께 수정(`driving-logs/CHANGELOG.md`).
+- 검증: 실제 aiohttp 서버로 2838바이트 단위로 나눠 보낸 응답에서 기존 방식은 3110바이트 중 2838바이트만 읽고 `Unterminated string` 오류를 재현했다. 새 방식은 전체를 읽고 제한 초과 시 `None`을 반환했다. 신규 회귀 테스트 4건(조각 응답 전체 읽기, 잘린·초과·HTTP 오류의 `ProviderError`, 15분→30분 재시도 후 성공 저장, 이전 버전 24시간 대기 기록 재조회) 통과. `vehicle-journal/tests` 전체에서 Windows 환경 오류 29건(임시 DB 파일 정리·인코딩 등)은 변경 전 HEAD와 동일한 목록이며 새 실패 없음.
+- 배포 상태: 커밋·푸시 후 HA 직접 반영 예정. Python 변경이라 사용자 HA 재시작이 필요하다. 재시작 후 10-26 기록의 자동 재조회와 실차 신규 충전 확인은 미확인. 버전·태그·릴리즈 없음.
+- 제한: 키워드 검색 결과의 거리·모호함 판정 기준은 바꾸지 않았다. 카카오 장애가 길면 최대 24시간 간격으로 재시도한다.
+
 ## 2026-10-26 — vehicle-journal: 상세 기록 단가 표시 HA 직접 반영
 
 - 커밋 `102be6e`. 사용자가 표시안을 확인하고 "일단 이렇게" 반영을 요청했다.

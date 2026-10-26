@@ -1,3 +1,11 @@
+## 2026-10-26 — 주행 로그 AI·수신기 설정 응답의 부분 읽기 수정
+
+- 이유: 차계부 충전소 자동 위치 실패 조사에서 aiohttp `response.content.read(n)`이 첫 네트워크 조각만 반환해 JSON이 잘리는 문제를 확인했다. `driving_logs/ai.py`의 Gemini 응답(256KB 제한)과 수신기 `/api/settings` 응답(2MB 제한)도 같은 방식이라 큰 응답이 간헐적으로 `provider_connection` 오류나 빈 설정이 될 수 있었다.
+- 변경: `ai.py`에 `read_limited`를 두어 EOF까지 조각별로 읽고 기존 크기 제한과 오류 코드를 유지한다. 주행 로그 패키지는 상위 패키지 import 없이 독립 로드되므로(테스트도 이 방식) 같은 6줄 도우미를 패키지 안에 둔다.
+- 관련 파일: `custom_components/carrot_ha/driving_logs/ai.py`.
+- 검증: aiohttp 3.14 환경에서 `tests.test_driving_logs_local` 7건 통과, `tests.test_driving_logs_ai` 8건 중 7건 통과(실패 1건은 로컬 numpy 미설치로 인한 cereal 하위 프로세스 검사로 이번 변경과 무관). 도우미 단독 검사(조각 결합·초과 시 `None`) 통과. 실제 Gemini 호출은 미확인.
+- 배포 상태: 차계부 수정과 같은 커밋으로 HA 직접 반영 예정, 사용자 HA 재시작 필요. 버전·태그·릴리즈 없음.
+
 ## 2026-10-19 — 마지막 주행 무료 자동 분석·추천 및 기존 메뉴 통합 구현 완료
 
 - 사용자 명시: 마지막 주행 전체를 원본처럼 무료 분석하고 파라미터 변경 후보까지 제안해야 한다. Gemini는 사용자가 버튼으로 시작한다. 별도 구간 선택 화면 대신 기존 주행 썸네일/세그먼트의 점3개 메뉴와 목록 체크박스를 사용하고 “이 구간을 분석하시겠습니까?” 확인을 거친다. 새로 추가되는 버튼·탭·뱃지·진행률 바는 기존 당근웹 로그 디자인 시스템(`smallBtn`, `btn--filled`, `c-segmented-control`, `chip`, `app-progress__track`)과 100% 동일한 스타일을 사용한다.

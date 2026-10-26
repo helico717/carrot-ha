@@ -149,8 +149,8 @@ assert.ok(source.includes('id="effectiveIntakeVal"'));
 assert.ok(source.includes('id="inspectCharger"'));
 assert.ok(source.includes('id="inspectEffective"'));
 assert.ok(source.includes('id="inspectEmergency"'));
-assert.ok(source.includes('id="btnModelSmooth"'));
-assert.ok(source.includes('id="btnToggleNoise"'));
-assert.ok(source.includes('BMS 전력 변동 시뮬레이션'));
+// The calculation-model / BMS noise test panel was removed from the debug dashboard (2026-10-26).
+assert.ok(!source.includes('id="btnModelSmooth"'));
+assert.ok(!source.includes('id="btnToggleNoise"'));
 
 console.log('All charging curve, EVSE presets, and Option D smoothing tests passed successfully!');

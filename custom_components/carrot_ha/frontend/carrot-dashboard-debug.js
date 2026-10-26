@@ -382,6 +382,24 @@ export function debugDisplay(raw, now = Date.now(), lastGood = null) {
   return values;
 }
 
+// Feature picker of the control panel: [section id, label]. 'always' groups stay visible.
+export const DEBUG_SECTIONS = [
+  ['all', '전체 보기'],
+  ['3d', '3D 차량 (문·주행·오픈파일럿·충전 장면)'],
+  ['doors', '잠금·도어·UI 후보'],
+  ['battery', '배터리 잔량 (SOC)'],
+  ['charger', '충전기·충전 계산'],
+  ['display', '테마·언어'],
+];
+const DEBUG_SECTION_KEY = 'carrot-debug-section';
+function storedDebugSection() {
+  try {
+    const saved = localStorage.getItem(DEBUG_SECTION_KEY);
+    if (DEBUG_SECTIONS.some(([id]) => id === saved)) return saved;
+  } catch {}
+  return 'all';
+}
+
 export default class CarrotDebugDashboard extends HTMLElement {
   constructor() {
     super();
@@ -405,6 +423,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         rear_passenger: false, // 조수석 뒤 도어
         trunk: false           // 트렁크
       },
+      debugSection: storedDebugSection(), // control group shown in the panel (DEBUG_SECTIONS)
       cameraMode: 'auto',      // 'auto' (real if entities exist, fallback mock) | 'real' | 'mock'
       simStreamStatus: 'ok',   // 'ok' | 'front_only' | 'rear_only' | 'both_wait' | 'sync_drift' | 'dropped'
       selectedCameraDevice: '',
@@ -676,6 +695,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const sim=this.sim3d;
     if(sim){
       v.light_low_beam_requested=sim.lowBeam;
+      // Same value the integration's binary_sensor.<vehicle>_enabled reports (openpilot engaged).
+      v.enabled=!!sim.openpilot;
       v.field_measured_at.light_low_beam_requested=new Date(now-(sim.expired?181000:0)).toISOString();
       this.dashCard.config.vehicle_3d=sim.enabled;
       const model=sim.missing?'/carrot_ha_models/debug-missing.glb':this.config?.vehicle_3d_model;
@@ -879,10 +900,122 @@ export default class CarrotDebugDashboard extends HTMLElement {
       <style>
         :host {
           display: block;
-          max-width: 1440px;
+          container-type: inline-size;
+          container-name: carrot-debug;
+          max-width: 1760px;
           margin: 0 auto;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           color: #f1f5f9;
+        }
+
+        /* Feature picker: only the chosen group (plus 'always') is shown. */
+        .section-picker {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 12px;
+          font-weight: 700;
+          color: #9ca3af;
+        }
+        .section-picker select {
+          flex: 1;
+          min-width: 0;
+          padding: 7px 10px;
+          border-radius: 10px;
+          border: 1px solid #374151;
+          background: #1f2937;
+          color: #f3f4f6;
+          font-size: 13px;
+          font-weight: 700;
+        }
+        :host([data-theme="light"]) .section-picker select {
+          background: #ffffff;
+          color: #0f172a;
+          border-color: #cbd5e1;
+        }
+        .debug-panel[data-show="3d"] [data-section]:not([data-section="always"]):not([data-section="3d"]),
+        .debug-panel[data-show="doors"] [data-section]:not([data-section="always"]):not([data-section="doors"]),
+        .debug-panel[data-show="battery"] [data-section]:not([data-section="always"]):not([data-section="battery"]),
+        .debug-panel[data-show="charger"] [data-section]:not([data-section="always"]):not([data-section="charger"]),
+        .debug-panel[data-show="display"] [data-section]:not([data-section="always"]):not([data-section="display"]) {
+          display: none !important;
+        }
+
+        /* Compact panel: denser cards and buttons. */
+        .debug-container .debug-panel {
+          padding: 14px;
+          gap: 10px;
+        }
+        .debug-panel .controls-grid {
+          gap: 10px;
+        }
+        .debug-panel .control-group {
+          padding: 10px 12px;
+          gap: 7px;
+          border-radius: 12px;
+        }
+        .debug-panel .btn-group {
+          gap: 4px;
+        }
+        .debug-panel .btn-group button {
+          padding: 5px 7px;
+          border-radius: 8px;
+          font-size: 11.5px;
+          min-width: 0;
+        }
+        .debug-panel .btn-group button small {
+          font-size: 9.5px;
+          margin-top: 1px;
+          white-space: normal;
+          word-break: keep-all;
+        }
+        /* Buttons with a caption (UI candidates, chargers) need room for it. */
+        .debug-panel .btn-group button:has(small) {
+          min-width: 96px;
+        }
+        .debug-panel .panel-header {
+          padding-bottom: 8px;
+        }
+        .debug-panel .panel-header h3 {
+          font-size: 14px;
+        }
+        /* 3D scenarios: a 3-column grid of short buttons instead of a long wrapped row. */
+        #sim3d .btn-group:has([data-scenario]) {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+        }
+        /* Seven state buttons: a 4-column grid so labels do not wrap letter by letter. */
+        .debug-panel [data-section="always"] .btn-group:has([data-mode]) {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .debug-panel [data-mode] {
+          word-break: keep-all;
+        }
+        #sim3d button[data-sim] {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+        #sim3d [data-scenario] {
+          font-size: 11px;
+          line-height: 1.25;
+        }
+        #sim3d label {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          font-size: 11.5px;
+        }
+        #sim3d #simResults {
+          max-height: 160px;
+          overflow-y: auto;
+          margin: 4px 0 0;
+          padding-left: 18px;
+          font-size: 11px;
+        }
+        #sim3d #simProgress {
+          margin: 2px 0;
+          font-size: 11px;
         }
 
         .debug-container {
@@ -890,6 +1023,31 @@ export default class CarrotDebugDashboard extends HTMLElement {
           flex-direction: column;
           gap: 16px;
           padding: 8px;
+        }
+
+        /* Desktop: dashboard and controls side by side, the dashboard stays in view while the
+           controls scroll. Only when the dashboard still gets its desktop width (820px+). */
+        @container carrot-debug (min-width: 1300px) {
+          .debug-container {
+            display: grid;
+            grid-template-columns: minmax(840px, 1fr) minmax(400px, 500px);
+            align-items: start;
+          }
+          .debug-container > .preview-pane {
+            position: sticky;
+            top: calc(var(--header-height, 56px) + 12px);
+            max-height: calc(100vh - var(--header-height, 56px) - 24px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-top: 30px;
+          }
+          /* The pane scrolls here, so the badge sits inside it instead of on the border. */
+          .debug-container > .preview-pane > .pane-badge {
+            top: 6px;
+          }
+          .debug-panel .controls-grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
         }
 
         /* Top embedded dashboard card area */
@@ -1241,7 +1399,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
         </div>
 
         <!-- Bottom: Interactive Developer Control Panel -->
-        <div class="debug-panel">
+        <div class="debug-panel" data-show="${this.state.debugSection}">
           <div class="panel-header">
             <h3>
               <span>🛠️</span> Carrot HA 실시간 디버거 (Live Debugger)
@@ -1249,11 +1407,17 @@ export default class CarrotDebugDashboard extends HTMLElement {
             </h3>
             <button id="btnReset" class="reset-btn">기본값 리셋</button>
           </div>
+          <label class="section-picker">
+            <span>테스트할 기능</span>
+            <select id="debugSection" aria-label="테스트할 기능">
+              ${DEBUG_SECTIONS.map(([id,label])=>`<option value="${id}"${this.state.debugSection===id?' selected':''}>${label}</option>`).join('')}
+            </select>
+          </label>
 
           <div class="controls-grid">
 
             <!-- Group 1: 차량 운행/충전 모드 -->
-            <div class="control-group">
+            <div class="control-group" data-section="always">
               <div class="group-label">
                 <span>차량 동작 모드</span>
               </div>
@@ -1269,7 +1433,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ${simulatorMarkup()}
 
             <!-- Group Lock & Candidate: 차량 잠금 상태 & UI 디자인 후보 5종 -->
-            <div class="control-group">
+            <div class="control-group" data-section="doors">
               <div class="group-label">
                 <span>차량 잠금 상태 & UI 디자인 후보 (5종)</span>
                 <span class="value" id="lockStatusVal">${this.state.doors_locked !== false ? '🔒 잠김 (정상)' : '🔓 열림 (경고)'}</span>
@@ -1343,7 +1507,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             </div>
 
             <!-- Group 2: 배터리 SOC 잔량 슬라이더 -->
-            <div class="control-group">
+            <div class="control-group" data-section="battery">
               <div class="group-label">
                 <span>배터리 잔량 (SOC)</span>
                 <span id="socVal" class="value">${this.state.soc}%</span>
@@ -1364,7 +1528,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
             </div>
 
             <!-- Group 3: 충전기 사양 선택 (EVSE Presets) & 충전 전력 -->
-            <div class="control-group">
+            <div class="control-group" data-section="charger">
               <div class="group-label">
                 <span>충전기 사양 (EVSE Spec)</span>
                 <span id="powerVal" class="value">${this.state.powerKw.toFixed(1)} kW</span>
@@ -1407,34 +1571,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
-            <!-- Group 4: 충전 시간 계산 모델 & 스무딩 체감 테스트 -->
-            <div class="control-group">
-              <div class="group-label">
-                <span>충전 시간 계산 모델 & 스무딩 (체감 테스트)</span>
-                <span id="calcModelVal" class="value">${this.state.calcModel === 'simple' ? '단순 선형' : this.state.calcModel === 'curve' ? 'ID.4 커브 (원시값)' : 'ID.4 커브 + 스무딩 (방안 D)'}</span>
-              </div>
-              <div class="btn-group">
-                <button id="btnModelSmooth" class="${this.state.calcModel === 'smooth' || !this.state.calcModel ? 'active charge' : ''}">⚡ ID.4 커브 + 스무딩 (추천)</button>
-                <button id="btnModelCurve" class="${this.state.calcModel === 'curve' ? 'active charge' : ''}">⚡ ID.4 커브 (원시값: 널뛰기)</button>
-                <button id="btnModelSimple" class="${this.state.calcModel === 'simple' ? 'active' : ''}">📏 기존 단순 선형</button>
-              </div>
-
-              <!-- BMS 전력 변동(노이즈) 시뮬레이션 토글 -->
-              <div style="margin-top: 8px;">
-                <button id="btnToggleNoise" class="${this.state.noiseEnabled ? 'active charge' : ''}" style="width: 100%; padding: 8px 12px; font-size: 11.5px; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                  ${this.state.noiseEnabled ? '🌊 BMS 전력 변동 시뮬레이션: ON (널뛰기 발생 중)' : '🌊 BMS 전력 변동 시뮬레이션: OFF'}
-                </button>
-              </div>
-
-              <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;">
-                • <b>ID.4 커브 + 스무딩 (방안 D)</b>: 1단계 전력 EMA(α=0.25) + 2단계 커브 적분 + 3단계 ETA 슬루율(최대 ±3분 클램핑 & 2분 데드밴드)을 적용하여 1~2시간 널뛰기를 완벽히 방지합니다.<br>
-                • <b>ID.4 커브 (원시값)</b>: 매 순간 측정값으로 즉시 계산합니다. 전력 노이즈 ON 시 소요시간이 1~2시간씩 널뛰는 현상을 직접 확인할 수 있습니다.<br>
-                • <b>🌊 전력 변동 시뮬레이션</b>: 실제 BMS 샘플링 오차(완속 ±1.6kW / 급속 ±15%)를 실시간으로 발생시켜 두 모델 간의 안정성 차이를 체감합니다.
-              </div>
-            </div>
-
             <!-- Group 5: 테마 & 언어 -->
-            <div class="control-group">
+            <div class="control-group" data-section="display">
               <div class="group-label">
                 <span>디스플레이 환경</span>
               </div>
@@ -1447,57 +1585,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
-            <!-- Group Camera: 360° 카메라 모니터링 실기기 & 시뮬레이터 제어 -->
-            <div class="control-group">
-              <div class="group-label">
-                <span>📹 360° 카메라 모니터링 (실기기 & 시뮬레이터)</span>
-                <span class="value" id="cameraModeVal">${this.getEffectiveCameraMode() === 'real' ? '🚗 실기기 연결 모드' : '🧪 모의 시뮬레이션 모드'}</span>
-              </div>
-              <div class="btn-group" style="margin-bottom: 8px;">
-                <button id="btnCamModeReal" class="${this.getEffectiveCameraMode() === 'real' ? 'active charge' : ''}">🚗 실기기 카메라 (기본 / HA 연결)</button>
-                <button id="btnCamModeMock" class="${this.getEffectiveCameraMode() !== 'real' ? 'active' : ''}">🧪 모의 시뮬레이션 (테스트)</button>
-              </div>
-
-              <!-- 모의 모드 시뮬레이션 시나리오 프리셋 -->
-              <div id="camMockScenarios" style="${this.getEffectiveCameraMode() === 'real' ? 'display:none;' : ''}">
-                <div class="charger-section-title">🧪 모의 스트림 상태 & 장애 시뮬레이션</div>
-                <div class="btn-group" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(110px, 1fr));gap:6px;margin-bottom:6px;">
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'ok' || !this.state.simStreamStatus ? 'active' : ''}" data-cam-preset="ok">✓ 정상 (Both OK)</button>
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'front_only' ? 'active' : ''}" data-cam-preset="front_only">⚠️ 전방만 (실내 대기)</button>
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'rear_only' ? 'active' : ''}" data-cam-preset="rear_only">⚠️ 실내만 (전방 대기)</button>
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'both_wait' ? 'active' : ''}" data-cam-preset="both_wait">⏳ 프레임 지연</button>
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'sync_drift' ? 'active' : ''}" data-cam-preset="sync_drift">⏱️ 동기화 편차 (+1.2s)</button>
-                  <button class="cam-preset-btn ${this.state.simStreamStatus === 'dropped' ? 'active' : ''}" data-cam-preset="dropped">❌ 스트림 단절</button>
-                </div>
-                <div class="text-[11px]" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:4px;">
-                  • <b>모의 모드</b>: 실제 차량 네트워크 요청 및 Comma 하드웨어 구동 없이 WebGL 투영, 방향 회전, 동기화 편차, 상태 전환을 100% 안전하게 검증합니다.
-                </div>
-              </div>
-
-              <!-- 실기기 시험 모드 기기 선택 및 상태 -->
-              <div id="camRealDevicePanel" style="${this.getEffectiveCameraMode() === 'real' ? '' : 'display:none;'}">
-                <div class="charger-section-title">🚗 Home Assistant 연결 기기 및 카메라 상태</div>
-                <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">
-                  * 브라우저 인증 세션을 통해 Home Assistant 카메라 엔터티(wide/driver)의 HLS 스트림을 수신합니다.
-                </div>
-                <div class="preset-dropdown-row">
-                  <span class="preset-label">장치 선택</span>
-                  <select id="camDeviceSelect" class="preset-select" aria-label="카메라 장치 선택">
-                    ${this.renderDeviceSelectOptions()}
-                  </select>
-                </div>
-                <!-- 실시간 감지된 카메라 엔터티 상태 리스트 -->
-                <div id="camEntitiesStatusBox" style="margin-top:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
-                  ${this.renderCameraEntitiesStatusHtml()}
-                </div>
-                <div class="sub-note" style="color:#9ca3af;font-size:11px;line-height:1.4;margin-top:6px;background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">
-                  🔒 <b>보안 및 주행 안전 규칙</b>: 실기기 시험 시 Comma 장치와 서버가 최신 실제 Offroad 및 주차/충전 상태를 재검증합니다. 주행 중에는 카메라 연결이 즉시 차단됩니다.
-                </div>
-              </div>
-            </div>
-
             <!-- Live Inspector Box -->
-            <div class="inspector-box">
+            <div class="inspector-box" data-section="charger">
               <div class="inspect-item">
                 <span>80% 도달 소요시간</span>
                 <strong id="inspect80">—</strong>
@@ -5078,6 +5167,13 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
   bindEvents() {
     const root = this.shadowRoot;
+
+    // Only the chosen feature's controls are shown, so they fit next to the dashboard.
+    root.querySelector('#debugSection')?.addEventListener('change', e => {
+      this.state.debugSection = e.target.value;
+      root.querySelector('.debug-panel')?.setAttribute('data-show', e.target.value);
+      try { localStorage.setItem(DEBUG_SECTION_KEY, e.target.value); } catch {}
+    });
 
     // Use the exact same state list as the upper-right badge.
     const updateModeBtns = () => {

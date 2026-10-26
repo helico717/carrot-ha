@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {SCENARIOS,DOORS} from '../custom_components/carrot_ha/frontend/carrot-debug-3d.js';
+import {SCENARIOS,DOORS,LANE_ON,LANE_OFF,simulatorMarkup} from '../custom_components/carrot_ha/frontend/carrot-debug-3d.js';
 import {vehicleViewState} from '../custom_components/carrot_ha/frontend/carrot-vehicle-3d.js';
-test('all 34 scenarios have unique identifiers and explicit expected views',()=>{
- assert.equal(SCENARIOS.length,34);assert.equal(new Set(SCENARIOS.map(s=>s.id)).size,34);
- const expected=['front',...Array(6).fill('top'),...Array(4).fill('drive'),'front',...Array(10).fill('charge'),'front','front','drive','drive',...Array(3).fill('top'),'front','fallback','fallback','front','front'];
+test('all 37 scenarios have unique identifiers and explicit expected views',()=>{
+ assert.equal(SCENARIOS.length,37);assert.equal(new Set(SCENARIOS.map(s=>s.id)).size,37);
+ const expected=['front',...Array(6).fill('top'),...Array(7).fill('drive'),'front',...Array(10).fill('charge'),'front','front','drive','drive',...Array(3).fill('top'),'front','fallback','fallback','front','front'];
  assert.deepEqual(SCENARIOS.map(s=>s.expected),expected);
 });
 test('scenario inputs use production vehicleViewState with driving, then charging, precedence',()=>{
@@ -39,4 +39,28 @@ test('debug preserves inherited render and synchronizes the embed shadowRoot thr
  assert.match(ko,/this\.syncVehicle3d\(v,state\)/);
  assert.match(ko,/m\.syncVehicle3d\(this,/);
  assert.match(debug,/simulatorMarkup\(\)/);assert.match(debug,/installSimulator\(this\)/);
+});
+
+test('openpilot scenarios check lane colour and doors drawn closed while driving',()=>{
+ const by=id=>SCENARIOS.find(s=>s.id===id);
+ assert.deepEqual([by('drive-op').patch.openpilot,by('drive-op').expect.lanes],[true,'on']);
+ assert.deepEqual([by('drive-op-off').patch.openpilot,by('drive-op-off').expect.lanes],[false,'off']);
+ assert.equal(by('drive-op-doors').expect.doors,'closed');
+ assert.equal(by('start').expect.doors,'closed');
+ assert.equal(by('stop').expect.doors,'open');
+ const viewer=fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js',import.meta.url),'utf8');
+ assert.ok(viewer.includes(`LANE_ON = new THREE.Color(0x${LANE_ON.slice(1)})`),'debug lane colours match the viewer');
+ assert.ok(viewer.includes(`LANE_OFF = new THREE.Color(0x${LANE_OFF.slice(1)})`));
+ const debug=fs.readFileSync(new URL('../custom_components/carrot_ha/frontend/carrot-dashboard-debug.js',import.meta.url),'utf8');
+ assert.ok(debug.includes('v.enabled=!!sim.openpilot;'));
+});
+
+test('debug panel: removed test panels, feature picker and desktop side-by-side layout',()=>{
+ const debug=fs.readFileSync(new URL('../custom_components/carrot_ha/frontend/carrot-dashboard-debug.js',import.meta.url),'utf8');
+ assert.ok(!debug.includes('<!-- Group Camera:'),'360 camera panel removed');
+ assert.ok(!debug.includes('<!-- Group 4: 충전 시간'),'charging model panel removed');
+ for(const id of ['3d','doors','battery','charger','display'])assert.match(debug,new RegExp(`data-section="${id}"`));
+ assert.match(simulatorMarkup(),/id="sim3d" data-section="3d"/);
+ assert.ok(debug.includes('@container carrot-debug (min-width: 1300px)'));
+ assert.ok(/\.debug-container > \.preview-pane \{\s+position: sticky;/.test(debug));
 });

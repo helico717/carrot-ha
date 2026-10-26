@@ -537,7 +537,7 @@ for (const m of mats.tail) {
     const laneTarget = state.openpilot ? LANE_ON : LANE_OFF;
     if (!dashMat.color.equals(laneTarget)) {
       dashMat.color.lerp(laneTarget, 1 - Math.exp(-dt * 6));
-      if (Math.abs(dashMat.color.r - laneTarget.r) + Math.abs(dashMat.color.g - laneTarget.g) + Math.abs(dashMat.color.b - laneTarget.b) < 0.004) dashMat.color.copy(laneTarget);
+      if (Math.abs(dashMat.color.r - laneTarget.r) + Math.abs(dashMat.color.g - laneTarget.g) + Math.abs(dashMat.color.b - laneTarget.b) < 0.0005) dashMat.color.copy(laneTarget);
       else busy = true;
     }
     road.visible = roadLevel > 0.01;
@@ -688,6 +688,8 @@ for (const m of mats.tail) {
     // Read-only status used by the debug simulator's checks.
     get lamp() { return lampLevel; },
     get charge() { return {active: chargeScene.active, period: chargeScene.period}; },
+    get laneColor() { return '#' + dashMat.color.getHexString(); },
+    get doorsOpen() { return Math.max(0, ...Object.values(clips).map((c) => c.value)); },
     get settled() { return settled; },
     dispose() {
       disposed = true;

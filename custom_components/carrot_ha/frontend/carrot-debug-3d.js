@@ -1,4 +1,8 @@
 // Debug-only synthetic scenarios; rendering and state mapping belong to the production viewer.
+// Lane colours of the production viewer (tools/vehicle3d/viewer.src.js LANE_ON / LANE_OFF).
+export const LANE_ON = '#1fff5e', LANE_OFF = '#9aa3a8';
+// Within 3/255 per channel: the colour fades in linear space, the hex is rounded sRGB.
+const sameColor = (a, b) => [1,3,5].every(i => Math.abs(parseInt(a.slice(i,i+2),16) - parseInt(b.slice(i,i+2),16)) <= 3);
 export const DOORS = ['driver','passenger','rear_driver','rear_passenger','trunk'];
 const item = (id, label, expected, patch = {}, expect = {}) => ({id,label,expected,patch,expect,waitMs:1800});
 const ALL_OPEN = Object.fromEntries(DOORS.map(k=>[k,true]));
@@ -8,6 +12,10 @@ export const SCENARIOS = [
   item('all','전부 열림','top',{doors:Object.fromEntries(DOORS.map(k=>[k,true]))}),
   ...[0,60,120].map(speed=>item('drive'+speed,`주행 ${speed} km/h`,'drive',{mode:'driving',speed})),
   item('drive-lights','주행 + 하향등','drive',{mode:'driving',speed:60,lowBeam:true}),
+  // openpilot (binary_sensor.<vehicle>_enabled): green lanes while engaged, grey otherwise.
+  item('drive-op','주행 + 오픈파일럿 작동','drive',{mode:'driving',speed:80,openpilot:true},{lanes:'on'}),
+  item('drive-op-off','주행 · 오픈파일럿 꺼짐','drive',{mode:'driving',speed:80,openpilot:false},{lanes:'off'}),
+  item('drive-op-doors','주행 + 오픈파일럿 + 문·트렁크 열림 값','drive',{mode:'driving',speed:60,openpilot:true,doors:ALL_OPEN},{lanes:'on',doors:'closed'}),
   item('night','주차 + 하향등 · 야간','front',{lowBeam:true,theme:'dark'}),
   item('charge-door','충전 + 문 열림','charge',{mode:'charging',doors:{driver:true}},{charging:true,lamp:1}),
   item('charge-ac7','충전 · 완속 7kW','charge',{mode:'charging',powerKw:7,soc:62},{charging:true,lamp:1,sweep:'slow'}),
@@ -22,8 +30,8 @@ export const SCENARIOS = [
   item('charge-end','충전 종료 → 하향등 원래대로 (꺼짐)','front',{mode:'parked',lowBeam:false},{charging:false,lamp:0}),
   item('charge-end-real','충전 종료 → 실제 하향등 유지 (켜짐)','front',{mode:'parked',lowBeam:true},{charging:false,lamp:1}),
   item('charge-to-drive','충전 중 주행 시작','drive',{mode:'driving',speed:60},{charging:false,lamp:0}),
-  item('start','문 열림 → 주행 시작','drive',{mode:'driving',speed:60,doors:{driver:true}}),
-  item('stop','문 열림 → 주행 종료','top',{doors:{driver:true}}),
+  item('start','문 열림 → 주행 시작 (닫혀 보임)','drive',{mode:'driving',speed:60,doors:{driver:true}},{doors:'closed'}),
+  item('stop','문 열림 → 주행 종료 (다시 열림)','top',{doors:{driver:true}},{doors:'open'}),
   item('stale','데이터 지연 · 문 유지','top',{mode:'stale',doors:{driver:true},retain:true}),
   item('offline','통신 지연 · 문 유지','top',{mode:'offline',doors:{driver:true},retain:true}),
   item('expired','하향등 181초 만료','front',{lowBeam:true,expired:true}),
@@ -32,10 +40,10 @@ export const SCENARIOS = [
   item('dark','다크','front',{theme:'dark'}),item('light','라이트','front',{theme:'light'})
 ];
 export function simulatorMarkup() {
-  return `<div class="control-group" id="sim3d"><div class="group-label">3D 차량 시뮬레이터</div>
+  return `<div class="control-group" id="sim3d" data-section="3d"><div class="group-label">3D 차량 시뮬레이터</div>
   <div class="btn-group"><button data-sim="open">전부 열기</button><button data-sim="close">전부 닫기</button>
   <label><input type="checkbox" id="simBeam">하향등</label><label><input type="checkbox" id="simExpired">하향등 값 만료</label>
-  <label><input type="checkbox" id="simOff">3D 끄기</label><label><input type="checkbox" id="simMissing">모델 없음</label></div>
+  <label><input type="checkbox" id="simOp">오픈파일럿 작동</label><label><input type="checkbox" id="simOff">3D 끄기</label><label><input type="checkbox" id="simMissing">모델 없음</label></div>
   <label>속도 <input id="simSpeed" type="range" min="0" max="140" value="42"> <output id="simSpeedValue">42 km/h</output></label>
   <div class="btn-group"><button data-sim="reset">시점 초기화</button><label><input id="simFree" type="checkbox">자유시점</label><span id="simView">뷰어 대기</span></div>
   <div class="btn-group" style="flex-wrap:wrap">${SCENARIOS.map(s=>`<button data-scenario="${s.id}">${s.label}</button>`).join('')}</div>
@@ -43,7 +51,7 @@ export function simulatorMarkup() {
   <p id="simProgress" role="status">각 단계 1.8초 이상 · 시점 안정화 후 검증</p><details open><summary id="simSummary">검증 대기</summary><ol id="simResults"></ol></details></div>`;
 }
 export function installSimulator(host) {
-  host.sim3d ||= {speed:42,lowBeam:false,expired:false,enabled:true,missing:false};
+  host.sim3d ||= {speed:42,lowBeam:false,expired:false,enabled:true,missing:false,openpilot:false};
   const root=host.shadowRoot, sim=host.sim3d;
   const viewer=()=>host.dashCard?._v3d?.viewer;
   const update=()=>{host.applyDebugTelemetry(); refresh();};
@@ -51,19 +59,19 @@ export function installSimulator(host) {
     const put=(id,text)=>{const el=root.querySelector('#'+id);if(el)el.textContent=text;};
     put('simView',`시점: ${viewer()?.view || 'PNG / 로딩'} · ${viewer()?.settled?'안정':'전환/대기'}`);
     put('simSpeedValue',`${host.state.mode==='driving'?sim.speed:0} km/h`);
-    for(const [id,key] of [['simBeam','lowBeam'],['simExpired','expired'],['simMissing','missing']])root.querySelector('#'+id).checked=sim[key];
+    for(const [id,key] of [['simBeam','lowBeam'],['simExpired','expired'],['simMissing','missing'],['simOp','openpilot']])root.querySelector('#'+id).checked=sim[key];
     root.querySelector('#simOff').checked=!sim.enabled;
     root.querySelector('#simSpeed').value=sim.speed;
     root.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===host.state.mode));
     root.querySelectorAll('[data-door]').forEach(b=>b.classList.toggle('door-open',!!host.state.doors?.[b.dataset.door]));
   };
-  for(const [id,key] of [['simBeam','lowBeam'],['simExpired','expired'],['simMissing','missing'],['simOff','enabled']])root.querySelector('#'+id).onchange=e=>{sim[key]=id==='simOff'?!e.target.checked:e.target.checked;update();};
+  for(const [id,key] of [['simBeam','lowBeam'],['simExpired','expired'],['simMissing','missing'],['simOp','openpilot'],['simOff','enabled']])root.querySelector('#'+id).onchange=e=>{sim[key]=id==='simOff'?!e.target.checked:e.target.checked;update();};
   root.querySelector('#simSpeed').oninput=e=>{sim.speed=Number(e.target.value);if(sim.speed>0)host.state.mode='driving';update();};
   root.querySelector('#simFree').onchange=e=>viewer()?.setFreeLook(e.target.checked);
   const stop=()=>{host._simRun=(host._simRun||0)+1;};
   host.stop3dSimulation=stop;
   const apply=s=>{
-    Object.assign(sim,{speed:0,lowBeam:false,expired:false,enabled:true,missing:false},s.patch);
+    Object.assign(sim,{speed:0,lowBeam:false,expired:false,enabled:true,missing:false,openpilot:false},s.patch);
     host.state.doors={...s.patch.doors};
     host.state.powerKw=s.patch.powerKw??11;host.state.soc=s.patch.soc??74;
     host.state.mode='parked';host.applyDebugTelemetry(); // healthy snapshot for stale/offline retention
@@ -75,7 +83,9 @@ export function installSimulator(host) {
   host.apply3dScenario=id=>apply(SCENARIOS.find(s=>s.id===id));
   const pause=ms=>new Promise(r=>setTimeout(r,ms));
   const check=async(s,token)=>{
-    host.dashCard.scrollIntoView({block:'start'});
+    // Side-by-side layout keeps the card in view; only scroll when it is off screen.
+    const top=host.dashCard.getBoundingClientRect().top;
+    if(top<0||top>innerHeight*0.5)host.dashCard.scrollIntoView({block:'start'});
     const begin=performance.now();
     do {
       if(host._simRun!==token||!host.isConnected)return null;
@@ -100,6 +110,16 @@ export function installSimulator(host) {
         const kw=card.v?.charge_power_kw,want=kw>11?2.2:4.4;
         if(Math.abs(v.charge.period-want)>0.01||(exp.sweep==='fast')!==(want===2.2)){extra=false;notes.push(`스윕 ${v.charge.period}초 (전력 ${kw} kW)`);}
         else notes.push(`스윕 ${v.charge.period}초 · ${kw} kW`);
+      }
+      if(exp.lanes){
+        const want=exp.lanes==='on'?LANE_ON:LANE_OFF;
+        if(!sameColor(v.laneColor,want)){extra=false;notes.push(`차선 ${v.laneColor} (기대 ${want})`);}
+        else notes.push(`차선 ${exp.lanes==='on'?'초록':'회색'}`);
+      }
+      if(exp.doors){
+        const closed=v.doorsOpen<0.02;
+        if(closed!==(exp.doors==='closed')){extra=false;notes.push(`문 열림 정도 ${v.doorsOpen.toFixed(2)}`);}
+        else notes.push(exp.doors==='closed'?'문 닫혀 보임':'문 열려 보임');
       }
     }
     const pass=actual===s.expected && (fallback?visibleFallback:!!v&&(v.settled||s.expected==='drive')) && !!lampOk && extra;
