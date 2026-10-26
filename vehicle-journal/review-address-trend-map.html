@@ -9,8 +9,7 @@
   저장소 루트에서  python3 -m http.server 8765  실행 후
   http://localhost:8765/vehicle-journal/review-address-trend-map.html
   장소·금액은 합성 데이터다. 지도 타일은 OpenStreetMap(인터넷 필요).
-  아래 "제안 표시" 코드는 프로덕션 파일에 아직 반영하지 않은 변경안이며, 이 페이지에서만
-  장소 카드에 "주소 기준 · 충전소 미확정" 표시를 덧입힌다. 위쪽 버튼으로 적용 전/후를 비교한다.
+  장소 카드의 "주소 기준 · 충전소 미확정" 표시는 프로덕션 코드에 반영되어 있다(사용자 승인 후 반영).
 -->
 <style>
   :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
@@ -24,7 +23,6 @@
 <body>
 <div class="bar">
   <b>추세 지도 검토</b>
-  <button id="proposed" aria-pressed="true">제안 표시 켬</button>
   <small>충전소 2곳 + 주소만 기록된 1곳(태안). 점을 눌러 카드를 확인하세요. 같은 주소로 2번 방문 → 한 점으로 합쳐짐.</small>
 </div>
 <main id="mount"></main>
@@ -44,20 +42,8 @@ const hass={callWS:async msg=>{
   return {};
 }};
 await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
-const Card=customElements.get('carrot-vehicle-journal');
-const original=Card.prototype.showTrendsPlaceCard;let proposed=true;
-Card.prototype.showTrendsPlaceCard=function(p,...rest){
-  original.call(this,p,...rest);
-  if(!proposed||!p.address_only)return;
-  const root=this.$('trendsPlaceCard');
-  const small=root.querySelector('.trends-place-title-wrap small');if(small)small.textContent='주소 기준';
-  const note=document.createElement('div');note.className='muted';note.style.cssText='margin-top:10px;font-size:12px;line-height:1.5';
-  note.textContent='여러 충전소가 가까워 충전소는 확정하지 않았어요. 기록에서 실제 이용한 충전소를 선택하면 정확해져요.';
-  root.querySelector('.trends-place-card-inner').append(note);
-};
 const card=document.createElement('carrot-vehicle-journal');
 document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
-document.getElementById('proposed').onclick=e=>{proposed=!proposed;e.target.setAttribute('aria-pressed',proposed);e.target.textContent='제안 표시 '+(proposed?'켬':'끔');};
 setTimeout(()=>card.selectTab(1),600);
 </script>
 </body>
