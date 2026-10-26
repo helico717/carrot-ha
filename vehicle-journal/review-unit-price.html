@@ -10,7 +10,7 @@
   http://localhost:8765/vehicle-journal/review-unit-price.html   (열면 "상세 기록" 탭이 자동으로 열린다)
   기록·금액·수량은 모두 합성 데이터다(운영 데이터 아님). 서버가 계산해 주는 unit_price 값(원/정수)을 합성으로 넣었다.
   아래 "제안 표시" 블록은 프로덕션 파일에 아직 반영하지 않은 변경안이며 이 페이지에서만 덧입힌다:
-   금액 아래에 작은 비볼드 단가("kWh당 313원" / "L당 1,701원"), 수량이 추정(배터리 kWh)이면 "약" 표시.
+   금액 아래에 작은 비볼드 단가("313원/kWh" / "1,701원/L"), 수량이 추정(배터리 kWh)이면 "약 200원/kWh".
   상단 버튼으로 제안 표시를 켜고 끌 수 있다.
 -->
 <style>
@@ -59,7 +59,7 @@ const apply=card=>{
     const id=tr.querySelector('[data-record]')?.dataset.record;const price=byId.get(id)?.unit_price;
     if(!price)continue;
     const el=document.createElement('small');el.className='ledger-unit-price';
-    el.textContent=`${price.unit}당 ${price.approximate?'약 ':''}${money(price.krw)}원`;
+    el.textContent=`${price.approximate?'약 ':''}${money(price.krw)}원/${price.unit}`;
     tr.querySelector('.ledger-amount-col')?.append(el);
   }
 };
