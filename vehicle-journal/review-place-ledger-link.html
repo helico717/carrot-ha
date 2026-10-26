@@ -11,7 +11,7 @@
   장소·금액·기록은 합성 데이터다. 지도 타일은 OpenStreetMap(인터넷 필요).
   아래 "제안 동작" 블록은 프로덕션 파일에 아직 반영하지 않은 변경안이며 이 페이지에서만 덧입힌다:
    1) 핀을 누르면 그 핀으로 부드럽게 확대(이미 더 확대돼 있으면 줄이지 않음)
-   2) 장소 카드의 "상세 기록에서 보기" 버튼 → 상세 기록 탭으로 이동, 그 장소 기록만 표시 + 필터 칩(✕로 해제)
+   2) 장소 카드의 작은 "기록 보기 ›" 버튼(전 버전 "상세 기록에서 보기"를 축소) → 상세 기록 탭으로 이동, 그 장소 기록만 표시 + 필터 칩(✕로 해제)
   합성 서버는 place 파라미터로 페이지 나누기 전에 걸러낸다(실제 구현도 서버 쪽 필터 예정).
 -->
 <style>
@@ -71,10 +71,15 @@ const updateFilters=P.updateLedgerFilters;P.updateLedgerFilters=function(){
 const showCard=P.showTrendsPlaceCard;P.showTrendsPlaceCard=function(p,name,...rest){
   showCard.call(this,p,name,...rest);
   const inner=this.$('trendsPlaceCard').querySelector('.trends-place-card-inner');
-  const btn=document.createElement('button');btn.type='button';btn.textContent='상세 기록에서 보기';
-  btn.style.cssText='margin-top:12px;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--j-accent);background:rgba(129,230,197,.12);color:var(--j-accent);font-weight:700;cursor:pointer';
+  /* 공간 절약: 긴 안내 문단을 없애고 라벨만 남긴다(주소 기준 장소). */
+  inner.querySelectorAll(':scope > .muted').forEach(n=>n.remove());
+  const small=inner.querySelector('.trends-place-title-wrap small');if(small&&p.address_only)small.textContent='주소 기준 · 충전소 미확정';
+  /* 공간 절약: 큰 전체 폭 버튼 대신, 금액·방문횟수와 같은 줄의 작은 버튼 */
+  const grid=inner.querySelector('.trends-place-stats-grid');grid.style.gridTemplateColumns='1fr 1fr auto';grid.style.alignItems='end';
+  const btn=document.createElement('button');btn.type='button';btn.textContent='기록 보기 ›';btn.setAttribute('aria-label','상세 기록에서 보기');
+  btn.style.cssText='min-height:0;height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--j-accent);background:rgba(129,230,197,.12);color:var(--j-accent);font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer';
   btn.onclick=e=>{e.stopPropagation();this.placeFilter={id:p.id,name};this.recordCategories.clear();this.offset=0;this.selectTab(3);this.updateLedgerFilters();this.load(true);};
-  inner.append(btn);
+  grid.append(btn);
 };
 const initMap=P.initTrendsMap;P.initTrendsMap=async function(){
   await initMap.call(this);const m=this.trendsMapInstance;
