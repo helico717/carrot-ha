@@ -490,7 +490,7 @@ class CarrotDashboard extends HTMLElement {
       .energy{background:linear-gradient(90deg,#28583c 0 var(--soc),#18221f var(--soc) 100%);min-height:110px;display:flex;align-items:center}.energy-head{width:100%}
       :host([data-theme="light"]) .energy{background:linear-gradient(90deg,#b8dec6 0 var(--soc),#e8eeeb var(--soc) 100%)}
       .nav{margin:0 16px 12px}.theme-control{justify-content:flex-end}
-      @container(max-width:700px){.hero{min-height:190px}.hero-copy{padding:12px 16px 0}.hero-copy h2{font-size:24px}.hero .car-image{height:155px;width:100%;padding:5px 12px}.energy{min-height:95px}}
+      @container(max-width:700px){.hero{min-height:190px}.hero-copy{padding:12px 16px 0}.hero-copy h2{font-size:24px}.hero .car-image{height:155px;width:100%;padding:5px 12px}.hero .car-image.vehicle3d{height:195px}.energy{min-height:95px}}
     `;
     themeStyle.textContent+=`
       .hero{background:#343b42;color:var(--ink);border:0}

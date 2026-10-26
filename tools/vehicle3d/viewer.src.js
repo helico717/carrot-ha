@@ -15,26 +15,26 @@ const DOOR_SECONDS = 0.9;
 
 // Telephoto framing: a narrow field of view with the camera pulled back keeps the same
 // car size as a wide lens, but without the rounded, wide-angle look.
-const tele = (view, fov) => {
+const tele = (view, fov, need) => {
   const k = Math.tan((view.fov * Math.PI) / 360) / Math.tan((fov * Math.PI) / 360);
   const look = view.look;
-  return {look, fov, pos: view.pos.map((v, i) => look[i] + (v - look[i]) * k)};
+  return {look, fov, need, pos: view.pos.map((v, i) => look[i] + (v - look[i]) * k)};
 };
 const VIEWS = {
   // Car faces +Z, left side is +X.
-  front: tele({pos: [0.0, 1.0, 5.6], look: [0, 0.74, 0], fov: 30}, 7.2),
-  top: tele({pos: [4.3, 5.5, 5.4], look: [0, 0.45, -0.05], fov: 32}, 18),
-  side: tele({pos: [-6.9, 1.2, 0], look: [0, 0.7, 0], fov: 30}, 11),
+  front: tele({pos: [0.0, 1.0, 5.6], look: [0, 0.74, 0], fov: 30}, 7.2, 2.5),
+  top: tele({pos: [4.3, 5.5, 5.4], look: [0, 0.45, -0.05], fov: 32}, 18, 4.8),
+  side: tele({pos: [-6.9, 1.2, 0], look: [0, 0.7, 0], fov: 30}, 11, 5.4),
   // Driving default: elevated three-quarter view from behind, passenger side.
-  drive: tele({pos: [-4.4, 2.6, -4.3], look: [0, 0.55, 0.4], fov: 30}, 13),
+  drive: tele({pos: [-4.4, 2.6, -4.3], look: [0, 0.55, 0.4], fov: 30}, 13, 5.6),
   // Charging: raised three-quarter view from the charge-port side; shows the open doors, the pack, the cable and the post.
-  charge: tele({pos: [-5.6, 3.1, 3.9], look: [-0.4, 0.4, -0.5], fov: 30}, 16),
+  charge: tele({pos: [-5.6, 3.1, 3.9], look: [-0.4, 0.4, -0.5], fov: 30}, 16, 6.2),
   // Extra charging viewpoints (manual modes; the default charging view is `charge`).
-  charge_side: tele({pos: [-7.4, 1.9, -0.6], look: [-0.5, 0.4, -0.55], fov: 30}, 15),
-  charge_top: tele({pos: [-0.4, 9.0, -0.55], look: [-0.5, 0.2, -0.55], fov: 30}, 21),
-  charge_port: tele({pos: [-3.7, 1.5, 0.3], look: [-1.35, 0.8, -1.95], fov: 30}, 11),
-  charge_left: tele({pos: [4.6, 2.5, 5.2], look: [-0.45, 0.4, -0.5], fov: 30}, 15),
-  rear: tele({pos: [0.0, 1.0, -5.6], look: [0, 0.74, 0], fov: 30}, 7.2),
+  charge_side: tele({pos: [-7.4, 1.9, -0.6], look: [-0.5, 0.4, -0.55], fov: 30}, 15, 6.0),
+  charge_top: tele({pos: [-0.4, 9.0, -0.55], look: [-0.5, 0.2, -0.55], fov: 30}, 21, 5.0),
+  charge_port: tele({pos: [-3.7, 1.5, 0.3], look: [-1.35, 0.8, -1.95], fov: 30}, 11, 3.5),
+  charge_left: tele({pos: [4.6, 2.5, 5.2], look: [-0.45, 0.4, -0.5], fov: 30}, 15, 5.8),
+  rear: tele({pos: [0.0, 1.0, -5.6], look: [0, 0.74, 0], fov: 30}, 7.2, 2.5),
 };
 
 const ease = (t) => t * t * (3 - 2 * t);
@@ -437,7 +437,11 @@ for (const m of mats.tail) {
 
   function targetCamera() {
     const v = VIEWS[viewName];
-    const fit = Math.min(1.35, Math.max(0.82, 1.55 / aspect)); // wide, short cards: bring the car closer
+    // How much of the scene fits sideways at this distance; narrow cards (phones) back off just enough
+    // for the width this view needs, wide cards come closer. Each view states the width it needs.
+    const dist = new THREE.Vector3(...v.pos).distanceTo(new THREE.Vector3(...v.look));
+    const visible = 2 * dist * Math.tan((v.fov * Math.PI) / 360);
+    const fit = Math.min(1.7, Math.max(0.8, (v.need || 5.4) / (aspect * visible)));
     const pos = new THREE.Vector3(...v.pos);
     const look = new THREE.Vector3(...v.look);
     const dir = pos.clone().sub(look).multiplyScalar(fit * offset.zoom);

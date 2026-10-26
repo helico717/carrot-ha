@@ -115,6 +115,15 @@ for (const lang of ['ko', 'en']) {
   });
 }
 
+for (const lang of ['ko', 'en']) {
+  test(`${lang}: the 3D card is a little taller on phones, and only the 3D container is`, () => {
+    const source = read(`carrot-dashboard-${lang}.js`);
+    const phone = source.indexOf('@container(max-width:700px){.hero{min-height:190px}');
+    assert.ok(phone >= 0);
+    assert.match(source.slice(phone, phone + 400), /\.hero \.car-image\{height:155px;width:100%;padding:5px 12px\}\.hero \.car-image\.vehicle3d\{height:195px\}/);
+  });
+}
+
 test('the 3D module adds no data requests: it only fetches the model file itself', () => {
   const source = read('carrot-vehicle-3d.js');
   assert.equal((source.match(/fetch\(/g) || []).length, 1);
