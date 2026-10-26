@@ -10,7 +10,8 @@ for (const language of ['ko','en','debug']) {
     const context={URL};vm.createContext(context);
     vm.runInContext(prefix.replaceAll('import.meta.url',JSON.stringify(`https://ha.test/carrot_ha_static/carrot-dashboard-${language}.js?v=0.8.12-beta.4`))+'\nthis.resolve=dependencyURL;',context);
     const dependencies=[...source.matchAll(/await import\(dependencyURL\('([^']+)'\)\)/g)].map(m=>m[1]);
-    assert.equal(dependencies.length,4);
+    assert.equal(dependencies.length,language==='debug'?5:4);
+    if(language==='debug') assert.ok(dependencies.includes('./carrot-debug-3d.js'));
     assert.doesNotMatch(source,/\bfrom\s+['"]\.\//);
     const staleCache=new Map([['https://ha.test/carrot_ha_static/carrot-trip-days.js',{old:true}]]);
     for(const name of dependencies){

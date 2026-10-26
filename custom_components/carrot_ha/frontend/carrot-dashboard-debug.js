@@ -22,6 +22,8 @@ if (typeof customElements !== 'undefined') {
 // Carrot HA Live Debug Dashboard Card
 // Clones the official Carrot Dashboard and provides a real-time UI controller underneath.
 
+const {simulatorMarkup, installSimulator} = await import(dependencyURL('./carrot-debug-3d.js'));
+
 const BMS_CAPACITY = DEFAULT_SOC_CAPACITY_KWH; // Shared display calibration, not nominal pack capacity
 
 // 2023 VW ID.4 Pro S AWD Theoretical Charging Curve (1% - 100% in kW)
@@ -435,6 +437,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
   disconnectedCallback(){
     clearInterval(this.freshnessTimer);
+    clearInterval(this._simMonitor);
+    this.stop3dSimulation?.();
     if (this._noiseTimer) {
       clearInterval(this._noiseTimer);
       this._noiseTimer = null;
@@ -557,7 +561,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
       field_measured_at: Object.fromEntries(['battery_wh','outside_temp_c','aux_voltage','ac_on'].map(k=>[k,measuredAt])),
       last_sync: new Date(this.state.mode==='cloud_error'?this.scenarioAt-30000:now).toISOString(),
       cloud_status: this.state.mode==='cloud_error'?'error':'ok',
-      speed_kph: isDriving?42:0,
+      speed_kph: isDriving?(this.sim3d?.speed ?? 42):0,
       soc_percent: this.state.soc,
       battery_kwh: currentKwh,
       soc_capacity_kwh: BMS_CAPACITY,
@@ -669,7 +673,25 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const batteryHistory = generateMockBatteryHistory(this.state.soc, isCharging, isDriving, now);
     v.battery_history = batteryHistory;
 
+    const sim=this.sim3d;
+    if(sim){
+      v.light_low_beam_requested=sim.lowBeam;
+      v.field_measured_at.light_low_beam_requested=new Date(now-(sim.expired?181000:0)).toISOString();
+      this.dashCard.config.vehicle_3d=sim.enabled;
+      const model=sim.missing?'/carrot_ha_models/debug-missing.glb':this.config?.vehicle_3d_model;
+      if(this.dashCard.config.vehicle_3d_model!==model){
+        // Model-option changes deliberately remount through the owner's normal disabled path.
+        // Ordinary telemetry updates keep the existing container and canvas untouched.
+        this.dashCard.config.vehicle_3d=false;
+        this.dashCard.render();
+        this.dashCard.config.vehicle_3d=sim.enabled;
+        this.dashCard.config.vehicle_3d_model=model;
+      }
+    }
     const displayed=debugDisplay(v,Date.now(),this.lastGood?.values);
+    // Simulate the receiver's 180-second low-beam expiry, including retained snapshots.
+    if(sim){displayed.light_low_beam_requested=sim.lowBeam&&!sim.expired;
+      displayed.field_measured_at={...displayed.field_measured_at,light_low_beam_requested:v.field_measured_at.light_low_beam_requested};}
     if(['charging','driving','parked'].includes(displayed.display_state))this.lastGood={mode:displayed.display_state,at:measuredAt,values:{...displayed}};
     this.dashCard.v = {
       ...displayed,
@@ -1244,6 +1266,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
               </div>
             </div>
 
+            ${simulatorMarkup()}
+
             <!-- Group Lock & Candidate: 차량 잠금 상태 & UI 디자인 후보 5종 -->
             <div class="control-group">
               <div class="group-label">
@@ -1519,6 +1543,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
 
     this.mountDashboard();
     this.bindEvents();
+    installSimulator(this);
     this.applyTheme(this.state.theme);
     this.applyDebugTelemetry();
   }

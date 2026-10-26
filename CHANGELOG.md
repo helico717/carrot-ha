@@ -1,3 +1,23 @@
+## 2026-10-26 — 디버그 3D 시나리오 제품 반영 (HA 배포 진행)
+
+- 사용자 승인: 사전 프리뷰 시연 후 “HA에 일단 바로 반영해줘”로 제품 반영·직접 배포 승인.
+- 변경: 프리뷰에서 확인한 22개 시나리오, 개별 문·트렁크 및 전체 토글, 하향등·181초 만료, 속도·모드 연동, 시점·자유시점·초기화, 3D 끔·모델 없음, 자동 순회·중지·통과/실패 패널을 제품 코드로 옮김. 운영 카드의 syncVehicle3d/vehicleViewState와 DOM 보존 경로를 재사용하며 운영 ko/en 파일은 변경하지 않음.
+- 관련 파일: frontend/carrot-dashboard-debug.js, frontend/carrot-debug-3d.js, tests/debug-3d.test.mjs, docs/VEHICLE_3D_MODEL.md, docs/DEBUG_DASHBOARD.md.
+- 검증: 프리뷰 22/22 통과·실패 0, 카드 안 실제 드래그 회전 확인. 제품 전체 JS 테스트 99개 중 97개 통과, 기존 motion-status·range-c3-and-fixes 2개만 실패. 디버그 신규 의존성까지 버전 쿼리를 검증하도록 기존 의존성 테스트를 확장함. HA SSH 연결·설치 경로 확인 완료. 백업·해시 결과는 아래 배포 기록에 추가함.
+- 배포 상태: main 커밋·푸시 및 HA 백업 후 직접 반영 진행. 버전 상승·태그·릴리즈 없음. GLB 변경·커밋 없음. 프론트엔드만 변경하여 HA 재시작 불필요.
+- 미확인: 실제 HA 로그인 화면·모바일. 프리뷰 검증과 운영 화면 검증은 구분함.
+
+## 2026-10-26 — 디버그 3D 시나리오 사전 프리뷰·러브레이스 복구 안내 (승인 대기)
+
+- 요청/이유: 디버그 카드에서 문 4개·트렁크·하향등·속도·시점·폴백과 22개 시나리오를 가상 값으로 시험하고, 제거한 러브레이스 디버그 카드를 다시 추가할 수 있도록 안내한다.
+- 시작 점검: main 작업 트리 깨끗함, MERGE_HEAD·기존 스테이징 없음. `git pull --ff-only` 결과 최신 상태.
+- 조사: hero의 `.vehicle3d`는 디버그 호스트가 아니라 `dashCard.shadowRoot` 안에 있다. `patchDashCard`가 보관한 운영 `origRender()`는 이미 `this.syncVehicle3d(v,state)`를 호출한다. 호출 누락이라는 가설은 현재 코드에서 확인되지 않았다. 운영의 `vehicleViewState`·동기화·뷰어를 그대로 사용한다.
+- 프리뷰: `.preview/dash3d/index.html`, `frontend/carrot-dashboard-debug.js` 사본, `frontend/carrot-debug-3d.js`, `debug-3d.test.mjs` (모두 gitignore 대상). 실제 전체 프론트엔드 모듈을 복사해 Custom Element와 합성 hass로 구동한다. 로컬 모델만 사용하며 GLB는 커밋하지 않는다. ordinary telemetry 갱신은 기존 운영 DOM 패치 경로를 유지한다. 모델 옵션 변경 시에만 운영의 3D 비활성화 렌더 경로로 뷰어를 해제하고 다시 만든다.
+- 검증: 첫 순회는 화면 밖 렌더 중지와 주행 중 계속 움직이는 뷰어의 settled 판정 때문에 실패했다. 검증 때 차량을 화면에 표시하고 주행은 1.8초 대기 뒤 실제 view를 비교하도록 수정한 뒤 22/22 통과, 실패 0. 카드 안 마우스 드래그로 정면에서 측면으로 회전 확인. 프리뷰 계약 테스트 3/3 통과. `node --test tests/*.test.mjs`: 96개 중 94개 통과, 기존 motion-status·range-c3-and-fixes 2개 실패.
+- 관련 문서: `docs/DEBUG_DASHBOARD.md`에 실제 등록 이름 `custom:carrot-dashboard-debug-card`, 카드 YAML, 공통 리소스 경로와 복구 절차를 추가했다. `docs/VEHICLE_3D_MODEL.md`는 승인 후 운영 적용과 함께 갱신할 예정.
+- 배포 상태: 사전 UI 승인 대기. 프로덕션 프론트엔드 수정·커밋·푸시·HA SSH 반영 없음. 버전·태그·릴리즈 없음. 프리뷰 서버 `http://127.0.0.1:8765/dash3d/` 유지.
+- 미확인/후속: 실제 HA 화면·모바일·운영 배포는 미검증. 승인 후 프리뷰 변경을 제품 파일로 옮기고 신규 테스트를 tests에 추가해 전체 검증, main 커밋·푸시, 백업 후 HA 직접 반영과 커밋/설치 SHA-256 대조를 수행한다. HA 재시작은 필요 없는 프론트엔드 변경이다.
+
 ## 2026-10-26 — 3D 차량: 드래그 불가 수정과 로딩 속도 개선
 
 - 사용자 보고: 3D 모델은 뜨지만 돌려 볼 수 없고(고정), 대시보드 진입 뒤 3D가 나오기까지 약 10~15초가 걸린다.
