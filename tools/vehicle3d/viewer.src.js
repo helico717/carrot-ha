@@ -139,7 +139,7 @@ export async function createVehicleViewer(container, options = {}) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   const canvas = renderer.domElement;
-  canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab;outline:none';
+  canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;cursor:grab;outline:none';
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', options.label || 'Vehicle 3D view');
   container.appendChild(canvas);
@@ -586,10 +586,10 @@ for (const m of mats.tail) {
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
-  // Plain wheel keeps scrolling the Home Assistant page; ctrl+wheel / trackpad pinch zooms.
+  // Gestures starting on the vehicle stay in the viewer; ctrl+wheel / pinch zooms.
   canvas.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey && !freeLook) return;
     e.preventDefault();
+    if (!e.ctrlKey && !freeLook) return;
     offset.zoom = clampZoom(offset.zoom * Math.exp(e.deltaY * 0.0025));
     kick();
   }, {passive: false});
@@ -619,7 +619,7 @@ for (const m of mats.tail) {
     },
     setFreeLook(on) {
       freeLook = !!on;
-      canvas.style.touchAction = freeLook ? 'none' : 'pan-y';
+      canvas.style.touchAction = 'none';
     },
     setOrbit(o = {}) {
       if ('yaw' in o) offset.yaw = o.yaw;

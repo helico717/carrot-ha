@@ -127,3 +127,16 @@ for (const lang of ['ko', 'en']) {
 test('view patching leaves the 3D container to its owner, like the Leaflet map', () => {
   assert.match(read('carrot-view-state.js'), /\['map','vehicle3d'\]\.some\(/);
 });
+
+
+test('vehicle gestures stay on the shared viewer in default and free-look modes', () => {
+  const source = fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js', import.meta.url), 'utf8');
+  assert.match(source, /touch-action:none/);
+  assert.doesNotMatch(source, /touch-action:pan-y|touchAction.*pan-y/);
+  assert.match(source, /setFreeLook\(on\)[\s\S]*?canvas\.style\.touchAction = 'none'/);
+  const wheel = source.slice(source.indexOf("canvas.addEventListener('wheel'"), source.indexOf("canvas.addEventListener('dblclick'"));
+  assert.ok(wheel.indexOf('e.preventDefault()') < wheel.indexOf('if (!e.ctrlKey && !freeLook) return'));
+  assert.match(wheel, /passive: false/);
+  assert.match(wheel, /offset\.zoom = clampZoom/);
+  for (const lang of ['ko', 'en']) assert.match(read(`carrot-dashboard-${lang}.js`), /carrot-vehicle-3d\.js/);
+});

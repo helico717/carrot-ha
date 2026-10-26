@@ -5,6 +5,8 @@
 // holds (doors, trunk, low beam, speed, driving state). It never issues its own cloud or HA
 // requests for vehicle data, so it cannot add query load (see docs/modular-ev-dashboard-architecture.md).
 //
+// The shared viewer owns gestures on its canvas: swipes and wheel input stay there,
+// while scrolling outside the vehicle remains available in production and debug cards.
 // The model itself is a user-supplied file (see docs/VEHICLE_3D_MODEL.md) and is never shipped
 // in this repository; without it the card silently keeps the PNG.
 const version = new URL(import.meta.url).searchParams.get('v');
