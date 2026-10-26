@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차계부 추세 핀 → 상세 기록 연결 검토</title>
+<!--
+  검토용 하네스: 실제 carrot-vehicle-journal.js 를 그대로 불러온다(추세 지도 Leaflet, 상세 기록 표 포함).
+  저장소 루트에서  python3 -m http.server 8765  실행 후
+  http://localhost:8765/vehicle-journal/review-place-ledger-link.html
+  장소·금액·기록은 합성 데이터다. 지도 타일은 OpenStreetMap(인터넷 필요).
+  아래 "제안 동작" 블록은 프로덕션 파일에 아직 반영하지 않은 변경안이며 이 페이지에서만 덧입힌다:
+   1) 핀을 누르면 그 핀으로 부드럽게 확대(이미 더 확대돼 있으면 줄이지 않음)
+   2) 장소 카드의 "상세 기록에서 보기" 버튼 → 상세 기록 탭으로 이동, 그 장소 기록만 표시 + 필터 칩(✕로 해제)
+  합성 서버는 place 파라미터로 페이지 나누기 전에 걸러낸다(실제 구현도 서버 쪽 필터 예정).
+-->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  .bar{position:sticky;top:0;z-index:5000;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)} .bar small{color:var(--j-sub)}
+</style>
+</head>
+<body>
+<div class="bar"><b>핀 → 상세 기록 검토</b><small>추세 탭에서 핀을 눌러 확대와 "상세 기록에서 보기"를 확인하세요. 주소 기준 장소(꽃지해안로)는 방문 2회 · 충전소 3곳 + 직접 기록 세차 1건이 섞여 있어요.</small></div>
+<main id="mount"></main>
+<script type="module">
+const loc=(name,address,lat,lon,extra={})=>({name,address,latitude:lat,longitude:lon,provider:'kakao',station_type:'charging',...extra});
+const T=loc('티스테이션 의왕시청점 전기차충전소','경기 의왕시 시청로 1',37.3447,126.9683,{station_id:'1',selection_source:'automatic'});
+const K=loc('꽃지해안공원 주차장 전기차충전소','충남 태안군 안면읍 장곡길 1',36.4999,126.3305,{station_id:'2',selection_source:'automatic'});
+const A=loc('충남 태안군 안면읍 꽃지해안로 400','충남 태안군 안면읍 꽃지해안로 400',36.5002,126.3321,{selection_source:'automatic_address'});
+const rec=(id,date,krw,location,place,extra={})=>({id,kind:'expense',origin:'automatic',status:'active',version:1,accounting_date:date,category:'charging',actual_krw:krw,estimated_krw:null,location,place,attachments:[],...extra});
+const records=[
+  rec('r1','2026-10-25',8728,K,'kakao:2'),
+  rec('r2','2026-10-25',4000,A,'address:A'),
+  rec('r3','2026-10-24',9000,null,'',{category:'washing',origin:'manual',memo:'세차'}),
+  rec('r4','2026-10-21',10974,T,'kakao:1'),
+  rec('r5','2026-10-19',14758,T,'kakao:1'),
+  rec('r6','2026-10-12',2368,A,'address:A'),
+  rec('r7','2026-10-05',4768,T,'kakao:1'),
+];
+const sum=(p)=>records.filter(r=>r.place===p).reduce((a,r)=>a+r.actual_krw,0),cnt=p=>records.filter(r=>r.place===p).length;
+const mk=(id,l,extra={})=>({id,kind:'charging',resolved:true,visits:cnt(id),actual_krw:sum(id),estimated_krw:0,billed_kwh:0,battery_kwh:0,unknown_quantity_count:0,location:l,...extra});
+const places=[mk('kakao:1',T),mk('kakao:2',K),mk('address:A',A,{address_only:true})];
+const hass={callWS:async msg=>{
+  const t=msg.type;
+  if(t.endsWith('/entries'))return [{entry_id:'demo',title:'검토용 차량',linked:true,fuel:'electric'}];
+  if(t.endsWith('/query')){
+    let rows=records;if(msg.place)rows=rows.filter(r=>r.place===msg.place);
+    if(msg.record_categories?.length)rows=rows.filter(r=>msg.record_categories.includes(r.category));
+    return {totals:{},daily:[],records:rows,recent_records:records,record_count:rows.length,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{},station_stats:{places,unlocated_records:0,basis:''},expense_category_groups_supported:true,manual_trip_records_supported:true};
+  }
+  if(t.endsWith('/map/config'))return {key:'',rest_configured:false};
+  return {};
+}};
+await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
+const Card=customElements.get('carrot-vehicle-journal'),P=Card.prototype;
+
+/* ===== 제안 동작(프로덕션 미반영) ===== */
+P.ledgerFilterKey=function(){return JSON.stringify([this.recordSort,[...this.recordCategories].sort(),this.placeFilter?.id||'']);};
+const call=P.call;P.call=function(type,params={}){if(type==='query'&&this.placeFilter&&'record_sort' in params)params={...params,place:this.placeFilter.id};return call.call(this,type,params);};
+const updateFilters=P.updateLedgerFilters;P.updateLedgerFilters=function(){
+  updateFilters.call(this);
+  const box=this.$('ledgerFilters');let chip=this.$('placeFilterChip');
+  if(!this.placeFilter){chip?.remove();return;}
+  if(!chip){chip=document.createElement('span');chip.id='placeFilterChip';chip.className='ledger-place-chip';chip.style.cssText='display:inline-flex;align-items:center;gap:8px;margin-left:10px;padding:8px 12px;border:1px solid var(--j-accent);border-radius:12px;color:var(--j-accent);font-size:14px;font-weight:700;max-width:100%';box.append(chip);}
+  chip.innerHTML='';const label=document.createElement('span');label.textContent='장소 · '+this.placeFilter.name;label.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','장소 필터 해제');x.style.cssText='border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;padding:0 2px';
+  x.onclick=()=>{this.placeFilter=null;this.offset=0;this.updateLedgerFilters();this.load(true);};chip.append(label,x);
+};
+const showCard=P.showTrendsPlaceCard;P.showTrendsPlaceCard=function(p,name,...rest){
+  showCard.call(this,p,name,...rest);
+  const inner=this.$('trendsPlaceCard').querySelector('.trends-place-card-inner');
+  const btn=document.createElement('button');btn.type='button';btn.textContent='상세 기록에서 보기';
+  btn.style.cssText='margin-top:12px;width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--j-accent);background:rgba(129,230,197,.12);color:var(--j-accent);font-weight:700;cursor:pointer';
+  btn.onclick=e=>{e.stopPropagation();this.placeFilter={id:p.id,name};this.recordCategories.clear();this.offset=0;this.selectTab(3);this.updateLedgerFilters();this.load(true);};
+  inner.append(btn);
+};
+const initMap=P.initTrendsMap;P.initTrendsMap=async function(){
+  await initMap.call(this);const m=this.trendsMapInstance;
+  if(m&&!m.__zoomPatched){m.__zoomPatched=true;m.panTo=ll=>m.flyTo(ll,Math.max(m.getZoom(),15),{duration:.7});}
+};
+/* ===== /제안 동작 ===== */
+
+const card=document.createElement('carrot-vehicle-journal');
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
+setTimeout(()=>card.selectTab(1),600);
+</script>
+</body>
+</html>
