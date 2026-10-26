@@ -1,3 +1,10 @@
+## 2026-10-26 — vehicle-journal: 핀 확대·장소 카드·장소 필터 HA 직접 반영
+
+- 커밋 `e1c62b0`(직전 `917b95c` 백엔드 포함). 사용자가 검토용 하네스의 카드 안과 칩 모양을 승인했다.
+- HA 반영 6개(모두 로컬과 해시 일치 확인): `stations.py`(`c1407743…`, GPS 거리 검증 포함), `station_stats.py`(`9cb7b75c…`), `store.py`(`a4f5bda6…`), `api.py`(`97b7c274…`), `carrot-journal-design.js`(`091334df…`), `carrot-vehicle-journal.js`(`996cd7d6…`). 반영 전 6개 모두 직전 반영본(`d26a279`)의 해시와 같음을 확인했고 Python 구문 검사도 통과했다. 백업은 HA `/config/carrot_ha/deployment-backups/e1c62b0/`(폴더가 root 소유라 `sudo`로 생성·덮어쓰기, 소유자 유지).
+- 건드리지 않은 것: 같은 시기 다른 작업(파라미터 대시보드·`carrot_web/*`)의 파일은 반영하지 않았다.
+- 미확인/후속: Python 변경(`api.py` 포함)이라 **HA 재시작 전까지 `place` 필터와 주소 폴백이 동작하지 않는다**(미수행). 재시작 전에 새 화면에서 "기록 보기"를 누르면 서버가 알 수 없는 `place` 값을 거부해 오류가 날 수 있다. 브라우저 새로고침(Ctrl+F5) 필요. 운영 화면·실제 카카오 호출 미확인. 릴리즈 없음.
+
 ## 2026-10-26 — vehicle-journal: 추세 핀 확대·장소 카드 축소·"기록 보기"·장소 필터 칩 구현
 
 - 이유: 사용자가 검토용 하네스(`review-place-ledger-link.html`)의 카드 안과 칩 모양을 승인하고 구현·HA 직접 반영을 요청했다.
