@@ -106,6 +106,9 @@ class AddressFallbackTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('station_id',place);Journal.validate_location(place)
     async def test_address_location_without_geocode_is_not_saved(self):
         self.assertIsNone(await self.station(False).address_location(36.5,126.3))
+    async def test_geocoded_address_far_from_gps_is_rejected(self):
+        station=self.station()
+        self.assertIsNone(await station.address_location(37.5,127.0))
     async def test_ambiguous_and_far_reasons(self):
         station=Stations(None)
         def doc(key,lat):return {'id':key,'place_name':key,'category_name':'교통 > 전기차 충전소','x':'127','y':lat}

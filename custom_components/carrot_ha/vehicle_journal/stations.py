@@ -113,6 +113,8 @@ class Stations:
         found=await self.cached(('address',address),'kakao','search/address.json',{'query':address,'size':1},86400)
         try:a,b=float(found['documents'][0]['y']),float(found['documents'][0]['x']);coordinates(a,b)
         except (KeyError,IndexError,TypeError,ValueError):return None
+        # A geocoded address far from the verified GPS fix is a wrong match, never a place to show on the map.
+        if distance_m(lat,lon,a,b)>300:return None
         return {'name':(road.get('building_name') or address)[:200],'address':address,'latitude':a,'longitude':b,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
     async def price_at(self,lat,lon,fuel):
         response=await self.nearby('refueling',lat,lon,fuel)

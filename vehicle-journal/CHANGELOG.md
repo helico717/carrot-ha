@@ -1,3 +1,11 @@
+## 2026-10-26 — vehicle-journal: 주소 위치 지오코딩 결과의 GPS 거리 검증 추가
+
+- 이유: 추세 지도 핀이 엉뚱한 곳에 찍히는 일이 운영에서도 생길 수 있는지 점검했다. 하네스 좌표는 손으로 적은 값이라 문제였지만, 운영의 주소 폴백에는 카카오 주소 검색이 GPS와 먼 다른 주소를 돌려줘도 그대로 저장하는 빈틈이 있었다.
+- 변경: `Stations.address_location()`이 지오코딩 좌표가 검증된 GPS 지점에서 300m를 넘으면 저장하지 않는다(장소 없음으로 유지). 충전소 후보 좌표는 카카오가 준 값이며 GPS 오차 범위의 선택은 기존 150m 기준이 그대로 적용된다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/stations.py`, `vehicle-journal/tests/test_automatic_locations.py`(거리 초과 거부 테스트 1건 추가).
+- 검증: `test_automatic_locations` 18건 통과. 좌표계는 카카오 `x`=경도·`y`=위도(WGS84)로 OSM 지도와 같아 별도 보정은 필요 없다.
+- 배포 상태: 커밋·푸시만. HA 직접 반영 전(Python 변경, HA 재시작 필요).
+
 ## 2026-10-26 — vehicle-journal: 검토용 하네스의 합성 좌표를 육지(꽃지해안공원 주차장)로 수정
 
 - 이유: 사용자가 추세 지도 핀이 바다 위에 떠 있다고 지적했다. 원인은 제가 하네스(`review-address-trend-map.html`, `review-place-ledger-link.html`)에 손으로 적은 합성 좌표가 부정확했기 때문이며 프로덕션 코드 문제가 아니다.
