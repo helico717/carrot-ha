@@ -1,3 +1,16 @@
+## 2026-10-26 — vehicle-journal: 충전소 미확정 시 도로명 주소 위치 자동 기록 및 추세 지도 반영
+
+- 이유: 한 곳에 충전소가 여러 개 붙어 있으면(1·2위 거리 차 25m 미만) 위치를 자동으로 정하지 않아 장소가 비고, 추세 지도에서도 빠졌다.
+- 변경(백엔드):
+  - `stations.py`: `nearby()` 보류 결과에 `reason`(`ambiguous`/`far`/`incomplete`) 추가. `address_location()` 추가 — 카카오 좌표→주소로 도로명 주소를 구한 뒤 그 주소를 다시 지오코딩한 좌표를 쓴다(GPS 원본 좌표를 쓰지 않아 같은 주소가 한 지도 장소로 합쳐짐). 지오코딩 실패 시 저장하지 않는다.
+  - `automatic_locations.py`: GPS 검증은 통과했지만 `ambiguous`/`far`로 보류된 경우에만 `selection_source='automatic_address'`(`station_id` 없음) 위치를 저장하고 후보 이름 최대 3개를 `location_lookup.candidates`에 남긴다. `LOOKUP_VERSION` 2→3으로 올려 기존 보류 기록도 다음 동기화에서 재시도한다. `propagate()`가 주소 위치도 지출로 전파한다(한 주소로 일치할 때만).
+  - `station_stats.py`: 주소 위치는 `address:<도로명주소>`로 집계하고 `address_only` 플래그를 붙인다. 충전소 확정 통계(`station_id`)와 섞지 않는다.
+  - `store.py`: `selection_source`에 `automatic_address` 허용. 사용자가 직접 지정한 위치는 기존대로 덮어쓰지 않는다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/{stations,automatic_locations,station_stats,store}.py`, `vehicle-journal/tests/test_automatic_locations.py`(지오코딩·보류 사유·지출 전파·추세 집계 테스트 4건 추가), `vehicle-journal/review-address-trend-map.html`(검토용 하네스).
+- 검증: `test_automatic_locations` 17건 통과. 검토용 하네스에서 실제 `carrot-vehicle-journal.js`의 추세 지도가 주소만 기록된 장소를 마커로 그리고 카드(누적 금액·방문 2회)가 열리는 것을 확인했다.
+- 미반영(승인 대기): 장소 카드의 "주소 기준 · 충전소 미확정" 표시는 하네스에서만 덧입힌 제안이며 프로덕션 프론트엔드는 수정하지 않았다. 실제 카카오 API 호출과 운영 데이터는 미확인.
+- 배포 상태: 커밋·푸시만. HA 직접 반영·릴리즈 없음.
+
 ## 2026-10-26 — vehicle-journal: 충전 위치가 자동 기록되지 않는 조건 조사(코드 변경 없음)
 
 - 조사 대상: 2026-10-25 11:57 충전비의 장소 공란. 코드(`automatic_locations.py`, `stations.py`)와 운영 DB를 읽기 전용으로 확인했다(root 전용 DB라 `sudo`로 `/tmp` 복사본을 만들어 조회 후 삭제, 좌표 출력 없음).

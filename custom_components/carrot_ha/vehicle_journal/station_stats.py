@@ -11,9 +11,11 @@ def facts(db,vehicle,start,end):
         if not location or not (location.get('name') or location.get('latitude') is not None):unlocated+=1;continue
         # Name-only imports remain separate until the user identifies an actual place.
         if location.get('provider') and location.get('station_id'):identity=location['provider']+':'+location['station_id']
+        elif location.get('selection_source')=='automatic_address' and location.get('address') and location.get('latitude') is not None:identity='address:'+location['address']
         elif location.get('latitude') is not None:identity=f"coordinate:{location['latitude']:.5f}:{location['longitude']:.5f}"
         else:identity='unresolved:'+rid
         group=groups.setdefault((kind,identity),{'id':identity,'kind':kind,'location':location,'resolved':not identity.startswith('unresolved:'),'visits':0,'actual_krw':0,'estimated_krw':0,'fuel_liters':0,'billed_kwh':0,'battery_kwh':0,'fuel_priced_liters':0,'fuel_priced_cost':0,'billed_priced_kwh':0,'billed_priced_cost':0,'battery_priced_kwh':0,'battery_priced_cost':0,'unknown_quantity_count':0})
+        group['address_only']=identity.startswith('address:')
         members_ids=[r[0] for r in db.execute('SELECT charge_id FROM expense_members WHERE vehicle_id=? AND expense_id=?',(vehicle,rid))];accounted.update(members_ids)
         group['visits']+=len(members_ids) or 1;group['actual_krw']+=actual or 0;group['estimated_krw']+=estimated or 0;cost=actual if actual is not None else estimated
         if kind=='refueling':
@@ -34,10 +36,12 @@ def facts(db,vehicle,start,end):
         timezone=db.execute('SELECT accounting_timezone FROM vehicles WHERE id=?',(vehicle,)).fetchone()[0]
         if rid in accounted or not start<=stamp(started).astimezone(ZoneInfo(timezone)).date().isoformat()<=end:continue
         extra=json.loads(text);location=extra.get('location',(extra.get('input') or {}).get('location'))
-        if not location or not location.get('station_id'):continue
-        identity=location.get('provider','manual')+':'+location['station_id']
+        if not location:continue
+        if location.get('station_id'):identity=location.get('provider','manual')+':'+location['station_id']
+        elif location.get('selection_source')=='automatic_address' and location.get('address') and location.get('latitude') is not None:identity='address:'+location['address']
+        else:continue
         g=groups.setdefault(('charging',identity),{'id':identity,'kind':'charging','location':location,'resolved':True,'visits':0,'actual_krw':0,'estimated_krw':0,'fuel_liters':0,'billed_kwh':0,'battery_kwh':0,'fuel_priced_liters':0,'fuel_priced_cost':0,'billed_priced_kwh':0,'billed_priced_cost':0,'battery_priced_kwh':0,'battery_priced_cost':0,'unknown_quantity_count':0})
-        g['visits']+=1
+        g['address_only']=identity.startswith('address:');g['visits']+=1
         if billed is not None:g['billed_kwh']+=billed
         elif battery is not None:g['battery_kwh']+=battery
         else:g['unknown_quantity_count']+=1

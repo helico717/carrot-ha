@@ -526,7 +526,7 @@ class Journal:
         if 'provider' in location and location['provider'] not in ('kakao','opinet','manual'):raise ValueError('장소 제공사를 확인해 주세요.')
         if 'station_id' in location and (not isinstance(location['station_id'],str) or not 1<=len(location['station_id'])<=100):raise ValueError('장소 ID를 확인해 주세요.')
         if 'station_type' in location and location['station_type'] not in ('charging','refueling'):raise ValueError('장소 종류를 확인해 주세요.')
-        if 'selection_source' in location and location['selection_source'] not in ('automatic','manual'):raise ValueError('장소 선택 출처를 확인해 주세요.')
+        if 'selection_source' in location and location['selection_source'] not in ('automatic','automatic_address','manual'):raise ValueError('장소 선택 출처를 확인해 주세요.')
         lat,lon=location.get('latitude'),location.get('longitude')
         if (lat is None)!=(lon is None):raise ValueError('위도와 경도를 함께 입력해 주세요.')
         if lat is not None and (type(lat) not in (float,int) or type(lon) not in (float,int) or not math.isfinite(lat) or not math.isfinite(lon) or not -90<=lat<=90 or not -180<=lon<=180):raise ValueError('좌표 범위를 확인해 주세요.')

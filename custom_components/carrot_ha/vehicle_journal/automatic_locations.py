@@ -8,7 +8,7 @@ from .stations import coordinates,distance_m
 from ..archive_codec import loads
 
 
-LOOKUP_VERSION=2
+LOOKUP_VERSION=3
 
 def pending(journal):
     with journal.connect() as db:
@@ -87,7 +87,7 @@ def position(archive,journal,started):
     return min(candidates,key=lambda p:p[0])[1] if candidates else None
 
 
-def save(journal,item,point,location,message):
+def save(journal,item,point,location,message,candidates=None):
     key,version,extra,_=item
     with journal.lock,journal.connect() as db:
         row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(journal.vehicle,key)).fetchone()
@@ -96,9 +96,15 @@ def save(journal,item,point,location,message):
         if 'location' in current or current.get('location_user_override'):return False
         if point:current['source_position']=point
         current['location_lookup']={'version':LOOKUP_VERSION,'retry_after':time.time()+86400,'message':message}
+        if candidates:current['location_lookup']['candidates']=candidates
         if location:journal.validate_location(location);current['location']=location
         db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(current),now(),journal.vehicle,key))
         return True
+
+
+def identity(place):
+    if place.get('station_id'):return (place.get('provider'),place['station_id'])
+    if place.get('selection_source')=='automatic_address' and place.get('address'):return ('address',place['address'])
 
 
 def propagate(journal):
@@ -107,9 +113,9 @@ def propagate(journal):
             row=db.execute('SELECT extra_json FROM records WHERE vehicle_id=? AND id=?',(journal.vehicle,expense)).fetchone();extra=json.loads(row[0])
             if extra.get('location_user_override') or extra.get('journal_override'):continue
             locations=[json.loads(r[0]).get('location') for r in db.execute('SELECT r.extra_json FROM expense_members x JOIN records r ON r.vehicle_id=x.vehicle_id AND r.id=x.charge_id WHERE x.vehicle_id=? AND x.expense_id=?',(journal.vehicle,expense))]
-            ids={(p.get('provider'),p.get('station_id')) for p in locations if p and p.get('station_id')}
-            if len(ids)!=1 or not locations or any(not p or not p.get('station_id') for p in locations):
-                if (extra.get('location') or {}).get('selection_source')=='automatic':
+            ids={identity(p) for p in locations if p and identity(p)}
+            if len(ids)!=1 or not locations or any(not p or not identity(p) for p in locations):
+                if (extra.get('location') or {}).get('selection_source') in ('automatic','automatic_address'):
                     extra.pop('location',None)
                     db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),journal.vehicle,expense))
                 continue
@@ -129,12 +135,17 @@ async def enrich(hass,manager,archive,journal):
     if not electric_vehicle(manager,journal):return
     for item in await hass.async_add_executor_job(pending,journal):
         point=await hass.async_add_executor_job(position,archive,journal,item[3])
-        selected=None;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
+        selected=None;candidates=None;address=None;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
         if not electric_vehicle(manager,journal):return
         if point:
             try:
                 result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']
+                if not selected and result.get('reason') in ('ambiguous','far'):
+                    address=await manager.stations.address_location(point['latitude'],point['longitude'])
+                    if address:
+                        message='충전소를 하나로 확정하지 못해 주소만 기록했어요. 실제 이용한 충전소를 선택하면 정확해져요.'
+                        candidates=[c['location']['name'] for c in result['candidates'][:3]]
             except ValueError as error:message=str(error)
         if not electric_vehicle(manager,journal):return
-        await hass.async_add_executor_job(save,journal,item,point,selected['location'] if selected else None,message)
+        await hass.async_add_executor_job(save,journal,item,point,selected['location'] if selected else address,message,candidates)
     await hass.async_add_executor_job(propagate,journal)

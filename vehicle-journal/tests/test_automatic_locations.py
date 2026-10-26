@@ -89,3 +89,51 @@ class ScopeTests(unittest.IsolatedAsyncioTestCase):
         station=Stations(None)
         async def cached(*args):return {'documents':[{'id':'near','place_name':'near','category_name':'전기차 충전소','x':'127','y':'37.5'}],'meta':{'is_end':False}}
         station.cached=cached;self.assertIsNone((await station.nearby('charging',37.5,127))['selected'])
+
+
+class AddressFallbackTests(unittest.IsolatedAsyncioTestCase):
+    def station(self,address_hit=True):
+        station=Stations(None)
+        async def cached(key,service,path,params,ttl=900):
+            if path=='geo/coord2address.json':return {'documents':[{'road_address':{'address_name':'충남 태안군 안면읍 장곡길 1','building_name':''},'address':{'address_name':'lot'}}]}
+            if path=='search/address.json':return {'documents':[{'x':'126.3','y':'36.5'}] if address_hit else []}
+            raise AssertionError(path)
+        station.cached=cached;return station
+    async def test_address_location_uses_geocoded_coordinate_not_gps(self):
+        place=await self.station().address_location(36.50012,126.30009)
+        self.assertEqual((place['latitude'],place['longitude']),(36.5,126.3))
+        self.assertEqual((place['selection_source'],place['address'],place['name']),('automatic_address','충남 태안군 안면읍 장곡길 1','충남 태안군 안면읍 장곡길 1'))
+        self.assertNotIn('station_id',place);Journal.validate_location(place)
+    async def test_address_location_without_geocode_is_not_saved(self):
+        self.assertIsNone(await self.station(False).address_location(36.5,126.3))
+    async def test_ambiguous_and_far_reasons(self):
+        station=Stations(None)
+        def doc(key,lat):return {'id':key,'place_name':key,'category_name':'교통 > 전기차 충전소','x':'127','y':lat}
+        async def cached(key,service,path,params,ttl=900):return {'documents':[doc('a','37.5'),doc('b','37.50005')],'meta':{'is_end':True}}
+        station.cached=cached;self.assertEqual((await station.nearby('charging',37.5,127))['reason'],'ambiguous')
+        async def far(key,service,path,params,ttl=900):return {'documents':[doc('a','37.51')],'meta':{'is_end':True}}
+        station.cached=far;self.assertEqual((await station.nearby('charging',37.5,127))['reason'],'far')
+
+class AddressPropagationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.j=Journal(Path(self.tmp.name)/'j.db','entry','car','Asia/Seoul')
+    def tearDown(self):self.tmp.cleanup()
+    def test_address_only_charge_reaches_expense_and_trend_map(self):
+        from custom_components.carrot_ha.vehicle_journal import station_stats
+        address={'name':'장곡길 1','address':'장곡길 1','latitude':36.5,'longitude':126.3,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
+        now='2026-10-25T00:00:00+00:00'
+        with self.j.lock,self.j.connect() as db:
+            for rid,kind,origin,extra in (('c1','charge','automatic',{'location':address}),('c2','charge','automatic',{'location':dict(address,latitude=36.5)}),('x1','expense','automatic',{}),('x2','expense','automatic',{})):
+                db.execute("INSERT INTO records(vehicle_id,id,kind,origin,source_kind,source_id,source_fingerprint,extra_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",(self.j.vehicle,rid,kind,origin,'t',rid,rid,json.dumps(extra),now,now))
+            for rid,start in (('c1','2026-10-25T03:00:00+00:00'),('c2','2026-10-25T04:00:00+00:00')):
+                db.execute("INSERT INTO mobility(vehicle_id,record_id,started_at,ended_at,battery_charge_kwh) VALUES (?,?,?,?,5)",(self.j.vehicle,rid,start,start))
+            for rid,krw in (('x1',1000),('x2',2000)):
+                db.execute("INSERT INTO expenses(vehicle_id,record_id,accounting_date,category,actual_krw,payment_owner,payment_id,payment_version) VALUES (?,?,'2026-10-25','charging',?,'ha_charge_payment',?,1)",(self.j.vehicle,rid,krw,'p'+rid))
+            db.execute("INSERT INTO expense_members VALUES (?,'x1','c1')",(self.j.vehicle,));db.execute("INSERT INTO expense_members VALUES (?,'x2','c2')",(self.j.vehicle,))
+        auto.propagate(self.j)
+        with self.j.connect() as db:
+            for rid in ('x1','x2'):self.assertEqual(json.loads(db.execute("SELECT extra_json FROM records WHERE id=?",(rid,)).fetchone()[0])['location']['address'],'장곡길 1')
+            facts=station_stats.facts(db,self.j.vehicle,'2026-10-01','2026-10-31')
+        self.assertEqual(facts['unlocated_records'],0);self.assertEqual(len(facts['places']),1)
+        place=facts['places'][0];self.assertEqual((place['visits'],place['actual_krw'],place['address_only']),(2,3000,True))
+        self.assertEqual((place['location']['latitude'],place['location']['longitude']),(36.5,126.3))

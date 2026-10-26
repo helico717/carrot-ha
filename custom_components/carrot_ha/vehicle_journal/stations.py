@@ -95,12 +95,25 @@ class Stations:
         result.sort(key=lambda p:p['distance_m'])
         selected=result[0] if result else None
         if kind=='charging' and incomplete:
-            return {'candidates':result,'selected':None,'message':'주변 충전소 검색 결과가 많아 전체 후보를 확인하지 못했어요. 실제 충전소를 검색해 선택해 주세요.'}
+            return {'reason':'incomplete','candidates':result,'selected':None,'message':'주변 충전소 검색 결과가 많아 전체 후보를 확인하지 못했어요. 실제 충전소를 검색해 선택해 주세요.'}
         if kind=='charging' and selected and selected['distance_m']>150:
-            return {'candidates':result,'selected':None,'message':'150m 이내 충전소 후보가 없어 자동 지정하지 않았어요. 실제 충전소를 검색해 선택해 주세요.'}
+            return {'reason':'far','candidates':result,'selected':None,'message':'150m 이내 충전소 후보가 없어 자동 지정하지 않았어요. 실제 충전소를 검색해 선택해 주세요.'}
         if kind=='charging' and selected and len(result)>1 and result[1]['distance_m']-selected['distance_m']<25:
-            return {'candidates':result,'selected':None,'message':'비슷한 거리에 여러 충전소가 있어 자동 확정하지 않았어요. 실제 이용한 충전소를 검색해 선택해 주세요.'}
+            return {'reason':'ambiguous','candidates':result,'selected':None,'message':'비슷한 거리에 여러 충전소가 있어 자동 확정하지 않았어요. 실제 이용한 충전소를 검색해 선택해 주세요.'}
         return {'candidates':result,'selected':selected,'message':'가장 가까운 후보를 자동 선택했어요. 실제 방문 장소와 단가를 확인해 주세요.' if result else '주변 장소를 찾지 못했어요. 직접 위치를 지정해 주세요.'}
+    async def address_location(self,lat,lon):
+        """Road-address place for a verified GPS point; the coordinate is the geocoded address, so one address is one map place."""
+        coordinates(lat,lon)
+        response=await self.cached(('coord2address',round(lat,5),round(lon,5)),'kakao','geo/coord2address.json',{'x':lon,'y':lat},86400)
+        documents=response.get('documents',[])
+        if not documents:return None
+        road=documents[0].get('road_address') or {};lot=documents[0].get('address') or {}
+        address=(road.get('address_name') or lot.get('address_name') or '')[:300]
+        if not address:return None
+        found=await self.cached(('address',address),'kakao','search/address.json',{'query':address,'size':1},86400)
+        try:a,b=float(found['documents'][0]['y']),float(found['documents'][0]['x']);coordinates(a,b)
+        except (KeyError,IndexError,TypeError,ValueError):return None
+        return {'name':(road.get('building_name') or address)[:200],'address':address,'latitude':a,'longitude':b,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
     async def price_at(self,lat,lon,fuel):
         response=await self.nearby('refueling',lat,lon,fuel)
         selected=response['selected']

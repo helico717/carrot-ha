@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차계부 추세 지도 · 주소만 기록된 장소 검토</title>
+<!--
+  검토용 하네스: 실제 carrot-vehicle-journal.js 를 그대로 불러와 "추세" 탭의 실제 지도(Leaflet)를 그린다.
+  저장소 루트에서  python3 -m http.server 8765  실행 후
+  http://localhost:8765/vehicle-journal/review-address-trend-map.html
+  장소·금액은 합성 데이터다. 지도 타일은 OpenStreetMap(인터넷 필요).
+  아래 "제안 표시" 코드는 프로덕션 파일에 아직 반영하지 않은 변경안이며, 이 페이지에서만
+  장소 카드에 "주소 기준 · 충전소 미확정" 표시를 덧입힌다. 위쪽 버튼으로 적용 전/후를 비교한다.
+-->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  .bar{position:sticky;top:0;z-index:5000;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)} .bar small{color:var(--j-sub)}
+  .bar button{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:10px;padding:7px 11px;font-size:12.5px;cursor:pointer}
+  .bar button[aria-pressed=true]{border-color:var(--j-accent);color:var(--j-accent)}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>추세 지도 검토</b>
+  <button id="proposed" aria-pressed="true">제안 표시 켬</button>
+  <small>충전소 2곳 + 주소만 기록된 1곳(태안). 점을 눌러 카드를 확인하세요. 같은 주소로 2번 방문 → 한 점으로 합쳐짐.</small>
+</div>
+<main id="mount"></main>
+<script type="module">
+const place=(id,name,address,lat,lon,extra={})=>({id,kind:'charging',resolved:true,visits:1,actual_krw:0,estimated_krw:0,billed_kwh:0,battery_kwh:0,unknown_quantity_count:0,
+  location:{name,address,latitude:lat,longitude:lon,provider:'kakao',station_type:'charging',...extra.location},...extra.stat});
+const places=[
+  place('kakao:1','티스테이션 의왕시청점 전기차충전소','경기 의왕시 시청로 1',37.3447,126.9683,{location:{station_id:'1',selection_source:'automatic'},stat:{visits:3,actual_krw:30500}}),
+  place('kakao:2','꽃지해안공원 주차장 전기차충전소','충남 태안군 안면읍 장곡길 1',36.4999,126.3305,{location:{station_id:'2',selection_source:'automatic'},stat:{visits:1,actual_krw:8728}}),
+  place('address:충남 태안군 안면읍 꽃지해안로 400','충남 태안군 안면읍 꽃지해안로 400','충남 태안군 안면읍 꽃지해안로 400',36.5002,126.3321,{location:{selection_source:'automatic_address'},stat:{visits:2,actual_krw:6368,address_only:true}}),
+];
+const hass={callWS:async msg=>{
+  const t=msg.type;
+  if(t.endsWith('/entries'))return [{entry_id:'demo',title:'검토용 차량',linked:true,fuel:'electric'}];
+  if(t.endsWith('/query'))return {totals:{},daily:[],records:[],recent_records:[],record_count:0,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{},station_stats:{places,unlocated_records:0,basis:''}};
+  if(t.endsWith('/map/config'))return {key:'',rest_configured:false};
+  return {};
+}};
+await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
+const Card=customElements.get('carrot-vehicle-journal');
+const original=Card.prototype.showTrendsPlaceCard;let proposed=true;
+Card.prototype.showTrendsPlaceCard=function(p,...rest){
+  original.call(this,p,...rest);
+  if(!proposed||!p.address_only)return;
+  const root=this.$('trendsPlaceCard');
+  const small=root.querySelector('.trends-place-title-wrap small');if(small)small.textContent='주소 기준';
+  const note=document.createElement('div');note.className='muted';note.style.cssText='margin-top:10px;font-size:12px;line-height:1.5';
+  note.textContent='여러 충전소가 가까워 충전소는 확정하지 않았어요. 기록에서 실제 이용한 충전소를 선택하면 정확해져요.';
+  root.querySelector('.trends-place-card-inner').append(note);
+};
+const card=document.createElement('carrot-vehicle-journal');
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
+document.getElementById('proposed').onclick=e=>{proposed=!proposed;e.target.setAttribute('aria-pressed',proposed);e.target.textContent='제안 표시 '+(proposed?'켬':'끔');};
+setTimeout(()=>card.selectTab(1),600);
+</script>
+</body>
+</html>
