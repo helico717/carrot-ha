@@ -1,10 +1,10 @@
-## 2026-10-26 — 디버그 3D 시나리오 제품 반영 (HA 배포 진행)
+## 2026-10-26 — 디버그 3D 시나리오 제품 반영·HA 직접 배포 완료
 
 - 사용자 승인: 사전 프리뷰 시연 후 “HA에 일단 바로 반영해줘”로 제품 반영·직접 배포 승인.
 - 변경: 프리뷰에서 확인한 22개 시나리오, 개별 문·트렁크 및 전체 토글, 하향등·181초 만료, 속도·모드 연동, 시점·자유시점·초기화, 3D 끔·모델 없음, 자동 순회·중지·통과/실패 패널을 제품 코드로 옮김. 운영 카드의 syncVehicle3d/vehicleViewState와 DOM 보존 경로를 재사용하며 운영 ko/en 파일은 변경하지 않음.
 - 관련 파일: frontend/carrot-dashboard-debug.js, frontend/carrot-debug-3d.js, tests/debug-3d.test.mjs, docs/VEHICLE_3D_MODEL.md, docs/DEBUG_DASHBOARD.md.
 - 검증: 프리뷰 22/22 통과·실패 0, 카드 안 실제 드래그 회전 확인. 제품 전체 JS 테스트 99개 중 97개 통과, 기존 motion-status·range-c3-and-fixes 2개만 실패. 디버그 신규 의존성까지 버전 쿼리를 검증하도록 기존 의존성 테스트를 확장함. HA SSH 연결·설치 경로 확인 완료. 백업·해시 결과는 아래 배포 기록에 추가함.
-- 배포 상태: main 커밋·푸시 및 HA 백업 후 직접 반영 진행. 버전 상승·태그·릴리즈 없음. GLB 변경·커밋 없음. 프론트엔드만 변경하여 HA 재시작 불필요.
+- 배포 상태: 제품 커밋 `0b11db5bb054b7d2269de41e78414a8cc37772f1` main 푸시 확인 후 HA SSH sudo 표준입력으로 프론트엔드 2개 반영 완료. 백업: `/homeassistant/carrot_ha/deployment-backups/debug-3d-0b11db5/before` (새 파일은 `.absent` 표식). 설치 및 HTTP 응답 SHA-256이 모두 커밋과 일치: `carrot-dashboard-debug.js` = `f041e28843e7f92c1364249c17e345694b79066ddccc5cc1a01be63c1a51445d`, `carrot-debug-3d.js` = `ed1094eb41a3891187a998eb6a4fe2b6d97a35656b06cb8122fb7946ee732f8e`. HA frontend-version = `0.9.0-beta.1-f1488c236ae6` 확인. 버전 상승·태그·릴리즈 없음. GLB 변경·커밋 없음. 프론트엔드만 변경하여 HA 재시작 불필요.
 - 미확인: 실제 HA 로그인 화면·모바일. 프리뷰 검증과 운영 화면 검증은 구분함.
 
 ## 2026-10-26 — 디버그 3D 시나리오 사전 프리뷰·러브레이스 복구 안내 (승인 대기)
