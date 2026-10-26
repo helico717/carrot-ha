@@ -6,6 +6,7 @@ Copies the complete HA frontend and supplies synthetic settings data.
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -68,9 +69,34 @@ html = target / 'settings.html'
 content = html.read_text()
 if 'interactive-widget=' not in content:
     content = content.replace('maximum-scale=1,', 'maximum-scale=1, interactive-widget=resizes-visual,')
+# Match the upstream search DOM as well as its JavaScript/CSS.
+upstream_html = git('show', f'{commit}:{prefix}index.html').decode()
+search_pattern = r'<form id="settingInlineSearch"[\s\S]*?</form>'
+upstream_search = re.search(search_pattern, upstream_html).group(0)
+content = re.sub(search_pattern, lambda _: upstream_search, content)
 html.write_text(content)
+# The upstream navigation now owns parent navigation. Remove the legacy HA
+# listener, which otherwise runs in addition to upstream's onclick handler.
+bridge = target / 'js/ha_bridge.js'
+bridge_source = bridge.read_text()
+start = bridge_source.index("    document.getElementById('itemsTitle')?.addEventListener")
+end = bridge_source.index("    send({type: 'carrot:ready'});", start)
+bridge.write_text(bridge_source[:start] + bridge_source[end:])
 (target.parent.parent / 'params-source.json').write_text(json.dumps({
     'repository': 'ajouatom/openpilot', 'commit': commit,
     'files': changed, 'status': 'preview only; not deployed',
 }, ensure_ascii=False, indent=2) + '\n')
+# Independent complete module trees prevent the two implementations sharing
+# registered custom elements, globals, settings state or fixed iframe URLs.
+preview_root = target.parent.parent
+for variant, source in [('before', production.parent), ('after', target.parent)]:
+    static = preview_root / variant / 'carrot_ha_static'
+    shutil.copytree(source, static, dirs_exist_ok=True)
+    for asset in static.rglob('*'):
+        if asset.is_file() and asset.suffix in ('.js', '.css', '.html'):
+            text = asset.read_text()
+            asset.write_text(text.replace('/carrot_ha_static/', f'/{variant}/carrot_ha_static/'))
+    child = fixture.read_text().replace('/carrot_ha_static/', f'/{variant}/carrot_ha_static/')
+    (preview_root / variant / 'index.html').write_text(child)
+shutil.copyfile(Path(__file__).parent / 'fixtures/params-compare.html', preview_root / 'compare.html')
 print(json.dumps({'commit': commit, 'changed_files': len(changed), 'target': str(target)}))
