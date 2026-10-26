@@ -13,6 +13,11 @@ LOOKUP_VERSION=4
 RETRY_DAY=86400
 RETRY_TRANSIENT=900
 
+def provisional(place,lookup):
+    """Road address saved while the provider was failing; replaced by the station once a lookup succeeds."""
+    return bool(place and place.get('selection_source')=='automatic_address' and lookup.get('failures'))
+
+
 def pending(journal):
     with journal.connect() as db:
         rows=db.execute("SELECT r.id,r.version,r.extra_json,m.started_at FROM records r JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id WHERE r.vehicle_id=? AND r.kind='charge' AND r.origin='automatic' AND r.status='active' ORDER BY m.started_at DESC",(journal.vehicle,)).fetchall()
@@ -20,7 +25,7 @@ def pending(journal):
         for key,version,text,started in rows:
             extra=json.loads(text)
             lookup=extra.get('location_lookup',{})
-            if extra.get('location_user_override') or 'location' in extra:continue
+            if extra.get('location_user_override') or ('location' in extra and not provisional(extra.get('location'),lookup)):continue
             if lookup.get('version')==LOOKUP_VERSION and lookup.get('retry_after',0)>time.time():continue
             result.append((key,version,extra,started))
             if len(result)==3:break
@@ -96,9 +101,9 @@ def save(journal,item,point,location,message,candidates=None,transient=False):
         row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(journal.vehicle,key)).fetchone()
         if not row or row[0]!=version:return False
         current=json.loads(row[1])
-        if 'location' in current or current.get('location_user_override'):return False
-        if point:current['source_position']=point
         previous=current.get('location_lookup',{})
+        if current.get('location_user_override') or ('location' in current and not provisional(current.get('location'),previous)):return False
+        if point:current['source_position']=point
         # Provider/transport failures are not a lookup result: back off from 15 minutes up to a day.
         failures=(previous.get('failures',0) if previous.get('version')==LOOKUP_VERSION else 0)+1 if transient else 0
         delay=min(RETRY_DAY,RETRY_TRANSIENT*2**(failures-1)) if transient else RETRY_DAY
@@ -148,13 +153,14 @@ async def enrich(hass,manager,archive,journal):
         if point:
             try:
                 result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']
-                if not selected and result.get('reason') in ('ambiguous','far'):
-                    address=await manager.stations.address_location(point['latitude'],point['longitude'])
-                    if address:
-                        message='충전소를 하나로 확정하지 못해 주소만 기록했어요. 실제 이용한 충전소를 선택하면 정확해져요.'
-                        candidates=[c['location']['name'] for c in result['candidates'][:3]]
+                if not selected and result.get('reason') in ('ambiguous','far'):candidates=[c['location']['name'] for c in result['candidates'][:3]] or None
             except ProviderError as error:message=str(error);transient=True
             except ValueError as error:message=str(error)
+            # Whenever the station itself is not settled, keep at least the verified road address.
+            if not selected:
+                try:address=await manager.stations.address_location(point['latitude'],point['longitude'])
+                except ValueError:address=None
+                if address:message='충전소 이름을 확인하지 못해 도로명 주소로 먼저 기록했어요. '+('잠시 뒤 충전소 이름을 다시 조회할게요.' if transient else '실제 이용한 충전소를 선택하면 정확해져요.')
         if not electric_vehicle(manager,journal):return
         await hass.async_add_executor_job(save,journal,item,point,selected['location'] if selected else address,message,candidates,transient)
     await hass.async_add_executor_job(propagate,journal)

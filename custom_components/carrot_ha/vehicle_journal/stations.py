@@ -72,7 +72,7 @@ class Stations:
         if kind not in ('charging','refueling'):raise ValueError('장소 종류를 확인해 주세요.')
         result=[];observed=datetime.now(timezone.utc).isoformat()
         if kind=='charging':
-            places={};incomplete=False
+            places={};incomplete=False;frontier=math.inf
             # Combine spelling variants, but exclude LPG and unrelated keyword matches.
             for query in ('전기차 충전소','전기차충전소','전기자동차 충전소'):
                 for page in range(1,4):
@@ -87,7 +87,11 @@ class Stations:
                             places[key]={'location':{'name':place['place_name'][:200],'address':(place.get('road_address_name') or place.get('address_name',''))[:300],'latitude':a,'longitude':b,'provider':'kakao','station_id':key[:100],'station_type':'charging','selection_source':'automatic'},'distance_m':distance_m(lat,lon,a,b),'unit_price_krw':None,'price_basis':'existing_ev_tariff'}
                         except (ValueError,TypeError,KeyError):continue
                     if response.get('meta',{}).get('is_end',True) or not documents:break
-                    if page==3:incomplete=True
+                    if page==3:
+                        incomplete=True
+                        # Distance-sorted: every unseen place is at least as far as the last returned one.
+                        try:frontier=min(frontier,distance_m(lat,lon,float(documents[-1]['y']),float(documents[-1]['x'])))
+                        except (ValueError,TypeError,KeyError):frontier=0
             result=list(places.values())
 
         else:
@@ -102,7 +106,8 @@ class Stations:
                 result.append({'location':{'name':str(oil['OS_NM'])[:200],'address':str(oil.get('NEW_ADR') or oil.get('VAN_ADR') or '')[:300],'latitude':a,'longitude':b,'provider':'opinet','station_id':str(oil['UNI_ID'])[:100],'station_type':'refueling','selection_source':'automatic'},'distance_m':float(oil.get('DISTANCE') or 0),'unit_price_krw':price if math.isfinite(price) and price>0 else None,'price_observed_at':observed,'price_basis':'opinet_current','fuel_type':fuel})
         result.sort(key=lambda p:p['distance_m'])
         selected=result[0] if result else None
-        if kind=='charging' and incomplete:
+        # Truncation only matters when an unseen place could be nearer than, or ambiguous with, the selection.
+        if kind=='charging' and incomplete and not (selected and selected['distance_m']<=150 and selected['distance_m']+25<=frontier):
             return {'reason':'incomplete','candidates':result,'selected':None,'message':'주변 충전소 검색 결과가 많아 전체 후보를 확인하지 못했어요. 실제 충전소를 검색해 선택해 주세요.'}
         if kind=='charging' and selected and selected['distance_m']>150:
             return {'reason':'far','candidates':result,'selected':None,'message':'150m 이내 충전소 후보가 없어 자동 지정하지 않았어요. 실제 충전소를 검색해 선택해 주세요.'}

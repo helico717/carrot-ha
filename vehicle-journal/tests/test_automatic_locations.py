@@ -91,6 +91,18 @@ class ScopeTests(unittest.IsolatedAsyncioTestCase):
         station=Stations(None)
         async def cached(*args):return {'documents':[{'id':'near','place_name':'near','category_name':'전기차 충전소','x':'127','y':'37.5'}],'meta':{'is_end':False}}
         station.cached=cached;self.assertIsNone((await station.nearby('charging',37.5,127))['selected'])
+    async def test_dense_area_still_selects_a_lone_nearby_charger(self):
+        """More than 45 results, but everything unseen is beyond the last returned (distance-sorted) place."""
+        def doc(key,lat):return {'id':key,'place_name':key,'category_name':'교통 > 전기차 충전소','x':'127','y':lat}
+        async def cached(key,service,path,params):
+            if params['page']==1:return {'documents':[doc('near','37.5')]+[doc(f'f{i}','37.505') for i in range(14)],'meta':{'is_end':False}}
+            return {'documents':[doc(f'f{params["page"]}{i}','37.51') for i in range(15)],'meta':{'is_end':False}}
+        station=Stations(None);station.cached=cached
+        result=await station.nearby('charging',37.5,127)
+        self.assertEqual(result['selected']['location']['station_id'],'near')
+        # Truncated while the last returned place is still close: an unseen nearer/ambiguous one is possible.
+        async def close(key,service,path,params):return {'documents':[doc('near','37.5')]+[doc(f'c{params["page"]}{i}','37.5001') for i in range(14)],'meta':{'is_end':False}}
+        station.cached=close;self.assertEqual((await station.nearby('charging',37.5,127))['reason'],'incomplete')
 
 
 class ChunkedResponse:
@@ -134,9 +146,10 @@ class TransientRetryTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):self.tmp.cleanup()
     def lookup(self):
         with self.j.connect() as db:return json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])['location_lookup']
-    async def run_enrich(self,nearby):
+    async def run_enrich(self,nearby,address=None):
         from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
-        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=nearby))
+        async def address_location(*a):return address
+        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=nearby,address_location=address_location))
         hass=types.SimpleNamespace(async_add_executor_job=lambda f,*a:asyncio.sleep(0,f(*a)))
         point={'latitude':37.5,'longitude':127.0,'accuracy_m':2}
         with patch.object(auto,'position',return_value=point):await auto.enrich(hass,manager,self.a,self.j)
@@ -161,6 +174,33 @@ class TransientRetryTests(unittest.IsolatedAsyncioTestCase):
         await self.run_enrich(found)
         with self.j.connect() as db:extra=json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])
         self.assertEqual(extra['location']['station_id'],'1');self.assertNotIn('failures',extra['location_lookup'])
+    def extra(self):
+        with self.j.connect() as db:return json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])
+    def expire(self):
+        extra=self.extra();extra['location_lookup']['retry_after']=0
+        with self.j.connect() as db:db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps(extra),))
+    async def test_provider_failure_keeps_road_address_then_upgrades_to_station(self):
+        from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
+        address={'name':'경기 의왕시 한밭들길 3','address':'경기 의왕시 한밭들길 3','latitude':37.5,'longitude':127.0,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
+        async def broken(*a):raise ProviderError('제공사 응답을 끝까지 확인하지 못했어요. 잠시 뒤 다시 조회할게요.')
+        await self.run_enrich(broken,address);extra=self.extra()
+        self.assertEqual(extra['location']['address'],'경기 의왕시 한밭들길 3');self.assertEqual(extra['location_lookup']['failures'],1)
+        self.assertIn('도로명 주소로 먼저 기록',extra['location_lookup']['message'])
+        self.assertEqual(auto.pending(self.j),[]);self.expire();self.assertEqual(len(auto.pending(self.j)),1)
+        place=dict(address,name='티스테이션 전기차충전소',station_id='1',selection_source='automatic')
+        async def found(*a):return {'selected':{'location':place},'message':'가장 가까운 후보를 자동 선택했어요.','candidates':[]}
+        await self.run_enrich(found,address);extra=self.extra()
+        self.assertEqual(extra['location']['station_id'],'1');self.assertEqual(auto.pending(self.j),[])
+        self.expire();self.assertEqual(auto.pending(self.j),[],'a settled station is never looked up again')
+    async def test_every_unsettled_reason_falls_back_to_road_address_and_is_final(self):
+        address={'name':'주소','address':'주소','latitude':37.5,'longitude':127.0,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
+        for reason in ('incomplete',None):
+            with self.subTest(reason=reason):
+                with self.j.connect() as db:db.execute("UPDATE records SET extra_json='{}' WHERE kind='charge'")
+                async def unsettled(*a):return {'reason':reason,'selected':None,'candidates':[],'message':'x'}
+                await self.run_enrich(unsettled,address);extra=self.extra()
+                self.assertEqual(extra['location']['selection_source'],'automatic_address');self.assertNotIn('failures',extra['location_lookup'])
+                self.expire();self.assertEqual(auto.pending(self.j),[])
     def test_records_parked_by_previous_lookup_version_are_retried(self):
         with self.j.connect() as db:db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps({'location_lookup':{'version':3,'retry_after':time.time()+86400,'message':'Unterminated string'}}),))
         self.assertEqual(len(auto.pending(self.j)),1)

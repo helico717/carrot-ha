@@ -4,7 +4,7 @@
 - 변경: `ai.py`에 `read_limited`를 두어 EOF까지 조각별로 읽고 기존 크기 제한과 오류 코드를 유지한다. 주행 로그 패키지는 상위 패키지 import 없이 독립 로드되므로(테스트도 이 방식) 같은 6줄 도우미를 패키지 안에 둔다.
 - 관련 파일: `custom_components/carrot_ha/driving_logs/ai.py`.
 - 검증: aiohttp 3.14 환경에서 `tests.test_driving_logs_local` 7건 통과, `tests.test_driving_logs_ai` 8건 중 7건 통과(실패 1건은 로컬 numpy 미설치로 인한 cereal 하위 프로세스 검사로 이번 변경과 무관). 도우미 단독 검사(조각 결합·초과 시 `None`) 통과. 실제 Gemini 호출은 미확인.
-- 배포 상태: 차계부 수정과 같은 커밋으로 HA 직접 반영 예정, 사용자 HA 재시작 필요. 버전·태그·릴리즈 없음.
+- 배포 상태: 커밋 `2730a920f993e7fc4e37dbabf8c4a0ba437b3044`. HA 기존 파일 해시가 직전 커밋과 일치함을 확인하고 `/config/carrot_ha/deployment-backups/2730a920f993e7fc4e37dbabf8c4a0ba437b3044/driving_logs/ai.py`에 백업한 뒤 직접 반영했다. 설치 SHA-256 `94368985a28b76cbf4cc047d3b31842602d2af6ebabbaed11671d613379de5b1`이 커밋 파일과 일치한다. 사용자 HA 재시작 필요, 실제 Gemini 호출 미확인. 버전·태그·릴리즈 없음.
 
 ## 2026-10-19 — 마지막 주행 무료 자동 분석·추천 및 기존 메뉴 통합 구현 완료
 
