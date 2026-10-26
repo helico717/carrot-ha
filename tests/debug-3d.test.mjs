@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {SCENARIOS,DOORS,LANE_ON,LANE_OFF,simulatorMarkup} from '../custom_components/carrot_ha/frontend/carrot-debug-3d.js';
 import {vehicleViewState} from '../custom_components/carrot_ha/frontend/carrot-vehicle-3d.js';
-test('all 37 scenarios have unique identifiers and explicit expected views',()=>{
- assert.equal(SCENARIOS.length,37);assert.equal(new Set(SCENARIOS.map(s=>s.id)).size,37);
- const expected=['front',...Array(6).fill('top'),...Array(7).fill('drive'),'front',...Array(10).fill('charge'),'front','front','drive','drive',...Array(3).fill('top'),'front','fallback','fallback','front','front'];
+test('all 38 scenarios have unique identifiers and explicit expected views',()=>{
+ assert.equal(SCENARIOS.length,38);assert.equal(new Set(SCENARIOS.map(s=>s.id)).size,38);
+ const expected=['front',...Array(6).fill('top'),...Array(8).fill('drive'),'front',...Array(10).fill('charge'),'front','front','drive','drive',...Array(3).fill('top'),'front','fallback','fallback','front','front'];
  assert.deepEqual(SCENARIOS.map(s=>s.expected),expected);
 });
 test('scenario inputs use production vehicleViewState with driving, then charging, precedence',()=>{
@@ -63,4 +63,14 @@ test('debug panel: removed test panels, feature picker and desktop side-by-side 
  assert.match(simulatorMarkup(),/id="sim3d" data-section="3d"/);
  assert.ok(debug.includes('@container carrot-debug (min-width: 1300px)'));
  assert.ok(/\.debug-container > \.preview-pane \{\s+position: sticky;/.test(debug));
+});
+
+test('speeds above 140 km/h keep the 140 km/h effect',()=>{
+ const by=id=>SCENARIOS.find(s=>s.id===id);
+ assert.deepEqual([by('drive180').patch.speed,by('drive180').expect.roll],[180,140]);
+ assert.equal(by('drive0').expect.roll,0);
+ assert.match(simulatorMarkup(),/id="simSpeed" type="range" min="0" max="200"/);
+ const viewer=fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js',import.meta.url),'utf8');
+ assert.ok(viewer.includes('const MAX_EFFECT_KPH = 140;'));
+ assert.ok(viewer.includes('Math.min(MAX_EFFECT_KPH, Math.max(0, state.speedKph))'));
 });

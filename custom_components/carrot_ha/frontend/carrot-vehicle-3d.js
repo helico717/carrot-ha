@@ -121,7 +121,8 @@ export function vehicleViewState(v, status, dark, openpilot = false) {
     trunk: open('trunk_open'),
     lowBeam: v?.light_low_beam_requested === true,
     driving: status?.key === 'driving',
-    speedKph: Number.isFinite(v?.speed_kph) ? v.speed_kph : 0,
+    // null = unknown (the viewer then animates at a nominal speed); 0 = stopped.
+    speedKph: Number.isFinite(v?.speed_kph) ? v.speed_kph : null,
     dark: Boolean(dark),
     // Charging scene: only while the card itself shows the vehicle as charging.
     charging: status?.key === 'charging',

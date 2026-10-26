@@ -10,7 +10,8 @@ export const SCENARIOS = [
   item('parked','주차 · 닫힘','front'),
   ...DOORS.map((door,i)=>item(door,['운전석','조수석','뒤 운전석','뒤 조수석','트렁크'][i]+' 열림','top',{doors:{[door]:true}})),
   item('all','전부 열림','top',{doors:Object.fromEntries(DOORS.map(k=>[k,true]))}),
-  ...[0,60,120].map(speed=>item('drive'+speed,`주행 ${speed} km/h`,'drive',{mode:'driving',speed})),
+  ...[0,60,120].map(speed=>item('drive'+speed,`주행 ${speed} km/h`,'drive',{mode:'driving',speed},{roll:speed})),
+  item('drive180','주행 180 km/h (효과 140 상한)','drive',{mode:'driving',speed:180},{roll:140}),
   item('drive-lights','주행 + 하향등','drive',{mode:'driving',speed:60,lowBeam:true}),
   // openpilot (binary_sensor.<vehicle>_enabled): green lanes while engaged, grey otherwise.
   item('drive-op','주행 + 오픈파일럿 작동','drive',{mode:'driving',speed:80,openpilot:true},{lanes:'on'}),
@@ -44,7 +45,7 @@ export function simulatorMarkup() {
   <div class="btn-group"><button data-sim="open">전부 열기</button><button data-sim="close">전부 닫기</button>
   <label><input type="checkbox" id="simBeam">하향등</label><label><input type="checkbox" id="simExpired">하향등 값 만료</label>
   <label><input type="checkbox" id="simOp">오픈파일럿 작동</label><label><input type="checkbox" id="simOff">3D 끄기</label><label><input type="checkbox" id="simMissing">모델 없음</label></div>
-  <label>속도 <input id="simSpeed" type="range" min="0" max="140" value="42"> <output id="simSpeedValue">42 km/h</output></label>
+  <label>속도 <input id="simSpeed" type="range" min="0" max="200" value="42"> <output id="simSpeedValue">42 km/h</output></label>
   <div class="btn-group"><button data-sim="reset">시점 초기화</button><label><input id="simFree" type="checkbox">자유시점</label><span id="simView">뷰어 대기</span></div>
   <div class="btn-group" style="flex-wrap:wrap">${SCENARIOS.map(s=>`<button data-scenario="${s.id}">${s.label}</button>`).join('')}</div>
   <div class="btn-group"><button data-sim="play">전체 순회 재생</button><button data-sim="stop">중지</button></div>
@@ -115,6 +116,12 @@ export function installSimulator(host) {
         const want=exp.lanes==='on'?LANE_ON:LANE_OFF;
         if(!sameColor(v.laneColor,want)){extra=false;notes.push(`차선 ${v.laneColor} (기대 ${want})`);}
         else notes.push(`차선 ${exp.lanes==='on'?'초록':'회색'}`);
+      }
+      if('roll' in exp){
+        // The displayed speed eases toward the target; after the wait it is within ~2% of it.
+        const ok=exp.roll===0?v.rollKph===0:Math.abs(v.rollKph-exp.roll)<=exp.roll*0.03;
+        if(!ok){extra=false;notes.push(`표시 속도 ${v.rollKph.toFixed(1)} km/h (기대 ${exp.roll})`);}
+        else notes.push(`표시 속도 ${v.rollKph.toFixed(0)} km/h`);
       }
       if(exp.doors){
         const closed=v.doorsOpen<0.02;

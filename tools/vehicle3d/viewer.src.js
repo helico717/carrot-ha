@@ -12,6 +12,7 @@ const WHEEL_RE = /^YSTAD_20_(FL|FR|RL|RR)_/;
 const CAR_LENGTH = 4.6;
 const DEFAULT_BODY_COLOR = '#333234'; // RGB 51,50,52
 const DOOR_SECONDS = 0.9;
+const MAX_EFFECT_KPH = 140;
 
 // Telephoto framing: a narrow field of view with the camera pulled back keeps the same
 // car size as a wide lens, but without the rounded, wide-angle look.
@@ -426,6 +427,7 @@ for (const m of mats.tail) {
   let roadLevel = 0;
   let wheelAngle = 0;
   let roadScroll = 0;
+  let shownKph = 0;
   let paintColor = null;
   let visible = true;
   let raf = 0;
@@ -541,22 +543,29 @@ for (const m of mats.tail) {
       else busy = true;
     }
     road.visible = roadLevel > 0.01;
-    if (state.driving) {
-      const mps = Math.max(8, state.speedKph || 40) / 3.6 * 0.5;
+    // Road and wheels follow the reported speed, eased so 15-second updates do not jump. A speed of 0
+    // (stopped at lights while driving) stands still; only an unknown speed uses a nominal 40 km/h.
+    // Above MAX_EFFECT_KPH the effect holds at that speed (faster scrolling only flickers).
+    const speedTarget = !state.driving ? 0 : Number.isFinite(state.speedKph) ? Math.min(MAX_EFFECT_KPH, Math.max(0, state.speedKph)) : 40;
+    shownKph += (speedTarget - shownKph) * (1 - Math.exp(-dt * 2.5));
+    if (speedTarget === 0 && shownKph < 0.3) shownKph = 0;
+    // Lay the dashes out along the road even when standing still (they all start at z = 0).
+    if (road.visible) dashes.forEach((d, i) => {
+      const idx = Math.floor(i / 2);
+      d.position.z = -((idx * PERIOD + roadScroll) % (COUNT * PERIOD)) + (COUNT * PERIOD) / 2;
+    });
+    if (shownKph > 0) {
+      const mps = shownKph / 3.6 * 0.5;
       roadScroll = (roadScroll + mps * dt) % PERIOD;
       wheelAngle += (mps * dt) / wheelRadius;
       busy = true;
-      dashes.forEach((d, i) => {
-        const idx = Math.floor(i / 2);
-        d.position.z = -((idx * PERIOD + roadScroll) % (COUNT * PERIOD)) + (COUNT * PERIOD) / 2;
-      });
-      car.rotation.z = Math.sin(performance.now() / 380) * 0.0025;
+      car.rotation.z = Math.sin(performance.now() / 380) * 0.0025 * Math.min(1, shownKph / 20);
     } else car.rotation.z = 0;
     for (const p of wheelPivots) p.rotation.x = wheelAngle; // lateral axis is X once the car faces +Z
 
     renderer.render(scene, camera);
     settled = !busy;
-    if (visible && (busy || state.driving || chargeFrames)) raf = requestAnimationFrame(frame);
+    if (visible && (busy || chargeFrames)) raf = requestAnimationFrame(frame);
   }
   function kick() {
     if (!raf && !disposed && visible) {
@@ -688,6 +697,7 @@ for (const m of mats.tail) {
     // Read-only status used by the debug simulator's checks.
     get lamp() { return lampLevel; },
     get charge() { return {active: chargeScene.active, period: chargeScene.period}; },
+    get rollKph() { return shownKph; },
     get laneColor() { return '#' + dashMat.color.getHexString(); },
     get doorsOpen() { return Math.max(0, ...Object.values(clips).map((c) => c.value)); },
     get settled() { return settled; },

@@ -31,7 +31,7 @@ test('expired or unknown values never light the lamp or open a door', () => {
   assert.equal(state.doors.fl, false);
   assert.equal(state.trunk, false);
   assert.equal(state.lowBeam, false);
-  assert.equal(state.speedKph, 0);
+  assert.equal(state.speedKph, null, 'unknown speed is not reported as stopped');
   assert.equal(state.driving, false);
 });
 
@@ -194,4 +194,13 @@ test('while driving the doors are drawn closed, lanes follow openpilot, and the 
   assert.match(source, /LANE_ON = new THREE\.Color\(0x1fff5e\)/);
   assert.match(source, /'soc', 'openpilot'\]\) if \(key in next\)/);
   assert.match(read('carrot-vehicle-3d.js'), /vehicleViewState\(v, status, dark, openpilotEngaged\(v, card\._hass, card\.config\)\)/);
+});
+
+test('a driving car at 0 km/h stands still; only an unknown speed animates at a nominal speed', () => {
+  assert.equal(vehicleViewState({speed_kph: 0}, {key: 'driving'}, false).speedKph, 0);
+  const source = fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /state\.speedKph \|\| 40/, '0 km/h must not fall back to 40 km/h');
+  assert.match(source, /Number\.isFinite\(state\.speedKph\) \? Math\.min\(MAX_EFFECT_KPH, Math\.max\(0, state\.speedKph\)\) : 40/);
+  assert.match(source, /if \(shownKph > 0\) \{/);
+  assert.match(source, /if \(visible && \(busy \|\| chargeFrames\)\) raf = requestAnimationFrame\(frame\);/);
 });
