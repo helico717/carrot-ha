@@ -5,7 +5,7 @@
 - 변경(구도): 높이가 늘면 카메라가 가로 폭 기준으로 너무 물러나 차가 작아지는 문제가 있어, 뷰어가 시점마다 필요한 가로 폭(`need`, 미터: 정면 2.5, 측면 5.4, 탑 4.8, 주행 5.6, 충전 6.2 등)과 실제 보이는 폭으로 거리를 계산하도록 바꿨다(범위 0.8~1.7). 폭이 좁은 정면·후면은 가까이, 충전 시점은 충전기까지 들어오도록 유지한다. 넓은 카드에서는 이전과 같은 0.8 하한이다.
 - 관련 파일: `custom_components/carrot_ha/frontend/{carrot-dashboard-ko.js,carrot-dashboard-en.js,carrot-assets/vehicle-3d.js}`, `tools/vehicle3d/viewer.src.js`, `tests/vehicle-3d-integration.test.mjs`.
 - 검증: JS 테스트 102개 중 100개 통과(실패 2건은 변경 전부터). 실제 한국어 카드를 모바일 폭(375px)에서 열어 3D 영역이 195px(영역 전체 235px)이고 정면 차량이 카드를 알맞게 채우며 충전+문 열림에서 차와 충전기가 모두 들어옴을 확인했다. 폭 683px과 1250px 레이아웃에서도 충전 시점 구도를 확인했다.
-- 배포 상태: 커밋 전. 푸시·HA 반영 결과는 배포 기록에 남긴다.
+- 배포 상태: `b5b893e`를 main에 푸시한 뒤 HA SSH(`sudo`)로 프론트엔드 파일 3개(`carrot-dashboard-ko.js`, `carrot-dashboard-en.js`, `carrot-assets/vehicle-3d.js`)를 직접 반영했다. 반영 전 설치 파일이 직전 커밋과 동일함을 해시로 확인했고, 반영 후 3개 모두 커밋과 SHA-256이 일치한다. 반영 전 파일은 `/homeassistant/carrot_ha/deployment-backups/vehicle-3d-mobile-height-b5b893e/before`에 백업했다. 모델 파일은 바뀌지 않았고 HA 재시작은 필요 없다(강력 새로고침). 새 pre-release/정식 릴리즈 없음.
 - 미확인: 실제 iPhone Safari/HA 앱 화면에서의 높이·구도(이 환경은 폭 375px 에뮬레이션만 확인), 아주 좁은 폭(360px 이하)의 구도.
 
 ## 2026-10-26 — 3D 차량: 충전 중 표시(X-ray·배터리 팩·케이블·충전기)와 디버그 충전 시나리오
