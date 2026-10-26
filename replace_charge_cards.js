@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = '/Users/davidlim/Documents/carrot-ha/custom_components/carrot_ha/frontend/carrot-dashboard-ko.js';
+const filePath = '/Users/davidlim/Developer/carrot-ha/custom_components/carrot_ha/frontend/carrot-dashboard-ko.js';
 let content = fs.readFileSync(filePath, 'utf8');
 
 const oldText = "`${metric('충전 상태',this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state==='on'?'충전중':'충전 중이 아님','','ev-station')}${metric('이번 달 충전량',n(v.month_charge_kwh),'kWh','battery-plus')}${metric('완속 분류',n(v.month_slow_kwh),'kWh','power-plug')}${metric('급속 분류',n(v.month_fast_kwh),'kWh','flash')}`";

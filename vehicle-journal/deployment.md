@@ -41,7 +41,8 @@ pre-release → 실사용 검증 통과 후 정식 릴리즈.**
 
 ## 1. 수정·검증·커밋·푸시
 
-저장소는 `/Users/davidlim/Documents/carrot-ha`, 작업 브랜치는 `main`이다.
+저장소는 iCloud 동기화 폴더 밖의 로컬 클론(이 Mac은 `/Users/davidlim/Developer/carrot-ha`)이고,
+작업 브랜치는 `main`이다. 여러 Mac 작업 순서와 병합 점검은 루트 [AGENTS.md](../AGENTS.md)를 따른다.
 
 ```bash
 git status --short

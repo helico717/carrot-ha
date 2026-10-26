@@ -1,5 +1,5 @@
 const fs = require('fs');
-const path = '/Users/davidlim/Documents/carrot-ha/custom_components/carrot_ha/frontend/carrot-dashboard-ko.js';
+const path = '/Users/davidlim/Developer/carrot-ha/custom_components/carrot_ha/frontend/carrot-dashboard-ko.js';
 let content = fs.readFileSync(path, 'utf8');
 
 const oldPart = "metric('급속 분류',n(v.month_fast_kwh),'kWh','flash')";

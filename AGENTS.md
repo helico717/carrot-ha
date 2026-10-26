@@ -35,6 +35,24 @@ HA 등록부·로그 프론트엔드와 openpilot의 로그 동기화 연결부�
 변경 내용·이유·관련 파일·검증 결과·배포 상태·미확인 사항을 포함하며, 로컬 검증과
 운영 반영·실차 설치를 구분한다. 저장소의 Comma SSH/SCP 수정 금지 규칙은 유지한다.
 
+## 저장소 위치·여러 Mac 작업·작업 시작 점검 — 2026-10-26
+
+- **저장소는 iCloud가 동기화하는 폴더(`~/Desktop`, `~/Documents`, iCloud Drive) 밖에 둔다.**
+  이 Mac의 위치는 `~/Developer/carrot-ha`이다. iCloud가 git이 파일을 바꾸는 순간을
+  충돌로 오인해 `이름 2.js`, `api 2.py` 같은 복사본을 만든 사례가 있다. 에이전트는 이런
+  추적되지 않은 `이름 2.확장자` 파일을 발견하면 임의로 삭제·커밋하지 말고 사용자에게 보고한다.
+- 다른 Mac에서도 같은 위치 규칙으로 각자 클론하고, 동기화는 GitHub로만 한다.
+  양쪽에서 `git config --global pull.ff only`를 설정해 pull이 몰래 병합 커밋을 만들지 않게 한다.
+- 작업 순서: 시작 시 `git status`가 깨끗한지 확인하고 `git pull --ff-only`를 실행한다. 끝날 때
+  커밋·푸시 후 `git rev-list --count origin/main..HEAD`가 0인지 확인한 뒤 다른 Mac으로 옮긴다.
+  커밋하지 않은 작업을 둔 채 다른 Mac에서 시작하지 않는다. 미완성은 임시 브랜치로 푸시한다.
+  병합이 충돌로 멈춘 상태(GitHub Desktop pull 포함)를 방치하지 않고 바로 해결하거나 중단한다.
+- **에이전트의 시작 점검:** 커밋·푸시·배포 전에 `git status`로 `.git/MERGE_HEAD`, 충돌(`UU`/`AA`),
+  이미 스테이징된 다른 작업이 있는지 확인한다. 있으면 그 작업을 함께 커밋하지 말고 분리하거나
+  사용자에게 보고한다. 사용자의 스테이징 작업과 GitHub Desktop 스태시를 임의로 커밋·폐기·복원하지 않는다.
+- 로컬에만 있는 브랜치와 스태시가 있을 수 있으므로 저장소를 옮길 때는 새로 클론하지 않고
+  폴더를 이동(`mv`)하며, 이동 전에 `git bundle create ~/<이름>.bundle --all`로 동기화되지 않는 위치에 백업한다.
+
 ## 1. Two-Repository Architecture
 
 The Carrot HA system is strictly divided into two independent repositories:
