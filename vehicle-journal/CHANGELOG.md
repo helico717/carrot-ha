@@ -1,3 +1,9 @@
+## 2026-10-26 — vehicle-journal: 상세 기록 단가 표시 HA 직접 반영
+
+- 커밋 `102be6e`. 사용자가 표시안을 확인하고 "일단 이렇게" 반영을 요청했다.
+- HA 반영 4개(모두 로컬과 해시 일치 확인): `station_stats.py`(`f21aa293…`), `store.py`(`c951aa9f…`), `carrot-journal-design.js`(`cea9605a…`), `carrot-vehicle-journal.js`(`d2ace900…`). 반영 전 4개 모두 직전 반영본(`e1c62b0`)의 해시와 같음을 확인했고 Python 구문 검사도 통과했다. 백업은 HA `/config/carrot_ha/deployment-backups/102be6e/`(백업 폴더·파일 root 소유라 `sudo` 사용, 소유자 유지).
+- 미확인/후속: Python 변경이라 **HA 재시작 전까지 단가가 표시되지 않는다**(미수행). 브라우저 새로고침(Ctrl+F5) 필요. 운영 데이터의 실제 단가와 "약" 표시는 미확인. 릴리즈 없음.
+
 ## 2026-10-26 — vehicle-journal: 상세 기록 단가 표시 구현
 
 - 이유: 사용자가 검토용 화면(`review-unit-price.html`)의 표시안(`원/단위`, "약" 규칙 그대로)을 확인하고 "일단 이렇게" HA 반영을 요청했다.
