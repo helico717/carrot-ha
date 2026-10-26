@@ -136,9 +136,9 @@ class CarrotParamsCard extends HTMLElement {
       this._setParam(msg.name, msg.value).then(
         value => source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: true, name: msg.name, value}, window.location.origin),
         error => {
-          this._applyStatus = {tone: 'error', text: '변경 확인 실패', detail: error.message};
+          this._applyStatus = {tone: 'error', text: error.uncertain ? '적용 여부 미확인 · 차량 값 재확인 중' : '변경 실패 · 마지막 확인값 복원', detail: error.message};
           this._renderHeaderStatus();
-          source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: false, error: error.message}, window.location.origin);
+          source.postMessage({type: 'carrot:response', requestId: msg.requestId, ok: false, error: error.message, uncertain: !!error.uncertain}, window.location.origin);
         }
       );
     } else if (msg.type === 'carrot:resize' && typeof msg.height === 'number') {
@@ -240,10 +240,10 @@ class CarrotParamsCard extends HTMLElement {
     this._checkingStatus = true;
     try {
       for (const [id, req] of this._pending) {
-        if (Date.now() - req.started > 100000) {
+        if (Date.now() - req.started > 100000 && !req.notified) {
           this._applyStatus = {tone: 'warning', text: '적용 확인 시간 초과', detail: '요청은 나중에 적용될 수 있습니다. 차량 연결 후 실제 값을 확인하세요.'};
-          req.reject(new Error('차량 적용 확인 시간이 초과되었습니다. 요청은 남아 있을 수 있으므로 재조회하세요.'));
-          this._pending.delete(id);
+          req.notified = true;
+          req.reject(Object.assign(new Error('차량 적용 확인 시간이 초과되었습니다. 요청은 남아 있을 수 있으므로 재조회하세요.'), {uncertain: true}));
         }
       }
       if (!this._pending.size) return;
@@ -259,6 +259,11 @@ class CarrotParamsCard extends HTMLElement {
           const actual = snapshot.values?.[req.name];
           if (actual === undefined) continue;
           this._values[req.name] = actual;
+          this.shadowRoot.getElementById('carrotSettingsFrame')?.contentWindow?.postMessage({type: 'carrot:confirmed', name: req.name, value: actual}, window.location.origin);
+          if (this._snapshotData) {
+            this._snapshotData.values = {...this._snapshotData.values, [req.name]: actual};
+            this._sendSnapshotToIframe();
+          }
           this._updatedAt = snapshot.updated_at || this._updatedAt;
           const matches = Number(actual) === Number(req.value);
           this._applyStatus = {
@@ -285,7 +290,7 @@ class CarrotParamsCard extends HTMLElement {
 
   async _setParam(name, value) {
     if (!this._hass || !this._entryId) throw new Error('HA 장치 연결이 없습니다.');
-    if (this._snapshotData?.param_queue_protocol !== 1) throw new Error('Worker를 최신 버전으로 배포한 뒤 새로고침하세요. 현재 서버는 적용 확인을 지원하지 않습니다.');
+    if (this._snapshotData?.param_queue_protocol !== 1) throw new Error('차량 수신 앱을 업데이트한 뒤 새로고침하세요. 현재 수신기는 적용 확인을 지원하지 않습니다.');
     const item = this._getAllItems().find(item => item.name === name);
     if (!item || !Number.isFinite(Number(value)) || value === '' || value === null ||
         Number(value) < Number(item.min) || Number(value) > Number(item.max)) throw new Error('현재 카탈로그에 없는 파라미터이거나 허용 범위를 벗어난 값입니다.');
@@ -297,11 +302,14 @@ class CarrotParamsCard extends HTMLElement {
     let res;
     try {
       res = await this._hass.callApi('POST', `carrot_ha/v1/param_set/${encodeURIComponent(entryId)}`, {name, value});
+    } catch (error) {
+      error.uncertain = true;
+      throw error;
     } finally {
       this._sending.delete(name);
     }
     if (this._entryId !== entryId || !this.isConnected) throw new Error('화면 연결이 변경되었습니다. 실제 적용 여부를 다시 확인하세요.');
-    if (!res?.ok || !res.ids?.length) throw new Error(res?.error || '변경 요청 ID를 받지 못했습니다. 적용 여부를 다시 확인하세요.');
+    if (!res?.ok || !res.ids?.length) throw Object.assign(new Error(res?.error || '변경 요청 ID를 받지 못했습니다. 적용 여부를 다시 확인하세요.'), {uncertain: true});
     this._showToast(`⏳ ${name}: 차량 적용 대기 중`);
     return new Promise((resolve, reject) => {
       this._pending.set(String(res.ids[0]), {name, value, resolve, reject, started: Date.now()});
@@ -342,7 +350,7 @@ class CarrotParamsCard extends HTMLElement {
 
   _syncStatus() {
     if (this._sending.size) return {tone: 'warning', text: '변경 요청 전송 중'};
-    if (this._pending.size) return {tone: 'warning', text: `Comma 적용 대기 · ${this._pending.size}건`, detail: this._statusError || '차량의 적용 응답과 실제 값을 확인하고 있습니다.'};
+    if (this._pending.size) return {tone: 'warning', text: [...this._pending.values()].some(req => req.notified) ? '적용 여부 미확인 · 차량 값 재확인 중' : `Comma 적용 대기 · ${this._pending.size}건`, detail: this._statusError || '차량의 적용 응답과 실제 값을 확인하고 있습니다.'};
     if (this._applyStatus) return this._applyStatus;
     if (this._error) return {tone: 'error', text: '수신 확인 실패', detail: this._error};
     if (this._waitingForSync || !this._updatedAt) return {tone: 'neutral', text: '차량 데이터 수신 대기'};

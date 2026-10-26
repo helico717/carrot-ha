@@ -71,7 +71,7 @@ const root = path.resolve('custom_components/carrot_ha/frontend');
     await page.evaluate(()=>window.failWrite=true);
     const rejected = await child.evaluate(async () => {try {await postJson('/api/param_set',{name:'TestOffset',value:9});return false;}catch(e){return e.message.includes('test rejection');}});
     assert.equal(rejected,true);
-    assert.match(await page.locator('#syncStatus').innerText(), /변경 확인 실패/);
+    assert.match(await page.locator('#syncStatus').innerText(), /실패|미확인/);
     assert.equal(await child.evaluate(async ()=>(await getJson('/api/params_bulk')).values.TestOffset),4);
     console.log('PASS: source isolation, unsupported actions, failure propagation and exact-ID application');
     await page.evaluate(async () => {

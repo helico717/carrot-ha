@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+from params_recovery_patch import apply_recovery
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--openpilot', required=True)
@@ -82,6 +83,7 @@ bridge_source = bridge.read_text()
 start = bridge_source.index("    document.getElementById('itemsTitle')?.addEventListener")
 end = bridge_source.index("    send({type: 'carrot:ready'});", start)
 bridge.write_text(bridge_source[:start] + bridge_source[end:])
+apply_recovery(target)
 (target.parent.parent / 'params-source.json').write_text(json.dumps({
     'repository': 'ajouatom/openpilot', 'commit': commit,
     'files': changed, 'status': 'preview only; not deployed',

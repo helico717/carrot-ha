@@ -1,7 +1,7 @@
-// Preserve existing Lovelace YAML and resource URLs while replacing the view.
-import CarrotLogsCard from './carrot-logs-card.js';
-class CarrotParamsCompat extends CarrotLogsCard {}
+// Existing YAML now opens parameter tuning again. Logs use carrot-logs-card.
+import CarrotParameterTuningCard from './carrot-parameter-tuning-card.js';
+class CarrotParamsCompat extends CarrotParameterTuningCard {}
 if (!customElements.get('carrot-params-card')) customElements.define('carrot-params-card', class extends CarrotParamsCompat {});
 window.customCards = window.customCards || [];
-if (!window.customCards.some(card => card.type === 'carrot-params-card')) window.customCards.push({type:'carrot-params-card', name:'Carrot HA — 당근웹 로그', description:'HA에 보관된 최신 주행 로그와 영상 조회'});
+if (!window.customCards.some(card => card.type === 'carrot-params-card')) window.customCards.push({type:'carrot-params-card', name:'Carrot HA — 파라미터 설정', description:'차량 파라미터 조회·변경 및 적용 확인'});
 export default CarrotParamsCompat;

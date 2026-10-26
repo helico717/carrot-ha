@@ -34,6 +34,7 @@ lazyCard('carrot-dashboard-en','./carrot-dashboard-en.js');
 lazyCard('carrot-dashboard-debug-card','./carrot-dashboard-debug.js');
 lazyCard('carrot-dashboard-debug','./carrot-dashboard-debug.js');
 lazyCard('carrot-debug-dashboard','./carrot-dashboard-debug.js');
+lazyCard('carrot-parameter-tuning-card','./carrot-parameter-tuning-card.js');
 lazyCard('carrot-params-card','./carrot-params-card.js');
 lazyCard('carrot-logs-card','./carrot-logs-card.js');
 class LocalizedDashboard extends HTMLElement {
@@ -65,3 +66,5 @@ window.customCards.push({type:'carrot-dashboard-card',name:'Carrot HA — MEB',d
 if (!window.customCards.some(card => card.type === 'carrot-logs-card')) window.customCards.push({type:'carrot-logs-card',name:'Carrot HA — 당근웹 로그',description:'HA에 보관된 최신 주행 로그와 영상 조회'});
 window.customCards.push({type:'carrot-dashboard-debug-card',name:'Carrot HA — 실시간 UI 디버깅 대시보드',description:'슬라이더와 토글로 충전/배터리 상태를 실시간 시뮬레이션하는 개발자 디버거 카드'});
 
+
+if (!window.customCards.some(card => card.type === 'carrot-parameter-tuning-card')) window.customCards.push({type:'carrot-parameter-tuning-card',name:'Carrot HA — 파라미터 설정',description:'차량 파라미터 조회·변경 및 적용 확인'});

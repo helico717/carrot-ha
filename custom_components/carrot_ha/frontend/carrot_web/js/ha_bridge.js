@@ -13,7 +13,7 @@
   const unsupported = () => { throw new Error('HA 원격 설정에서 지원하지 않는 기능입니다.'); };
 
   window.getJson = async function (url) {
-    if (url === '/api/settings/snapshot') return cachedSnapshot;
+    if (url === '/api/settings/snapshot') return structuredClone(cachedSnapshot);
     if (url === '/api/settings') return cachedSnapshot.settings;
     if (url.startsWith('/api/params_bulk')) return {ok: true, values: {...cachedSnapshot.values}};
     if (url === '/api/setting_favorites') return {ok: true, favorites: []};
@@ -36,7 +36,7 @@
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         requests.delete(requestId);
-        reject(new Error('적용 확인 시간 초과. 차량 재연결 후 실제 값을 확인하세요.'));
+        reject(Object.assign(new Error('적용 여부 미확인. 마지막 확인값을 표시합니다.'), {uncertain: true}));
         flushDeferred();
       }, 110000);
       requests.set(requestId, {name: body.name, resolve, reject, timer});
@@ -90,6 +90,16 @@
     const msg = event.data;
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'carrot:snapshot') hydrate(msg.data).catch(showError);
+    if (msg.type === 'carrot:confirmed' && typeof msg.name === 'string') {
+      cachedSnapshot.values[msg.name] = msg.value;
+      window.CarrotSettingsRuntime.values.applyValues({[msg.name]: msg.value});
+      window.dispatchEvent(new CustomEvent('carrot:paramsrestored', {detail: {source: 'ha_confirmed', values: {[msg.name]: msg.value}}}));
+      document.querySelectorAll('.setting[data-setting-name]').forEach(row => {
+        if (row.dataset.settingName !== msg.name) return;
+        const state = row.querySelector('.ha-param-state');
+        if (state) state.textContent = `차량 확인값: ${msg.value}`;
+      });
+    }
     if (msg.type === 'carrot:response') {
       const req = requests.get(msg.requestId);
       if (!req) return;
@@ -98,7 +108,7 @@
       if (msg.ok) {
         cachedSnapshot.values[req.name] = msg.value;
         req.resolve({ok: true, name: req.name, value: msg.value});
-      } else req.reject(new Error(msg.error || '변경 실패'));
+      } else req.reject(Object.assign(new Error(msg.error || '변경 실패'), {uncertain: !!msg.uncertain}));
       // An older snapshot must not overwrite the just-confirmed result.
       deferredSnapshot = null;
     }
@@ -114,16 +124,6 @@
       const el = document.getElementById(id);
       if (el) { el.hidden = true; el.disabled = true; }
     }
-    document.getElementById('itemsTitle')?.addEventListener('click', () => {
-      if (CURRENT_SETTING_DETAIL) {
-        CURRENT_SETTING_DETAIL = null;
-        renderItems(CURRENT_GROUP, {scrollMode: 'restore', animateItems: false}).catch(showError);
-      } else {
-        CURRENT_GROUP = null;
-        showSettingScreen('groups', false);
-        renderGroups({animateGroups: false});
-      }
-    });
     send({type: 'carrot:ready'});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready);
