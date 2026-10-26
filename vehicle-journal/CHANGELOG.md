@@ -5,7 +5,7 @@
 - 소급 적용: 순서는 저장값이 아니라 조회 때마다 SQL로 계산하므로 기존 기록에도 마이그레이션 없이 적용된다.
 - 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`(`test_same_day_records_are_newest_first_regardless_of_id` 추가).
 - 검증: 신규 테스트 통과. `test_journal.py`의 기존 오류 4건은 로컬에 PIL이 없어서 나며 이 변경 전에도 같다. 실제 운영 DB의 꽃지해안 기록 순서는 미확인.
-- 배포 상태: 커밋·푸시만. Python 변경이므로 HA 반영 시 HA 재시작이 필요하다. HA 직접 반영·릴리즈 없음.
+- 배포 상태: 커밋·푸시 `0f32bb4`. 사용자 승인으로 HA SSH 직접 반영: `vehicle_journal/store.py` 1개(`d058be89…`, 로컬과 일치, 구문 검사 통과). 반영 전 SHA-256이 직전 커밋 `59d9e798…`과 같음을 확인했고 백업은 HA `/config/carrot_ha/deployment-backups/0f32bb4/store.py`(백업 폴더가 root 소유라 `sudo`로 생성). Python 변경이므로 **HA 재시작 전까지 적용되지 않는다**(미수행). 릴리즈 없음. 운영 화면 순서 확인 미수행.
 
 ## 2026-10-26 — 저장소 위치 이동 및 여러 Mac 작업·시작 점검 규칙 문서화
 
