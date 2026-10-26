@@ -7,7 +7,13 @@ import math
 import re
 import time
 
+from ..http_body import read_limited
+
 PRODUCTS={'gasoline':'B027','diesel':'D047','premium':'B034'}
+
+
+class ProviderError(ValueError):
+    """Transient provider/transport failure; callers retry soon instead of treating it as a lookup result."""
 
 
 def coordinates(lat,lon):
@@ -39,12 +45,14 @@ class Stations:
         try:
             async with asyncio.timeout(12):
                 async with async_get_clientsession(self.manager.hass).get(url,params=params,headers=headers,allow_redirects=False) as response:
-                    if response.status!=200:raise ValueError('제공사 API 활성화·키·호출 한도를 확인해 주세요.')
-                    body=await response.content.read(1048577)
-                    if len(body)>1048576:raise ValueError('제공사 응답이 너무 커요.')
-                    return json.loads(body)
+                    if response.status!=200:raise ProviderError('제공사 API 활성화·키·호출 한도를 확인해 주세요.')
+                    # Read to EOF: a single read() can stop at the first network chunk and truncate JSON.
+                    body=await read_limited(response,1048576)
+                    if body is None:raise ProviderError('제공사 응답이 너무 커요.')
+                    try:return json.loads(body)
+                    except ValueError:raise ProviderError('제공사 응답을 끝까지 확인하지 못했어요. 잠시 뒤 다시 조회할게요.') from None
         except ValueError:raise
-        except Exception:raise ValueError('장소/가격 조회에 실패했어요. 기존 입력값은 유지합니다.') from None
+        except Exception:raise ProviderError('장소/가격 조회에 실패했어요. 기존 입력값은 유지합니다.') from None
     async def cached(self,key,service,path,params,ttl=900):
         now=time.monotonic();item=self.cache.get(key)
         if item and now-item[0]<ttl:return item[1]

@@ -4,11 +4,14 @@ import json
 import time
 import math
 from .store import stamp,encode,now
-from .stations import coordinates,distance_m
+from .stations import coordinates,distance_m,ProviderError
 from ..archive_codec import loads
 
 
-LOOKUP_VERSION=3
+# 4: re-run lookups that a truncated provider response wrongly parked for 24 hours.
+LOOKUP_VERSION=4
+RETRY_DAY=86400
+RETRY_TRANSIENT=900
 
 def pending(journal):
     with journal.connect() as db:
@@ -87,7 +90,7 @@ def position(archive,journal,started):
     return min(candidates,key=lambda p:p[0])[1] if candidates else None
 
 
-def save(journal,item,point,location,message,candidates=None):
+def save(journal,item,point,location,message,candidates=None,transient=False):
     key,version,extra,_=item
     with journal.lock,journal.connect() as db:
         row=db.execute('SELECT version,extra_json FROM records WHERE vehicle_id=? AND id=?',(journal.vehicle,key)).fetchone()
@@ -95,7 +98,12 @@ def save(journal,item,point,location,message,candidates=None):
         current=json.loads(row[1])
         if 'location' in current or current.get('location_user_override'):return False
         if point:current['source_position']=point
-        current['location_lookup']={'version':LOOKUP_VERSION,'retry_after':time.time()+86400,'message':message}
+        previous=current.get('location_lookup',{})
+        # Provider/transport failures are not a lookup result: back off from 15 minutes up to a day.
+        failures=(previous.get('failures',0) if previous.get('version')==LOOKUP_VERSION else 0)+1 if transient else 0
+        delay=min(RETRY_DAY,RETRY_TRANSIENT*2**(failures-1)) if transient else RETRY_DAY
+        current['location_lookup']={'version':LOOKUP_VERSION,'retry_after':time.time()+delay,'message':message}
+        if transient:current['location_lookup']['failures']=failures
         if candidates:current['location_lookup']['candidates']=candidates
         if location:journal.validate_location(location);current['location']=location
         db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(current),now(),journal.vehicle,key))
@@ -135,7 +143,7 @@ async def enrich(hass,manager,archive,journal):
     if not electric_vehicle(manager,journal):return
     for item in await hass.async_add_executor_job(pending,journal):
         point=await hass.async_add_executor_job(position,archive,journal,item[3])
-        selected=None;candidates=None;address=None;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
+        selected=None;candidates=None;address=None;transient=False;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
         if not electric_vehicle(manager,journal):return
         if point:
             try:
@@ -145,7 +153,8 @@ async def enrich(hass,manager,archive,journal):
                     if address:
                         message='충전소를 하나로 확정하지 못해 주소만 기록했어요. 실제 이용한 충전소를 선택하면 정확해져요.'
                         candidates=[c['location']['name'] for c in result['candidates'][:3]]
+            except ProviderError as error:message=str(error);transient=True
             except ValueError as error:message=str(error)
         if not electric_vehicle(manager,journal):return
-        await hass.async_add_executor_job(save,journal,item,point,selected['location'] if selected else address,message,candidates)
+        await hass.async_add_executor_job(save,journal,item,point,selected['location'] if selected else address,message,candidates,transient)
     await hass.async_add_executor_job(propagate,journal)

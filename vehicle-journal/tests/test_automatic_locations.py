@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 import types
 import unittest
 from uuid import uuid4
@@ -90,6 +91,79 @@ class ScopeTests(unittest.IsolatedAsyncioTestCase):
         station=Stations(None)
         async def cached(*args):return {'documents':[{'id':'near','place_name':'near','category_name':'전기차 충전소','x':'127','y':'37.5'}],'meta':{'is_end':False}}
         station.cached=cached;self.assertIsNone((await station.nearby('charging',37.5,127))['selected'])
+
+
+class ChunkedResponse:
+    """aiohttp-like body that arrives in pieces; read(n) returns only the first piece like StreamReader."""
+    def __init__(self,chunks,status=200):self.status=status;self.chunks=chunks;self.content=self
+    async def __aenter__(self):return self
+    async def __aexit__(self,*args):return False
+    async def read(self,n=-1):return self.chunks[0]
+    async def iter_chunked(self,size):
+        for chunk in self.chunks:yield chunk
+
+
+class ProviderBodyTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        helpers=types.ModuleType('homeassistant.helpers.aiohttp_client');self.reply=None
+        helpers.async_get_clientsession=lambda hass:types.SimpleNamespace(get=lambda *a,**k:self.reply)
+        self.mods={'homeassistant':types.ModuleType('homeassistant'),'homeassistant.helpers':types.ModuleType('homeassistant.helpers'),'homeassistant.helpers.aiohttp_client':helpers}
+        sys.modules.update(self.mods)
+        self.station=Stations(types.SimpleNamespace(kakao_rest_key='test',hass=None))
+    def tearDown(self):
+        for name in self.mods:sys.modules.pop(name,None)
+    async def test_body_split_across_network_chunks_is_read_to_the_end(self):
+        body=json.dumps({'documents':[{'id':str(i),'place_name':'충전소'*40} for i in range(15)],'meta':{'is_end':True}},ensure_ascii=False).encode()
+        self.reply=ChunkedResponse([body[:2838],body[2838:]])
+        self.assertEqual(len((await self.station.get('kakao','search/keyword.json',{}))['documents']),15)
+    async def test_truncated_or_oversized_body_is_a_transient_provider_error(self):
+        from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
+        for chunks in ([b'{"documents":[{"id":"1'],[b'x'*700000,b'x'*700000]):
+            self.reply=ChunkedResponse(chunks)
+            with self.assertRaises(ProviderError):await self.station.get('kakao','search/keyword.json',{})
+        self.reply=ChunkedResponse([b'{}'],status=500)
+        with self.assertRaises(ProviderError):await self.station.get('kakao','search/keyword.json',{})
+
+
+class TransientRetryTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory(ignore_cleanup_errors=True);self.a=Archive(Path(self.tmp.name)/'a.db');self.j=Journal(Path(self.tmp.name)/'j.db','entry','car','Asia/Seoul')
+        start=datetime(2026,1,1,1,tzinfo=timezone.utc)
+        self.a.put({'schema':1,'device_id':'car','event_id':'charge','kind':'charge','observed_at':(start+timedelta(hours=1)).isoformat(),'data':{'started_at':start.isoformat(),'ended_at':(start+timedelta(hours=1)).isoformat(),'energy_kwh':10,'duration_s':3600}})
+        sync(self.a,self.j)
+    def tearDown(self):self.tmp.cleanup()
+    def lookup(self):
+        with self.j.connect() as db:return json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])['location_lookup']
+    async def run_enrich(self,nearby):
+        from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
+        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=nearby))
+        hass=types.SimpleNamespace(async_add_executor_job=lambda f,*a:asyncio.sleep(0,f(*a)))
+        point={'latitude':37.5,'longitude':127.0,'accuracy_m':2}
+        with patch.object(auto,'position',return_value=point):await auto.enrich(hass,manager,self.a,self.j)
+        return ProviderError
+    async def test_provider_failure_retries_soon_with_backoff_then_succeeds(self):
+        async def broken(*a):
+            from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
+            raise ProviderError('제공사 응답을 끝까지 확인하지 못했어요. 잠시 뒤 다시 조회할게요.')
+        await self.run_enrich(broken);first=self.lookup()
+        self.assertEqual(first['failures'],1);self.assertLess(first['retry_after']-time.time(),auto.RETRY_TRANSIENT+5)
+        self.assertEqual(auto.pending(self.j),[])
+        with self.j.connect() as db:
+            extra=json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0]);extra['location_lookup']['retry_after']=0
+            db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps(extra),))
+        await self.run_enrich(broken);second=self.lookup()
+        self.assertEqual(second['failures'],2);self.assertGreater(second['retry_after']-time.time(),auto.RETRY_TRANSIENT*2-5)
+        with self.j.connect() as db:
+            extra=json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0]);extra['location_lookup']['retry_after']=0
+            db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps(extra),))
+        place={'name':'근처 전기차충전소','address':'경기 의왕시 한밭들길 3','latitude':37.5,'longitude':127.0,'provider':'kakao','station_id':'1','station_type':'charging','selection_source':'automatic'}
+        async def found(*a):return {'selected':{'location':place},'message':'가장 가까운 후보를 자동 선택했어요.','candidates':[]}
+        await self.run_enrich(found)
+        with self.j.connect() as db:extra=json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])
+        self.assertEqual(extra['location']['station_id'],'1');self.assertNotIn('failures',extra['location_lookup'])
+    def test_records_parked_by_previous_lookup_version_are_retried(self):
+        with self.j.connect() as db:db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps({'location_lookup':{'version':3,'retry_after':time.time()+86400,'message':'Unterminated string'}}),))
+        self.assertEqual(len(auto.pending(self.j)),1)
 
 
 class AddressFallbackTests(unittest.IsolatedAsyncioTestCase):

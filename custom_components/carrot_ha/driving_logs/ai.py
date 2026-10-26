@@ -44,6 +44,16 @@ class AnalysisError(Exception):
         super().__init__(code)
 
 
+async def read_limited(response, limit):
+    """Whole body or None over limit; StreamReader.read(n) may return only the first chunk."""
+    body = bytearray()
+    async for chunk in response.content.iter_chunked(65536):
+        body += chunk
+        if len(body) > limit:
+            return None
+    return bytes(body)
+
+
 def finite(value):
     if type(value) not in (int, float) or not math.isfinite(value):
         raise ValueError('finite_number_required')
@@ -235,8 +245,8 @@ class AiManager:
         try:
             async with session.request(method,API+path,headers={'x-goog-api-key':key},
                     json=body,timeout=ClientTimeout(total=90),allow_redirects=False) as response:
-                raw=await response.content.read(256*1024+1)
-                if len(raw)>256*1024:raise AnalysisError('response_limit','AI 응답 크기가 제한을 초과했습니다.',502)
+                raw=await read_limited(response,256*1024)
+                if raw is None:raise AnalysisError('response_limit','AI 응답 크기가 제한을 초과했습니다.',502)
                 if response.status==429:raise AnalysisError('provider_quota','Gemini API의 요청·토큰 한도에 도달했습니다. AI Studio에서 확인해 주세요.',429)
                 if response.status in (401,403):raise AnalysisError('provider_auth','Gemini 키의 권한·API 제한·프로젝트 설정을 확인해 주세요.',502)
                 if not 200<=response.status<300:raise AnalysisError('provider_error',f'Gemini 요청이 실패했습니다 (HTTP {response.status}). 자동 재시도는 하지 않습니다.',502)
@@ -300,7 +310,7 @@ class AiManager:
                     params={'device_id':self.runtime['entry'].data['device_id']},
                     headers={'Authorization':'Bearer '+options['receiver_view_token']},timeout=ClientTimeout(total=15)) as response:
                 if response.status!=200:return {}
-                if len(raw:=await response.content.read(2*1024**2+1))>2*1024**2:return {}
+                if (raw:=await read_limited(response,2*1024**2)) is None:return {}
                 return json.loads(raw)
         except asyncio.CancelledError:raise
         except Exception:return {}
