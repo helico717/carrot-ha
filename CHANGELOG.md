@@ -3,7 +3,7 @@
 - 원인: aiohttp `response.content.read(n)`은 첫 네트워크 조각만 반환할 수 있어 카카오 충전소 검색 JSON이 잘렸다. 2026-10-26 충전 기록의 위치가 자동 지정되지 않고 24시간 재시도 대기가 됐다.
 - 변경: 응답을 EOF까지 읽는 `read_limited` 도입(`http_body.py`, 주행 로그 `ai.py`), 일시 실패는 15분부터 최대 24시간 백오프, 조회 버전 4로 대기 중 기록 재조회. 상세: `vehicle-journal/CHANGELOG.md`, `driving-logs/CHANGELOG.md`.
 - 추가: 충전소 이름을 못 정하는 모든 경우(제공사 오류·결과 과다·결과 없음 포함)에 도로명 주소를 먼저 저장하고, 오류로 저장한 주소는 재조회 성공 시 충전소로 교체한다. 결과가 45건을 넘는 지역에서도 거리상 안전하면 단독 근접 충전소를 자동 선택한다.
-- 배포 상태: `2730a92` HA 직접 반영·해시 확인 완료(백업 `/config/carrot_ha/deployment-backups/2730a920f993e7fc4e37dbabf8c4a0ba437b3044/`). 후속 커밋도 HA 직접 반영 예정. 사용자 HA 재시작 필요. 버전·태그·릴리즈 없음. 상세: `vehicle-journal/CHANGELOG.md`.
+- 배포 상태: `2730a92` HA 직접 반영·해시 확인 완료(백업 `/config/carrot_ha/deployment-backups/2730a920f993e7fc4e37dbabf8c4a0ba437b3044/`). 후속 `cfd291f`도 HA 직접 반영·해시 확인 완료(백업 `/config/carrot_ha/deployment-backups/cfd291fc8e2739429adc3ec5e19ebe4b8a7d63d5/`). 사용자 HA 재시작 필요. 버전·태그·릴리즈 없음. 상세: `vehicle-journal/CHANGELOG.md`.
 
 ## 2026-10-26 — 디버그 대시보드: 오픈파일럿 시나리오, 테스트 완료 패널 제거, 데스크톱 좌우 배치·기능 선택 (HA 반영)
 
