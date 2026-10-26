@@ -27,8 +27,8 @@
 <script type="module">
 const loc=(name,address,lat,lon,extra={})=>({name,address,latitude:lat,longitude:lon,provider:'kakao',station_type:'charging',...extra});
 const T=loc('티스테이션 의왕시청점 전기차충전소','경기 의왕시 시청로 1',37.3447,126.9683,{station_id:'1',selection_source:'automatic'});
-const K=loc('꽃지해안공원 주차장 전기차충전소','충남 태안군 안면읍 장곡길 1',36.4999,126.3305,{station_id:'2',selection_source:'automatic'});
-const A=loc('충남 태안군 안면읍 꽃지해안로 400','충남 태안군 안면읍 꽃지해안로 400',36.5002,126.3321,{selection_source:'automatic_address'});
+const K=loc('꽃지해안공원 주차장 전기차충전소','충남 태안군 안면읍 장곡길 1',36.5012,126.3370,{station_id:'2',selection_source:'automatic'});
+const A=loc('충남 태안군 안면읍 꽃지해안로 400','충남 태안군 안면읍 꽃지해안로 400',36.5015,126.3374,{selection_source:'automatic_address'});
 const rec=(id,date,krw,location,place,extra={})=>({id,kind:'expense',origin:'automatic',status:'active',version:1,accounting_date:date,category:'charging',actual_krw:krw,estimated_krw:null,location,place,attachments:[],...extra});
 const records=[
   rec('r1','2026-10-25',8728,K,'kakao:2'),
