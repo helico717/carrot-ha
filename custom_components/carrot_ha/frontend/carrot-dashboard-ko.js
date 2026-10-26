@@ -1439,12 +1439,16 @@ class CarrotDashboard extends HTMLElement {
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
-    // Legacy artwork contains large transparent margins; crop only for an explicit preset.
-    if(this.config?.vehicle_image_layout==='legacy_id4')return `<svg class="car-image" viewBox="1000 552 2120 1680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(this.config?.vehicle_name||'차량')}"><image href="${esc(src)}" width="4096" height="2729"/></svg>`;
     const alt=esc(this.config?.vehicle_name||'Carrot HA');
-    // The PNG stays inside the 3D container as the fallback (no model file, no WebGL, or 3D disabled).
-    if(this.config?.vehicle_3d===false)return `<img class="car-image" src="${esc(src)}" alt="${alt}" style="object-fit:contain">`;
-    return `<div class="car-image vehicle3d"><img class="v3d-fallback" src="${esc(src)}" alt="${alt}"></div>`;
+    // Legacy artwork contains large transparent margins; crop only for an explicit preset.
+    const legacy=this.config?.vehicle_image_layout==='legacy_id4';
+    const legacySvg=cls=>`<svg class="${cls}" viewBox="1000 552 2120 1680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(this.config?.vehicle_name||'차량')}"><image href="${esc(src)}" width="4096" height="2729"/></svg>`;
+    // 3D disabled: the original image markup, unchanged.
+    if(this.config?.vehicle_3d===false)return legacy?legacySvg('car-image'):`<img class="car-image" src="${esc(src)}" alt="${alt}" style="object-fit:contain">`;
+    // The configured image (legacy crop included) stays inside the 3D container as the fallback used
+    // when there is no model file, no WebGL, or the model fails to load.
+    const fallback=legacy?legacySvg('v3d-fallback'):`<img class="v3d-fallback" src="${esc(src)}" alt="${alt}">`;
+    return `<div class="car-image vehicle3d">${fallback}</div>`;
   }
   // Interactive 3D vehicle: lazy-loaded, fed with the state this card already holds.
   syncVehicle3d(v,state){

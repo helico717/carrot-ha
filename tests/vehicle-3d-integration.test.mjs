@@ -60,8 +60,28 @@ for (const lang of ['ko', 'en']) {
     assert.doesNotMatch(source, /^(import|const .*await import).*carrot-vehicle-3d/m, 'must not load 3D eagerly');
     assert.match(source, /import\(dependencyURL\('\.\/carrot-vehicle-3d\.js'\)\)/);
     assert.match(source, /this\.syncVehicle3d\(v,state\);/);
-    assert.match(source, /class="car-image vehicle3d"><img class="v3d-fallback"/);
-    assert.match(source, /vehicle_3d===false\)return `<img class="car-image"/);
+    assert.match(source, /<div class="car-image vehicle3d">\$\{fallback\}<\/div>/);
+  });
+}
+
+globalThis.HTMLElement = class { attachShadow() {} };
+for (const lang of ['ko', 'en']) {
+  const Card = (await import(new URL(`carrot-dashboard-${lang}.js`, frontend))).default;
+  const image = config => Card.prototype.vehicleImage.call({config});
+  test(`${lang}: the 3D container is used for every image layout, with the configured image as fallback`, () => {
+    // Regression: a card configured with the legacy ID.4 crop used to bypass 3D entirely.
+    const legacy = image({vehicle_image_layout: 'legacy_id4', vehicle_image: '/local/carrot-assets/id4.png', vehicle_name: 'ID.4 PRO'});
+    assert.match(legacy, /^<div class="car-image vehicle3d"><svg class="v3d-fallback" viewBox="1000 552 2120 1680"/);
+    assert.match(legacy, /href="\/local\/carrot-assets\/id4\.png"/);
+    const plain = image({vehicle_image: '/local/x.png'});
+    assert.match(plain, /^<div class="car-image vehicle3d"><img class="v3d-fallback" src="\/local\/x\.png"/);
+    const bare = image({});
+    assert.match(bare, /class="car-image vehicle3d"/);
+  });
+  test(`${lang}: vehicle_3d false returns the original image markup`, () => {
+    assert.match(image({vehicle_3d: false, vehicle_image_layout: 'legacy_id4', vehicle_image: '/a.png'}), /^<svg class="car-image" viewBox="1000 552 2120 1680"/);
+    assert.match(image({vehicle_3d: false, vehicle_image: '/a.png'}), /^<img class="car-image" src="\/a\.png"/);
+    assert.doesNotMatch(image({vehicle_3d: false}), /vehicle3d/);
   });
 }
 
