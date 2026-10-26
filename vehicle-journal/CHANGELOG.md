@@ -1,3 +1,12 @@
+## 2026-10-26 — vehicle-journal: 상세 기록 단가 표시 구현
+
+- 이유: 사용자가 검토용 화면(`review-unit-price.html`)의 표시안(`원/단위`, "약" 규칙 그대로)을 확인하고 "일단 이렇게" HA 반영을 요청했다.
+- 변경(프론트): `carrot-vehicle-journal.js`가 서버의 `unit_price`가 있는 행의 금액 아래에 `313원/kWh`·`1,701원/L`(추정이면 `약 200원/kWh`)을 표시한다. `carrot-journal-design.js`에 12px·보통 굵기·보조색 스타일(`.ledger-unit-price`) 추가. 캐시 버스팅 파라미터를 `journal-20261026-unit-price-1`로 갱신. 하네스의 덧입히기 코드는 제거했다.
+- "약" 조건: 청구 kWh 없이 연결 충전 세션의 배터리 kWh 합계로 계산했거나, 실제 금액 없이 추정 금액만 있을 때(`approximate`).
+- 알려진 빈틈(미수정, 사용자 확인 후 결정): 주유량이 입력 화면의 자동 추정(`fuel_quantity_source='estimated'`)인 기록에는 "약"이 붙지 않는다.
+- 검증: 하네스에서 실제 프로덕션 코드로 6개 행 표시(글자 굵기 400·12px, 단가 없는 세차·정비 행 미표시), 콘솔 오류 없음. `test_automatic_locations` 21건, `test_frontend_revision`, `frontend-revision-bootstrap` 통과.
+- 배포 상태: HA 직접 반영은 아래 별도 기록 참조.
+
 ## 2026-10-26 — vehicle-journal: 상세 기록 단가 표시(서버 계산 구현, 화면은 검토용)
 
 - 이유: 사용자가 상세 기록의 충전/주유 금액 아래에 단가를 정수로, 결제 금액보다 작고 볼드 없이 표시해 달라고 요청했다(전기차는 `원/kWh`, 내연기관은 `원/L`).

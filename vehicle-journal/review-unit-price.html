@@ -9,9 +9,7 @@
   저장소 루트에서  python3 -m http.server 8765  실행 후
   http://localhost:8765/vehicle-journal/review-unit-price.html   (열면 "상세 기록" 탭이 자동으로 열린다)
   기록·금액·수량은 모두 합성 데이터다(운영 데이터 아님). 서버가 계산해 주는 unit_price 값(원/정수)을 합성으로 넣었다.
-  아래 "제안 표시" 블록은 프로덕션 파일에 아직 반영하지 않은 변경안이며 이 페이지에서만 덧입힌다:
-   금액 아래에 작은 비볼드 단가("313원/kWh" / "1,701원/L"), 수량이 추정(배터리 kWh)이면 "약 200원/kWh".
-  상단 버튼으로 제안 표시를 켜고 끌 수 있다.
+  단가 표시는 이제 프로덕션 코드에 반영된 동작을 그대로 보여준다(덧입히기 코드 없음): 금액 아래 작은 비볼드 "313원/kWh"·"1,701원/L", 추정 수량이면 "약 200원/kWh".
 -->
 <style>
   :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
@@ -23,7 +21,7 @@
 </style>
 </head>
 <body>
-<div class="bar"><b>단가 표시 검토</b><button id="toggle" aria-pressed="true">제안 표시 켬</button>
+<div class="bar"><b>단가 표시 검토</b>
 <small>충전(청구 kWh) · 충전(배터리 추정, "약") · 주유(L) 예시와, 단가가 없는 세차·정비 행이 섞여 있어요. 전기차/내연기관을 한 화면에 보이려고 섞은 합성 데이터예요.</small></div>
 <main id="mount"></main>
 <script type="module">
@@ -45,29 +43,8 @@ const hass={callWS:async msg=>{
   return {};
 }};
 await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
-const P=customElements.get('carrot-vehicle-journal').prototype;
-let on=true;
-/* ===== 제안 표시(프로덕션 미반영): 금액 아래 작은 비볼드 단가 ===== */
-const money=n=>Number(n).toLocaleString('ko-KR');
-const apply=card=>{
-  const root=card.shadowRoot;
-  if(!root.getElementById('unitPriceStyle')){const st=document.createElement('style');st.id='unitPriceStyle';st.textContent='.ledger-unit-price{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--j-sub);font-variant-numeric:tabular-nums}';root.append(st);}
-  root.querySelectorAll('.ledger-unit-price').forEach(n=>n.remove());
-  if(!on)return;
-  const byId=new Map((card.data?.records||[]).map(r=>[r.id,r]));
-  for(const tr of root.querySelectorAll('#records tr')){
-    const id=tr.querySelector('[data-record]')?.dataset.record;const price=byId.get(id)?.unit_price;
-    if(!price)continue;
-    const el=document.createElement('small');el.className='ledger-unit-price';
-    el.textContent=`${price.approximate?'약 ':''}${money(price.krw)}원/${price.unit}`;
-    tr.querySelector('.ledger-amount-col')?.append(el);
-  }
-};
-const renderData=P.renderData;P.renderData=function(...a){const r=renderData.apply(this,a);apply(this);return r;};
-/* ===== /제안 표시 ===== */
 const card=document.createElement('carrot-vehicle-journal');
 document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
-document.getElementById('toggle').onclick=e=>{on=!on;e.target.setAttribute('aria-pressed',on);e.target.textContent='제안 표시 '+(on?'켬':'끔');apply(card);};
 setTimeout(()=>card.selectTab(3),700);
 </script>
 </body>
