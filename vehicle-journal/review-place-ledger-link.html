@@ -9,10 +9,10 @@
   저장소 루트에서  python3 -m http.server 8765  실행 후
   http://localhost:8765/vehicle-journal/review-place-ledger-link.html
   장소·금액·기록은 합성 데이터다. 지도 타일은 OpenStreetMap(인터넷 필요).
-  아래 "제안 동작" 블록은 프로덕션 파일에 아직 반영하지 않은 변경안이며 이 페이지에서만 덧입힌다:
+  이제 프로덕션 코드에 반영된 동작을 그대로 보여준다(덧입히기 코드 없음):
    1) 핀을 누르면 그 핀으로 부드럽게 확대(이미 더 확대돼 있으면 줄이지 않음)
-   2) 장소 카드의 작은 "기록 보기 ›" 버튼(전 버전 "상세 기록에서 보기"를 축소) → 상세 기록 탭으로 이동, 그 장소 기록만 표시 + 필터 칩(✕로 해제)
-  합성 서버는 place 파라미터로 페이지 나누기 전에 걸러낸다(실제 구현도 서버 쪽 필터 예정).
+   2) 장소 카드의 작은 "기록 보기 ›" 버튼 → 상세 기록 탭으로 이동, 그 장소 기록만 표시 + 필터 칩(✕로 해제)
+  합성 서버는 place 파라미터로 거른다(실제 서버 필터는 Journal.query(place=…)).
 -->
 <style>
   :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
@@ -54,53 +54,7 @@ const hass={callWS:async msg=>{
   return {};
 }};
 await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
-const Card=customElements.get('carrot-vehicle-journal'),P=Card.prototype;
 
-/* ===== 제안 동작(프로덕션 미반영) ===== */
-P.ledgerFilterKey=function(){return JSON.stringify([this.recordSort,[...this.recordCategories].sort(),this.placeFilter?.id||'']);};
-const call=P.call;P.call=function(type,params={}){if(type==='query'&&this.placeFilter&&'record_sort' in params)params={...params,place:this.placeFilter.id};return call.call(this,type,params);};
-const updateFilters=P.updateLedgerFilters;P.updateLedgerFilters=function(){
-  updateFilters.call(this);
-  const box=this.$('ledgerFilters');let chip=this.$('placeFilterChip');
-  if(!this.placeFilter){chip?.remove();return;}
-  if(!chip){chip=document.createElement('span');chip.id='placeFilterChip';box.append(chip);}
-  /* "분류 선택"(.ledger-dropdown summary)과 같은 규격: 높이 34px·모서리 9px·테두리/배경 토큰·굵기 650, 값만 강조색. */
-  chip.style.cssText='display:inline-flex;align-items:center;gap:8px;min-height:34px;box-sizing:border-box;padding:4px 6px 4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650;max-width:100%';
-  chip.innerHTML='';const label=document.createElement('span');label.style.cssText='min-width:0;overflow-wrap:anywhere';
-  const kind=document.createElement('span');kind.textContent='장소 ';const value=document.createElement('span');value.textContent=this.placeFilter.name;value.style.cssText='color:var(--j-accent);font-size:.92em;margin-left:4px';label.append(kind,value);
-  const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','장소 필터 해제');x.style.cssText='flex:none;min-height:24px;width:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--j-sub);cursor:pointer;font-size:13px';
-  x.onclick=()=>{this.placeFilter=null;this.offset=0;this.updateLedgerFilters();this.load(true);};chip.append(label,x);
-};
-const showCard=P.showTrendsPlaceCard;P.showTrendsPlaceCard=function(p,name,...rest){
-  showCard.call(this,p,name,...rest);
-  const inner=this.$('trendsPlaceCard').querySelector('.trends-place-card-inner');
-  /* 공간 절약: 긴 안내 문단을 없애고 라벨만 남긴다(주소 기준 장소). */
-  inner.querySelectorAll(':scope > .muted').forEach(n=>n.remove());
-  const small=inner.querySelector('.trends-place-title-wrap small');if(small&&p.address_only)small.textContent='주소 기준';
-  /* 공간 절약: 큰 전체 폭 버튼 대신, 금액·방문횟수와 같은 줄의 작은 버튼 */
-  const grid=inner.querySelector('.trends-place-stats-grid');
-  /* 폭 절약: 라벨 위·값 아래 2줄 두 칸 대신 한 줄("누적 6,368원 · 방문 2회")과 작은 버튼. 카드는 내용 폭(최대 288px)이고 금액이 커져 한 줄에 안 들어가면 버튼이 다음 줄(오른쪽)로 내려간다. */
-  const [amount,visits]=[...grid.querySelectorAll('.trends-place-stat-val')].map(n=>n.textContent);
-  grid.style.cssText='display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px';
-  grid.innerHTML=`<span style="font-size:13px;color:var(--j-sub);white-space:nowrap">누적 <b style="color:#fff;font-size:15px">${amount}</b> · 방문 <b style="color:#fff;font-size:15px">${visits}</b></span>`;
-  const box=this.$('trendsPlaceCard');box.style.cssText+=';right:auto;width:max-content;max-width:min(288px,calc(100% - 20px));padding:10px 12px';
-  inner.querySelector('.trends-place-card-head').style.cssText+=';margin-bottom:8px;padding-bottom:6px';
-  /* 이름 생략(…) 금지: 제목은 줄바꿈해 끝까지 보이고, 종류 라벨은 제목 아래 줄로 내린다. */
-  const wrap=inner.querySelector('.trends-place-title-wrap');wrap.style.cssText+=';flex-wrap:wrap;gap:2px 8px;align-items:flex-start;flex:1';
-  const title=inner.querySelector('.trends-place-title');title.style.cssText+=';font-size:14px;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3;flex:1 1 0;min-width:0';
-  inner.querySelector('.trends-place-dot').style.marginTop='5px';
-  if(small)small.style.cssText+=';white-space:nowrap;flex:0 0 100%;margin:0 0 0 16px';
-  inner.querySelector('.trends-place-close-btn').style.alignSelf='flex-start';
-  const btn=document.createElement('button');btn.type='button';btn.textContent='기록 보기 ›';btn.setAttribute('aria-label','상세 기록에서 보기');
-  btn.style.cssText='min-height:0;height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--j-accent);background:rgba(129,230,197,.12);color:var(--j-accent);font-size:12.5px;font-weight:700;white-space:nowrap;cursor:pointer;flex:none';
-  btn.onclick=e=>{e.stopPropagation();this.placeFilter={id:p.id,name};this.recordCategories.clear();this.offset=0;this.selectTab(3);this.updateLedgerFilters();this.load(true);};
-  btn.style.marginLeft='auto';grid.append(btn);
-};
-const initMap=P.initTrendsMap;P.initTrendsMap=async function(){
-  await initMap.call(this);const m=this.trendsMapInstance;
-  if(m&&!m.__zoomPatched){m.__zoomPatched=true;m.panTo=ll=>m.flyTo(ll,Math.max(m.getZoom(),15),{duration:.7});}
-};
-/* ===== /제안 동작 ===== */
 
 const card=document.createElement('carrot-vehicle-journal');
 document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;

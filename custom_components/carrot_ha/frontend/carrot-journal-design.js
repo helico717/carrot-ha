@@ -1626,21 +1626,29 @@ export const journalDesign = `:host {
 .trends-map-dot-wrap{display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer}
 .trends-map-dot{width:14px;height:14px;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.5);transition:transform 0.18s cubic-bezier(0.34,1.56,0.64,1),box-shadow 0.18s ease}
 .trends-map-dot-wrap:hover .trends-map-dot,.trends-map-dot-wrap.active .trends-map-dot{transform:scale(1.45);box-shadow:0 0 0 4px rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.6)}
-.trends-place-card{position:absolute;bottom:14px;left:14px;right:14px;max-width:380px;z-index:1002;background:rgba(17,24,30,0.94);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,0.55);animation:trendsCardFadeIn 0.2s ease-out}
+.trends-place-card{position:absolute;bottom:14px;left:14px;right:auto;width:max-content;max-width:min(288px,calc(100% - 28px));z-index:1002;background:rgba(17,24,30,0.94);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.16);border-radius:16px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.55);animation:trendsCardFadeIn 0.2s ease-out}
 @keyframes trendsCardFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.trends-place-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08)}
-.trends-place-title-wrap{display:flex;align-items:center;gap:8px;min-width:0}
-.trends-place-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.trends-place-title{font-size:16px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trends-place-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.trends-place-title-wrap{display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px 8px;min-width:0;flex:1}
+.trends-place-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.trends-place-title{font-size:14px;font-weight:800;color:#ffffff;letter-spacing:-0.3px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;flex:1 1 0;min-width:0}
+.trends-place-kind{flex:0 0 100%;margin:0 0 0 18px;font-size:12px;color:var(--j-sub);white-space:nowrap}
 .trends-place-close-btn{background:transparent;border:0;color:var(--j-sub);font-size:20px;line-height:1;padding:2px 6px;min-height:auto;cursor:pointer;border-radius:6px}
 .trends-place-close-btn:hover{color:#ffffff;background:rgba(255,255,255,0.1)}
-.trends-place-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.trends-place-stats-grid{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px}
+.trends-place-stat-line{font-size:13px;color:var(--j-sub);white-space:nowrap}
+.trends-place-stat-line b{font-size:15px;color:#ffffff;font-variant-numeric:tabular-nums}
+.trends-place-ledger-btn{min-height:0;height:30px;padding:0 10px;margin-left:auto;flex:none;border-radius:999px;border:1px solid var(--j-accent);background:rgba(129,230,197,.12);color:var(--j-accent);font-size:12.5px;font-weight:700;white-space:nowrap;cursor:pointer}
+.ledger-place-chip{display:inline-flex;align-items:center;gap:8px;min-height:34px;box-sizing:border-box;max-width:100%;padding:4px 6px 4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650}
+.ledger-place-chip-label{min-width:0;overflow-wrap:anywhere}
+.ledger-place-chip-value{margin-left:8px;color:var(--j-accent);font-size:.92em}
+.ledger-place-chip button{flex:none;min-height:24px;width:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--j-sub);cursor:pointer;font-size:13px}
 .trends-place-stat-item{display:flex;flex-direction:column;gap:2px}
 .trends-place-stat-label{font-size:12px;color:var(--j-sub);font-weight:500}
 .trends-place-stat-val{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:#ffffff}
 @media(max-width:600px){
   .trends-map-wrapper{height:350px}
-  .trends-place-card{bottom:10px;left:10px;right:10px;padding:12px 14px}
+  .trends-place-card{bottom:10px;left:10px;max-width:min(288px,calc(100% - 20px));padding:10px 12px}
 }
 
 /* 백업 상태 탭 스타일 */

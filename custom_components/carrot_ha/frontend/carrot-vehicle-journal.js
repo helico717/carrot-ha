@@ -1,4 +1,4 @@
-const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261025-trends-rename-1';
+const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20261026-place-ledger-1';
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
@@ -343,7 +343,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('locationName').oninput=()=>{if(this.draftLocation){this.draftLocation.name=this.$('locationName').value;this.setDraftDirty(true);}this.updateNameState();};
     this.$('placeSearch').onclick=()=>this.searchLocation();
     this.$('placeQuery').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();this.searchLocation();}};
-    if(this.$('entry'))this.$('entry').onchange=()=>{const key=this.$('entry').value;if(key==='__add__'||key==='__manage__'){this.$('entry').value=this.entry||'';key==='__add__'?this.openVehicle():this.openVehicleManagement();return;}this.entry=key;this.offset=0;this.updateDefaultVehicleButton();this.load(true);};
+    if(this.$('entry'))this.$('entry').onchange=()=>{const key=this.$('entry').value;if(key==='__add__'||key==='__manage__'){this.$('entry').value=this.entry||'';key==='__add__'?this.openVehicle():this.openVehicleManagement();return;}this.entry=key;this.offset=0;this.placeFilter=null;this.updateDefaultVehicleButton();this.load(true);};
     if(this.$('pinDefault'))this.$('pinDefault').onclick=()=>{if(!this.entry||this.entry==='__add__'||this.entry==='__manage__')return;const cur=this.getFavoriteVehicle();if(cur===this.entry){this.setFavoriteVehicle(null);}else{this.setFavoriteVehicle(this.entry);}this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry;this.updateDefaultVehicleButton();this._hass?.callWS({type:'carrot_ha/journal/user_default/set',entry_id:this.entry}).catch(()=>{});};
     if(this.$('trendsMapReset'))this.$('trendsMapReset').onclick=()=>this.resetTrendsMap();
     if(this.$('month'))this.$('month').onchange=()=>{this.offset=0;this.load(true);};
@@ -480,7 +480,7 @@ export class VehicleJournal extends HTMLElement {
       const month=this.$('month')?.value;const range=this.range();if(!range)throw new Error('기록 기간을 골라 주세요.');const scope=this.scope;
       const selectedEntry=this.entry,selectedOffset=this.offset,selectedFilters=this.ledgerFilterKey();
       const manualVehicle=this.entries.find(e=>e.entry_id===this.entry)?.linked===false;
-      const filterParams=this.recordFiltersSupported?{include_trips:manualVehicle,expenses_only:!manualVehicle,record_sort:this.recordSort,record_categories:[...this.recordCategories],...(this.manualTripRecordsSupported?{include_manual_trips:true}:{})}:{};
+      const filterParams=this.recordFiltersSupported?{include_trips:manualVehicle,expenses_only:!manualVehicle,record_sort:this.recordSort,record_categories:[...this.recordCategories],...(this.placeFilter?{place:this.placeFilter.id}:{}),...(this.manualTripRecordsSupported?{include_manual_trips:true}:{})}:{};
       const [data,previous]=await Promise.all([this.call('query',{from:range.from,to:range.to,offset:selectedOffset,...filterParams}),this.call('query',{from:range.previousFrom,to:range.previousTo,offset:0}).catch(()=>null)]);
       data.previous=previous;
       if(generation!==this.request||!this.isConnected||this.entry!==selectedEntry||this.offset!==selectedOffset||this.$('month')?.value!==month||this.scope!==scope||this.ledgerFilterKey()!==selectedFilters)return;
@@ -544,7 +544,7 @@ export class VehicleJournal extends HTMLElement {
     if(this.scope==='year'){end.setUTCMonth(11,31);previous.setUTCFullYear(year-1);previousEnd.setUTCFullYear(year-1);previousEnd.setUTCMonth(11,31);}
     return {from:iso(date),to:iso(end),previousFrom:iso(previous),previousTo:iso(previousEnd)};
   }
-  ledgerFilterKey(){return JSON.stringify([this.recordSort,[...this.recordCategories].sort()]);}
+  ledgerFilterKey(){return JSON.stringify([this.recordSort,[...this.recordCategories].sort(),this.placeFilter?.id||'']);}
   recordCategory(record){return record.kind==='trip'?'trip':record.kind==='charge'?'charging':['charging','refueling','maintenance','washing','tuning','accident'].includes(record.category)?record.category:'other';}
   changeLedgerFilters(){this.offset=0;this.updateLedgerFilters();this.load(true);}
   updateLedgerFilters(){
@@ -553,7 +553,16 @@ export class VehicleJournal extends HTMLElement {
     this.$('ledgerAll').checked=this.recordCategories.size===0;
     this.$('ledgerFilterSummary').textContent=this.recordCategories.size?`${this.recordCategories.size}개 선택`:'전체';
     for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.checked=this.recordCategories.has(button.dataset.ledgerCategory);
+    let chip=this.$('placeFilterChip');
+    if(!this.placeFilter){chip?.remove();return;}
+    if(!chip){chip=document.createElement('span');chip.id='placeFilterChip';chip.className='ledger-place-chip';this.$('ledgerFilters').append(chip);}
+    const label=document.createElement('span'),kind=document.createElement('span'),value=document.createElement('span'),clear=document.createElement('button');
+    label.className='ledger-place-chip-label';value.className='ledger-place-chip-value';kind.textContent='장소';value.textContent=this.placeFilter.name;label.append(kind,value);
+    clear.type='button';clear.textContent='✕';clear.setAttribute('aria-label','장소 필터 해제');
+    clear.onclick=()=>{this.placeFilter=null;this.offset=0;this.updateLedgerFilters();this.load(true);};
+    chip.replaceChildren(label,clear);
   }
+  showPlaceRecords(place,name){this.placeFilter={id:place.id,name};this.recordCategories.clear();this.offset=0;this.selectTab(3);this.updateLedgerFilters();this.load(true);}
   recordedDistance(){return this.isCombustion()?(this.data?.odometer_facts?.distance_km??this.data?.totals?.distance_km??null):this.data?.totals?.distance_km??null;}
   isCombustion(){return ['gasoline','diesel','hybrid'].includes(this.entries.find(e=>e.entry_id===this.entry)?.fuel);}
   categoryColor(key){return {trip:'#7bb6ff',accident:'#ff8585',refueling:'#81e6c5',charging:'#81e6c5',maintenance:'#f59e0b',washing:'#60a5fa',tuning:'#c084fc',other:'#94a3b8'}[key]||'#94a3b8';}
@@ -1624,7 +1633,9 @@ export class VehicleJournal extends HTMLElement {
     if(!card)return;
     card.hidden=false;
     const kindLabel=p.address_only?'주소 기준':p.kind==='refueling'?'주유소':p.kind==='charging'?'충전소':(categories[p.kind]||'방문 장소');
-    card.innerHTML=`<div class="trends-place-card-inner"><div class="trends-place-card-head"><div class="trends-place-title-wrap"><span class="trends-place-dot" style="background:${color}"></span><strong class="trends-place-title">${esc(placeName)}</strong><small class="muted" style="font-size:12px;margin-left:4px;">${kindLabel}</small></div><button type="button" class="trends-place-close-btn" aria-label="닫기">×</button></div><div class="trends-place-stats-grid"><div class="trends-place-stat-item"><span class="trends-place-stat-label">누적 사용금액</span><strong class="trends-place-stat-val">${money(totalKrw)}</strong></div><div class="trends-place-stat-item"><span class="trends-place-stat-label">누적 방문횟수</span><strong class="trends-place-stat-val">${numeric(visits,0)}회</strong></div></div>${p.address_only?'<div class="muted" style="margin-top:10px;font-size:12px;line-height:1.5">여러 충전소가 가까워 충전소는 확정하지 않았어요. 기록에서 실제 이용한 충전소를 선택하면 정확해져요.</div>':''}</div>`;
+    card.innerHTML=`<div class="trends-place-card-inner"><div class="trends-place-card-head"><div class="trends-place-title-wrap"><span class="trends-place-dot" style="background:${color}"></span><strong class="trends-place-title">${esc(placeName)}</strong><small class="trends-place-kind">${kindLabel}</small></div><button type="button" class="trends-place-close-btn" aria-label="닫기">×</button></div><div class="trends-place-stats-grid"><span class="trends-place-stat-line">누적 <b>${money(totalKrw)}</b> · 방문 <b>${numeric(visits,0)}회</b></span><button type="button" class="trends-place-ledger-btn" aria-label="상세 기록에서 보기">기록 보기 ›</button></div></div>`;
+    const ledgerBtn=card.querySelector('.trends-place-ledger-btn');
+    if(ledgerBtn)ledgerBtn.onclick=e=>{e.stopPropagation();this.showPlaceRecords(p,placeName);};
     const closeBtn=card.querySelector('.trends-place-close-btn');
     if(closeBtn)closeBtn.onclick=e=>{
       e.stopPropagation();
@@ -1699,7 +1710,8 @@ export class VehicleJournal extends HTMLElement {
           const wrap=marker.getElement()?.querySelector('.trends-map-dot-wrap');
           if(wrap)wrap.classList.add('active');
           this.showTrendsPlaceCard(p,placeName,totalKrw,visits,color);
-          this.trendsMapInstance.panTo([lat,lon]);
+          // Zoom in on the pin; never zoom back out when the user is already closer.
+          this.trendsMapInstance.flyTo([lat,lon],Math.max(this.trendsMapInstance.getZoom(),15),{duration:0.7});
         });
       }
     }catch(e){
