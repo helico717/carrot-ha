@@ -1,0 +1,60 @@
+name: Direct receiver validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'addons/carrot_receiver/**'
+      - 'custom_components/carrot_ha/**'
+      - 'tests/**'
+      - 'tools/receiver-recovery.py'
+      - 'tools/run-unit-suite.py'
+      - '.github/workflows/receiver-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  radar-ha-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python 3.14 Alpine replay without external zstandard
+        run: |
+          docker run --rm -v "$PWD:/workspace" -w /workspace python:3.14-alpine sh -c '
+            python -m pip install --only-binary=:all: aiohttp numpy pycapnp==2.2.4 &&
+            python -c "import importlib.util; assert importlib.util.find_spec(\"zstandard\") is None" &&
+            python -m unittest discover -s tests -p test_driving_logs_v2.py -v &&
+            python -m unittest discover -s tests -p test_driving_logs_ai.py -v
+          '
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      CARROT_OPENPILOT_ROOT: ${{ github.workspace }}/companion-openpilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: helico717/openpilot
+          ref: d5879396da460d8fde85171f88d90cfde0d721d4
+          path: companion-openpilot
+          sparse-checkout: |
+            openpilot/selfdrive/carrot/ha
+            openpilot/system/manager
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install aiohttp==3.13.3 Pillow==12.0.0 xlrd==2.0.2 voluptuous==0.15.2 av==16.0.1 numpy pycapnp==2.2.4 zstandard==0.25.0
+      - name: Python regression suites in isolated processes
+        run: |
+          for suite in tests/test_*.py; do
+            python tools/run-unit-suite.py --pattern "$(basename "$suite")"
+          done
+          python tools/run-unit-suite.py --directory vehicle-journal/tests
+      - name: Published Comma direct configuration and polling
+        working-directory: companion-openpilot
+        run: python -m unittest openpilot.selfdrive.carrot.ha.tests.test_direct_connection openpilot.selfdrive.carrot.ha.tests.test_param_polling
+      - name: Dashboard loading and state preservation
+        run: |
+          node --test tests/dashboard-live-loading.test.mjs tests/dashboard-lazy-runtime.test.mjs tests/dashboard-view-state.test.mjs tests/dashboard-battery-pagination.test.mjs

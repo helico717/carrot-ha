@@ -16,6 +16,8 @@
     const url = cache.get(key);
     if (!url || !image.isConnected) return false;
     cache.delete(key); cache.set(key, url);
+    image.style.visibility = 'visible';
+    image.closest('.dashcam-route-preview,.dashcam-segment-thumb,.dashcam-player-segment-thumb')?.querySelector('.ha-thumb-loading')?.remove();
     if (image.getAttribute('src') !== url) image.src = url;
     return true;
   }
@@ -76,9 +78,16 @@
     } finally { active = false; }
   }
   function enqueue(image) {
-    if (!visible.has(image) || inactive()) return;
     const key = source(image);
     if (!key || apply(image, key)) return;
+    image.style.visibility = 'hidden';
+    const host = image.closest('.dashcam-route-preview,.dashcam-segment-thumb,.dashcam-player-segment-thumb');
+    if (host && !host.querySelector('.ha-thumb-loading')) {
+      const loader = document.createElement('span');
+      loader.className = 'dashcam-segment-thumb is-thumb-loading ha-thumb-loading';
+      loader.setAttribute('aria-hidden', 'true'); host.append(loader);
+    }
+    if (!visible.has(image) || inactive()) return;
     if (!queue.has(key) && queue.size >= 32) return;
     if (!queue.has(key)) queue.set(key, new Set());
     queue.get(key).add(image); pump();
@@ -93,6 +102,7 @@
     if (node.nodeType !== 1) return;
     for (const image of node.matches('img') ? [node] : node.querySelectorAll('img')) {
       if (!source(image)) continue;
+      enqueue(image);
       if (!observed.has(image)) { observed.add(image); intersection.observe(image); }
       else enqueue(image);
     }

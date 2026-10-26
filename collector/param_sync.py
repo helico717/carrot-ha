@@ -1,3 +1,4 @@
+# DEPRECATED standalone cloud parameter reference; not deployed by current HA setup.
 """CarrotPilot parameter synchronizer.
 
 - Syncs settings catalog and current values from Carrot server (port 7000) or carrot_settings.json to Cloudflare Worker.

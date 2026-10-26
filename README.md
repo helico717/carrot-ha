@@ -1,8 +1,10 @@
+> 현재 연결: Comma → 자체 수신 앱 → HA. [초기화 후 복구 안내](docs/CLEAN_INSTALL_RECOVERY.md).
+
 # Carrot HA — Volkswagen MEB
 
 한국어 | [English](README.en.md)
 
-Carrotpilot이 실행 중인 콤마에서 차량 정보를 수집하여 Cloudflare에 저장하고 Home Assistant에서 확인합니다. 주행 경로, 배터리 잔량, 충전 추정 기록, 최근 7일 배터리 그래프를 제공하며, 당근파일럿의 모든 파라미터를 원격으로 확인·조절하고 공식 Wiki 상세 설명을 열람할 수 있는 파라미터 튜닝 카드를 지원합니다. (주행/도어 등 실차 원격 제어 기능은 없습니다.)
+Carrotpilot이 실행 중인 콤마에서 차량 정보를 수집하여 집 서버의 차량 수신 앱 Home Assistant에서 확인합니다. 주행 경로, 배터리 잔량, 충전 추정 기록, 14일 단위 배터리 이력를 제공하며, 당근파일럿의 모든 파라미터를 원격으로 확인·조절하고 공식 Wiki 상세 설명을 열람할 수 있는 파라미터 튜닝 카드를 지원합니다. (주행/도어 등 실차 원격 제어 기능은 없습니다.)
 
 ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른 MEB 차량과 모든 Carrotpilot 브랜치의 호환성을 보장하지 않습니다. HA 2026.9 이상이 필요하며 다른 차량은 아래 사전 확인을 거치세요. 현재 대시보드 API는 HA 관리자 계정만 사용할 수 있습니다.
 
@@ -16,41 +18,9 @@ ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른
 - [Windows/Mac 수집기 복구 가이드](docs/REINSTALL.md): 콤마를 플래싱하거나 재설치했을 때 연결 정보 복구 절차.
 - [주차 카메라 설치·테스트](docs/CAMERA_SETUP.md): 실험적 광각·실내 camera 엔터티, 별도 콤마 서비스와 HTTPS 영상 연결.
 
-## 아키텍처 및 처음 설치
+## 처음 설치·초기화 복구
 
-1. **Comma 4 (Git 기반 내장 데몬)**:
-   - Comma 기기 소프트웨어로 [`helico717/openpilot`](https://github.com/helico717/openpilot)의 `carrot-wip-model_selector-ha` 브랜치를 사용합니다.
-   - 수집기, 파라미터 동기화, 역방향 터미널 데몬이 `selfdrive/carrot/ha`에 이미 내장되어 있어 별도의 파일 복사가 필요 없습니다.
-   - [설치 안내](docs/INSTALL.md)에 따라 개인 Cloudflare 서버와 연결 정보(`connection.json`)를 등록합니다.
-2. HACS → 오른쪽 위 메뉴 → Custom repositories에서 `https://github.com/helico717/carrot-ha`를 추가합니다. 유형은 **Integration**입니다.
-3. Carrot HA를 다운로드하고 HA를 재시작합니다.
-4. 설정 → 기기 및 서비스 → 통합 추가 → Carrot HA. 정해둔 장치 ID와 전용 토큰을 입력합니다.
-5. 통합의 구성에서 Worker 주소, 읽기 토큰, 차량 모델, SOC 계산 용량을 입력합니다. 배터리 용량은 차량별로 확인하세요.
-6. 대시보드 리소스 등록:
-   - `/carrot_ha_static/carrot-dashboard.js` (JavaScript 모듈: 대시보드 및 파라미터 카드)
-   - `/carrot_ha_static/carrot-terminal-card.js` (JavaScript 모듈: 원격 웹 터미널 카드)
-7. **차량 대시보드 카드**:
-```yaml
-type: custom:carrot-dashboard-card
-device_id: my-meb
-vehicle_name: ID. Buzz
-```
-
-8. **당근파일럿 파라미터 튜닝 카드**:
-```yaml
-type: custom:carrot-params-card
-device_id: my-meb
-```
-
-9. **Comma 원격 터미널 카드**:
-```yaml
-type: custom:carrot-terminal-card
-device_id: my-meb
-title: Comma 원격 터미널
-```
-- 주차 중 셀룰러 환경에서도 원격으로 Comma 셸에 접속합니다.
-- **`[🔍 업데이트 확인]`**, **`[📥 당근 Git Pull]`**, **`[🔄 기기 재부팅]`** 원클릭 워크플로우 단축키를 제공합니다.
-
+[쉬운 설치·복구 안내](docs/CLEAN_INSTALL_RECOVERY.md)를 따릅니다. HAOS 수신 앱 설치, HA 설정, Windows/Mac Comma 연결 명령을 포함합니다.
 
 ## 다른 MEB 차량
 
@@ -63,11 +33,11 @@ title: Comma 원격 터미널
 
 ## 개인정보
 
-사용자마다 본인의 Cloudflare 계정/서버를 사용합니다. 이 저장소로 토큰, DB, 주행 경로, 로그, 연결 설정을 올리지 마세요. 운영자는 사용자들의 데이터를 모으는 공용 서버를 제공하지 않습니다.
+사용자마다 본인의 집 서버의 차량 수신 앱 계정/서버를 사용합니다. 이 저장소로 토큰, DB, 주행 경로, 로그, 연결 설정을 올리지 마세요. 운영자는 사용자들의 데이터를 모으는 공용 서버를 제공하지 않습니다.
 
 ## 출처
 
-Cloudflare 및 CAN 참조 코드: `cloudflare/SOURCE.md`, `cloudflare/LICENSE.upstream`, `collector/LICENSE.reference`.
+집 서버의 차량 수신 앱 및 CAN 참조 코드: `cloudflare/SOURCE.md`, `cloudflare/LICENSE.upstream`, `collector/LICENSE.reference`.
 지도: Leaflet 및 OpenStreetMap. 지도 출처 표시는 유지해야 합니다.
 첨부 브랜드 이미지: 프로젝트 소유자가 제공한 이미지입니다. Carrotpilot·Volkswagen·Home Assistant의 공식 제품이나 공식 인증 통합이 아닙니다.
 

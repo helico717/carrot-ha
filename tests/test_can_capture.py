@@ -1,11 +1,11 @@
-import ast, importlib.util, tempfile, unittest, gzip, json
+import ast, importlib.util, tempfile, unittest, gzip, json, os
 from pathlib import Path
 ha_path=Path(__file__).resolve().parents[1]/'custom_components/carrot_ha/can_capture.py'
 tree=ast.parse(ha_path.read_text())
 tree.body=[n for n in tree.body if not isinstance(n,ast.ImportFrom) or n.module not in ('aiohttp','homeassistant.components.http')]
 ha={'HomeAssistantView':object}
 exec(compile(tree,str(ha_path),'exec'),ha)
-companion=Path(__file__).resolve().parents[2]/'openpilot/openpilot/selfdrive/carrot/ha/can_capture.py'
+companion=Path(os.environ.get('CARROT_OPENPILOT_ROOT', str(Path(__file__).resolve().parents[2]/'openpilot')))/'openpilot/selfdrive/carrot/ha/can_capture.py'
 if not companion.exists():
  raise unittest.SkipTest('Cross-repository CAN wire tests require companion openpilot checkout')
 spec=importlib.util.spec_from_file_location('capture',companion)

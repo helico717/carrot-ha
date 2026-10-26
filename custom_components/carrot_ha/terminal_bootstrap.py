@@ -11,8 +11,9 @@ _LOGGER = logging.getLogger(__name__)
 
 async def publish_loop(hass, entry):
     options = entry.options
-    base = options.get('cloud_url', '').rstrip('/')
-    credential = options.get('terminal_upload_token', '')
+    direct = bool(options.get('receiver_url'))
+    base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+    credential = options.get('receiver_upload_token', '') if direct else options.get('terminal_upload_token', '')
     address = options.get('terminal_ha_url', '')
     if not base or not credential or not address:
         return

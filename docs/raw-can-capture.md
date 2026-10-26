@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # Raw CAN analysis files
 
 This feature subscribes to Comma's existing `can` stream; it sends no diagnostic
@@ -8,7 +10,7 @@ of the collector's battery/charging fields and their measurement times.
 Comma compresses batches with gzip and uploads them directly over HTTPS to HA,
 using the existing remote-terminal discovery and credential. HA writes them to
 `/config/carrot_ha/can-analysis/<entry_id>/*.json.gz`. Neither HA's archive SQLite
-nor Cloudflare D1 stores these CAN batches. Comma's temporary retry queue lives
+nor ~~Cloudflare~~ ~~D1~~ stores these CAN batches. Comma's temporary retry queue lives
 outside the Git checkout and deletes acknowledged batches.
 
 After installing both updates, the HA switch **원시 CAN 기록 수집** starts or

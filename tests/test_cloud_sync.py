@@ -3,6 +3,7 @@ import ast
 import asyncio
 import json
 import logging
+import importlib.util
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,7 +77,10 @@ class CloudSyncTests(unittest.IsolatedAsyncioTestCase):
         async def refresh_costs(hass, runtime):
             runtime['charge_cost_totals'] = {'effective_cost_krw': 0}
 
-        namespace = dict(refresh_runtime_costs=refresh_costs, asyncio=asyncio, json=json, datetime=datetime, timezone=timezone, urlencode=urlencode,
+        archive_spec = importlib.util.spec_from_file_location('archive_codec', Path(__file__).parents[1] / 'custom_components/carrot_ha/cloud_archive.py')
+        archive_codec = importlib.util.module_from_spec(archive_spec)
+        archive_spec.loader.exec_module(archive_codec)
+        namespace = dict(restore_page=archive_codec.restore_page, refresh_runtime_costs=refresh_costs, asyncio=asyncio, json=json, datetime=datetime, timezone=timezone, urlencode=urlencode,
                          ClientTimeout=lambda **kwargs: None,
                          async_get_clientsession=lambda hass: SimpleNamespace(get=get),
                          async_dispatcher_send=lambda *args: notifications.append(runtime['latest']['observed_at']),

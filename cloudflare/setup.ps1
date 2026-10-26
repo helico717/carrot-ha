@@ -1,3 +1,4 @@
+throw 'Deprecated: current HA setup uses Carrot Vehicle Receiver. See docs/CLEAN_INSTALL_RECOVERY.md. This legacy setup is disabled.'
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 $databaseId = Read-Host 'D1 database_id (UUID)'
@@ -10,4 +11,6 @@ $config = @{
 }
 $json = $config | ConvertTo-Json -Depth 5
 [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'wrangler.json'), $json, [System.Text.UTF8Encoding]::new($false))
+node (Join-Path $PSScriptRoot 'configure_storage.mjs')
+if ($LASTEXITCODE -ne 0) { throw 'Storage policy configuration failed.' }
 Write-Host 'wrangler.json saved. No deployment performed.'

@@ -1,0 +1,7 @@
+{
+  "commit": "5d69d6ae6904be65f00858a79bc861269291ce53",
+  "source": "tools/carrot_route_vault",
+  "adapters": [
+    "HA authenticated paths and labels"
+  ]
+}

@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 충전 freshness 및 라이브 액티비티 수정 — 2026-10-06
 
 ## 원인과 범위
@@ -30,7 +32,7 @@ HA 로그북에서 10:30:01 충전 복구(측정10:28:46,75초 경과)→10:30:2
 
 ## 검증 및 배포
 
-HA296tests(4skip) 통과, 충전 집중56tests 통과, 최신/lazy/view-state/전력JS12tests통과, 전체JS64중63통과. motion-status1실패는 변경전HEAD 파일로도 재현했다. Worker incremental 테스트·benchmark 및 Comma param polling4tests통과. 런타임 Python의 개별 charging_power 테스트는 package stub 없이 실행하면 aiohttp 의존성으로 import 실패하며, 기존 charging_smoothing package stub과 함께 또는 전체 discovery에서는 통과했다.
+HA296tests(4skip) 통과, 충전 집중56tests 통과, 최신/lazy/view-state/전력JS12tests통과, 전체JS64중63통과. motion-status1실패는 변경전HEAD 파일로도 재현했다. ~~Worker~~ incremental 테스트·benchmark 및 Comma param polling4tests통과. 런타임 Python의 개별 charging_power 테스트는 package stub 없이 실행하면 aiohttp 의존성으로 import 실패하며, 기존 charging_smoothing package stub과 함께 또는 전체 discovery에서는 통과했다.
 
 사용자 지시에 따라 자동화 수정 검증 전 발행을 보류했고, 이후 정식v0.8.12 발행을 요청받았다. 발행 결과는 실제 확인 후 아래에 기록한다. HA HACS설치·재시작은 사용자가 수행한다.
 

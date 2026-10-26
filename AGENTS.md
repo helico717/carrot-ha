@@ -1,3 +1,11 @@
+> **현재 사용자 지시 — 2026-10-14:** 주 운영 경로는 자체 HAOS 차량 수신 앱입니다.
+> 이전 Cloudflare 설치/배포와 무료 플랜 지침은 과거 구현 기록입니다. 직접 수신기 배포에는 적용하지 않습니다.
+> 전체 요청 반영·검증 후 **v0.9.0-beta.1** 발행을 사용자가 승인했습니다. 이전 0.8.x 제한·발행 대기보다 우선합니다.
+> Comma Git 전용 배포·기기 소스 SSH/SCP 수정 금지·변경 기록·사용자 재시작 원칙은 유지합니다.
+> 설치/복구는 `docs/CLEAN_INSTALL_RECOVERY.md`, 현재 배포 담당은 `docs/DEVELOPMENT_WORKFLOW.md`를 따릅니다.
+
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](docs/CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # AGENTS.md — Developer & AI Agent Guidelines
 
 > **CRITICAL RULE FOR ALL AI AGENTS & DEVELOPERS:**
@@ -91,9 +99,33 @@ The Carrot HA system is strictly divided into two independent repositories:
 | **Modify the parked camera agent, capture, or compatibility checks on Comma** | `helico717/openpilot` (branch: `carrot-wip-model_selector-ha`) | `openpilot/selfdrive/carrot/ha/camera/` | Commit & push → clean Git pull & reboot; no camera ZIP/SCP |
 | **Modify Home Assistant sensors, coordinator, or entities** | `helico717/carrot-ha` (branch: `main`) | `custom_components/carrot_ha/` | Commit & push to GitHub → Update in HA & restart |
 | **Update the Lovelace cards (Dashboard, Params, Terminal Card)** | `helico717/carrot-ha` (branch: `main`) | `custom_components/carrot_ha/frontend/` | Commit & push to GitHub → Refresh browser (`Ctrl+F5`) |
-| **Update Cloudflare Worker API, D1 schema, or WSS relay** | `helico717/carrot-ha` (branch: `main`) | `cloudflare/src/worker.js` | `cd cloudflare && npx wrangler deploy` |
+| **Update ~~Cloudflare~~ ~~Worker~~ API, ~~D1~~ schema, or WSS relay** | `helico717/carrot-ha` (branch: `main`) | `cloudflare/src/worker.js` | `cd cloudflare && npx wrangler deploy` |
 
 ---
+
+## 사용자 재확인 개발·배포 정책 — 2026-10-21 (최우선)
+
+이 정책은 아래의 자동 정식 릴리즈·HACS 기본 배포 설명보다 우선하며, 차계부뿐 아니라
+HA 통합·대시보드 등 모든 Carrot HA 작업에 적용한다.
+
+- 개발 중에는 변경을 검증하고 커밋·푸시한 뒤, 사용자가 허용한 HA SSH 직접 반영
+  경로로 배포한다. 기존 파일을 먼저 백업하고 배포 커밋과 파일 해시를 확인한다.
+  Comma 파일의 SSH/SCP 수정 금지는 유지한다.
+- 모든 변경·검증·직접 반영·철회·배포 상태를 changelog에 기록한다. 전체 프로젝트
+  공통 기록은 `CHANGELOG.md`, 차계부와 주행 로그는 각 전용 CHANGELOG에도 기록한다.
+- **pre-release도 사용자가 “올려도 된다”, “발행하라” 등으로 명시적으로 승인했을
+  때만 발행한다.** 개발 준비 완료·로컬/CI 통과·기능 수정 또는 HA 직접 반영 요청은
+  pre-release 발행 승인이 아니다. 이전 릴리즈의 승인은 새 릴리즈에 재사용하지 않는다.
+- 발행 승인 후에는 `CHANGELOG.md`, `vehicle-journal/CHANGELOG.md`,
+  `driving-logs/CHANGELOG.md`를 포함한 저장소의 모든 관련 changelog와 Git 이력·실제
+  diff를 대조한다. **직전 pre-release 이후 모든 미발행 변경**을 포함해 새 pre-release를
+  준비한다. 현재 작업만 적거나 다른 개발자의 변경을 빠뜨리지 않는다. 기준 태그·대상
+  커밋·누적 변경·검증·HA 직접 반영 및 미확인 상태를 릴리즈 노트에 명시한다.
+  아직 준비되지 않은 작업이나 불일치가 있으면 발행을 중단하고 범위를 확인한다.
+- **정식 릴리즈는 사용자가 필드 테스트 통과를 알려주고 정식 발행을 명시적으로
+  지시했을 때만 발행한다.** 로컬 테스트·CI 성공·기능 수정 요청은 정식 발행 허가가 아니다.
+- 사용자가 배포를 보류한 동안에는 SSH 반영·pre-release·정식 발행을 모두 중단한다.
+  릴리즈 철회 요청은 다른 미발행 작업의 삭제·원복 또는 새 릴리즈 발행 허가가 아니다.
 
 ## 3. How to Deploy Changes
 
@@ -108,15 +140,15 @@ Carrot HA 기능 수정·버그 해결 요청은 **업데이트 가능한 배포
 | --- | --- | --- |
 | HA 통합·대시보드 | 수정, 관련 검증, `0.8.x` 버전 및 릴리즈 노트 갱신, `main` 커밋·푸시, 태그 푸시, GitHub Release 생성·Actions 성공 확인 | HACS에서 신규 릴리즈 업데이트 → HA 재시작 |
 | Comma 수집기·데몬·카메라 | 로컬 openpilot 수정·검증, `carrot-wip-model_selector-ha` 커밋·푸시, 원격 브랜치의 커밋 확인 | 기기에서 `git pull --ff-only` → 재부팅 |
-| Cloudflare Worker·D1 | 필요한 변경·검증, Git 커밋·푸시, 필요한 마이그레이션을 먼저 적용한 뒤 Worker 배포, 배포 결과 확인 | 별도 작업 없음 |
+| ~~Cloudflare~~ ~~Worker~~·~~D1~~ | 필요한 변경·검증, Git 커밋·푸시, 필요한 마이그레이션을 먼저 적용한 뒤 ~~Worker~~ 배포, 배포 결과 확인 | 별도 작업 없음 |
 
 - HA 실행 코드가 변경되면 HACS에서 받을 수 있는 **새 GitHub Release**까지 발행합니다.
   기존 태그를 덮어쓰지 말고, manifest 버전과 새 태그를 일치시키세요.
   완료된 수정은 정식 패치 릴리즈를 기본으로 하며, 베타 테스트가 필요한 경우에만
   pre-release로 발행하고 HACS의 베타 표시 설정이 필요함을 안내하세요.
 - AGENTS.md 등 지침·문서만 변경된 경우에는 커밋·푸시하고, 실행 코드 변경이 없는
-  불필요한 버전 상승·HACS 릴리즈·Worker 배포는 하지 마세요.
-- Worker나 D1 변경이 필요하지 않은 작업은 그대로 두고 최종 보고에 그 사실을 명시하세요.
+  불필요한 버전 상승·HACS 릴리즈·~~Worker~~ 배포는 하지 마세요.
+- Worker나 ~~D1~~ 변경이 필요하지 않은 작업은 그대로 두고 최종 보고에 그 사실을 명시하세요.
 - 사용자에게 로컬 `git add`, `git commit`, `git push`, 태그 발행, Wrangler 실행,
   HA 파일 직접 복사·동기화를 요구하지 마세요. 직접 동기화는 사용자가 명시적으로
   요청한 예외 경로입니다.
@@ -210,15 +242,15 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 4. **HA에서 업데이트 적용**:
    - HA 업데이트 알림 카드 또는 **HACS → Carrot HA → [업데이트]** 클릭 후 HA 재시작.
 
-### C. Deploying Cloudflare Worker Changes
+### C. Deploying ~~Cloudflare~~ ~~Worker~~ Changes
 
-아래 작업은 에이전트가 수행합니다. 필요한 D1 마이그레이션을 Worker 배포보다 먼저 적용하세요.
+아래 작업은 에이전트가 수행합니다. 필요한 ~~D1~~ 마이그레이션을 ~~Worker~~ 배포보다 먼저 적용하세요.
 
 1. Navigate to the `cloudflare/` directory:
    ```bash
    cd cloudflare
    ```
-2. If D1 database migrations are needed, apply them **before** deploying the Worker:
+2. If ~~D1~~ database migrations are needed, apply them **before** deploying the ~~Worker~~:
    ```bash
    npx wrangler d1 execute id4-ha-db --remote --file migration.sql
    ```
@@ -233,7 +265,7 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 
 | Access Method | Protocol | Availability | Purpose | What NEVER to do |
 | :--- | :--- | :--- | :--- | :--- |
-| **Home Assistant Remote Terminal Card** | Reverse WSS via Cloudflare Worker | Available whenever parked (even on cellular!) | Diagnostics, checking git status (`[🔍 업데이트 확인]`), pulling code (`[📥 당근 Git Pull]`), rebooting (`[🔄 기기 재부팅]`) | **Do NOT** use it to manually rewrite python files on the device. |
+| **Home Assistant Remote Terminal Card** | Reverse WSS via ~~Cloudflare~~ ~~Worker~~ | Available whenever parked (even on cellular!) | Diagnostics, checking git status (`[🔍 업데이트 확인]`), pulling code (`[📥 당근 Git Pull]`), rebooting (`[🔄 기기 재부팅]`) | **Do NOT** use it to manually rewrite python files on the device. |
 | **Direct SSH (Port 22)** | Local SSH / Hotspot | Only when connected to Comma's local Wi-Fi hotspot (`192.168.43.1`) | **Emergency disaster recovery only** (e.g. bootloop, network interface crash). | **Do NOT** use for regular feature development or deployment. |
 
 ---
@@ -273,6 +305,20 @@ HACS 2.0은 릴리스가 존재하는 저장소의 경우 GitHub Release만 다�
 ---
 
 ## 7. Version Management & HACS Release Policy
+
+### 모든 대시보드 UI 변경 시 사전 인터랙티브 HTML 프리뷰 필수 절차 — 2026-10-17
+
+사용자가 차량 대시보드(`carrot-dashboard-ko.js`, `carrot-dashboard-en.js`, `carrot-dashboard-debug.js`), 차계부(`carrot-vehicle-journal.js`, `carrot-journal-design.js`), 주행 로그(`carrot_logs/`) 등 **UI·레이아웃·애니메이션·인디케이터·디자인 변경**을 요청할 경우, **실제 프로덕션 파일을 수정하기 전에 반드시 아래 기준을 충족하는 로컬 인터랙티브 HTML 프리뷰를 먼저 생성하여 사용자에게 시연하고 승인**을 받아야 한다.
+
+1. **실제 대시보드 100% 미러링 (축약·누락 없는 전체 기능 구현)**:
+   - 단순 요약 목업이나 일부 영역만 떼어낸 정적 샘플 HTML로 대체하지 않는다.
+   - 실제 프로덕션 프론트엔드 모듈 전체(`carrot-vehicle-journal.js`, `carrot-dashboard-ko.js`, `carrot-journal-design.js`, `carrot-view-state.js`, `carrot-trip-days.js`, `carrot-charge-payment.js`, `carrot-receipt-ocr.js`, `carrot-camera-360.js`, `leaflet.js`/`leaflet.css` 등)를 기능 누락 없이 번들링하여 실제 Custom Element가 그대로 렌더링·동작하도록 구성한다.
+2. **합성 더미 데이터(`mockHass`) 기반의 실제 조작 환경 제공**:
+   - 다중 차량(전기차·내연기관), 일/월/연도 기간 전환, 모든 하위 탭 이동, Leaflet 지도 마커·경로, SVG 차트·도넛, 원장 필터·정렬·페이지네이션, 모달 창, 다크/라이트 테마 및 차량 상태(주차/충전/주행) 변경이 **실제 대시보드를 조작하는 것처럼 100% 동작**하도록 `mockHass` 더미 데이터를 연결한다.
+   - 비교 가능한 디자인/모션 옵션이 있을 경우 상단 시뮬레이터 컨트롤 바를 통해 실시간으로 전환·비교할 수 있게 제공한다.
+3. **대시보드별 고유 테마 색상 및 기하학적 경계(Border Radius / Overflow) 준수**:
+   - 각 대시보드의 고유 테마 팔레트(차계부 `--j-bg`/`--j-surface`/`--j-raised`/`--j-border`/`--j-accent`, 차량 대시보드 다크/라이트 모드 및 상태별 블루/그린/오렌지 토큰)를 존중하며, 기존 UI에 자연스럽게 스며드는 절제된 모션을 사용한다.
+   - 둥근 모서리(`border-radius`)가 적용된 버튼·셀렉트·필(Pill)·테이블 요소에 각진 하이라이트가 생기는 현상이나, 로딩 애니메이션·오버레이가 카드 경계 밖으로 이탈(`overflow` 누출)하는 현상이 없는지 프리뷰 단계에서 반드시 검증한다.
 
 ### 모든 대시보드 화폐 표기 공통 규칙 — 2026-10-09
 
@@ -337,12 +383,12 @@ optimization is impossible or that post-deployment account quotas have been veri
   Include updates to existing routes and quality metadata, not just new trip IDs.
   Persist the cursor only after the entire page is durably saved. Never download
   unchanged full routes each minute. Preserve HA history when cloud retention
-  deletes old trips. Do not switch an authoritative external server to D1 silently.
+  deletes old trips. Do not switch an authoritative external server to ~~D1~~ silently.
 - **Bound catch-up:** at most 10 telemetry pages and 10 trip pages per sync run;
   latest-state refresh must remain available throughout catch-up. Compatibility
   fallback applies to 404/unsupported-source 409, not arbitrary transient errors.
 - **No query amplification:** current state and unchanged trip-change checks each
-  use one indexed D1 query. Legacy trip quality uses two set queries, not per-trip
+  use one indexed ~~D1~~ query. Legacy trip quality uses two set queries, not per-trip
   queries. Device-scoped history must have a matching device/cursor index.
 - **HA archive:** identical cloud events must not be rewritten or invalidate trip
   derivations. Share battery-history calculations across clients; never cache live
@@ -365,12 +411,12 @@ optimization is impossible or that post-deployment account quotas have been veri
   do not present this as instantaneous push. Preserve validation, local readback,
   durable queue-ID idempotency, explicit rejection, and ACK retries.
 - **Budget:** no latest-state, history-read, or parameter-poll operation may write
-  KV. A continuously visible dashboard adds at most about 5,760 latest reads/day
+  ~~KV~~. A continuously visible dashboard adds at most about 5,760 latest reads/day
   per HA entry; idle parameter polling is about 5,760/day instead of 28,800/day.
   Include all Workers, telemetry, terminal discovery, settings, retries, index
   writes, and retention deletes in account-wide estimates. Never claim "free-plan
-  guaranteed" from request counts alone: actual D1 rows read/written and CPU matter.
-- **Rollout:** apply `cloudflare/migration_incremental_sync.sql` before the Worker,
+  guaranteed" from request counts alone: actual ~~D1~~ rows read/written and CPU matter.
+- **Rollout:** apply `cloudflare/migration_incremental_sync.sql` before the ~~Worker~~,
   then update HA and the Git-managed Comma daemon. No manual device source edits.
   Full operational sign-off requires actual deployed-version checks and a 24-hour
   workload/latency/quota observation; local tests alone cannot establish that.
@@ -512,5 +558,5 @@ Antigravity 등 개발 에이전트는 [차계부 배포·인계 절차](vehicle
 차계부 설계·지침·참고 자료·변경 이력은 `vehicle-journal/`, 향후 실행 코드는
 `custom_components/carrot_ha/vehicle_journal/`에 둔다. 기존 통합 연결부에도 해당
 지침을 적용한다. 커밋 접두사는 `vehicle-journal:`이다. 장기 저장·집계·수동 기록·
-조회는 HA 로컬에서 처리하고 차계부용 Cloudflare 요청·변경을 추가하지 않는다.
-준비 문서와 미연결 SQL만 변경한 단계에는 버전 상승·HACS 릴리즈·Worker 배포를 하지 않는다.
+조회는 HA 로컬에서 처리하고 차계부용 ~~Cloudflare~~ 요청·변경을 추가하지 않는다.
+준비 문서와 미연결 SQL만 변경한 단계에는 버전 상승·HACS 릴리즈·~~Worker~~ 배포를 하지 않는다.

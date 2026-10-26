@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 오프라인 복구 업데이트
 
 이번 수정은 최신 스냅샷을 우선 전송하고, 이후 최신 telemetry와 FIFO 대기 기록을 번갈아 전송합니다. 재시작 시에도 첫 새 스냅샷 생성 후 업로드를 시작합니다. 업로드 실패 후에는 최신 스냅샷부터 재시도합니다. 과거 기록을 삭제하거나 대기열 DB를 초기화하지 않습니다.
@@ -17,7 +19,7 @@ HA는 history를 DB에 저장한 뒤 최신 상태를 한 번 반영하며, 중�
 
 `connection.json`, `state/collector.sqlite3`, openpilot 파일은 교체하지 않습니다. 이전 버전에서 올라오는 경우 기존 배포 문서 상단의 `telemetry_fields.py` 등 필수 의존 파일 안내도 확인합니다.
 
-HA에서도 `custom_components/carrot_ha/cloud.py`를 `/config/custom_components/carrot_ha/cloud.py`에 적용하고 HA를 재시작합니다. 이번 수정에 Cloudflare Worker 재배포는 필요하지 않습니다.
+HA에서도 `custom_components/carrot_ha/cloud.py`를 `/config/custom_components/carrot_ha/cloud.py`에 적용하고 HA를 재시작합니다. 이번 수정에 ~~Cloudflare~~ ~~Worker~~ 재배포는 필요하지 않습니다.
 
 ## 확인
 

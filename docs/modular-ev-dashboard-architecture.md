@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # Carrot HA — 범용 EV 카드 호환 및 모듈형 대시보드 아키텍처 로드맵 (Modular EV Architecture)
 
 > **문서 상태**: 설계 및 미래 구현 로드맵 (Draft & Planned Architecture)  
@@ -6,23 +8,23 @@
 
 ---
 
-## 0. 🛑 절대 철칙: Cloudflare 무료 플랜 한도 & 사용성 최적화 보장 (Non-Negotiable Core Principle)
+## 0. 🛑 절대 철칙: ~~Cloudflare~~ 무료 플랜 한도 & 사용성 최적화 보장 (Non-Negotiable Core Principle)
 
-> **"개별 카드든 통합형 대시보드든, 무슨 일이 있어도 Cloudflare 무료 플랜 한도 내에서의 최적화와 대시보드 사용성은 100% 유지되어야 한다."**
+> **"개별 카드든 통합형 대시보드든, 무슨 일이 있어도 ~~Cloudflare~~ 무료 플랜 한도 내에서의 최적화와 대시보드 사용성은 100% 유지되어야 한다."**
 > 
-> 카드를 쪼개거나 타사 카드용 엔티티를 추가한다고 해서 Cloudflare Worker 요청 수나 D1 쿼리가 1회라도 증폭되어서는 절대 안 됩니다.
+> 카드를 쪼개거나 타사 카드용 엔티티를 추가한다고 해서 ~~Cloudflare~~ ~~Worker~~ 요청 수나 ~~D1~~ 쿼리가 1회라도 증폭되어서는 절대 안 됩니다.
 
 ### A. 쿼리 증폭(Query Amplification) 원천 차단 규칙
 1. **단일 수집, 다중 분배 (Single Coordinator Ingestion, Zero Extra Remote Calls)**:
-   - 사용자가 대시보드 화면에 `carrot-trip-card`, `carrot-charge-card`, `ultra-vehicle-card` 등 **10개의 카드를 동시에 띄워두더라도, Cloudflare Worker로 나가는 요청은 단 1회(통합 대시보드 1개 분량)로 완전히 동일해야 합니다.**
-   - 개별 카드가 독립적으로 Cloudflare Worker API를 직접 fetch하는 것을 엄격히 금지합니다.
+   - 사용자가 대시보드 화면에 `carrot-trip-card`, `carrot-charge-card`, `ultra-vehicle-card` 등 **10개의 카드를 동시에 띄워두더라도, ~~Cloudflare~~ Worker로 나가는 요청은 단 1회(통합 대시보드 1개 분량)로 완전히 동일해야 합니다.**
+   - 개별 카드가 독립적으로 ~~Cloudflare~~ ~~Worker~~ API를 직접 fetch하는 것을 엄격히 금지합니다.
    - 오직 **Home Assistant 내부의 단일 코디네이터(Central Coordinator)**가 15초(화면 활성화 시) 주기로 받아온 로컬 캐시 메모리를, 각 카드가 로컬 이벤트 버스(`hass.states` 또는 WebSocket)를 통해 수동적으로 구독(Subscribe)만 해야 합니다.
 
 2. **화면 비활성화 시 즉시 중단 (Visible-Only Contract)**:
-   - 개별 카드든 통합 대시보드든 사용자가 화면을 보고 있을 때(Document Visible)만 15초 주기로 갱신되며, 브라우저 탭이 백그라운드로 가거나 모바일 화면이 꺼지면 모든 타이머가 즉시 클리어되어 Worker 요청을 0으로 만듭니다.
+   - 개별 카드든 통합 대시보드든 사용자가 화면을 보고 있을 때(Document Visible)만 15초 주기로 갱신되며, 브라우저 탭이 백그라운드로 가거나 모바일 화면이 꺼지면 모든 타이머가 즉시 클리어되어 ~~Worker~~ 요청을 0으로 만듭니다.
 
 3. **무료 플랜 예산 불변성**:
-   - `live=1` 독립 경량 패스 유지: KV 쓰기 0건, 단일 인덱스 D1 쿼리 원칙 유지.
+   - `live=1` 독립 경량 패스 유지: ~~KV~~ 쓰기 0건, 단일 인덱스 ~~D1~~ 쿼리 원칙 유지.
    - 종일 화면을 켜두더라도 1 HA 인스턴스당 일 최대 약 5,760회 최신 상태 조회를 절대 초과하지 않음.
 
 ---
@@ -35,7 +37,7 @@
 하지만 현재 Carrot HA는 다음과 같은 구조적 한계로 인해 **전용 올인원 대시보드(`carrot-dashboard.js`) 사용이 강제**되고 있습니다:
 1. **복합 데이터의 엔티티 부재**:
    - 일반적인 EV 카드는 HA의 표준 엔티티(`sensor.*`, `binary_sensor.*`)의 `state`만 읽어옵니다.
-   - 반면 Carrot HA의 핵심 가치인 **30분 단위 트립 병합, 일별 주행거리/전비, 정밀 충전 곡선, 충전 요금 계산, 24시간 타임라인**은 HA 센서에 존재하는 것이 아니라 대시보드 JS 내부와 Cloudflare Worker D1 DB에서 복합 계산되어 표시됩니다.
+   - 반면 Carrot HA의 핵심 가치인 **30분 단위 트립 병합, 일별 주행거리/전비, 정밀 충전 곡선, 충전 요금 계산, 24시간 타임라인**은 HA 센서에 존재하는 것이 아니라 대시보드 JS 내부와 ~~Cloudflare~~ ~~Worker~~ ~~D1~~ DB에서 복합 계산되어 표시됩니다.
 2. **모놀리식(Monolithic) UI 구조**:
    - 대시보드 전체(차량 상태 뷰, 충전 탭, 주행 기록 탭, 360° 카메라 뷰어)가 하나의 거대한 코드로 묶여 있어, 사용자가 "트립 기록만 떼어내어 내 대시보드에 붙이기"가 불가능합니다.
 

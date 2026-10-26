@@ -99,3 +99,70 @@ test('stale session completion cannot update state after close', () => {
   assert.equal(m.state, 'connecting'); // remains unchanged
   assert.equal(m.renderLoopStarted, undefined);
 });
+
+test('fragmented WLV1 telephoto frames reach road decoder only when selected', () => {
+  const m = fixture();
+  m.selectedView = 3;
+  const decoded = [];
+  m._decodeVideo = (...args) => decoded.push(args);
+  const packet = new Uint8Array(28);
+  packet.set([87, 76, 86, 49, 4, 1]);
+  new DataView(packet.buffer).setUint32(16, 2000);
+  new DataView(packet.buffer).setUint32(20, 4);
+  packet.set([1, 2, 3, 4], 24);
+  m._appendChunk(packet.slice(0, 15), 1);
+  assert.equal(decoded.length, 0);
+  m._appendChunk(packet.slice(15), 1);
+  assert.equal(decoded[0][0], 'road');
+  assert.equal(decoded[0][2], true);
+  assert.equal(decoded[0][3], 2000);
+  m.selectedView = 0;
+  m._appendChunk(packet, 1);
+  assert.equal(decoded.length, 1, '360 view does not spend CPU decoding telephoto');
+});
+
+test('telephoto plays without wide or cabin and view switching keeps one render loop', () => {
+  const m = fixture();
+  m.selectedView = 3;
+  m.realStreams.road = {ready: true, frame: {}};
+  let loops = 0;
+  m.startRealRenderLoop = () => { loops++; m.animId = 42; };
+  m._checkStreamsReady(1);
+  assert.equal(m.state, 'playing');
+  assert.equal(loops, 1);
+  m.selectedView = 0;
+  m._checkStreamsReady(1);
+  assert.notEqual(m.state, 'playing');
+  m.selectedView = 3;
+  m._checkStreamsReady(1);
+  assert.equal(m.state, 'playing');
+  assert.equal(loops, 1);
+  m.animId = null;
+});
+
+test('full telephoto frame is contained with letterboxing, never cropped', () => {
+  const m = fixture();
+  const calls = [];
+  const ctx = {fillRect() {}, drawImage(...args) {calls.push(args);}};
+  m.roadCanvas = {width: 960, height: 540, getContext: () => ctx};
+  for (const [width, height] of [[1928, 1208], [1920, 1080], [1000, 2000], [2400, 600]]) {
+    const frame = {displayWidth: width, displayHeight: height};
+    m.drawRoadFrame(frame);
+    const [source, x, y, w, h] = calls.at(-1);
+    assert.equal(source, frame);
+    assert.equal(calls.at(-1).length, 5, 'no source crop rectangle');
+    assert.ok(x >= 0 && y >= 0);
+    assert.ok(x + w <= 960.000001 && y + h <= 540.000001);
+    assert.ok(Math.abs(w / h - width / height) < 1e-9);
+  }
+});
+
+test('telephoto decoder and last frame are released on session teardown', () => {
+  const m = fixture();
+  const closed = [];
+  m.realStreams.road = {decoder: {state: 'configured', close() {closed.push('decoder');}}, frame: {close() {closed.push('frame');}}, ready: true};
+  m.cleanupSession();
+  assert.deepEqual(closed, ['frame', 'decoder']);
+  assert.equal(m.realStreams.road.ready, false);
+  assert.equal(m.realStreams.road.frame, null);
+});

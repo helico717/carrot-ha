@@ -123,8 +123,33 @@ class CarrotDashboard extends HTMLElement {
     this._onVisible=()=>{if(!document.hidden&&this._hass){this.loadLive();this.load(true);}};
     document.addEventListener('visibilitychange',this._onVisible);
     if(this.initialized)this._onVisible();
+    this.setupTabsObserver();
   }
-  disconnectedCallback(){this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  setupTabsObserver(){
+    this._tabsObserver?.disconnect();
+    this._tabsObserver=null;
+    const target=this.shadowRoot?.querySelector('.nav');
+    if(!target)return;
+    const check=()=>{
+      const rect=target.getBoundingClientRect();
+      if(rect.height===0&&rect.width===0)return;
+      const outOfView=rect.bottom<=10;
+      if(outOfView)this.setAttribute('data-tabs-scrolled-out','true');
+      else this.removeAttribute('data-tabs-scrolled-out');
+    };
+    if(typeof IntersectionObserver!=='undefined'){
+      this._tabsObserver=new IntersectionObserver((entries)=>{
+        for(const entry of entries)check();
+      },{threshold:[0,0.1,0.5,1.0]});
+      this._tabsObserver.observe(target);
+    }
+    if(!this._boundScrollSync){
+      this._boundScrollSync=()=>check();
+      window.addEventListener('scroll',this._boundScrollSync,{passive:true});
+    }
+    requestAnimationFrame(check);
+  }
   getCardSize(){return 8;}
   getGridOptions(){return {columns:36,rows:"auto",min_columns:6};}
   async loadLive(){
@@ -154,7 +179,7 @@ class CarrotDashboard extends HTMLElement {
     finally{this.liveBusy=false;}
   }
   async load(quiet=false){
-    if(this.busy){this.loadLive();return;}this.busy=true;this.error='';
+    if(this.busy){this.loadLive();return;}this.busy=true;if(this.setAttribute)this.setAttribute('data-loading','true');this.error='';
     const refBtn=this.shadowRoot?.querySelector('.refresh');if(refBtn)refBtn.textContent='조회 중…';
     try{
       if(!this.v||!Object.keys(this.v).length){
@@ -190,7 +215,7 @@ class CarrotDashboard extends HTMLElement {
       }
       this.saveCache();
     }catch(e){this.error=e instanceof Error?e.message:'HA 조회 실패. 관리자 계정과 통합 업데이트를 확인하세요.';}
-    finally{this.busy=false;this.render();}
+    finally{this.busy=false;if(this.removeAttribute)this.removeAttribute('data-loading');this.render();}
   }
   clearMiniMaps(){
     if(this._mapResizeObserver){try{this._mapResizeObserver.disconnect();}catch(e){}}
@@ -310,9 +335,119 @@ class CarrotDashboard extends HTMLElement {
 .parking-heading-left h2{font-size:18px;margin:0}
 .parking-tiles{margin-top:18px}
 
+:host{
+  --c-load-accent:#60a5fa;
+  --c-load-accent-soft:rgba(96,165,250,0.28);
+  --c-load-ring:rgba(96,165,250,0.45);
+  --c-load-glow:0 0 14px rgba(96,165,250,0.35);
+}
+:host([data-theme="light"]){
+  --c-load-accent:#2563eb;
+  --c-load-accent-soft:rgba(37,99,235,0.20);
+  --c-load-ring:rgba(37,99,235,0.38);
+  --c-load-glow:0 0 12px rgba(37,99,235,0.25);
+}
+@keyframes carrotBorderBeamSpin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+@-webkit-keyframes carrotBorderBeamSpin{from{-webkit-transform:rotate(0deg);}to{-webkit-transform:rotate(360deg);}}
+.nav{border:2px solid transparent;position:relative;border-radius:14px;transition:border-color 0.2s ease,box-shadow 0.2s ease}
+.nav>*{position:relative!important;z-index:2!important}
+:host([data-loading="true"]) .nav{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  border-radius:14px!important;
+  border:2px solid transparent!important;
+  box-shadow:var(--c-load-glow)!important;
+}
+:host([data-loading="true"]) .nav::before{
+  content:""!important;
+  position:absolute!important;
+  top:50%!important;
+  left:50%!important;
+  width:1400px!important;
+  height:1400px!important;
+  margin-top:-700px!important;
+  margin-left:-700px!important;
+  background:conic-gradient(from 0deg,transparent 0deg,transparent 260deg,var(--c-load-accent-soft) 310deg,var(--c-load-accent) 360deg)!important;
+  animation:carrotBorderBeamSpin 1.4s linear infinite!important;
+  -webkit-animation:carrotBorderBeamSpin 1.4s linear infinite!important;
+  z-index:0!important;
+  pointer-events:none!important;
+}
+:host([data-loading="true"]) .nav::after{
+  content:""!important;
+  position:absolute!important;
+  inset:2px!important;
+  background:#181b1d!important;
+  border-radius:12px!important;
+  z-index:1!important;
+  pointer-events:none!important;
+}
+:host([data-theme="light"][data-loading="true"]) .nav::after{
+  background:#e9eef0!important;
+}
+.carrot-floating-bubble{
+  position:fixed;
+  top:max(72px,calc(env(safe-area-inset-top,0px) + 64px));
+  left:50%;
+  transform:translate(-50%,-24px) scale(0.92);
+  z-index:99998;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6.5px;
+  min-width:66px;
+  height:38px;
+  padding:0 18px;
+  border-radius:999px;
+  background:rgba(15,23,31,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border:1.5px solid var(--c-load-ring);
+  box-shadow:0 10px 28px rgba(0,0,0,0.55),0 0 16px var(--c-load-accent-soft);
+  pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity 0.28s cubic-bezier(0.16,1,0.3,1),transform 0.28s cubic-bezier(0.16,1,0.3,1),visibility 0.28s;
+}
+:host([data-theme="light"]) .carrot-floating-bubble{
+  background:rgba(255,255,255,0.92);
+  box-shadow:0 10px 24px rgba(0,0,0,0.14),0 0 12px var(--c-load-accent-soft);
+}
+:host([data-loading="true"][data-tabs-scrolled-out="true"]) .carrot-floating-bubble{
+  opacity:1;
+  visibility:visible;
+  transform:translate(-50%,0) scale(1);
+}
+.carrot-floating-bubble .bubble-dot{
+  width:7.5px;
+  height:7.5px;
+  border-radius:50%;
+  background:var(--c-load-accent);
+  box-shadow:0 0 8px var(--c-load-accent);
+  display:inline-block;
+  animation:carrotBubbleDotBounce 1.2s ease-in-out infinite;
+  -webkit-animation:carrotBubbleDotBounce 1.2s ease-in-out infinite;
+}
+.carrot-floating-bubble .bubble-dot:nth-child(1){animation-delay:-0.32s;-webkit-animation-delay:-0.32s;}
+.carrot-floating-bubble .bubble-dot:nth-child(2){animation-delay:-0.16s;-webkit-animation-delay:-0.16s;}
+.carrot-floating-bubble .bubble-dot:nth-child(3){animation-delay:0s;-webkit-animation-delay:0s;}
+@keyframes carrotBubbleDotBounce{
+  0%,80%,100%{transform:scale(0.7);opacity:0.45;}
+  40%{transform:scale(1.22);opacity:1;}
+}
+@-webkit-keyframes carrotBubbleDotBounce{
+  0%,80%,100%{-webkit-transform:scale(0.7);opacity:0.45;}
+  40%{-webkit-transform:scale(1.22);opacity:1;}
+}
+@media(prefers-reduced-motion:reduce){
+  :host([data-loading="true"]) .nav::before{animation:none!important;}
+  .carrot-floating-bubble .bubble-dot{animation:none!important;opacity:1;}
+}
 .trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
-</style><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Cloudflare · ${esc(v.live_status||v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>최신 확인 ${time(v.live_checked_at||v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`);
+</style><div class="carrot-floating-bubble" aria-hidden="true"><span class="bubble-dot"></span><span class="bubble-dot"></span><span class="bubble-dot"></span></div><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','내 차'],['trips','주행'],['parking','위치'],['charge','충전'],['vehicle','상태']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>차량 수신기 · ${esc(v.live_status||v.cloud_status||(this.busy?'연결 확인 중…':'연결 확인 중'))}<br>최신 확인 ${time(v.live_checked_at||v.last_sync)}<br>차량 정보 수신 ${time(v.measured_at)}${this.isFromCache?' (최신 확인 중…)':''}</div><button class="refresh">${this.busy?'조회 중…':'↻ 새로고침'}</button></footer></main></ha-card>`);
     this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.setupTabsObserver();
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
       .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
@@ -908,7 +1043,7 @@ class CarrotDashboard extends HTMLElement {
       row('crosshairs-gps','GPS 정확도',n(v.gps_accuracy_m,1),'m'),
       row('parking','주차 기록 시각',v.parking_at?time(v.parking_at,this._hass?.config?.time_zone):'—'),
       row('cloud-check','HA 동기화 시각',v.last_sync?time(v.last_sync,this._hass?.config?.time_zone):'—'),
-      row('cloud-outline','클라우드 연동 상태',v.cloud_status||'—'),
+      row('cloud-outline','차량 수신기 상태',v.cloud_status||'—'),
       row('calculator','SOC 계산 배터리 용량',n(v.soc_capacity_kwh,1),'kWh'),
       row('fan','공조 송풍 단계',n(v.blower_level,0)),
       row('fan-auto','공조 송풍 제어 전압',n(v.blower_volt,2),'V'),

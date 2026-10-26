@@ -1,4 +1,10 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # HA 주행 로그 이식 탐색 결과 및 구현 계획
+
+2026-10-14 후속 변경: 보관 한도는 사용자 요청으로 **10GB·주행 전체 단위 삭제**로
+변경됐다. 아래 초기 5GB·세그먼트 기준 계획은 당시 기록이며 현재 동작은
+`docs/driving-logs-setup.md`와 `driving-logs/CHANGELOG.md`를 따른다.
 
 작성·실서버 확인: 2026-10-14 13:06–13:10 KST. 상태: 구현 전 계획서.
 이번 범위는 읽기 전용 환경 조사와 계획 작성이다. 운영 설정, HA 실행 코드,
@@ -18,7 +24,7 @@ Comma 코드, Worker/D1/KV를 변경하지 않았고 파일 시험 업로드도 
 5. HA에는 실제 기록 시각이 최신인 로그부터 최대 5GB만 유지한다. 오래된 기록을
    우선 정리하고 보관 고정 예외는 두지 않는다. 업로드 순서는 보관 순서가 아니다.
 6. 완성된 구간은 주행 중에도 즉시 전송하고 주차 후 누락분을 대조·보충한다.
-7. 기존 Cloudflare 무료 플랜 사용을 침해할 가능성이 있으면 원본은 HA 직접 전송한다.
+7. 기존 ~~Cloudflare~~ 무료 플랜 사용을 침해할 가능성이 있으면 원본은 HA 직접 전송한다.
    현재 계획은 Worker/D1/KV 변경·원본 중계 없이 직접 전송을 기본으로 한다.
 8. 기존 대시보드·차계부·파라미터·카메라·원격 터미널의 계약과 저장소를 보존한다.
    Comma 소스는 Git 배포만 사용한다. 원격 수동 파일 수정·재부팅은 수행하지 않는다.
@@ -39,7 +45,7 @@ Comma 코드, Worker/D1/KV를 변경하지 않았고 파일 시험 업로드도 
 
 외부 호스트는 사용자가 제공한 `https://homeassistant202604.duckdns.org/`이다.
 인증정보·개인키·config entry 원문·GPS 원문은 조회 결과나 계획서에 넣지 않는다.
-DuckDNS는 주소 서비스이며 이름만으로 Cloudflare 경유 여부를 입증하지 않는다.
+DuckDNS는 주소 서비스이며 이름만으로 ~~Cloudflare~~ 경유 여부를 입증하지 않는다.
 프록시 상위 경로와 include 유효값은 추가 확인한다. 무료 한도 보장은 하지 않는다.
 
 기존 기록: `docs/CAMERA_FEASIBILITY.md`에는 DuckDNS·ARM64·기기 WSS probe 성공과
@@ -56,7 +62,7 @@ openpilot의 `openpilot/selfdrive/carrot/web/src/features/logs/` 및 `features/r
 목록, 파일, 업로드, 리플레이 입력 설명을 제공한다. 완성되지 않은 구간은 현재도
 전송 대상으로 거부한다. `route_summary/worker.js`는 브라우저에서 압축 로그와
 Cap'n Proto 이벤트를 해석한다. HA 설정 화면의 기존 `ha_bridge.js`는 설정 API만
-지원하므로 로그용 브리지를 별도로 구현해야 한다. 파일·Web Worker 경로를 포함해
+지원하므로 로그용 브리지를 별도로 구현해야 한다. 파일·Web ~~Worker~~ 경로를 포함해
 HA 정적 자산 경로 아래로 옮기고 전체 당근웹 앱을 함께 로드하지 않는다.
 
 ### 첨부 분석 화면
@@ -211,7 +217,7 @@ CPU·열·I/O·메모리 실측 후 전송 한도와 pause 조건을 정한다. 
 - 다중 주행/중첩 경로/날짜 경계/타임존/보관 삭제 후 지도 일관성 검증.
 - Chromium 비동기 갱신 후 후속 animation frame까지 스크롤·선택·지도 상태 보존 검증.
 - 기존 필수 gates: dashboard-live-loading, dashboard-lazy-runtime, dashboard-view-state,
-  test_cloud_live, test_incremental_sync, test_history_cache, Worker incremental/benchmark,
+  test_cloud_live, test_incremental_sync, test_history_cache, ~~Worker~~ incremental/benchmark,
   Comma test_param_polling 및 관련 daemon suite. auth/isolation·차계부·trip/charge·카메라
   driving interlock·terminal 회귀도 보존. 기존 실패는 신규 실패와 구분해 기록.
 

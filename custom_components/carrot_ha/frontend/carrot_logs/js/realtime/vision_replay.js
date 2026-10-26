@@ -143,7 +143,10 @@ window.CarrotHAReplayRuntime = window.CarrotHAReplayRuntime || (() => {
   function syncSegmentPicker(index, total) {
     if (!segmentSelectEl) return;
     const expectedSegments = state.active ? state.segments : [];
-    const expectedLabels = expectedSegments.map((segment) => replayTitleForSegment(segment));
+    const expectedLabels = expectedSegments.map((segment) => (
+      (segment === state.segment ? `${text('ha_replay_current_segment', CURRENT_LANG === 'en' ? '[Current]' : '[현재 구간]')} ` : '')
+      + replayTitleForSegment(segment)
+    ));
     const currentOptions = Array.from(segmentSelectEl.options);
     const optionsChanged = currentOptions.length !== expectedSegments.length
       || currentOptions.some((option, optionIndex) => (
@@ -155,6 +158,7 @@ window.CarrotHAReplayRuntime = window.CarrotHAReplayRuntime || (() => {
         const option = document.createElement("option");
         option.value = segment;
         option.textContent = expectedLabels[optionIndex];
+        if (segment === state.segment) option.setAttribute('aria-current', 'true');
         return option;
       }));
     }
@@ -164,7 +168,7 @@ window.CarrotHAReplayRuntime = window.CarrotHAReplayRuntime || (() => {
     if (index >= 0) segmentSelectEl.value = state.segment;
     const label = text("replay_select_segment", "Select replay segment");
     segmentSelectEl.setAttribute("aria-label", label);
-    segmentSelectEl.title = label;
+    segmentSelectEl.title = replayTitleForSegment(state.segment) || label;
   }
 
   function syncSegmentNavigation() {

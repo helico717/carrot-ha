@@ -1,0 +1,4 @@
+{
+  "vars": {"ARCHIVE_STORAGE_V1": "1"},
+  "triggers": {"crons": ["17 * * * *"]}
+}

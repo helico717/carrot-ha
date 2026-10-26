@@ -20,27 +20,30 @@
   "options": {
     "step": {
       "init": {
-        "title": "Carrot HA settings",
+        "title": "Vehicle receiver, camera and SOC settings",
         "description": "Set the SOC calculation capacity for your vehicle. This is not a battery degradation measurement.",
         "data": {
           "soc_capacity_kwh": "SOC calculation capacity (kWh)",
-          "cloud_url": "Cloudflare Worker URL (https://…workers.dev)",
-          "cloud_view_token": "WAYON_VIEW_TOKEN (read-only key)",
           "vehicle_model": "Vehicle model (e.g. ID. Buzz)",
+          "driving_logs_nas_path": "30-day log archive: NAS path ending in /driving-logs (optional)",
           "camera_enabled": "Enable parked cameras (experimental)",
           "camera_token": "Dedicated camera token (32+ characters, separate from other tokens)",
           "terminal_enabled": "Enable parked remote terminal (experimental)",
           "terminal_ha_url": "External HA HTTPS URL (automatic terminal connection)",
-          "terminal_upload_token": "Existing WAYON_UPLOAD_TOKEN (no Comma file edits)"
+          "receiver_url": "Own vehicle receiver URL (internal HTTP or external HTTPS)",
+          "receiver_view_token": "Receiver view token",
+          "receiver_upload_token": "Receiver upload token (connection discovery)"
         }
       }
     },
     "error": {
       "invalid_capacity": "Enter a finite capacity between 20 and 150 kWh.",
+      "invalid_log_archive": "Select an available NAS network mount and a dedicated driving-logs directory.",
       "invalid_cloud": "Enter an HTTPS base URL without a path and a view token.",
       "invalid_camera_token": "Use a separate 32–256 character ASCII token without whitespace.",
       "invalid_terminal_token": "Use a terminal-only 32–256 character ASCII token different from every other token.",
-      "invalid_terminal_setup": "Enter the external HA HTTPS URL, Worker URL and an upload token separate from the view token."
+      "invalid_terminal_setup": "Check the external HA HTTPS base URL and vehicle receiver configuration.",
+      "invalid_receiver": "Use an HTTPS receiver URL (HTTP only on a private local network), with distinct 32+ character upload and view tokens."
     }
   }
 }

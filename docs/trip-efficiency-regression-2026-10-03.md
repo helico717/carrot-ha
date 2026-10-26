@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # Trip efficiency regression investigation — 2026-10-03
 
 ## Cause
@@ -19,7 +21,7 @@ boundaries that independently pass distance eligibility, temporal proximity,
 charging/invalid-sample checks and plausible-power checks. Increment derivation
 version to 4. Original events are never rewritten. Archive initialization after
 HA restart refreshes derivations, enabling historical recovery without new cloud
-queries or a Worker migration.
+queries or a ~~Worker~~ migration.
 
 ## Read-only evidence and recovery
 
@@ -48,7 +50,7 @@ information is required to reproduce the confirmed efficiency regression.
 ## Validation and deployment status
 
 HA Python: 194 tests, 192 passed, 2 skipped. Selected dashboard tests: 24 passed.
-Worker incremental tests and sync benchmark passed. Comma boundary tests: 4 passed;
+~~Worker~~ incremental tests and sync benchmark passed. Comma boundary tests: 4 passed;
 parameter polling: 4 passed. Full Comma suite: 53 tests, 1 camera compatibility
 failure and 3 camera/terminal errors, including unavailable asyncio.timeout under
 system Python 3.9 and missing camera encode_media. Those paths are unchanged.
@@ -56,8 +58,8 @@ system Python 3.9 and missing camera encode_media. Those paths are unchanged.
 HA changes are packaged as version 0.8.9 with version-matched release notes and
 a release tag. The user will install the HACS update and restart HA. Comma changes
 remain uncommitted in the local openpilot checkout for the user to commit, push,
-and apply through a clean device Git update/restart. No Worker changes or new
-D1 migrations are needed for this fix. Never copy or
+and apply through a clean device Git update/restart. No ~~Worker~~ changes or new
+~~D1~~ migrations are needed for this fix. Never copy or
 patch Comma source through SSH/SCP. Physical-device and deployed-dashboard results
 remain unverified.
 
@@ -83,8 +85,8 @@ positive efficiency. No current SOC is substituted into historical trips.
 
 The earlier deployment-status paragraph records the initial handoff; subsequently
 Comma fixes were committed and pushed. This follow-up needs only HACS 0.8.11,
-HA restart and browser refresh. No new Comma or Worker changes are required.
+HA restart and browser refresh. No new Comma or ~~Worker~~ changes are required.
 
 Validation: HA Python 199 tests (197 passed, 2 skipped); dashboard regression
-suite 27 passed; Worker incremental tests and sync benchmark passed. Deployed
+suite 27 passed; ~~Worker~~ incremental tests and sync benchmark passed. Deployed
 HA display remains to be checked after the user installs the release.

@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # WIP·NAV·Model selector 간 HA 유지 전환 — 분석 및 구현 계획
 
 작성일: 2026-10-13 KST. 상태: 설계 제안, 실행 코드 미변경, 기기 미접속.
@@ -263,7 +265,7 @@ OS downgrade나 임의 force reset을 자동 복구로 실행하지 않는다.
 임의 terminal 문자열을 UI에서 생성하는 방식보다 허용된 전환 요청을 우선한다.
 Worker/D1 변경은 필요성 확인 후 결정한다. 파라미터 epoch 또는 relay 타입 확장이
 필요하면 최소 변경을 하고, 필요한 migration을 Worker보다 먼저 적용한다.
-전환 목록 조회로 KV write·별도 telemetry polling·카드별 cloud query를 추가하지 않는다.
+전환 목록 조회로 ~~KV~~ write·별도 telemetry polling·카드별 cloud query를 추가하지 않는다.
 
 ## 9. 자동 동기화 개선
 
@@ -303,14 +305,14 @@ Linux CI에서 각 candidate의 daemon suite, param polling, 기존 sync conflic
 camera/terminal 인터록, repo_update와 updater/launcher 회귀를 수행한다.
 HA 변경에는 terminal 권한/relay/device isolation과 UI 진행 상태 검사를 추가한다.
 데이터 경로·polling을 건드리면 프로젝트의 dashboard live/lazy/view-state,
-cloud live/incremental/history, Worker incremental/benchmark gates도 수행한다.
+cloud live/incremental/history, ~~Worker~~ incremental/benchmark gates도 수행한다.
 기존 실패와 새 실패를 구분하고 Mac 결과를 Comma 결과로 보고하지 않는다.
 
 최종 완료는 (1) 두 신규 배포 branch와 기존 branch의 원격 SHA 확인,
 (2) 실제 새 Actions 성공, (3) HA 실행 변경 시 0.8.x 정식 HACS release/Actions 확인,
 (4) 사용자 설치 후 실기 왕복 전환·동일 identity 업로드 확인으로 판단한다.
 24시간 freshness/업로드량 관측은 운영 안정성 확인 단계로 별도 기록한다.
-설계 문서 단계에서는 코드·branch·tag·Worker·D1·기기 업데이트가 없다.
+설계 문서 단계에서는 코드·branch·tag·~~Worker~~·~~D1~~·기기 업데이트가 없다.
 
 ## 11. 남은 확인 항목
 

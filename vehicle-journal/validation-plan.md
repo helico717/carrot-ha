@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](../docs/CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 검증 계획
 
 ## 이번 설계 검증
@@ -46,7 +48,7 @@ openpilot `ha/tests/test_param_polling.py`와 관련 auth/charge/trip/camera int
 - 초기 SQL 9건, 기존 storage purge·monthly energy·charge payments/API·trip repair/
   boundaries·archive compression/performance·frontend revision 검증 통과.
 - freshness 필수 Node 3파일(10개 test)과 cloud live/incremental/history cache Python,
-  Worker incremental/benchmark, Comma param_polling(4개) 통과.
+  ~~Worker~~ incremental/benchmark, Comma param_polling(4개) 통과.
 - 독립 Chromium: 탭·차트 지표·수동 저장·memo escaping, 1280/850/520/360/320px,
   오래된 월 응답 거부, async 갱신 후 2개 animation frame의 scroll/style 보존 확인.
 - HA source read-only 이관과 target integrity/FK 검증, 기존 자료로 로컬 화면 확인.

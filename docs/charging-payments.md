@@ -1,3 +1,5 @@
+> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
+
 # 충전 실제 결제 금액과 비용 요약
 
 충전 탭에서 완료 충전마다 요금 위의 **직접 입력** 버튼을 눌러 실제 결제 총액을 저장합니다. 입력 후 **수정**으로 바뀌며 입력 삭제 시 기존 추정 금액으로 돌아갑니다. 0원은 무료 충전이며 미입력과 다릅니다. 원 단위 정수와 천 단위 쉼표를 허용하며 입력 범위는 0~999,999,999원입니다. 조회·변경은 기존 대시보드와 동일하게 HA 관리자 계정으로 제한합니다.
@@ -20,7 +22,7 @@ HA의 `carrot_ha/<entry_id>.sqlite3` 안에 `charge_summaries`, `charge_payments
 
 HA WebSocket `carrot_ha/charge_payment/save`와 `carrot_ha/charge_payment/delete`는 `entry_id`, `payment_id`, `source_event_ids`, `expected_version`을 받습니다. save는 정수 `actual_cost_krw`도 필요합니다. 차량 소속과 서버가 계산한 병합 범위를 검증합니다. 변경 버전이 다르면 `conflict`, 잘못된 금액은 `invalid_payment`, 비관리자는 `unauthorized`를 반환합니다. 성공 시 변경 버전을 반환합니다.
 
-대시보드의 `charge_cost_totals`는 `month`, `effective_cost_krw`, `actual_cost_krw`, `estimated_cost_krw` (미입력 건만), `actual_count`, `count`, `cost_source`를 제공합니다. 최신 상태 조회는 메모리에 준비된 합계를 사용해 원본 히스토리 계산을 기다리지 않습니다. 수신·결제 변경 후 갱신하며 월 전환은 로컬 60초 갱신에서 반영합니다. 추가 클라우드 요청·KV 쓰기는 없습니다.
+대시보드의 `charge_cost_totals`는 `month`, `effective_cost_krw`, `actual_cost_krw`, `estimated_cost_krw` (미입력 건만), `actual_count`, `count`, `cost_source`를 제공합니다. 최신 상태 조회는 메모리에 준비된 합계를 사용해 원본 히스토리 계산을 기다리지 않습니다. 수신·결제 변경 후 갱신하며 월 전환은 로컬 60초 갱신에서 반영합니다. 추가 클라우드 요청·~~KV~~ 쓰기는 없습니다.
 
 ## 검증 기록 — 2026-10-04
 

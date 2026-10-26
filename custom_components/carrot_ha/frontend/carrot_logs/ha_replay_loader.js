@@ -22,48 +22,47 @@
         const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = base + file; document.head.append(link);
       }
       const style = document.createElement('style');
-      style.textContent = '#haRecordedReplay{position:fixed;inset:0;z-index:1000;background:#080d11;overflow:auto}#haRecordedReplay[hidden]{display:none}#haRecordedReplay .page{position:relative;inset:auto;transform:none!important;opacity:1!important;visibility:visible!important;width:100%;max-width:none;display:flex!important;min-height:100%;height:100%;padding:0}#carrotStage{min-height:320px}#haRecordedReplay #carrotRoadVideo{width:calc(100% - var(--carrot-replay-content-right,0px));height:calc(100% - 52px);object-fit:contain}#visionStartOverlay,#carrotNaviPane,#haRecordedReplay .carrot-stage__controls{display:none!important}#haReplayValues{position:absolute;top:60px;left:16px;z-index:30;color:white;background:#101820cc;padding:8px;border-radius:8px;font-size:13px;pointer-events:none}.carrot-stage:not(.is-replay-hud-visible) #haReplayValues{display:none}';
+      style.textContent = '#haRecordedReplay{position:fixed;inset:0;z-index:1000;background:#080d11;overflow:auto}#haRecordedReplay[hidden]{display:none}#haRecordedReplay .page{position:relative;inset:auto;transform:none!important;opacity:1!important;visibility:visible!important;width:100%;max-width:none;display:flex!important;min-height:100%;height:100%;padding:0}#carrotStage{min-height:320px}#visionStartOverlay,#carrotNaviPane,#btnWebSound{display:none!important}';
       document.head.append(style);
-      const state = Object.create(null);
-      window.CarrotHudState = state; window.CarrotOverlayState = state;
+      const heading = root.querySelector('.carrot-replay-controls__heading');
+      for (const [direction, originalId, label] of [
+        ['Previous', 'btnCarrotReplayPrevious', CURRENT_LANG === 'en' ? 'Previous' : '이전'],
+        ['Next', 'btnCarrotReplayNext', CURRENT_LANG === 'en' ? 'Next' : '다음'],
+      ]) {
+        const original = document.getElementById(originalId);
+        const button = document.createElement('button');
+        button.id = 'haReplay' + direction; button.type = 'button';
+        button.className = 'smallBtn ha-replay-step'; button.textContent = label;
+        button.title = label; button.setAttribute('aria-label', label);
+        button.addEventListener('click', () => original.click());
+        const sync = () => { button.disabled = original.disabled || original.hidden; };
+        new MutationObserver(sync).observe(original, {attributes:true, attributeFilter:['disabled','hidden']});
+        sync(); heading.append(button);
+      }
+      const hudRoot = document.createElement('div'); hudRoot.id = 'driveHudCard'; root.append(hudRoot);
       window.CarrotWebSettingsState = {replay_hud_visible:true};
       window.getWebSettingByKey = (key, fallback) => window.CarrotWebSettingsState[key] ?? fallback;
       window.setWebSettingByKey = async (key, value) => { window.CarrotWebSettingsState[key] = value; };
       window.showPage = page => {
         CURRENT_PAGE = page === 'carrot' ? 'carrot' : 'logs';
+        document.body.dataset.page = CURRENT_PAGE;
         root.hidden = page !== 'carrot';
+        if (page === 'carrot') window.DriveVisionHudContent?.activate();
+        else window.DriveVisionHudContent?.deactivate();
         window.dispatchEvent(new CustomEvent('carrot:pagechange', {detail:{page:CURRENT_PAGE}}));
       };
-      window.CarrotVisionSetActive = active => { if (!active) root.hidden = true; };
-      window.CarrotVisionSetPhase = (phase, options = {}) => {
-        document.getElementById('carrotStage').classList.toggle('is-stream-ready', phase === 'ready');
-        document.getElementById('carrotStageLoading').hidden = phase === 'ready' || phase === 'inactive' || phase === 'unavailable';
-        document.getElementById('carrotStageLoadingText').textContent = options.statusText || '';
-        document.getElementById('carrotStageLoadingDetail').textContent = options.detailText || '';
-      };
-      const values = document.createElement('div'); values.id = 'haReplayValues';
-      document.getElementById('carrotStage').append(values);
-      const render = () => {
-        const car = state.carState || {}, radar = state.radarState || {};
-        const speed = Number.isFinite(car.vEgo) ? (car.vEgo * 3.6).toFixed(1) + ' km/h' : '—';
-        const acceleration = Number.isFinite(car.aEgo) ? car.aEgo.toFixed(2) + ' m/s²' : '—';
-        const lead = radar.leadOne?.status && Number.isFinite(radar.leadOne.dRel) ? radar.leadOne.dRel.toFixed(1) + ' m' : '—';
-        values.textContent = `기록 속도 ${speed} · 가속도 ${acceleration} · Lead 1 ${lead}`;
-        window.CarrotVisionReplay.reportRenderable?.(document.getElementById('carrotRoadVideo').readyState >= 2);
-      };
-      window.requestCarrotVisionRender = render;
-      document.getElementById('carrotRoadVideo').addEventListener('seeked', render);
-      window.CarrotVisionRaw = {
-        clearState(options = {}) { for (const key of Object.keys(state)) delete state[key]; if (options.render !== false) render(); },
-        applyCompactFrames(frames, options = {}) {
-          let applied = 0;
-          for (const frame of frames) if (frame?.service && frame.decoded) { state[frame.service] = frame.decoded; applied++; }
-          if (options.render !== false) render();
-          return applied;
-        },
-        disconnectOverlay() {}, disconnectHud() {},
-      };
-      for (const file of ['js/realtime/vision_compact.js','js/generated/replay.js','js/realtime/replay_client.js','js/realtime/vision_replay.js']) await script(file);
+      // Recorded data is the only producer. The original raw decoder and GPU
+      // renderer share the same state, projection and frame scheduler as Carrot Web.
+      window.shouldRunCarrotHudData = () => false;
+      window.shouldRunCarrotHudRealtime = () => false;
+      window.shouldRunCarrotVisionRealtime = () => false;
+      window.isCarrotDriveDataRequested = () => false;
+      window.emitCarrotRenderRequest = detail => window.HomeDrive?.requestRender(detail);
+      window.requestCarrotVisionRender = window.emitCarrotRenderRequest;
+      const vision = await import(base + 'src/features/drive/contents/vision/index.js');
+      vision.installDriveVisionLeafFacades(window);
+      for (const file of ['js/realtime/vision_state.js','js/realtime/vision_compact.js','js/realtime/vision_raw.js','js/realtime/vision_webgl2.js','js/realtime/home_drive.js','js/generated/replay.js','js/realtime/replay_client.js','js/realtime/vision_replay.js']) await script(file);
+      if (!vision.finalizeDriveVisionFacade(window)) throw new Error('원본 주행 HUD 렌더러 초기화 실패');
     })();
     return await loading;
   }

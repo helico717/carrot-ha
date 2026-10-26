@@ -297,7 +297,7 @@ class JournalTests(unittest.TestCase):
 
     def test_photo_limit_cleans_failed_file(self):
         ns,Image,BytesIO=self.photo_functions()
-        key=str(uuid4());self.journal.save_manual(key,0,{'kind':'expense','date':'2026-09-02','category':'maintenance'})
+        key=str(uuid4());self.journal.save_manual(key,0,{'kind':'expense','date':'2026-09-02','category':'other'})
         for index in range(6):
             output=BytesIO();Image.new('RGB',(20,20),(index*20,0,0)).save(output,format='PNG')
             if index<5:ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
@@ -305,6 +305,17 @@ class JournalTests(unittest.TestCase):
                 with self.assertRaises(sqlite3.IntegrityError):ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
         directory=Path(self.journal.path).with_suffix('')/'attachments'
         self.assertEqual(len(list(directory.iterdir())),5)
+
+    def test_maintenance_twenty_five_photos(self):
+        ns,Image,BytesIO=self.photo_functions();key=str(uuid4())
+        self.journal.save_manual(key,0,{'kind':'expense','date':'2026-09-02','category':'maintenance'})
+        for index in range(26):
+            output=BytesIO();Image.new('RGB',(20,20),(index*8,0,0)).save(output,format='PNG')
+            if index<25:ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
+            else:
+                with self.assertRaises(sqlite3.IntegrityError):ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
+        with self.assertRaises(ValueError):self.journal.save_manual(key,1,{'kind':'expense','date':'2026-09-02','category':'other'})
+        self.assertEqual(len(self.journal.query('2026-09-01','2026-09-30')['records'][0]['attachments']),25)
 
     def test_accident_ten_photos_and_snapshot(self):
         ns,Image,BytesIO=self.photo_functions();key=str(uuid4())
@@ -314,7 +325,7 @@ class JournalTests(unittest.TestCase):
             if index<10:ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
             else:
                 with self.assertRaises(sqlite3.IntegrityError):ns['save_photo'](self.journal,key,output.getvalue(),'photo.png')
-        with self.assertRaises(ValueError):self.journal.save_manual(key,1,{'kind':'expense','date':'2026-09-02','category':'maintenance'})
+        with self.assertRaises(ValueError):self.journal.save_manual(key,1,{'kind':'expense','date':'2026-09-02','category':'other'})
         self.assertEqual(len(self.journal.query('2026-09-01','2026-09-30')['records'][0]['attachments']),10)
         from custom_components.carrot_ha.vehicle_journal.snapshots import export_snapshot,snapshot_preview,restore_snapshot
         plan=snapshot_preview(export_snapshot(self.journal,{'vehicle_id':self.journal.vehicle,'device_id':'car','timezone':'Asia/Seoul'}))

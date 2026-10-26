@@ -1,4 +1,4 @@
-"""Poll the MyID4-compatible Worker; credentials never reach the frontend."""
+"""Sync the own vehicle receiver; legacy source compatibility preserves old archives."""
 import asyncio
 import json
 import logging
@@ -8,6 +8,7 @@ from aiohttp import ClientTimeout
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .cloud_feed import parse_feed
+from .cloud_archive import restore_page
 from .charge_costs import refresh_runtime_costs
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ async def sync_trip_changes(hass, runtime, get, save):
     if now < runtime.get('trip_changes_retry_at', 0):
         return False
     archive = runtime['archive']
-    cursor = int(await hass.async_add_executor_job(archive.cursor, 'trip_changes') or 0)
+    cursor_name = runtime.get('source_cursor_prefix', '') + 'trip_changes'
+    cursor = int(await hass.async_add_executor_job(archive.cursor, cursor_name) or 0)
     for _ in range(10):
         try:
             feed = await get('/api/trip-changes?' + urlencode({
@@ -48,7 +50,7 @@ async def sync_trip_changes(hass, runtime, get, save):
             raise ValueError('Trip change cursor did not advance')
         await save({'trips': trips})
         # On any partial write failure, retry the entire page. put_cloud is idempotent.
-        await hass.async_add_executor_job(archive.cursor, 'trip_changes', next_cursor)
+        await hass.async_add_executor_job(archive.cursor, cursor_name, next_cursor)
         cursor = next_cursor
         if not more:
             break
@@ -56,8 +58,9 @@ async def sync_trip_changes(hass, runtime, get, save):
 
 async def sync(hass, runtime):
     entry = runtime['entry']
-    base = entry.options.get('cloud_url', '').rstrip('/')
-    token = entry.options.get('cloud_view_token', '')
+    direct = bool(entry.options.get('receiver_url'))
+    base = (entry.options.get('receiver_url') if direct else entry.options.get('cloud_url', '')).rstrip('/')
+    token = entry.options.get('receiver_view_token', '') if direct else entry.options.get('cloud_view_token', '')
     if not base or not token or runtime.get('syncing'):
         return
     runtime['syncing'] = True
@@ -110,6 +113,20 @@ async def sync(hass, runtime):
         # even when subsequent archive work fails and must retry its cursor.
         runtime['state_status'] = 'ok'
         runtime['state_checked_at'] = datetime.now(timezone.utc).isoformat()
+        if direct:
+            identity = await get('/api/source?' + urlencode({'device_id': entry.data['device_id']}))
+            source_id = identity.get('source_id')
+            if (identity.get('schema') != 'carrot-receiver-v1' or not isinstance(source_id, str)
+                    or len(source_id) != 36 or identity.get('device_id') != entry.data['device_id']):
+                raise ValueError('Invalid receiver identity')
+            prefix = 'receiver:' + source_id + ':'
+        else:
+            prefix = ''
+        if runtime.get('source_cursor_prefix', '') != prefix:
+            runtime.pop('archive_acknowledged', None)
+            runtime.pop('archive_ack_retry_at', None)
+            runtime.pop('trip_changes_retry_at', None)
+        runtime['source_cursor_prefix'] = prefix
         if fallback_trips and isinstance(fallback_trips, list):
             await save({'trips': fallback_trips})
         # Recent trips must not wait behind an offline telemetry backlog.
@@ -118,10 +135,13 @@ async def sync(hass, runtime):
         except CloudHTTPError as trip_error:
             incremental_trips = True  # Never turn transient errors into a full rescan.
             _LOGGER.warning('Carrot trip changes unavailable: HTTP %s; retrying next sync', trip_error.status)
-        cursor = await hass.async_add_executor_job(runtime['archive'].cursor, 'telemetry')
+        telemetry_cursor = prefix + 'telemetry'
+        cursor = await hass.async_add_executor_job(runtime['archive'].cursor, telemetry_cursor)
         for _ in range(10):
             try:
-                history = await get('/api/telemetry-history?' + urlencode({'after': cursor, 'limit': 100, 'device_id': entry.data['device_id']}))
+                history = await get('/api/telemetry-history?' + urlencode({'after': cursor, 'limit': 100,
+                    'device_id': entry.data['device_id'], 'encoding': 'carrot-cloud-archive-v1'}))
+                history = await hass.async_add_executor_job(restore_page, history)
             except CloudHTTPError as error:
                 if error.status == 404:
                     runtime['history_supported'] = False
@@ -132,8 +152,11 @@ async def sync(hass, runtime):
                 payload = json.loads(item['raw_json'])
                 await archive_history({'state':{'device_id':payload['deviceId'],'updated_at':payload['updatedAt'],'onroad':payload.get('onroad'),'raw_json':payload}})
                 cursor = item['sequence']
-                await hass.async_add_executor_job(runtime['archive'].cursor,'telemetry',cursor)
+                await hass.async_add_executor_job(runtime['archive'].cursor,telemetry_cursor,cursor)
             if not history['has_more']:break
+        # Notify cloud retention only after the local durable checkpoints. A
+        # failed ACK is retried, and never invalidates an already saved page.
+        await acknowledge_archive(hass, runtime, session, base, token)
         offset = 0
         try:
             if not incremental_trips:
@@ -197,3 +220,30 @@ async def sync(hass, runtime):
         finally:
             runtime['syncing'] = False
             async_dispatcher_send(hass, 'carrot_ha' + entry.entry_id)
+
+
+async def acknowledge_archive(hass, runtime, session, base, token):
+    now = datetime.now(timezone.utc).timestamp()
+    if now < runtime.get('archive_ack_retry_at', 0) or runtime.get('history_supported') is False:
+        return
+    archive = runtime['archive']
+    prefix = runtime.get('source_cursor_prefix', '')
+    telemetry = int(await hass.async_add_executor_job(archive.cursor, prefix + 'telemetry') or 0)
+    trips = int(await hass.async_add_executor_job(archive.cursor, prefix + 'trip_changes') or 0)
+    pair = (telemetry, trips)
+    if pair == runtime.get('archive_acknowledged'):
+        return
+    try:
+        async with session.post(base + '/api/archive-ack', json={
+            'device_id': runtime['entry'].data['device_id'],
+            'telemetry_sequence': telemetry, 'trip_sequence': trips},
+            headers={'Authorization': 'Bearer ' + token, 'User-Agent': 'CarrotHA/0.8',
+                     'Accept': 'application/json'}, timeout=ClientTimeout(total=15),
+            allow_redirects=False) as response:
+            if response.status != 200 or (await response.json()).get('ok') is not True:
+                runtime['archive_ack_retry_at'] = now + (3600 if response.status in (404,409) else 120)
+                return
+        runtime['archive_acknowledged'] = pair
+    except Exception:
+        runtime['archive_ack_retry_at'] = now + 120
+        _LOGGER.warning('Carrot archive retention acknowledgement deferred; cloud history preserved')

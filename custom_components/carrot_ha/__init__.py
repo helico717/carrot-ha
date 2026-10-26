@@ -103,6 +103,8 @@ async def async_setup(hass, config):
     return True
 
 async def async_setup_entry(hass, entry):
+    from .direct_receiver import apply_prepared
+    await apply_prepared(hass, entry)
     archive = await hass.async_add_executor_job(Archive, hass.config.path('carrot_ha', entry.entry_id + '.sqlite3'), hass.config.time_zone)
     latest = await hass.async_add_executor_job(archive.latest, entry.data['device_id'])
     hass.data[DOMAIN][entry.entry_id] = {'entry': entry, 'archive': archive, 'lock': asyncio.Lock(), 'latest': latest}
@@ -111,6 +113,8 @@ async def async_setup_entry(hass, entry):
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
     await refresh_runtime_costs(hass, runtime)
+    from .driving_logs.runtime import setup as setup_driving_logs
+    setup_driving_logs(hass, entry, runtime)
     from .vehicle_journal.runtime import setup as setup_journal
     try:
         await setup_journal(hass, entry, runtime)
@@ -192,6 +196,12 @@ async def async_setup_entry(hass, entry):
 async def _options_updated(hass, entry):
     from .cloud import sync
     runtime = hass.data[DOMAIN][entry.entry_id]
+    from .driving_logs.runtime import configured_path
+    configured = await hass.async_add_executor_job(configured_path, hass, entry)
+    active_store = runtime.get('driving_log_store')
+    if active_store is not None and getattr(active_store, 'nas_root', '') != configured:
+        await hass.config_entries.async_reload(entry.entry_id)
+        return
     if runtime.get('camera_options') != (entry.options.get('camera_enabled', False), entry.options.get('camera_token', '')):
         await hass.config_entries.async_reload(entry.entry_id)
         return
@@ -208,6 +218,20 @@ async def _options_updated(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
+        if task := hass.data[DOMAIN][entry.entry_id].get('driving_local_task'):
+            task.cancel()
+            await asyncio.gather(task,return_exceptions=True)
+        if local := hass.data[DOMAIN][entry.entry_id].get('driving_local'):
+            await local.close()
+        if ai := hass.data[DOMAIN][entry.entry_id].get('driving_ai'):
+            await ai.close()
+        if jobs := hass.data[DOMAIN][entry.entry_id].get('driving_log_v2_jobs'):
+            await jobs.close()
+        if task := hass.data[DOMAIN][entry.entry_id].get('driving_log_archive_task'):
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        if uploads := hass.data[DOMAIN][entry.entry_id].get('driving_log_upload'):
+            await uploads.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('camera_relay'):
             await relay.close()
         if relay := hass.data[DOMAIN][entry.entry_id].get('terminal_relay'):
@@ -391,8 +415,10 @@ class SettingsView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:
@@ -429,8 +455,10 @@ class ParamSetView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:
@@ -478,8 +506,10 @@ class ParamStatusView(HomeAssistantView):
         if runtime is None:
             return web.Response(status=404)
 
-        base = runtime['entry'].options.get('cloud_url', '').rstrip('/')
-        token = runtime['entry'].options.get('cloud_view_token', '')
+        options = runtime['entry'].options
+        direct = bool(options.get('receiver_url'))
+        base = (options.get('receiver_url') if direct else options.get('cloud_url', '')).rstrip('/')
+        token = options.get('receiver_view_token', '') if direct else options.get('cloud_view_token', '')
         device_id = runtime['entry'].data['device_id']
 
         if not base or not token:

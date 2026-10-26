@@ -16,6 +16,7 @@ const FRAME_METADATA = 0;
 const FRAME_WIDE = 1;
 const FRAME_DRIVER = 2;
 const FRAME_STATUS = 3;
+const FRAME_ROAD = 4;
 const FLAG_KEY = 1;
 const FRAME_SYNC_TOLERANCE_US = 100_000; // 100ms
 const MAX_DECODE_QUEUE = 12;
@@ -522,6 +523,7 @@ export class CarrotCamera360Modal {
     this.isOpen = false;
     this.sessionSeq = 0;
     this.state = 'idle'; // idle | connecting | starting | waiting_for_frames | playing | retrying | error | stopped
+    this.selectedView = 0;
     this.mode = 'mock';  // 'mock' | 'real'
     this.retryCount = 0;
     this.maxRetries = 3;
@@ -556,6 +558,10 @@ export class CarrotCamera360Modal {
         keySeen: false,
         droppingUntilKey: false,
         lastTimestamp: -1,
+      },
+      road: {
+        decoder: null, frame: null, ready: false, keySeen: false,
+        droppingUntilKey: false, lastTimestamp: -1,
       },
       driver: {
         decoder: null,
@@ -930,6 +936,7 @@ export class CarrotCamera360Modal {
           border-radius: 10px;
           padding: 2px;
           gap: 2px;
+          flex-wrap: wrap;
         }
         .camera360-modal-root[data-theme="light"] .camera360-view-tabs {
           background: #f1f5f9;
@@ -1078,6 +1085,7 @@ export class CarrotCamera360Modal {
 
         <div class="camera360-viewport" id="cam360Viewport">
           <canvas class="camera360-canvas" id="cam360Canvas" width="960" height="540"></canvas>
+          <canvas class="camera360-canvas" id="cam360RoadCanvas" width="960" height="540" style="display:none;object-fit:contain;background:#000"></canvas>
           <div class="camera360-hud">
             <div class="hud-dot" id="cam360HudDot"></div>
             <span id="cam360HudYaw">0° (정면 · FRONT)</span>
@@ -1113,12 +1121,13 @@ export class CarrotCamera360Modal {
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"></path>
             </svg>
-            <span>${isEn ? 'Drag mouse or touch to rotate 360°' : '화면을 드래그하여 360° 시야를 자유롭게 회전하세요'}</span>
+            <span id="cam360Hint">${isEn ? 'Drag mouse or touch to rotate 360°' : '화면을 드래그하여 360° 시야를 자유롭게 회전하세요'}</span>
           </div>
           <div class="camera360-controls">
             <div class="camera360-view-tabs">
               <button type="button" class="view-btn is-active" data-view="0">${isEn ? '360° View' : '360° 합성'}</button>
               <button type="button" class="view-btn" data-view="1">${isEn ? 'Front' : '전방 광각'}</button>
+              <button type="button" class="view-btn" data-view="3">${isEn ? 'Telephoto · Full frame' : '텔레포토 원본'}</button>
               <button type="button" class="view-btn" data-view="2">${isEn ? 'Cabin' : '실내 광각'}</button>
             </div>
             <button type="button" class="reset-btn" id="cam360ResetBtn">
@@ -1138,6 +1147,8 @@ export class CarrotCamera360Modal {
 
     // Cache elements
     this.canvas = wrapper.querySelector('#cam360Canvas');
+    this.roadCanvas = wrapper.querySelector('#cam360RoadCanvas');
+    this.hint = wrapper.querySelector('#cam360Hint');
     this.viewport = wrapper.querySelector('#cam360Viewport');
     this.modePill = wrapper.querySelector('#cam360ModePill');
     this.statusPill = wrapper.querySelector('#cam360StatusPill');
@@ -1180,12 +1191,7 @@ export class CarrotCamera360Modal {
     this.viewButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const mode = parseInt(btn.getAttribute('data-view'), 10);
-        this.viewButtons.forEach(b => b.classList.toggle('is-active', b === btn));
-        if (this.renderer) {
-          this.renderer.viewMode = mode;
-          this.renderer.setOrientation(mode === 2 ? 180 : 0, 0);
-          this.updateHud();
-        }
+        this.selectView(mode);
       });
     });
 
@@ -1263,7 +1269,7 @@ export class CarrotCamera360Modal {
 
     const onPointerDown = (e) => {
       if (e.target && e.target.closest('#cam360Ptz')) return;
-      if (!this.renderer || this.state !== 'playing' || isDragging || e.button > 0) return;
+      if (this.selectedView === 3 || !this.renderer || this.state !== 'playing' || isDragging || e.button > 0) return;
       dragPointer = e.pointerId;
       e.preventDefault();
       isDragging = true;
@@ -1319,6 +1325,55 @@ export class CarrotCamera360Modal {
     window.addEventListener('keydown', this._onKeyDown);
   }
 
+  selectView(mode) {
+    if (this.selectedView === 3 && mode !== 3) this._resetDecoder('road', this.sessionSeq);
+    this.selectedView = mode;
+    const road = mode === 3;
+    const isEn = this.lang === 'en';
+    this.viewButtons.forEach(b => b.classList.toggle('is-active', Number(b.getAttribute('data-view')) === mode));
+    this.canvas.style.display = road ? 'none' : 'block';
+    this.roadCanvas.style.display = road ? 'block' : 'none';
+    this.wrapper.querySelector('.camera360-hud').style.display = road ? 'none' : '';
+    this.wrapper.querySelector('#cam360Ptz').style.display = road ? 'none' : '';
+    this.resetBtn.style.display = road ? 'none' : '';
+    this.viewport.style.cursor = road ? 'default' : '';
+    this.syncWarn.style.display = 'none';
+    this.hint.textContent = road
+      ? (isEn ? 'Full camera frame · no crop or 360° projection · check all four corners for CPL obstruction'
+        : '전체 화각 · 자르기·360° 보정 없음 · 네 모서리의 CPL 테두리 가림을 확인하세요')
+      : (isEn ? 'Drag mouse or touch to rotate 360°' : '화면을 드래그하여 360° 시야를 자유롭게 회전하세요');
+    if (this.renderer) {
+      this.renderer.viewMode = road ? 0 : mode;
+      this.renderer.setOrientation(mode === 2 ? 180 : 0, 0);
+      this.updateHud();
+    }
+    if (road) {
+      const ctx = this.roadCanvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, this.roadCanvas.width, this.roadCanvas.height);
+    }
+    if (this.mode === 'real') {
+      if (this.state === 'playing') this.setState('playing');
+      this._checkStreamsReady(this.sessionSeq);
+    }
+    else if (road) this.setState('waiting_for_frames', isEn ? 'Telephoto requires a real Comma camera connection.' : '텔레포토는 실제 Comma 카메라 연결에서 확인할 수 있습니다.');
+    else if (this.mockFeed) this.setState('playing');
+  }
+
+  drawRoadFrame(frame) {
+    const width = frame.displayWidth;
+    const height = frame.displayHeight;
+    if (!(width > 0 && height > 0)) return;
+    const canvas = this.roadCanvas;
+    const ctx = canvas.getContext('2d');
+    const scale = Math.min(canvas.width / width, canvas.height / height);
+    const w = width * scale, h = height * scale;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Destination-only sizing preserves every pixel at the source edges.
+    ctx.drawImage(frame, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  }
+
   panBy(dYawDeg, dPitchDeg) {
     if (!this.renderer) return;
     this.renderer.yaw = (this.renderer.yaw + dYawDeg * DEG2RAD) % (2 * Math.PI);
@@ -1355,6 +1410,8 @@ export class CarrotCamera360Modal {
     clearTimeout(this.closeTimer);
     this.isOpen = true;
     this.mode = mode;
+    this.selectedView = 0;
+    this.selectView(0);
     this.hass = hass;
     this.deviceId = deviceId;
     this.cameraEntities = cameraEntities;
@@ -1428,7 +1485,9 @@ export class CarrotCamera360Modal {
 
       case 'playing':
         this.statusPill.classList.add('status-playing');
-        this.statusPill.textContent = isEn ? 'Playing 360°' : '360° 정상 재생 중';
+        this.statusPill.textContent = this.selectedView === 3
+          ? (isEn ? 'Telephoto · Full frame' : '텔레포토 원본 재생 중')
+          : (isEn ? 'Playing 360°' : '360° 정상 재생 중');
         this.overlay.style.display = 'none';
         break;
 
@@ -1471,7 +1530,7 @@ export class CarrotCamera360Modal {
     try {
       this.renderer = new Camera360Renderer(this.canvas);
       this.renderer.resetOrientation();
-      this.updateHud();
+      this.selectView(this.selectedView);
     } catch (err) {
       this.setState('error', `WebGL 초기화 실패: ${err.message}`);
       return;
@@ -1712,6 +1771,8 @@ export class CarrotCamera360Modal {
 
       if (frameType === FRAME_WIDE) {
         this._decodeVideo('wide', payload, isKey, timestamp, targetSeq);
+      } else if (frameType === FRAME_ROAD && this.selectedView === 3) {
+        this._decodeVideo('road', payload, isKey, timestamp, targetSeq);
       } else if (frameType === FRAME_DRIVER) {
         this._decodeVideo('driver', payload, isKey, timestamp, targetSeq);
       }
@@ -1764,6 +1825,7 @@ export class CarrotCamera360Modal {
       try { stream.decoder.close(); } catch (_) {}
     }
     stream.decoder = null;
+    stream.ready = false;
     stream.keySeen = false;
     stream.droppingUntilKey = false;
     stream.lastTimestamp = -1;
@@ -1806,19 +1868,25 @@ export class CarrotCamera360Modal {
     const driverReady = Boolean(this.realStreams.driver.ready && this.realStreams.driver.frame);
     const isEn = this.lang === 'en';
 
-    if (wideReady && driverReady) {
+    const roadSelected = this.selectedView === 3;
+    const roadReady = Boolean(this.realStreams.road?.ready && this.realStreams.road?.frame);
+    if (roadSelected ? roadReady : wideReady && driverReady) {
       if (this.firstFrameTimer) {
         clearTimeout(this.firstFrameTimer);
         this.firstFrameTimer = null;
       }
-      if (this.state !== 'playing') {
-        this.setState('playing');
-        this.startRealRenderLoop(targetSeq);
-      }
+      if (this.state !== 'playing') this.setState('playing');
+      if (!this.animId) this.startRealRenderLoop(targetSeq);
+    } else if (roadSelected) {
+      this.setState('waiting_for_frames', isEn
+        ? 'Waiting for Telephoto. If unavailable, update Comma openpilot and reopen.'
+        : '텔레포토 수신 대기 중입니다. 계속 표시되지 않으면 Comma를 업데이트하고 다시 열어주세요.');
     } else if (wideReady && !driverReady) {
       this.setState('waiting_for_frames', isEn ? 'Front ready. Waiting for Cabin camera...' : '전방 수신 완료. 실내 카메라 대기 중...');
     } else if (!wideReady && driverReady) {
       this.setState('waiting_for_frames', isEn ? 'Cabin ready. Waiting for Front camera...' : '실내 수신 완료. 전방 카메라 대기 중...');
+    } else {
+      this.setState('waiting_for_frames', isEn ? 'Waiting for Front and Cabin cameras...' : '전방·실내 카메라 수신 대기 중입니다.');
     }
   }
 
@@ -1831,7 +1899,11 @@ export class CarrotCamera360Modal {
       const wideFrame = this.realStreams.wide.frame;
       const driverFrame = this.realStreams.driver.frame;
 
-      if (this.renderer && wideFrame && driverFrame) {
+      if (this.selectedView === 3) {
+        const roadFrame = this.realStreams.road?.frame;
+        if (roadFrame) this.drawRoadFrame(roadFrame);
+        this.syncWarn.style.display = 'none';
+      } else if (this.renderer && wideFrame && driverFrame) {
         this.renderer.updateTexture(0, wideFrame);
         this.renderer.updateTexture(1, driverFrame);
         this.renderer.render();
@@ -1899,7 +1971,7 @@ export class CarrotCamera360Modal {
     }
     this.realStreams.receiveBuffer = new Uint8Array(0);
 
-    for (const name of ['wide', 'driver']) {
+    for (const name of ['wide', 'driver', 'road']) {
       const stream = this.realStreams[name];
       if (stream) {
         if (stream.frame) {
