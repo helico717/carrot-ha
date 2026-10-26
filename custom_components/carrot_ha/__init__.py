@@ -366,7 +366,7 @@ class DashboardView(HomeAssistantView):
         data['live_checked_at']=runtime.get('live_checked_at')
         from homeassistant.helpers import entity_registry as er
         registry=er.async_get(self.hass)
-        data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online','emergency_charging')}
+        data['entity_ids']={key:registry.async_get_entity_id('binary_sensor', DOMAIN, runtime['entry'].data['device_id']+'_'+key) for key in ('charging','comma_online','emergency_charging','enabled')}
         data['vehicle_model']=runtime['entry'].options.get('vehicle_model','Volkswagen MEB')
         if request.query.get('live') != '1':
             from .history_cache import battery_history

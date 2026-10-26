@@ -99,7 +99,17 @@ export function warmVehicle3d(config) {
   loadViewerModule().catch(() => {});
 }
 
-export function vehicleViewState(v, status, dark) {
+// openpilot engaged: the card's `enabled` entity (binary_sensor.<vehicle>_enabled, or `openpilot_entity`
+// in the card config) when HA has it, otherwise the same `enabled` value in the card data.
+export function openpilotEngaged(v, hass, config) {
+  const id = config?.openpilot_entity || v?.entity_ids?.enabled;
+  const state = id ? hass?.states?.[id]?.state : undefined;
+  if (state === 'on') return true;
+  if (state === 'off') return false;
+  return v?.enabled === true;
+}
+
+export function vehicleViewState(v, status, dark, openpilot = false) {
   const open = key => v?.[key] === true;
   return {
     doors: {
@@ -118,7 +128,16 @@ export function vehicleViewState(v, status, dark) {
     chargeKind: v?.charge_mode === 'dc_charging' ? 'dc' : 'ac',
     chargePowerKw: Number.isFinite(v?.charge_power_kw) ? v.charge_power_kw : (Number.isFinite(v?.charge_power_w) ? v.charge_power_w / 1000 : null),
     soc: Number.isFinite(v?.soc_percent) ? v.soc_percent : null,
+    // Lane colour while driving.
+    openpilot: Boolean(openpilot),
   };
+}
+
+// Pixels from the top of the 3D stage to the bottom of the card heading (0 when it is not above it).
+export function headingBottom(box, stage) {
+  const heading = box?.parentElement?.querySelector('.hero-copy');
+  if (!heading || !stage) return 0;
+  return Math.max(0, heading.getBoundingClientRect().bottom - stage.getBoundingClientRect().top);
 }
 
 export function disposeVehicle3d(card) {
@@ -138,10 +157,13 @@ export async function syncVehicle3d(card, {v, status, dark}) {
     if (holder) disposeVehicle3d(card);
     return;
   }
-  const next = vehicleViewState(v, status, dark);
+  const next = vehicleViewState(v, status, dark, openpilotEngaged(v, card._hass, card.config));
   if (holder && holder.box === box) {
     holder.pending = next;
-    if (holder.viewer) holder.viewer.setState(next);
+    if (holder.viewer) {
+      holder.viewer.setState(next);
+      holder.viewer.refreshFrame?.();
+    }
     return;
   }
   if (holder) disposeVehicle3d(card);
@@ -163,6 +185,8 @@ export async function syncVehicle3d(card, {v, status, dark}) {
       modelBuffer: model.buffer.slice(0),
       bodyColor: card.config?.vehicle_3d_color,
       label: card.config?.vehicle_name || 'Carrot HA',
+      // The stage spans the whole hero, heading included: frame the car in the space below it.
+      frameTop: () => headingBottom(box, stage),
     });
     if (card._v3d !== holder || !box.isConnected) {
       viewer.dispose();

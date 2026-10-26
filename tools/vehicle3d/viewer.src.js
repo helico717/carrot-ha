@@ -23,12 +23,14 @@ const tele = (view, fov, need) => {
 const VIEWS = {
   // Car faces +Z, left side is +X.
   front: tele({pos: [0.0, 1.0, 5.6], look: [0, 0.74, 0], fov: 30}, 7.2, 2.5),
-  top: tele({pos: [4.3, 5.5, 5.4], look: [0, 0.45, -0.05], fov: 32}, 18, 4.8),
+  // Doors/tailgate open: aimed a little higher and further back, with room for the raised tailgate.
+  top: {...tele({pos: [4.3, 5.85, 5.15], look: [0, 0.8, -0.3], fov: 32}, 18, 4.8), needV: 4.6},
   side: tele({pos: [-6.9, 1.2, 0], look: [0, 0.7, 0], fov: 30}, 11, 5.4),
-  // Driving default: elevated three-quarter view from behind, passenger side.
-  drive: tele({pos: [-4.4, 2.6, -4.3], look: [0, 0.55, 0.4], fov: 30}, 13, 5.6),
+  // Driving default: raised three-quarter view from behind, passenger side, aimed ahead of the car so more road shows.
+  // `pad` backs the camera off on every card size (the width fit alone is clamped on wide cards).
+  drive: {...tele({pos: [-4.4, 3.5, -3.85], look: [0, 0.55, 0.85], fov: 30}, 13, 5.6), pad: 1.15},
   // Charging: raised three-quarter view from the charge-port side; shows the open doors, the pack, the cable and the post.
-  charge: tele({pos: [-5.6, 3.1, 3.9], look: [-0.4, 0.4, -0.5], fov: 30}, 16, 6.2),
+  charge: tele({pos: [-5.6, 5.8, 3.9], look: [-0.4, 0.4, -0.5], fov: 30}, 16, 6.2),
   // Extra charging viewpoints (manual modes; the default charging view is `charge`).
   charge_side: tele({pos: [-7.4, 1.9, -0.6], look: [-0.5, 0.4, -0.55], fov: 30}, 15, 6.0),
   charge_top: tele({pos: [-0.4, 9.0, -0.55], look: [-0.5, 0.2, -0.55], fov: 30}, 21, 5.0),
@@ -336,7 +338,8 @@ for (const m of mats.tail) {
   scene.add(shadow);
 
   const road = new THREE.Group();
-  const dashMat = new THREE.MeshBasicMaterial({color: 0x9aa3a8, transparent: true, opacity: 0, depthWrite: false});
+  const LANE_OFF = new THREE.Color(0x9aa3a8), LANE_ON = new THREE.Color(0x1fff5e);
+  const dashMat = new THREE.MeshBasicMaterial({color: LANE_OFF.clone(), transparent: true, opacity: 0, depthWrite: false});
   const DASH = 1.4, GAP = 1.6, COUNT = 14, PERIOD = DASH + GAP;
   const dashes = [];
   for (let i = 0; i < COUNT; i++) {
@@ -409,12 +412,15 @@ for (const m of mats.tail) {
   const state = {
     doors: {fl: false, fr: false, rl: false, rr: false}, trunk: false, lowBeam: false,
     driving: false, speedKph: 0, dark: false, bodyColor: options.bodyColor || DEFAULT_BODY_COLOR, mode: 'auto',
-    charging: false, chargeKind: 'ac', chargePowerKw: null, soc: null,
+    charging: false, chargeKind: 'ac', chargePowerKw: null, soc: null, openpilot: false,
   };
   const chargeScene = createChargeScene(scene, model, wheelPivots);
   let viewName = 'front';
   const camState = {pos: new THREE.Vector3(...VIEWS.front.pos), look: new THREE.Vector3(...VIEWS.front.look), fov: VIEWS.front.fov};
   let aspect = 1.6;
+  // The canvas may run under a heading at the top of the card. The car is framed in the area below
+  // it (`frameTop` px), while the canvas still draws over the heading so nothing tall gets cut off.
+  const size = {w: 1, h: 1, top: 0};
   const offset = {yaw: 0, pitch: 0, zoom: 1};
   let lampLevel = 0;
   let roadLevel = 0;
@@ -441,7 +447,8 @@ for (const m of mats.tail) {
     // for the width this view needs, wide cards come closer. Each view states the width it needs.
     const dist = new THREE.Vector3(...v.pos).distanceTo(new THREE.Vector3(...v.look));
     const visible = 2 * dist * Math.tan((v.fov * Math.PI) / 360);
-    const fit = Math.min(1.7, Math.max(0.8, (v.need || 5.4) / (aspect * visible)));
+    // Views with tall poses (an open tailgate) also state the height they need.
+    const fit = Math.min(1.7, Math.max(0.8, (v.need || 5.4) / (aspect * visible), (v.needV || 0) / visible)) * (v.pad || 1);
     const pos = new THREE.Vector3(...v.pos);
     const look = new THREE.Vector3(...v.look);
     const dir = pos.clone().sub(look).multiplyScalar(fit * offset.zoom);
@@ -479,11 +486,15 @@ for (const m of mats.tail) {
     camera.position.copy(camState.pos);
     camera.fov = camState.fov;
     camera.aspect = aspect;
+    // Off-axis projection: the lens centre sits in the middle of the area below the heading.
+    if (size.top > 0) camera.setViewOffset(size.w, size.h - size.top, 0, -size.top, size.w, size.h);
+    else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     camera.lookAt(camState.look);
 
     for (const [key, c] of Object.entries(clips)) {
-      const want = key === 'trunk' ? state.trunk : state.doors[key];
+      // While driving every door and the tailgate are drawn closed, whatever the sensors report.
+      const want = !state.driving && (key === 'trunk' ? state.trunk : state.doors[key]);
       c.target = want ? 1 : 0;
       if (c.value !== c.target) {
         const step = dt / DOOR_SECONDS;
@@ -521,7 +532,14 @@ for (const m of mats.tail) {
       roadLevel += (roadTarget - roadLevel) * (1 - Math.exp(-dt * 3));
       busy = true;
     } else roadLevel = roadTarget;
-    dashMat.opacity = roadLevel * 0.55;
+    dashMat.opacity = roadLevel * (state.openpilot ? 0.9 : 0.55);
+    // Lane markings turn green while openpilot is engaged, grey otherwise.
+    const laneTarget = state.openpilot ? LANE_ON : LANE_OFF;
+    if (!dashMat.color.equals(laneTarget)) {
+      dashMat.color.lerp(laneTarget, 1 - Math.exp(-dt * 6));
+      if (Math.abs(dashMat.color.r - laneTarget.r) + Math.abs(dashMat.color.g - laneTarget.g) + Math.abs(dashMat.color.b - laneTarget.b) < 0.004) dashMat.color.copy(laneTarget);
+      else busy = true;
+    }
     road.visible = roadLevel > 0.01;
     if (state.driving) {
       const mps = Math.max(8, state.speedKph || 40) / 3.6 * 0.5;
@@ -547,10 +565,24 @@ for (const m of mats.tail) {
     }
   }
 
+  // Returns true when the framed area changed.
+  function updateFrame() {
+    const raw = typeof options.frameTop === 'function' ? options.frameTop() : options.frameTop;
+    // Keep at least 60% of the canvas for the car, whatever the heading measures.
+    const top = Math.round(Math.min(size.h * 0.4, Math.max(0, Number(raw) || 0)));
+    const next = size.w / Math.max(1, size.h - top);
+    if (top === size.top && next === aspect) return false;
+    size.top = top;
+    aspect = next;
+    return true;
+  }
+
   function resize() {
-    const w = container.clientWidth || 1, h = container.clientHeight || 1;
-    renderer.setSize(w, h, false);
-    aspect = w / h;
+    size.w = container.clientWidth || 1;
+    size.h = container.clientHeight || 1;
+    renderer.setSize(size.w, size.h, false);
+    size.top = -1;
+    updateFrame();
     kick();
   }
   const ro = new ResizeObserver(resize);
@@ -606,11 +638,12 @@ for (const m of mats.tail) {
   };
   canvas.addEventListener('pointerup', endPointer);
   canvas.addEventListener('pointercancel', endPointer);
-  // Gestures starting on the vehicle stay in the viewer; ctrl+wheel / pinch zooms.
+  // Gestures starting on the vehicle stay in the viewer. The page does not scroll over the car, so
+  // the mouse wheel zooms, as do trackpad pinches (ctrl+wheel) and two-finger swipes.
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (!e.ctrlKey && !freeLook) return;
-    offset.zoom = clampZoom(offset.zoom * Math.exp(e.deltaY * 0.0025));
+    const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1); // lines/pages to px
+    offset.zoom = clampZoom(offset.zoom * Math.exp(Math.max(-150, Math.min(150, dy)) * 0.0025));
     kick();
   }, {passive: false});
   canvas.addEventListener('dblclick', () => { offset.yaw = offset.pitch = 0; offset.zoom = 1; kick(); });
@@ -633,7 +666,7 @@ for (const m of mats.tail) {
   return {
     setState(next = {}) {
       if (next.doors) Object.assign(state.doors, next.doors);
-      for (const key of ['trunk', 'lowBeam', 'driving', 'speedKph', 'dark', 'bodyColor', 'mode', 'charging', 'chargeKind', 'chargePowerKw', 'soc']) if (key in next) state[key] = next[key];
+      for (const key of ['trunk', 'lowBeam', 'driving', 'speedKph', 'dark', 'bodyColor', 'mode', 'charging', 'chargeKind', 'chargePowerKw', 'soc', 'openpilot']) if (key in next) state[key] = next[key];
       chargeScene.set({on: state.charging && !state.driving, kind: state.chargeKind, powerKw: state.chargePowerKw, soc: state.soc});
       applyPaint();
       kick();
@@ -649,6 +682,8 @@ for (const m of mats.tail) {
       kick();
     },
     resetView() { offset.yaw = offset.pitch = 0; offset.zoom = 1; kick(); },
+    // Re-measure `frameTop` (the heading text can change without the canvas resizing).
+    refreshFrame() { if (updateFrame()) kick(); },
     get view() { return viewName; },
     // Read-only status used by the debug simulator's checks.
     get lamp() { return lampLevel; },

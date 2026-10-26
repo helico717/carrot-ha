@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const frontend = new URL('../custom_components/carrot_ha/frontend/', import.meta.url);
 const read = name => fs.readFileSync(new URL(name, frontend), 'utf8');
-const {vehicleViewState, syncVehicle3d, loadModel, warmVehicle3d, DEFAULT_MODEL_URL} = await import(new URL('carrot-vehicle-3d.js', frontend));
+const {vehicleViewState, syncVehicle3d, loadModel, warmVehicle3d, headingBottom, openpilotEngaged, DEFAULT_MODEL_URL} = await import(new URL('carrot-vehicle-3d.js', frontend));
 
 test('vehicle state maps door, trunk, low beam, speed and driving from the values the card already has', () => {
   const state = vehicleViewState({door_driver_open: true, door_passenger_open: false, door_rear_driver_open: true,
@@ -154,8 +154,44 @@ test('vehicle gestures stay on the shared viewer in default and free-look modes'
   assert.doesNotMatch(source, /touch-action:pan-y|touchAction.*pan-y/);
   assert.match(source, /setFreeLook\(on\)[\s\S]*?canvas\.style\.touchAction = 'none'/);
   const wheel = source.slice(source.indexOf("canvas.addEventListener('wheel'"), source.indexOf("canvas.addEventListener('dblclick'"));
-  assert.ok(wheel.indexOf('e.preventDefault()') < wheel.indexOf('if (!e.ctrlKey && !freeLook) return'));
+  assert.ok(wheel.indexOf('e.preventDefault()') < wheel.indexOf('offset.zoom = clampZoom'));
+  assert.doesNotMatch(wheel, /ctrlKey/, 'a plain mouse wheel zooms, not only ctrl+wheel / pinch');
   assert.match(wheel, /passive: false/);
   assert.match(wheel, /offset\.zoom = clampZoom/);
   for (const lang of ['ko', 'en']) assert.match(read(`carrot-dashboard-${lang}.js`), /carrot-vehicle-3d\.js/);
+});
+
+test('the car is framed below the card heading, and the open-door view leaves room for the tailgate', () => {
+  const rect = (top, bottom) => ({getBoundingClientRect: () => ({top, bottom})});
+  const box = {parentElement: {querySelector: sel => sel === '.hero-copy' ? rect(214, 272) : null}};
+  assert.equal(headingBottom(box, rect(214, 616)), 58);
+  assert.equal(headingBottom(box, rect(300, 500)), 0, 'a heading above the stage does not inset it');
+  assert.equal(headingBottom({parentElement: {querySelector: () => null}}, rect(0, 100)), 0);
+  const source = fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js', import.meta.url), 'utf8');
+  assert.match(source, /setViewOffset\(size\.w, size\.h - size\.top, 0, -size\.top, size\.w, size\.h\)/);
+  assert.match(source, /top: \{\.\.\.tele\([^\n]*needV: 4\.6\}/);
+  assert.match(read('carrot-vehicle-3d.js'), /frameTop: \(\) => headingBottom\(box, stage\)/);
+});
+
+test('openpilot engagement comes from the enabled entity, falling back to the card data', () => {
+  const v = {enabled: false, entity_ids: {enabled: 'binary_sensor.id_4_enabled'}};
+  const hass = state => ({states: {'binary_sensor.id_4_enabled': {state}}});
+  assert.equal(openpilotEngaged(v, hass('on')), true);
+  assert.equal(openpilotEngaged({...v, enabled: true}, hass('off')), false, 'the entity wins over the card value');
+  assert.equal(openpilotEngaged({...v, enabled: true}, hass('unavailable')), true, 'unknown entity state falls back to the card value');
+  assert.equal(openpilotEngaged({enabled: true}, {states: {}}), true);
+  assert.equal(openpilotEngaged({}, {states: {'binary_sensor.custom': {state: 'on'}}}, {openpilot_entity: 'binary_sensor.custom'}), true);
+  assert.equal(vehicleViewState({}, {key: 'driving'}, false, true).openpilot, true);
+  assert.equal(vehicleViewState({}, {key: 'driving'}, false).openpilot, false);
+});
+
+test('while driving the doors are drawn closed, lanes follow openpilot, and the drive view backs off', () => {
+  const source = fs.readFileSync(new URL('../tools/vehicle3d/viewer.src.js', import.meta.url), 'utf8');
+  assert.match(source, /const want = !state\.driving && \(key === 'trunk' \? state\.trunk : state\.doors\[key\]\);/);
+  assert.match(source, /const laneTarget = state\.openpilot \? LANE_ON : LANE_OFF;/);
+  assert.match(source, /LANE_OFF = new THREE\.Color\(0x9aa3a8\)/);
+  assert.match(source, /drive: \{\.\.\.tele\(\{pos: \[-4\.4, 3\.5, -3\.85\], look: \[0, 0\.55, 0\.85\][^\n]*pad: 1\.15\}/);
+  assert.match(source, /LANE_ON = new THREE\.Color\(0x1fff5e\)/);
+  assert.match(source, /'soc', 'openpilot'\]\) if \(key in next\)/);
+  assert.match(read('carrot-vehicle-3d.js'), /vehicleViewState\(v, status, dark, openpilotEngaged\(v, card\._hass, card\.config\)\)/);
 });
