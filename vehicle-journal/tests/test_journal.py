@@ -169,6 +169,18 @@ class JournalTests(unittest.TestCase):
         self.assertIsNone(result['totals']['battery_charge_kwh'])
         self.assertIsNone(result['totals']['charge_effective_krw'])
 
+    def test_same_day_records_are_newest_first_regardless_of_id(self):
+        keys=[str(uuid4()) for _ in range(4)]
+        for index,key in enumerate(keys):
+            self.journal.save_manual(key,0,{'kind':'expense','date':'2026-10-25','category':'washing','actual_krw':1000*(index+1)})
+        for expected in (lambda r:r['recent_records'],lambda r:r['records']):
+            order=[row['id'] for row in expected(self.journal.query('2026-10-01','2026-10-31'))]
+            self.assertEqual(order,keys[::-1])
+        with sqlite3.connect(Path(self.tmp.name)/'journal.sqlite3') as db:
+            db.execute("UPDATE records SET created_at='2000-01-01T00:00:00+00:00' WHERE id=?",(keys[3],))
+        order=[row['id'] for row in self.journal.query('2026-10-01','2026-10-31')['records']]
+        self.assertEqual(order,[keys[2],keys[1],keys[0],keys[3]])
+
     def test_manual_roundtrip_conflicts_and_restore(self):
         key=str(uuid4());payload={'kind':'expense','date':'2026-09-02','category':'maintenance','actual_krw':0,'memo':'와이퍼'}
         result=self.journal.save_manual(key,0,payload)

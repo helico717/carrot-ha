@@ -341,7 +341,8 @@ class Journal:
         record_filter=" AND r.kind!='trip'" if not include_trips else ''
         if manual_records:record_filter=" AND (r.kind='expense' OR (r.kind='trip' AND r.origin='manual'))"
         elif expenses_only:record_filter=" AND r.kind='expense'"
-        time_order='COALESCE(e.accounting_date,m.started_at) DESC,r.id'
+        time_order=('COALESCE(e.accounting_date,m.started_at) DESC,COALESCE(m.started_at,(SELECT MAX(m3.started_at) FROM expense_members em3 '
+                    'JOIN mobility m3 ON m3.vehicle_id=em3.vehicle_id AND m3.record_id=em3.charge_id WHERE em3.vehicle_id=r.vehicle_id AND em3.expense_id=r.id),r.created_at) DESC,r.rowid DESC')
         record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
         if record_categories:

@@ -1,3 +1,12 @@
+## 2026-10-26 — vehicle-journal: 같은 날 기록의 정렬 순서를 최신 시각순으로 수정
+
+- 이유: 세부 내역에서 2026-10-25에 나중에 충전한 꽃지해안 충전비가 먼저 충전한 건보다 아래에 표시됐다. 지출·충전비 행의 정렬 키가 날짜(`accounting_date`, 시각 없음)뿐이어서 같은 날 기록은 `r.id`(uuid4/uuid5, 생성 시각과 무관)의 오름차순으로 정렬됐고, 날짜 내림차순과 방향도 달랐다.
+- 변경: `Journal.query`의 `time_order`를 `날짜 DESC → 시각 DESC → r.rowid DESC`로 바꿨다. 시각은 자신의 `mobility.started_at`, 없으면 연결된 충전 기록(`expense_members`)의 최신 `started_at`, 그것도 없으면 `records.created_at`을 쓴다. 금액 정렬의 보조 키와 최근 지출 목록도 같은 키를 쓴다.
+- 소급 적용: 순서는 저장값이 아니라 조회 때마다 SQL로 계산하므로 기존 기록에도 마이그레이션 없이 적용된다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`(`test_same_day_records_are_newest_first_regardless_of_id` 추가).
+- 검증: 신규 테스트 통과. `test_journal.py`의 기존 오류 4건은 로컬에 PIL이 없어서 나며 이 변경 전에도 같다. 실제 운영 DB의 꽃지해안 기록 순서는 미확인.
+- 배포 상태: 커밋·푸시만. Python 변경이므로 HA 반영 시 HA 재시작이 필요하다. HA 직접 반영·릴리즈 없음.
+
 ## 2026-10-26 — 저장소 위치 이동 및 여러 Mac 작업·시작 점검 규칙 문서화
 
 - 이유: 저장소가 iCloud 동기화 대상인 `~/Documents`에 있어 git 작업 중 `이름 2.js`·`api 2.py`·`CHANGELOG 2.md` 충돌 복사본이 생겼고(9월 19일의 `carrot-trip-days 2.js`도 확인), 같은 날 GitHub Desktop pull이 `driving-logs/` 충돌로 병합을 미완료로 남겨 303개 파일이 스테이징된 상태가 됐다.
