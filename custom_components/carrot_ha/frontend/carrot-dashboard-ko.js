@@ -125,7 +125,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.initialized)this._onVisible();
     this.setupTabsObserver();
   }
-  disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  disconnectedCallback(){if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;
@@ -480,6 +480,7 @@ class CarrotDashboard extends HTMLElement {
     themeStyle.textContent+=`
       .hero{background:#777b80;color:#fff;min-height:280px;display:flex;flex-direction:column;border:0;min-width:0}
       .hero-copy{padding:16px 20px 0}.hero-copy h2{font-size:28px;margin:0;max-width:none}
+      .vehicle3d{position:relative;overflow:hidden}.vehicle3d .v3d-fallback{display:block;width:100%;height:100%;object-fit:contain}.vehicle3d .v3d-stage{position:absolute;inset:0}
       .hero .car-image{position:static;inset:auto;width:100%;max-width:100%;height:250px;object-fit:contain;object-position:center;display:block;min-width:0;flex-shrink:0;padding:12px}
       .badge.parked{background:#363b40;color:#e0e3e5}.badge.driving{background:#133960;color:#83bdff}.badge.charging{background:#173e29;color:#83e2a4}.badge.offline{background:#483c13;color:#ffe17b}
       .badge.stale,.badge.unknown,.badge.offline,.badge.connection_unknown{background:#49391e;color:#ffdc91}
@@ -768,6 +769,7 @@ class CarrotDashboard extends HTMLElement {
       this.cameraModal.setState('stopped','차량 주행 감지됨 — 안전을 위해 카메라 모니터링이 자동 종료되었습니다.');
       this.cameraModal.cleanupSession();
     }
+    this.syncVehicle3d(v,state);
     const camBtn=this.shadowRoot.querySelector('#camera360Trigger');
     if(camBtn){
       camBtn.onclick=(e)=>{
@@ -1439,7 +1441,15 @@ class CarrotDashboard extends HTMLElement {
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
     // Legacy artwork contains large transparent margins; crop only for an explicit preset.
     if(this.config?.vehicle_image_layout==='legacy_id4')return `<svg class="car-image" viewBox="1000 552 2120 1680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(this.config?.vehicle_name||'차량')}"><image href="${esc(src)}" width="4096" height="2729"/></svg>`;
-    return `<img class="car-image" src="${esc(src)}" alt="${esc(this.config?.vehicle_name||'Carrot HA')}" style="object-fit:contain">`;
+    const alt=esc(this.config?.vehicle_name||'Carrot HA');
+    // The PNG stays inside the 3D container as the fallback (no model file, no WebGL, or 3D disabled).
+    if(this.config?.vehicle_3d===false)return `<img class="car-image" src="${esc(src)}" alt="${alt}" style="object-fit:contain">`;
+    return `<div class="car-image vehicle3d"><img class="v3d-fallback" src="${esc(src)}" alt="${alt}"></div>`;
+  }
+  // Interactive 3D vehicle: lazy-loaded, fed with the state this card already holds.
+  syncVehicle3d(v,state){
+    if(!this.shadowRoot.querySelector('.vehicle3d')&&!this._v3d)return;
+    import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.syncVehicle3d(this,{v,status:state,dark:this.getAttribute('data-theme')==='dark'})).catch(()=>{});
   }
   vehicleStatus(v){
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;

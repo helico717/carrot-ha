@@ -20,6 +20,11 @@ async def async_setup(hass, config):
     from pathlib import Path
     from homeassistant.components.http import StaticPathConfig
     await hass.http.async_register_static_paths([StaticPathConfig('/carrot_ha_static', str(Path(__file__).parent / 'frontend'), False)])
+    # Optional user-supplied 3D vehicle model (never shipped in this repository). The folder is served
+    # only if it exists at startup; without it the dashboard keeps its PNG. Restart HA after adding it.
+    models = Path(hass.config.path('carrot_ha', 'models'))
+    if await hass.async_add_executor_job(models.is_dir):
+        await hass.http.async_register_static_paths([StaticPathConfig('/carrot_ha_models', str(models), False)])
     version = await hass.async_add_executor_job(_read_frontend_version)
     hass.http.register_view(FrontendVersionView(hass, version))
     hass.http.register_view(ReceiveView(hass))

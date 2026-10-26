@@ -6,6 +6,9 @@ BINARY_FIELDS = {
     'door_rear_passenger_open': ('조수석 뒤 도어 열림', 'door'),
     'trunk_open': ('트렁크 열림', 'opening'),
     'doors_locked': ('차량 잠김 상태', None),
+    # Request signal (BCM Licht_Anf_01), not a confirmed lamp state. Only the low beam is exposed; the
+    # other lamp requests stay in the collector. It expires like diagnostics (see LIGHT_FIELDS).
+    'light_low_beam_requested': ('하향등 요청', 'light'),
 }
 SENSOR_FIELDS = {
     'battery_temperature_c': ('배터리 온도', '°C', 'mdi:thermometer', 'temperature', 1),
@@ -28,7 +31,9 @@ SENSOR_FIELDS = {
     'comma_network_strength': ('콤마 네트워크 신호 단계', None, 'mdi:signal', None, None),
 }
 # Door/lock/trunk fields retain last-known values when the vehicle sleeps.
-# Only hardware diagnostics and BMS fields expire after FRESHNESS_SECONDS.
+# Lamp requests are transient, so they expire after FRESHNESS_SECONDS like hardware diagnostics
+# and BMS fields: a stale "on" must never be shown after the vehicle goes to sleep.
+LIGHT_FIELDS = {'light_low_beam_requested'}
 CHARGE_CAN_SIGNALS = {
     'plug_text': ('WBA_03', 'WBA_GE_Texte_02'),
     'motor_text': ('Motor_26', 'MO_E_Texte'),
@@ -38,7 +43,7 @@ CHARGE_CAN_SIGNALS = {
 }
 CHARGE_CAN_KEYS = {f'charge_can_{name}_bus{bus}' for name in CHARGE_CAN_SIGNALS for bus in (0, 1)}
 BMS_ACTUAL_KEYS = {f'bms_{field}_bus{bus}' for field in ('actual_mode', 'power_w', 'voltage_v') for bus in (0, 1)}
-OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | BMS_ACTUAL_KEYS
+OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | BMS_ACTUAL_KEYS | LIGHT_FIELDS
 REFRESH_FIELDS = OPTIONAL_FIELDS | {'actual_charge_power_w', 'hv_voltage', 'charge_mode', 'charging', 'can_capture_storage', 'can_capture_last_received', 'can_capture_enabled'}
 FRESHNESS_SECONDS = 180
 

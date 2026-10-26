@@ -15,3 +15,9 @@ camera_agent/continue.sh.before-camera
 cloudflare/wrangler.json
 
 .receiver-venv/
+
+# User-supplied 3D vehicle models are licensed separately and are never committed.
+*.glb
+
+# Offline tool dependencies
+node_modules/

@@ -1,0 +1,16 @@
+{
+  "name": "carrot-ha-vehicle-3d-model-tools",
+  "private": true,
+  "type": "module",
+  "description": "Offline tools that build the optional 3D vehicle model. Not used at runtime.",
+  "dependencies": {
+    "@gltf-transform/core": "4.5.1",
+    "@gltf-transform/extensions": "4.5.1",
+    "@gltf-transform/functions": "4.5.1",
+    "meshoptimizer": "1.3.0",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

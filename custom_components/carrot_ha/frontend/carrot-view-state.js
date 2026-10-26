@@ -47,9 +47,9 @@ export function updateView(root, html) {
         const replacement=wanted.cloneNode(true);parent.replaceChild(replacement,old);old=replacement.nextSibling;continue;
       }
       if(old.nodeType===1){
-        // Leaflet owns this subtree. drawMap updates/replaces it only when needed.
-        const map=old.classList.contains('map')&&wanted.classList.contains('map');
-        if(!map){
+        // Leaflet (.map) and the 3D vehicle (.vehicle3d) own their subtrees; the owner updates them.
+        const owned=['map','vehicle3d'].some(name=>old.classList.contains(name)&&wanted.classList.contains(name));
+        if(!owned){
           for(const attr of Array.from(old.attributes))if(!wanted.hasAttribute(attr.name)&&!(old.tagName==='DETAILS'&&attr.name==='open'))old.removeAttribute(attr.name);
           for(const attr of Array.from(wanted.attributes))if(old.getAttribute(attr.name)!==attr.value)old.setAttribute(attr.name,attr.value);
           sync(old,wanted);

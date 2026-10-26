@@ -233,6 +233,21 @@ class TestNewSensors(unittest.TestCase):
             'field_measured_at': {'door_driver_open': now.isoformat()}}))
         self.assertIs(result['door_driver_open'], False)
 
+    def test_low_beam_entity_is_the_only_lamp_and_expires(self):
+        from custom_components.carrot_ha.telemetry import BINARY_FIELDS, OPTIONAL_FIELDS
+        lamps = [key for key in BINARY_FIELDS if key.startswith('light_')]
+        self.assertEqual(lamps, ['light_low_beam_requested'])
+        self.assertIn('light_low_beam_requested', OPTIONAL_FIELDS)
+        now = datetime.now(timezone.utc)
+        fresh = values(self._make_runtime({'light_low_beam_requested': True, 'measured_at': now.isoformat(),
+            'field_measured_at': {'light_low_beam_requested': now.isoformat()}}))
+        self.assertIs(fresh['light_low_beam_requested'], True)
+        stale = values(self._make_runtime({'light_low_beam_requested': True, 'measured_at': now.isoformat(),
+            'field_measured_at': {'light_low_beam_requested': (now-timedelta(seconds=181)).isoformat()}}))
+        self.assertIsNone(stale['light_low_beam_requested'])
+        missing = values(self._make_runtime({'light_low_beam_requested': True, 'measured_at': now.isoformat()}))
+        self.assertIsNone(missing['light_low_beam_requested'])
+
     def test_optional_fields_survive_collector_cloud_and_ha(self):
         import tempfile
         from pathlib import Path
