@@ -329,7 +329,7 @@ class Journal:
                 db.execute('DELETE FROM dirty_days WHERE vehicle_id=? AND day=? AND accounting_timezone=?',
                            (self.vehicle,value,self.time_zone))
 
-    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None, expenses_only=False, record_sort='time',manual_records=False):
+    def query(self, start, end, limit=100, offset=0, include_trips=True, record_categories=None, expenses_only=False, record_sort='time',manual_records=False,place=None):
         a,b=day(start),day(end)
         if b<a or (b-a).days>365 or type(limit) is not int or not 1<=limit<=100 or type(offset) is not int or offset<0:
             raise ValueError('조회 기간과 페이지를 확인해 주세요.')
@@ -345,6 +345,7 @@ class Journal:
                     'JOIN mobility m3 ON m3.vehicle_id=em3.vehicle_id AND m3.record_id=em3.charge_id WHERE em3.vehicle_id=r.vehicle_id AND em3.expense_id=r.id),r.created_at) DESC,r.rowid DESC')
         record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
+        if place is not None and (not isinstance(place,str) or not 1<=len(place)<=400):raise ValueError('장소 필터를 확인해 주세요.')
         if record_categories:
             clauses=[]
             for key in record_categories:
@@ -356,6 +357,11 @@ class Journal:
             record_filter+=' AND ('+' OR '.join(clauses)+')'
         with self.lock,self.connect() as db:
             db.row_factory=sqlite3.Row
+            if place:
+                from .station_stats import place_record_ids
+                ids=sorted(place_record_ids(db,self.vehicle,start,end,place))
+                record_filter+=' AND r.id IN ('+','.join('?' for _ in ids)+')' if ids else ' AND 0'
+                filter_params.extend(ids)
             daily=[dict(row) for row in db.execute('''SELECT * FROM daily_summaries WHERE vehicle_id=?
                 AND accounting_timezone=? AND day BETWEEN ? AND ? ORDER BY day''',
                 (self.vehicle,self.time_zone,start,end))]

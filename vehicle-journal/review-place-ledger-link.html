@@ -63,9 +63,12 @@ const updateFilters=P.updateLedgerFilters;P.updateLedgerFilters=function(){
   updateFilters.call(this);
   const box=this.$('ledgerFilters');let chip=this.$('placeFilterChip');
   if(!this.placeFilter){chip?.remove();return;}
-  if(!chip){chip=document.createElement('span');chip.id='placeFilterChip';chip.className='ledger-place-chip';chip.style.cssText='display:inline-flex;align-items:center;gap:8px;margin-left:10px;padding:8px 12px;border:1px solid var(--j-accent);border-radius:12px;color:var(--j-accent);font-size:14px;font-weight:700;max-width:100%';box.append(chip);}
-  chip.innerHTML='';const label=document.createElement('span');label.textContent='장소 · '+this.placeFilter.name;label.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-  const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','장소 필터 해제');x.style.cssText='border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;padding:0 2px';
+  if(!chip){chip=document.createElement('span');chip.id='placeFilterChip';box.append(chip);}
+  /* "분류 선택"(.ledger-dropdown summary)과 같은 규격: 높이 34px·모서리 9px·테두리/배경 토큰·굵기 650, 값만 강조색. */
+  chip.style.cssText='display:inline-flex;align-items:center;gap:8px;min-height:34px;box-sizing:border-box;padding:4px 6px 4px 12px;border:1px solid var(--j-border);border-radius:9px;background:var(--j-surface);font-weight:650;max-width:100%';
+  chip.innerHTML='';const label=document.createElement('span');label.style.cssText='min-width:0;overflow-wrap:anywhere';
+  const kind=document.createElement('span');kind.textContent='장소 ';const value=document.createElement('span');value.textContent=this.placeFilter.name;value.style.cssText='color:var(--j-accent);font-size:.92em;margin-left:4px';label.append(kind,value);
+  const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','장소 필터 해제');x.style.cssText='flex:none;min-height:24px;width:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--j-sub);cursor:pointer;font-size:13px';
   x.onclick=()=>{this.placeFilter=null;this.offset=0;this.updateLedgerFilters();this.load(true);};chip.append(label,x);
 };
 const showCard=P.showTrendsPlaceCard;P.showTrendsPlaceCard=function(p,name,...rest){

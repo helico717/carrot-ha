@@ -3,17 +3,41 @@ import json
 from .efficiency import value
 
 
+def place_identity(location,rid):
+    """One rule for grouping a record into a map place; the ledger's place filter must use the same one."""
+    if not location or not (location.get('name') or location.get('latitude') is not None):return None
+    # Name-only imports remain separate until the user identifies an actual place.
+    if location.get('provider') and location.get('station_id'):return location['provider']+':'+location['station_id']
+    if location.get('selection_source')=='automatic_address' and location.get('address') and location.get('latitude') is not None:return 'address:'+location['address']
+    if location.get('latitude') is not None:return f"coordinate:{location['latitude']:.5f}:{location['longitude']:.5f}"
+    return 'unresolved:'+rid
+
+
+def place_record_ids(db,vehicle,start,end,place):
+    """Ids of the records behind one trend-map place: its expenses and their charge sessions."""
+    ids=set();accounted=set()
+    rows=db.execute("SELECT r.id,r.extra_json FROM records r JOIN expenses e ON e.vehicle_id=r.vehicle_id AND e.record_id=r.id WHERE r.vehicle_id=? AND r.status='active' AND e.category IN ('charging','refueling') AND e.accounting_date BETWEEN ? AND ?",(vehicle,start,end)).fetchall()
+    for rid,text in rows:
+        extra=json.loads(text);location=extra.get('location',(extra.get('input') or {}).get('location'))
+        members=[r[0] for r in db.execute('SELECT charge_id FROM expense_members WHERE vehicle_id=? AND expense_id=?',(vehicle,rid))];accounted.update(members)
+        if place_identity(location,rid)==place:ids.add(rid);ids.update(members)
+    from .store import stamp
+    from zoneinfo import ZoneInfo
+    timezone=db.execute('SELECT accounting_timezone FROM vehicles WHERE id=?',(vehicle,)).fetchone()[0]
+    for rid,text,started in db.execute("SELECT r.id,r.extra_json,m.started_at FROM records r JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id WHERE r.vehicle_id=? AND r.kind='charge' AND r.status='active'",(vehicle,)):
+        if rid in accounted or not start<=stamp(started).astimezone(ZoneInfo(timezone)).date().isoformat()<=end:continue
+        extra=json.loads(text);location=extra.get('location',(extra.get('input') or {}).get('location'))
+        if location and (location.get('station_id') or location.get('selection_source')=='automatic_address') and place_identity(location,rid)==place:ids.add(rid)
+    return ids
+
+
 def facts(db,vehicle,start,end):
     groups={};unlocated=0;accounted=set()
     rows=db.execute("SELECT r.id,r.extra_json,e.category,e.actual_krw,e.estimated_krw FROM records r JOIN expenses e ON e.vehicle_id=r.vehicle_id AND e.record_id=r.id WHERE r.vehicle_id=? AND r.status='active' AND e.category IN ('charging','refueling') AND e.accounting_date BETWEEN ? AND ?",(vehicle,start,end))
     for rid,text,kind,actual,estimated in rows:
         extra=json.loads(text);data=extra.get('input') or {};location=extra.get('location',data.get('location'));fields=extra.get('import_source',{}).get('fields',{})
-        if not location or not (location.get('name') or location.get('latitude') is not None):unlocated+=1;continue
-        # Name-only imports remain separate until the user identifies an actual place.
-        if location.get('provider') and location.get('station_id'):identity=location['provider']+':'+location['station_id']
-        elif location.get('selection_source')=='automatic_address' and location.get('address') and location.get('latitude') is not None:identity='address:'+location['address']
-        elif location.get('latitude') is not None:identity=f"coordinate:{location['latitude']:.5f}:{location['longitude']:.5f}"
-        else:identity='unresolved:'+rid
+        identity=place_identity(location,rid)
+        if not identity:unlocated+=1;continue
         group=groups.setdefault((kind,identity),{'id':identity,'kind':kind,'location':location,'resolved':not identity.startswith('unresolved:'),'visits':0,'actual_krw':0,'estimated_krw':0,'fuel_liters':0,'billed_kwh':0,'battery_kwh':0,'fuel_priced_liters':0,'fuel_priced_cost':0,'billed_priced_kwh':0,'billed_priced_cost':0,'battery_priced_kwh':0,'battery_priced_cost':0,'unknown_quantity_count':0})
         group['address_only']=identity.startswith('address:')
         members_ids=[r[0] for r in db.execute('SELECT charge_id FROM expense_members WHERE vehicle_id=? AND expense_id=?',(vehicle,rid))];accounted.update(members_ids)

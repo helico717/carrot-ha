@@ -140,3 +140,12 @@ class AddressPropagationTests(unittest.TestCase):
         self.assertEqual(facts['unlocated_records'],0);self.assertEqual(len(facts['places']),1)
         place=facts['places'][0];self.assertEqual((place['visits'],place['actual_krw'],place['address_only']),(2,3000,True))
         self.assertEqual((place['location']['latitude'],place['location']['longitude']),(36.5,126.3))
+    def test_place_filter_returns_the_records_behind_the_map_place(self):
+        self.test_address_only_charge_reaches_expense_and_trend_map()
+        found=self.j.query('2026-10-01','2026-10-31',place='address:장곡길 1')
+        self.assertEqual({r['id'] for r in found['records']},{'x1','x2'})
+        self.assertEqual(self.j.query('2026-10-01','2026-10-31',place='kakao:none')['records'],[])
+        self.assertEqual(self.j.query('2026-11-01','2026-11-30',place='address:장곡길 1')['records'],[])
+    def test_place_filter_rejects_bad_value(self):
+        for bad in ('',7,'x'*401):
+            with self.assertRaises(ValueError):self.j.query('2026-10-01','2026-10-31',place=bad)
