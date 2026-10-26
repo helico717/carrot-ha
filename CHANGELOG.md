@@ -1,4 +1,4 @@
-## 2026-10-26 — 3D 차량: 주행 중 속도 0이면 정지 표시, 140 km/h 효과 상한 (승인 대기)
+## 2026-10-26 — 3D 차량: 주행 중 속도 0이면 정지 표시, 140 km/h 효과 상한 (HA 반영)
 
 - 사용자 질문: 주행 중 속도가 0인데 왜 차량이 굴러가는가.
 - 원인: 뷰어가 `Math.max(8, state.speedKph || 40)`으로 도로·바퀴 속도를 계산했다. JavaScript에서 0은 거짓이라 0 km/h가 40 km/h로 바뀌고, 최소 8 km/h도 강제됐다. 또 래퍼가 속도 값이 없을 때도 0을 넘겨 "정지"와 "모름"을 구분하지 못했다.
@@ -7,7 +7,7 @@
 - 관련 파일: `tools/vehicle3d/viewer.src.js`, `custom_components/carrot_ha/frontend/{carrot-vehicle-3d.js,carrot-assets/vehicle-3d.js}`, `tests/vehicle-3d-integration.test.mjs`.
 - 검증: 3D 통합·디버그 테스트 31/31 통과(신규 1건, 기존 "알 수 없는 값" 테스트의 속도 기대값을 0→null로 갱신). 전체 JS 테스트 실패 6건은 기존과 동일. 로컬 프리뷰에서 주행·0 km/h는 주행 시점으로 전환 후 애니메이션이 멈춤(`settled: true`), 차선 점선이 정상 배치, 62 km/h는 계속 이동 확인. 실차 정차 화면은 미확인.
 - 추가(사용자 질문 "140이 넘으면 MAX 140 속도 효과를 유지하는가"): 이전에는 유지하지 않았다. 140은 디버그 속도 슬라이더의 최대값일 뿐 뷰어에 상한이 없어 더 빠르게 움직였다. 뷰어에 `MAX_EFFECT_KPH = 140` 상한을 두어 140 km/h 초과는 140 km/h 효과로 표시한다. 디버그: 검사용 읽기 전용 `rollKph`(표시 속도) 추가, 속도 슬라이더 최대 140→200, 시나리오 `주행 180 km/h (효과 140 상한)` 추가(37→38개), 주행 0/60/120/180 시나리오가 표시 속도(0 / 각 속도 ±3% / 140)를 검사. 프리뷰 디버그 카드에서 네 시나리오 통과(표시 0·59·119·140 km/h). JS 테스트 106 통과/6 실패(기존과 동일).
-- 배포 상태: 사전 승인 대기. 커밋·푸시·HA 직접 반영·버전·태그·릴리즈 없음.
+- 배포 상태: `abee103`을 main에 푸시한 뒤 HA SSH(`sudo`)로 프론트엔드 3개(`carrot-vehicle-3d.js`, `carrot-debug-3d.js`, `carrot-assets/vehicle-3d.js`)를 직접 반영했다. 반영 전 설치 파일이 직전 커밋과 해시가 같음을 확인하고 `/homeassistant/carrot_ha/deployment-backups/vehicle-3d-speed-abee103/before`에 백업(SHA256SUMS.before 포함). 반영 후 설치 파일과 HTTP 응답(200) SHA-256이 커밋과 일치(`carrot-vehicle-3d.js` `a93195d1…`, `carrot-debug-3d.js` `f490653c…`, `vehicle-3d.js` `7a99583e…`). Python 변경 없음(HA 재시작 불필요), 브라우저 강력 새로고침 필요. 실차 정차·고속 화면 미확인. 버전·태그·릴리즈 없음.
 
 ## 2026-10-26 — 외부 API 응답 부분 읽기 수정(차계부 충전소 자동 위치·주행 로그 AI)
 
