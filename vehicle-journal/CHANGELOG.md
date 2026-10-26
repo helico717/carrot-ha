@@ -1,3 +1,11 @@
+## 2026-10-26 — vehicle-journal: 위치 지정 UI·SVG 아이콘·주소 검색 폴백 푸시 및 HA 직접 반영
+
+- 커밋: `d8bb8d0` main 푸시(직전 병합 `f1f102f`). 사용자가 검토용 하네스(`review-location-ui.html`)로 확인 후 승인했다.
+- 병합 처리: 오전 GitHub Desktop pull이 `driving-logs/` 2개 파일 충돌로 멈춰 있던 병합을 원격 버전으로 해결해 `b9ad5b7`로 마무리하고, 이후 원격 신규 2커밋(`0ec2920`, `c6b0e78`)을 병합(`f1f102f`)·푸시했다. 로컬 중복 문서 커밋 3개의 내용은 원격과 동일해 손실이 없다. 스태시 `!!GitHub_Desktop<main>`은 오래된 인덱스 상태라 복원하지 않고 보관 중이다.
+- HA 반영 파일 3개: `carrot-vehicle-journal.js`(`c6335b8b…`), `carrot-journal-design.js`(`66ff6dfc…`), `vehicle_journal/api.py`(`637856f5…`). 반영 전 HA 파일의 SHA-256이 직전 커밋 `f1f102f`과 일치함을 확인했고, 반영 후 로컬·HA SHA-256 일치를 확인했다.
+- 백업: HA `/config/carrot_ha/deployment-backups/d8bb8d0/`(반영 전 3개 파일).
+- 미확인: 운영 브라우저의 실제 화면·카카오 실검색·지도 핀 동작. `api.py`(Python) 변경이라 **HA 재시작이 필요**하며 사용자 수행 전까지 주소 검색 폴백은 적용되지 않는다. 화면 변경은 새로고침으로 적용된다. 새 태그/릴리즈 없음.
+
 ## 2026-10-26 — vehicle-journal: 위치 지정 UI 검토용 하네스 추가 및 지도 안내 문구 수정
 
 - 이유: 프리뷰 선행 절차(AGENTS.md)보다 프로덕션 소스 수정을 먼저 진행한 것을 바로잡고, 사용자 검토·승인 후 반영하도록 검토용 파일을 추가했다. 기존 `review-record-ui.html`(추세 화면 작업 중)은 수정하지 않았다.
