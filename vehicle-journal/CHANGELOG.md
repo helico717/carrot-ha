@@ -1,3 +1,11 @@
+## 2026-10-27 — vehicle-journal: 주행 SOC 기준 통일 HA 직접 반영
+
+- 배포 커밋: `af794a1` (vehicle-journal: compute trip SOC with the dashboard capacity and fix SOC per 100km), main 푸시 확인.
+- 반영 전 확인: HA 설치 파일 4개의 SHA-256이 직전 커밋 `8200971`의 파일과 모두 일치했다. HA의 `storage.py`에 `_format_trip_energy`가, `battery.py`에 `DEFAULT_SOC_CAPACITY_KWH = 64.0`이 있음을 확인했다.
+- 백업: `/config/carrot_ha/deployment-backups/af794a160f9801b5cf50e20b631914a6ed1e4456/`에 기존 4개 파일을 백업했다.
+- 설치 SHA-256(커밋 파일과 일치): `runtime.py` `e1ffe66c…`, `source.py` `ca1a0841…`, `store.py` `898f428a…`, `carrot-vehicle-journal.js` `60e685e0…`. HA Python으로 Python 3개 파일의 구문 검사(`ast`)를 통과했다. HA HTTP(`/carrot_ha_static/`)가 새 화면 파일을 같은 해시로 제공한다.
+- 상태: Python 변경이라 **사용자의 HA 재시작 후** 다음 동기화에서 64 기준 재동기화·전체 재집계가 실행된다. 재시작 전에는 새 화면이 SOC 측정 거리 필드가 없는 기존 요약에 대체 분모를 쓴다. 재시작 뒤 실제 화면 값(예상 9월 25.9%, 10월 25.8%)과 대시보드 주행 탭 SOC 불변은 미확인이다. 운영 DB는 직접 수정하지 않았다. 버전·태그·릴리즈 없음.
+
 ## 2026-10-27 — vehicle-journal: 주행 SOC를 대시보드와 같은 설정 용량으로 계산·100km당 배터리 소모 분모 수정
 
 - 커밋 제목: vehicle-journal: compute trip SOC with the dashboard capacity and fix SOC per 100km
