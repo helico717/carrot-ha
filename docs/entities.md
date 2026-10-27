@@ -1,5 +1,3 @@
-> **2026-10-14 서버 경로 변경:** Cloudflare Worker/D1/KV 관련 설치·배포·한도 설명은 폐기된 과거 기록입니다. 관련 코드 블록을 현재 설치에 실행하지 마세요. 현재 절차: [직접 수신기 설치·복구](CLEAN_INSTALL_RECOVERY.md). 과거 장애 증거·기록 ID는 보존합니다.
-
 # Carrot HA 엔티티 전체 레퍼런스 가이드
 
 이 문서는 **Carrot HA (당근 Home Assistant 통합구성요소)**가 폭스바겐 ID.4 및 지원 전기차(EV)와 Comma 4 장치로부터 수집하여 Home Assistant(HA)에 등록하는 모든 엔티티의 상세 구조, 속성(Attributes), 데이터 출처 및 자동화 활용법을 설명합니다.
@@ -14,11 +12,13 @@ Carrot HA의 엔티티는 기기 식별자(`device_id`) 또는 사용자가 설�
 - **이진 센서 (`binary_sensor`)**: `binary_sensor.<vehicle_name>_<key>` (예: `binary_sensor.id_4_charging`, `binary_sensor.id_4_emergency_charging`)
 - **위치 추적 (`device_tracker`)**: `device_tracker.<vehicle_name>_<key>` (예: `device_tracker.id_4_vehicle_position`)
 
-### B. 데이터 수집 및 Free-Plan 성능 계약 (Zero Query Amplification)
-- **차량 CAN 버스**: 주행/충전 중 Comma 4의 오픈파일럿/당근파일럿 데몬(`openpilot/selfdrive/carrot/ha/`)이 차량 CAN 텔레메트리를 고속 수집합니다.
-- **클라우드 릴레이**: ~~Cloudflare~~ ~~Worker~~ 및 ~~D1~~ 데이터베이스에 증분 동기화(Incremental Sync)로 안전하게 적재됩니다.
-- **HA 로컬 코디네이터**: Home Assistant는 백그라운드 코디네이터를 통해 로컬 SQLite DB 및 인메모리 런타임에 데이터를 유지합니다.
-- **단일 소스 소비**: 새로 추가된 복합 요약 센서(`last_trip`, `charging_session`, `today_summary` 등)를 포함한 모든 엔티티는 **로컬 코디네이터 메모리에서 직접 데이터를 구독**하므로, 클라우드 API를 추가로 호출하지 않아 ~~Cloudflare~~ ~~Worker~~ 무료 플랜 한도를 완벽하게 보호합니다.
+### B. 현재 데이터 수집과 공유 조회
+
+- Comma가 차량 상태·일반 주행 기록을 집 서버의 독립 Carrot Vehicle Receiver에 HTTPS로 보낸다.
+- HA는 내부 HTTP로 수신 앱을 조회하고 로컬 SQLite와 런타임 메모리에 유지한다.
+- 센서와 카드는 HA의 공유 데이터에서 조회하며 카드마다 수신 앱에 별도 요청하지 않는다.
+- 터미널·주차 카메라·영상/rlog는 수신 앱을 통과하지 않고 HA Core에 직접 연결한다.
+- 상세 경로와 인증·장애 범위: [현재 연결 구조](CURRENT_CONNECTION_ARCHITECTURE.md).
 
 ---
 
@@ -251,7 +251,7 @@ HA 설정은 코드 동기화 대상에서 제외합니다.
 ### F. 시스템 연결 및 진단 센서
 | 엔티티 키 | 센서 이름 | 단위 | 설명 |
 | :--- | :--- | :---: | :--- |
-| `cloud_status` | 클라우드 연결 상태 | - | ~~Cloudflare~~ 릴레이 상태 (`online`, `idle`, `offline`, `not_configured`) |
+| `cloud_status` | 차량 수신기 연결 상태 | - | 설정된 차량 수신 소스의 동기화 상태 (기존 `cloud_status` 식별자 유지) (`not_configured`, `syncing`, `ok`, `HTTP_<상태코드>`, `error`) |
 | `last_sync` | HA 동기화 시각 | `timestamp` | Home Assistant가 클라우드로부터 마지막 데이터를 성공적으로 동기화한 시각 |
 | `measured_at` | 차량 측정 시각 | `timestamp` | 차량 CAN 버스에서 실제 데이터가 측정된 UTC 시각 |
 | `measurement_age_s` | 차량 데이터 경과시간 | `s` | 마지막 차량 측정 이후 경과된 시간 (차량이 슬립 중인지 판단에 사용) |

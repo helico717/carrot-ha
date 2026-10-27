@@ -1,5 +1,8 @@
 # CarrotPilot 설정 확인·변경
 
+연결 경로·주소·인증·장애 범위: [현재 연결 구조](CURRENT_CONNECTION_ARCHITECTURE.md).
+
+
 [자체 수신기 설치](CLEAN_INSTALL_RECOVERY.md)를 완료하고 Comma에 해당 HA 브랜치를 설치합니다.
 파라미터 목록과 값은 집 서버 수신 앱을 거쳐 HA로 들어옵니다. Cloudflare 설치가 필요하지 않습니다.
 명령은 수신 앱에 보관되며 Comma가 로컬 검증·적용·실제 값 확인 후 결과를 돌려줍니다.

@@ -1,5 +1,8 @@
 # 주차 상태 원격 터미널
 
+연결 경로·주소·인증·장애 범위: [현재 연결 구조](CURRENT_CONNECTION_ARCHITECTURE.md).
+
+
 설치는 [초기화 복구 안내](CLEAN_INSTALL_RECOVERY.md)의 3번과 7번을 따릅니다.
 HA 통합 구성에서 자체 수신기 주소·조회 키·업로드 키를 설정하고 원격 터미널을 켠 뒤,
 HA 외부 HTTPS 기본 주소를 입력합니다. 주소 끝에 `/carrot-receiver`를 붙이지 않습니다.

@@ -1,3 +1,9 @@
+## 2026-10-27 — 현행 연결 안내 문서 정리
+
+- 변경/이유: 현재 직접 연결을 설명하는 공통 문서를 추가하고 docs/driving-logs-setup.md에서 연결했다. 일반 주행 요약은 독립 수신 앱, 영상/rlog는 HA Core 직접 업로드임을 구분했다. 별도 업로드 인증과 HA Core 중단 영향을 명시했다.
+- 관련 파일: docs/{CURRENT_CONNECTION_ARCHITECTURE.md,driving-logs-setup.md}, AGENTS.md. 과거 사건·기록 ID는 보존했다.
+- 검증/배포: HA 업로드 라우트 코드 대조, 12개 문서의 상대 링크·폐기 명령 검사 및 git diff --check 통과. 문서만 변경하여 실행 테스트·운영 배포·재시작·릴리즈 없음. 운영 차량/NAS 확인 및 차량 최신 코드 대조는 미수행. 커밋·푸시 결과는 후속 확인한다.
+
 ## 2026-10-26 — 주행 로그 AI·수신기 설정 응답의 부분 읽기 수정
 
 - 이유: 차계부 충전소 자동 위치 실패 조사에서 aiohttp `response.content.read(n)`이 첫 네트워크 조각만 반환해 JSON이 잘리는 문제를 확인했다. `driving_logs/ai.py`의 Gemini 응답(256KB 제한)과 수신기 `/api/settings` 응답(2MB 제한)도 같은 방식이라 큰 응답이 간헐적으로 `provider_connection` 오류나 빈 설정이 될 수 있었다.
@@ -859,3 +865,10 @@
 - 결과: IQ+HA 전용 Git 포크/adapter로 대부분의 사용자 기능 보존 가능성이 있으나 전부 호환 완료는 아님. IQ에 없는 당근 파라미터 의미 보존 불가, 대응 설정으로 교체 필요. 기존 HA 기록과 신규 수집 연속성 구분.
 - IQ 장점은 선택형 주행 플랫폼/기능 묶음의 후보 가치로 평가. 독점기술·코너 통과·한국지역 서비스 우위 미확인. 별도 주행 이득 검증 전 이주 이득 확정하지 않음.
 - 산출물: `assessment-2026-10-19-iqpilot-ha-preservation.md`. 소스 타당성 조사만 완료, 구현/전체호환/실기 미검증. 문서만 게시, 주행코드·설정·기기 변경 없음.
+
+## 2026-10-27 — 직접 연결 구조 확인 조사
+
+- 목적/내용: Cloudflare 문서 혼동 정리를 위해 driving_logs/http.py의 차량 업로드 경로와 인증을 확인했다. 영상/rlog는 HA Core의 /api/carrot_ha/v1/driving_logs_upload/{device_id}/...로 직접 수신하며, terminal_enabled 및 terminal_token에서 HMAC으로 파생한 전용 업로드 인증을 검사한다. 독립 차량 수신기 DB를 영상/rlog 저장소로 사용하지 않는다.
+- 관련 파일: custom_components/carrot_ha/driving_logs/{http.py,upload.py}, docs/{CLEAN_INSTALL_RECOVERY.md,driving-logs-setup.md}.
+- 검증: 로컬 코드·문서 대조만 수행. 실제 차량 업로드·운영 프록시·NAS 상태 및 차량 실행 코드는 미확인(지정 로컬 openpilot 경로 없음).
+- 배포 상태: 조사 기록만 추가. 실행 코드·기기·HA 변경/배포·재시작·릴리즈 없음. 기존 미추적 분석 문서는 수정하지 않았다.

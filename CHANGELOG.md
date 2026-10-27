@@ -1,3 +1,11 @@
+## 2026-10-27 — Cloudflare 과거 중계 설명과 현재 직접 연결 문서 분리
+
+- 변경/이유: 조사에서 멈추지 않고 현행 안내를 수정하라는 사용자 요청에 따라 AGENTS의 과거 구조도·Wrangler 실행 절차·D1/KV 무료 한도 규칙을 현재 수신기 구조로 교체했다. GUIDE의 클라우드 경로/60초 화면 조회 설명, entities의 저장 경로·cloud_status 설명, 모듈형 설계의 수집 계층과 부하 원칙을 수정했다.
+- 관련 파일: AGENTS.md, docs/CURRENT_CONNECTION_ARCHITECTURE.md, docs/{GUIDE.md,entities.md,modular-ev-dashboard-architecture.md,DEVELOPMENT_WORKFLOW.md,CLEAN_INSTALL_RECOVERY.md,TERMINAL_SETUP.md,CAMERA_SETUP.md,COMMA_PARAM_SETUP.md,driving-logs-setup.md,cloudflare-retirement-audit-2026-10-14.md}.
+- 내용: 독립 수신 앱 경로와 HA Core 직접 경로, 외부/내부 URL, 키 구분, 60초 이력·15초 최신 조회, HA Core 재시작 영향, 과거 호환 분기와 자동 fallback 부재를 명시했다. 과거 릴리즈·changelog·archive·라이선스와 원본 서버 소스는 보존했다.
+- 검증: 코드 근거 대조 및 12개 문서의 상대 링크와 폐기 명령 잔존 검사 및 git diff --check 통과. 실행 코드 변경이 없어 런타임 테스트·배포·버전 상승·재시작은 해당하지 않는다. 운영 프록시/차량 상태 및 차량 최신 소스는 미검증이다.
+- 배포 상태: 문서 전용 커밋·main 푸시 대상으로 준비했다. 다른 작업 파일은 제외했다. 최초 FETCH_HEAD 권한 오류 후 승인된 git fetch가 성공했고 원격 main과 HEAD가 일치함을 확인했다. 실행 배포·버전·태그·릴리즈·재시작 없음.
+
 ## 2026-10-27 — 절약 비교 화면 HA 직접 반영 완료
 
 - 배포 커밋: `34d6e3c` (main 푸시 확인). 기존 설치 파일 2개가 직전 Git 버전과 일치함을 확인한 뒤 `/config/carrot_ha/deployment-backups/34d6e3c/`에 각각 백업하고 화면 코드·디자인 파일 반영.
@@ -336,3 +344,11 @@
 - 현재 상태: 텔레포토 기능은 Git에만 게시되어 있으며 이 세션에서 HA SSH 반영은 하지 않았다.
   사용자의 추가 보류 지시에 따라 새 pre-release·정식 릴리즈·HA 직접 배포를 진행하지 않는다.
   실제 Comma/CPL 확인은 미검증이다. Comma 소스·Worker·D1 배포는 없다.
+
+## 2026-10-27 — 현재 직접 연결 경로 문서 정리를 위한 코드 조사
+
+- 목적: 폐기된 Cloudflare 중계 설명과 현재 연결을 구분하기 위해 HA 통합·독립 수신기 코드를 읽기 전용으로 대조했다.
+- 확인: 상태/일반 주행/파라미터/터미널 bootstrap은 자체 수신기, 터미널·카메라·영상/rlog는 HA Core 경로다. receiver_url이 있으면 해당 주소를 선택하며 실패에 따른 Cloudflare 주소 자동 전환은 없다. cloud_* 파일명·옵션은 현재 수신기 구현과 과거 호환 코드에 함께 남아 있다.
+- 관련 파일: addons/carrot_receiver/{receiver.py,config.yaml,DOCS.md}, custom_components/carrot_ha/{cloud.py,cloud_live.py,terminal_bootstrap.py,terminal_http.py,camera_http.py,__init__.py,config_flow.py}, driving_logs/http.py, docs/CLEAN_INSTALL_RECOVERY.md.
+- 검증/한계: 로컬 HEAD 3527e6b의 코드·설치 문서 대조. git pull은 FETCH_HEAD 권한 오류로 실패. 지정된 로컬 openpilot 경로가 없어 차량 실행 코드 대조 및 운영 HA/Comma 연결 상태 확인은 하지 못했다.
+- 배포 상태: 조사 기록만 추가. 실행 코드·운영 설정·문서 본문 변경, 배포·재시작·태그·릴리즈 없음. 기존 사용자 작업은 유지했다.
