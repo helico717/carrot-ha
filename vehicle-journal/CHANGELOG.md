@@ -1,3 +1,32 @@
+## 2026-10-27 — vehicle-journal: 주행 SOC를 대시보드와 같은 설정 용량으로 계산·100km당 배터리 소모 분모 수정
+
+- 커밋 제목: vehicle-journal: compute trip SOC with the dashboard capacity and fix SOC per 100km
+- 증상: 추세의 `100km당 배터리 소모`가 10월 2.4%(9월 14.2%)로 표시됐다. "11.8% 감소"는 %p 차이인데 비율처럼 읽혔고, "14.2 %"처럼 숫자와 % 사이에 공백이 있었다.
+- 원인(운영 DB 읽기 전용 조회):
+  - Comma `b9b49b4a`(10-03)부터 주행 경계 `trip_measurements`가 `battery_wh`만 담고 `soc_percent`는 항상 null이다. 공용 `trip_repair.derive()`가 상태 기록에서 찾은 SOC 경계값을 이 측정값으로 덮어써, 10월 주행 143건 중 134건(거리 88%)에서 차계부 SOC가 사라졌다.
+  - 카드 분모는 SOC가 없는 주행까지 포함한 전체 거리였다.
+  - 9월까지 차계부 SOC는 Comma 상태 `soc_percent`(Wh/780, 78kWh)였고, 대시보드는 Wh ÷ 설정 `soc_capacity_kwh`(64)라 기준도 달랐다.
+- 64 검증:
+  - 2026-09-25 완속 충전 종료 잔량은 65,050Wh(÷64 = 101.6%, ÷78 = 83.4%)였고, 사용자는 계기판 100%로 기억한다. 충전기는 잔량 증가가 멈춘 뒤 15분 더 공급해 효율이 84%로 낮았다.
+  - 2026-10-04 급속 충전 동안 계기판 SOC 후보(`0x14A`)는 30.5→56.0%였고, HA 잔량은 19,350→35,950Wh(÷64 = 30.2→56.2%)였다.
+  - 충전기 공급량 대비 Wh 증가는 완속 약 95%, 급속 약 93%로, Wh 단위가 실제 kWh임을 확인했다.
+- 변경:
+  - `runtime.py`: 차계부에 엔트리 옵션 `soc_capacity_kwh`(기본 64)를 전달한다.
+  - `source.py`: 주행 경계 SOC를 대시보드 주행 탭과 같은 `Archive._format_trip_energy`로 계산한다(Wh ÷ 설정 용량). 공용 `trip_repair.py`와 대시보드 경로는 변경하지 않았다.
+  - `source.py`·`store.py`: 동기화 기준(`soc_capacity_kwh`)을 `sync_state`에 기록한다. 기준이 다르면 원본 세대가 같아도 다시 동기화하고 모든 날짜를 재집계한다.
+  - `store.py`: 일별 `quality.soc_distance_km`(SOC가 측정된 주행거리)를 집계한다. 스키마 변경 없음.
+  - `carrot-vehicle-journal.js`: `100km당 배터리 소모`의 분모를 SOC가 측정된 거리로 바꿨다(이 필드가 없는 이전 요약은 SOC가 있는 날의 전체 거리로 대체). SOC 측정 거리가 없는 구간은 0이 아니라 기록 없음이다. % 지표의 비교 증감은 `%p`로 표시하고, 비교 문장의 % 앞 공백을 없앴다.
+- 예상 결과(운영 데이터 읽기 전용 재계산): 9월 25.9%(SOC 측정 거리 67%), 10월 25.8%(SOC 측정 거리 100%, 이전 12%).
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/{runtime.py,source.py,store.py}`, `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `vehicle-journal/tests/{test_journal.py,test_runtime_schedule.py,browser-check.cjs}`.
+- 검증:
+  - 신규 `test_trip_soc_uses_dashboard_capacity_and_measured_distance`는 SOC 없는 경계 측정값, 64 기준 12.5%p, `soc_distance_km` 100, 78로 바꾼 뒤 자동 재동기화(10.2%p)를 확인한다.
+  - `vehicle-journal/tests` 103건 실행. 오류 2건은 `test_station_backup`의 Windows 임시 폴더 권한 오류다.
+  - 루트 `test_trip_boundary_truth`·`test_trip_energy`·`test_cloud_live`·`test_incremental_sync`·`test_history_cache`, `dashboard-live-loading`·`dashboard-lazy-runtime`·`dashboard-view-state` 통과. `test_direct_receiver`는 이 PC에 aiohttp가 없어 실행하지 못했다(변경 파일과 무관).
+  - `node --check` 통과. Chrome에서 실제 모듈의 추세 검사(13개 카드, `%p` 문장, SOC 측정 거리 분모 47.6%)를 통과했다.
+  - 기존 `browser-check.cjs` 전체는 변경 전 HEAD에서도 첫 화면 대기 단계에서 실패한다. 하네스가 모듈 앞부분(`jIcon` 등)을 잘라 내기 때문이다. 추세 구간만 모듈 전체를 불러와 따로 실행했다.
+- 배포: 아래 HA 반영 기록을 참고. Python 변경이라 사용자의 HA 재시작 후 다음 동기화(60초 주기)에서 재계산된다.
+- 제한: Wh가 없는 경계는 기존 보정값(상태 `soc_percent`, Wh/780)이 남을 수 있다(대시보드와 동일 동작). 계기판 SOC 직접 수집은 별도 작업(`0x14A`)에서 실차 대조 중이다. UI 변경은 문구 단위(`%p`)와 계산뿐이라 별도 미리보기를 만들지 않았다.
+
 ## 2026-10-27 — vehicle-journal: 충전 위치 실패 사유 표시 HA 직접 반영
 
 - 배포 커밋: `dfa203e` (vehicle-journal: explain automatic charge location failures in the ledger), main 푸시 확인.

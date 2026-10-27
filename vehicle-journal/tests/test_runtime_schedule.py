@@ -39,12 +39,12 @@ class ScheduleTests(unittest.IsolatedAsyncioTestCase):
         from datetime import timedelta
         async def attach(entry,runtime,journal):return journal
         namespace = dict(manager=lambda hass:SimpleNamespace(attach=attach),callback=callback, async_track_time_interval=track, timedelta=timedelta,
-                         Journal=lambda *args: SimpleNamespace(cleanup_purged_photos=lambda:0), sync=sync)
+                         Journal=lambda *args: SimpleNamespace(cleanup_purged_photos=lambda:0), sync=sync, DEFAULT_SOC_CAPACITY_KWH=64.0)
         exec(compile(tree, str(path), 'exec'), namespace)
         runtime = {'archive': SimpleNamespace(journal_guard=None)}
         hass = SimpleNamespace(async_add_executor_job=executor,
             async_create_background_task=create, config=SimpleNamespace(path=lambda *a: 'temp',time_zone='Asia/Seoul'))
-        entry = SimpleNamespace(entry_id='entry',data={'device_id':'car'},async_on_unload=unload.append)
+        entry = SimpleNamespace(entry_id='entry',data={'device_id':'car'},options={},async_on_unload=unload.append)
         await namespace['setup'](hass, entry, runtime)
         async def dispatch():
             if getattr(tick[0], 'ha_callback', False):

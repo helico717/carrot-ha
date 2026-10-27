@@ -15,6 +15,9 @@ async def setup(hass, entry, runtime):
         entry.entry_id,entry.data['device_id'],hass.config.time_zone)
     from .vehicles import manager
     journal=await manager(hass).attach(entry,runtime,journal)
+    # Same Wh→SOC calibration as the dashboard trip tab; a change resyncs records.
+    from ..battery import DEFAULT_SOC_CAPACITY_KWH
+    journal.soc_capacity_kwh=entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH)
     runtime['journal']=journal
     runtime['archive'].journal_guard=lambda: sync(runtime['archive'],journal,True)
     from homeassistant.core import callback

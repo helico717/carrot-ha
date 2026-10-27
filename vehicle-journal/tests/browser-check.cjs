@@ -55,6 +55,9 @@ const path=require('path');
   if(!trend('distance').querySelector('.trend-chart-avg-label').textContent.includes('42km'))throw Error('observed-day distance mean wrong');
   if(!trend('cost100').querySelector('.trend-chart-avg-label').textContent.includes('5,714원'))throw Error('cost per 100km wrong');
   if(!trend('soc100').querySelector('.trend-chart-avg-label').textContent.includes('23.8%'))throw Error('SOC per 100km wrong');
+  card.data={...original,daily:original.daily.map(row=>({...row,quality:{soc_distance_km:21}}))};card.renderTrendsDashboard();
+  if(![...trend('soc100').querySelectorAll('.trend-chart-avg-label')].some(el=>el.textContent.includes('47.6%'))||!trend('soc100').textContent.includes('%p'))throw Error('SOC per 100km must use distance with measured SOC');
+  card.data=original;card.renderTrendsDashboard();
   if(!trend('per_charge').querySelector('.trend-chart-avg-label').textContent.includes('20kWh'))throw Error('charge mean wrong');
   if(!trend('charge_count').querySelector('.trend-chart-avg-label').textContent.includes('1회'))throw Error('charge count wrong');
   for(const scope of ['month','year']){
@@ -66,7 +69,7 @@ const path=require('path');
     if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
     if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
     for(const change of card.shadowRoot.querySelectorAll('.trend-change')){
-     if(!/^[0-9.,]+(km|kWh|km\/kWh|원|%|회) (증가|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
+     if(!/^[0-9.,]+(km|kWh|km\/kWh|원|%p|회) (증가|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
      if(getComputedStyle(change).color!==getComputedStyle(change.closest('.trend-card').querySelector('.trend-metric-name')).color)throw Error('change color does not match metric');
     }
     if(previous&&!card.shadowRoot.querySelector('.trend-change'))throw Error('missing change emphasis');
@@ -86,7 +89,7 @@ const path=require('path');
       }
      }
      if(/기록이 있는 날|기간 충전 단가|실제·추정 비용|누적 지출|주행거리당 SOC|기록 범위/.test(summary))throw Error('unrequested explanatory text remains');
-     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|원|%|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
+     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|원|%p|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
     }
    }
   }

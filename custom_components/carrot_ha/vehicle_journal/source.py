@@ -4,10 +4,16 @@ import json
 from .store import number, stamp
 from .. import trip_repair, archive_codec
 from ..charge_costs import is_fast_charge
+from ..battery import DEFAULT_SOC_CAPACITY_KWH
+
+
+def soc_basis(journal):
+    return getattr(journal,'soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH)
 
 
 def snapshot(archive, journal):
     trips=[]; charges=[]
+    capacity=soc_basis(journal)
     with archive.connect() as db:
         db.execute('BEGIN')
         generation=(db.execute('SELECT generation FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
@@ -20,6 +26,8 @@ def snapshot(archive, journal):
         for source,body in rows:
             event=json.loads(body);data=event['data']
             trip_repair.apply(event,derived.get(source))
+            # Boundary SOC from Wh exactly as the dashboard trip tab shows it.
+            archive._format_trip_energy(data,capacity)
             try:
                 start=stamp(data['started_at'])
                 end=stamp(data['ended_at']) if data.get('ended_at') else start+timedelta(seconds=data.get('duration_s',0))
@@ -65,7 +73,7 @@ def sync(archive, journal, force=False):
         reconcile(archive,journal)
         with archive.connect() as db:
             row=db.execute('SELECT generation,acknowledged FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
-        if not force and row and row[0]==row[1]:return False
+        if not force and row and row[0]==row[1] and journal.synced_soc_basis()==soc_basis(journal):return False
         archive._ensure_derivations(journal.device)
         facts=snapshot(archive,journal)
         journal.import_snapshot(*facts)

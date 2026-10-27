@@ -274,12 +274,22 @@ class Journal:
                     db.execute("UPDATE records SET status='deleted' WHERE vehicle_id=? AND id=? AND source_fingerprint!='purged'",(self.vehicle,key))
                     self._dirty(db,[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))])
                 self._dirty(db,old_days)
+                basis=getattr(self,'soc_capacity_kwh',None)
+                if basis!=self.synced_soc_basis(db):
+                    # Re-aggregate every day so SOC coverage follows the new basis.
+                    self._dirty(db,[r[0] for r in db.execute('SELECT DISTINCT day FROM day_parts WHERE vehicle_id=?',(self.vehicle,))])
             self.aggregate()
             with self.connect() as db:
                 db.execute('''INSERT INTO sync_state VALUES (?,?,?,'complete',NULL,?)
                     ON CONFLICT(vehicle_id,source_kind) DO UPDATE SET cursor_json=excluded.cursor_json,
                     phase='complete',last_error=NULL,updated_at=excluded.updated_at''',
-                    (self.vehicle,'archive',encode({'generation':generation}),now()))
+                    (self.vehicle,'archive',encode({'generation':generation,'soc_capacity_kwh':basis}),now()))
+
+    def synced_soc_basis(self, db=None):
+        if db is None:
+            with self.connect() as db:return self.synced_soc_basis(db)
+        row=db.execute("SELECT cursor_json FROM sync_state WHERE vehicle_id=? AND source_kind='archive'",(self.vehicle,)).fetchone()
+        return json.loads(row[0]).get('soc_capacity_kwh') if row else None
 
     def aggregate(self):
         """Rebuild affected dates from compact facts; never read the source/cloud."""
@@ -293,12 +303,15 @@ class Journal:
                     (self.vehicle,value,self.time_zone)).fetchall()
                 sums={k:None for k in METRICS}
                 counts={k:0 for k in ('slow_count','fast_count','unknown_count')}
-                qualities=[]
+                qualities=[];soc_distance=None
                 for metrics,quality in parts:
                     metrics=json.loads(metrics);qualities.append(json.loads(quality))
                     for key in METRICS:
                         if key in metrics:
                             sums[key]=(sums[key] or 0)+metrics[key]
+                    # Distance that has measured SOC: the denominator for SOC per distance.
+                    if 'drive_soc_used_pp' in metrics:
+                        soc_distance=(soc_distance or 0)+metrics.get('distance_km',0)
                     for key in counts:
                         counts[key]+=metrics.get(key,0)
                 categories={}; actual=estimated=effective=None; cost_sources=set()
@@ -316,7 +329,7 @@ class Journal:
                         if cost is not None: effective=(effective or 0)+cost
                 coverage=100*(sums['energy_distance_km'] or 0)/sums['distance_km'] if sums['distance_km'] else None
                 quality={'origins':sorted({q.get('origin','automatic') for q in qualities}),
-                         'energy_coverage_percent':coverage,'total_soc':'missing',
+                         'energy_coverage_percent':coverage,'soc_distance_km':soc_distance,'total_soc':'missing',
                          'allocation':'boundary_or_time_prorated','parking':'not_available',
                          'cost_source':'mixed' if len(cost_sources)>1 else next(iter(cost_sources),'missing')}
                 columns=['vehicle_id','day','accounting_timezone',*METRICS,'total_soc_used_pp',

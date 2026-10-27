@@ -1061,10 +1061,13 @@ export class VehicleJournal extends HTMLElement {
       numBins=12;
     }
 
+    // Only distance with measured SOC divides SOC use; older summaries lack the field.
+    const socDistance=row=>row.quality?.soc_distance_km!==undefined?row.quality.soc_distance_km:(row.drive_soc_used_pp!=null?row.distance_km:null);
+    const socDistanceTotal=rows=>rows.reduce((sum,row)=>{const km=socDistance(row);return km==null?sum:(sum||0)+km;},null);
     const bins=Array.from({length:numBins},()=>({
       distance_km:0,energy_distance_km:0,drive_energy_kwh:0,
       battery_charge_kwh:0,billed_charge_kwh:0,charge_effective_krw:0,
-      drive_soc_used_pp:0,slow_count:0,fast_count:0,unknown_count:0,day_count:0
+      drive_soc_used_pp:0,soc_distance_km:0,slow_count:0,fast_count:0,unknown_count:0,day_count:0
     }));
 
     for(const row of daily){
@@ -1085,6 +1088,7 @@ export class VehicleJournal extends HTMLElement {
       b.billed_charge_kwh+=row.billed_charge_kwh||0;
       b.charge_effective_krw+=row.charge_effective_krw||0;
       b.drive_soc_used_pp+=row.drive_soc_used_pp||0;
+      b.soc_distance_km+=socDistance(row)||0;
       b.slow_count+=row.slow_count||0;
       b.fast_count+=row.fast_count||0;
       b.unknown_count+=row.unknown_count||0;
@@ -1135,15 +1139,17 @@ export class VehicleJournal extends HTMLElement {
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
           const changeValue=unit==='원'?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
-          changeText=`${changeValue.toLocaleString('ko-KR')}${unit} ${diff>0?'증가':'감소'}`;
+          // A difference between two percentages is percentage points, not a ratio.
+          changeText=`${changeValue.toLocaleString('ko-KR')}${unit==='%'?'%p':unit} ${diff>0?'증가':'감소'}`;
+          const pastText=`${trendValue(pastVal,unit)}${unit==='%'?'':' '}${unit}`;
           if(diff>0){
             trendStatus='up';
             headline=`${periodName} 동안 증가 추세`;
-            subDesc=`${prevPeriodName} 평균 ${trendValue(pastVal,unit)} ${unit} 대비 ${changeText}했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${pastText} 대비 ${changeText}했어요.`;
           }else{
             trendStatus='down';
             headline=`${periodName} 동안 감소 추세`;
-            subDesc=`${prevPeriodName} 평균 ${trendValue(pastVal,unit)} ${unit} 대비 ${changeText}했어요.`;
+            subDesc=`${prevPeriodName} 평균 ${pastText} 대비 ${changeText}했어요.`;
           }
         }else{
           trendStatus='consistent';
@@ -1189,7 +1195,7 @@ export class VehicleJournal extends HTMLElement {
       eff=t.efficiency_km_kwh??eff;
       return eff>0&&kwh>0&&t.charge_effective_krw!=null?Math.round(t.charge_effective_krw/kwh/eff*100):null;
     };
-    const soc100=t=>t.drive_soc_used_pp!=null&&t.distance_km>0?round(t.drive_soc_used_pp/t.distance_km*100):null;
+    const soc100=(t,km)=>t.drive_soc_used_pp!=null&&km>0?round(t.drive_soc_used_pp/km*100):null;
     const perCharge=t=>chargeCount(t)>0&&t.battery_charge_kwh!=null?round(t.battery_charge_kwh/chargeCount(t)):null;
     const spending=row=>Object.values(row.cost_categories||{}).reduce((sum,v)=>sum+(v.effective_krw||0),0);
     const extraBins=bins.map(()=>[]);
@@ -1203,7 +1209,7 @@ export class VehicleJournal extends HTMLElement {
       createMetric('total_cost','총 차량 지출',jIcon('wallet'),'#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true}),
       createMetric('charge_count','총 충전 횟수',jIcon('plug'),'#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
       createMetric('per_charge','1회 평균 충전량',jIcon('battery'),'#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
-      createMetric('soc100','100km당 배터리 소모',jIcon('car'),'#af52de','%',soc100(totals),soc100(prevTotals),observed(b=>soc100(b)),{})
+      createMetric('soc100','100km당 배터리 소모',jIcon('car'),'#af52de','%',soc100(totals,socDistanceTotal(daily)),soc100(prevTotals,socDistanceTotal(prevDaily)),observed(b=>soc100(b,b.soc_distance_km)),{})
     );
     for(const [category,label] of Object.entries(categories)){
       const current=totals.categories?.[category],past=prevTotals.categories?.[category];

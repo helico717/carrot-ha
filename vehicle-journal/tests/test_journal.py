@@ -156,6 +156,25 @@ class JournalTests(unittest.TestCase):
         sync(self.archive,self.journal)
         self.assertEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['distance_km'],60)
 
+    def test_trip_soc_uses_dashboard_capacity_and_measured_distance(self):
+        # Collector boundaries carry Wh but no SOC, as observed since 2026-10-03.
+        point=lambda at,wh:{'at':at,'battery_wh':wh,'soc_percent':None}
+        self.archive.put(self.event('trip','measured',{'started_at':'2026-09-01T00:00:00Z','ended_at':'2026-09-01T01:00:00Z',
+            'distance_m':100000,'partial':True,'trip_measurements':{'start':point('2026-09-01T00:00:00Z',48000),
+            'end':point('2026-09-01T01:00:00Z',40000),'complete':False}}))
+        self.archive.put(self.event('trip','unmeasured',{'started_at':'2026-09-01T02:00:00Z','ended_at':'2026-09-01T03:00:00Z','distance_m':50000}))
+        self.journal.soc_capacity_kwh=64
+        sync(self.archive,self.journal)
+        result=self.journal.query('2026-09-01','2026-09-30')
+        self.assertEqual(result['totals']['drive_soc_used_pp'],12.5)
+        self.assertEqual(result['totals']['distance_km'],150)
+        self.assertEqual(result['daily'][0]['quality']['soc_distance_km'],100)
+        # A calibration change resyncs without a new archive generation.
+        self.journal.soc_capacity_kwh=78
+        self.assertTrue(sync(self.archive,self.journal))
+        self.assertAlmostEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['drive_soc_used_pp'],10.2,places=6)
+        self.assertFalse(sync(self.archive,self.journal))
+
     def test_zero_payment_and_deletion(self):
         self.archive.put(self.charge())
         sync(self.archive,self.journal)
