@@ -877,13 +877,13 @@ export class VehicleJournal extends HTMLElement {
       const basisDistance=this.recordedDistance(),cost=this.data.fuel_facts?.totals?.fuel_cost_krw;
       if(!priceKnown||!(economy>0)||!(basisDistance>0)||cost==null||!(this.data.fuel_facts?.totals?.fuel_count>0)){this.$('saving').textContent='비교에 필요한 관측 거리·주유 지출·비교 차량 연비·유가를 확인해 주세요.';this.$('compareDetail').textContent='';return;}
       const current=distance*cost/basisDistance,other=distance/economy*price,diff=other-current,max=Math.max(1,current,other);
-      this.$('saving').textContent=money(Math.abs(diff))+(diff>=0?' 덜 들어요':' 더 들어요');
+      this.$('saving').textContent=money(Math.abs(diff))+(diff>=0?' 더 들어요':' 덜 들어요');
       this.$('compareDetail').innerHTML='<p class="note">주유 지출 기준 추정 · 실제 연비 계산이 아니며 주유·주행 기간 차이로 오차가 있어요.</p>'+[[title,current,'mint'],['비교 차량',other,'orange']].map(([label,value,color])=>`<div class="row spaced"><span>${esc(label)}</span><b class="${color}">${money(value)}</b></div><div class="cost-bar ${color}"><span style="width:${value/max*100}%"></span></div>`).join('');return;
     }
     const kwh=t.billed_charge_kwh||t.battery_charge_kwh,rate=kwh>0&&t.charge_effective_krw!=null?t.charge_effective_krw/kwh:null,eff=t.efficiency_km_kwh;
     if(!priceKnown||rate==null||!(eff>0)||t.distance_km==null){this.$('saving').textContent='비교에 필요한 거리·전비·충전비·유가를 확인해 주세요.';this.$('compareDetail').textContent='';return;}
     const ev=distance/eff*rate,ice=distance/economy*price,diff=ice-ev,max=Math.max(1,ev,ice);
-    this.$('saving').textContent=money(Math.abs(diff))+(diff>=0?' 덜 들어요':' 더 들어요');
+    this.$('saving').textContent=money(Math.abs(diff))+(diff>=0?' 더 들어요':' 덜 들어요');
     this.$('compareDetail').innerHTML=[[title,ev,'mint'],['비교 차량',ice,'orange']].map(([label,value,color])=>`<div class="row spaced"><span>${esc(label)}</span><b class="${color}">${money(value)}</b></div><div class="cost-bar ${color}"><span style="width:${value/max*100}%"></span></div>`).join('');
   }
   renderTrendsDashboard(){
