@@ -82,7 +82,7 @@ async def async_setup_entry(hass,entry,async_add_entities):
 ID4_DIAGNOSTIC_KEYS = {
     'aux_voltage', 'hv_voltage', 'recirc', 'blower_level', 'blower_volt',
     'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
-    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh'
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'display_soc_candidate_percent'
 }
 
 class VehicleSensor(VehicleEntity,SensorEntity):

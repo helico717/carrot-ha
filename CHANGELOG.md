@@ -1,3 +1,14 @@
+## 2026-10-27 — 계기판 SOC 후보(0x14A) 비교 전용 수집
+
+- 요청/이유: 대시보드 SOC는 잔량 Wh ÷ 사용자 설정 64kWh 비례식이라 하단 버퍼 같은 오프셋을 반영하지 못하고, Comma `soc_percent`(Wh/780)와 기준도 다르다. 장기적으로 계기판 표시 SOC를 직접 읽기 위해 연구 저장소에서 찾은 후보(bus1 `0x14A` 32byte byte19 × 0.5%, 주행 r≈0.99991, 일부 시점 ±1%p 차이)를 별도 필드로 수집하고 실차 대조를 준비한다.
+- Comma(openpilot `carrot-wip-model_selector-ha` `d718061f`): `display_soc_candidate_percent`를 CAN 수신 시각(`field_measured_at`)과 함께 텔레메트리에 추가하고, 주행 경계 `tripMeasurements` start/end에 값과 `display_soc_candidate_measured_at`(180초 초과 시 미확인)을 넣었다. bus1 32byte만 사용하며 raw 201 이상(초기화 254/255 포함)은 값을 지운다. 기존 `soc_percent`·`battery_wh`·에너지 완전성 판정은 변경하지 않았다.
+- 수신 앱 0.1.4: `trip_measurements` 출력에 후보 필드를 보존한다. 수집기가 보낸 경우에만 추가하므로 이전 주행의 API 출력과 HA 주행 fingerprint는 그대로다. 후보만으로는 측정 경계를 만들지 않는다.
+- HA: 진단 센서 `계기판 SOC 후보`(180초 신선도, 속성 can_id 0x14A·검증 대기·`used_for_dashboard_soc=false`)를 추가했다. 주행 원본의 `trip_measurements`는 그대로 보관된다. 대시보드·차계부의 SOC 계산과 우선순위는 변경하지 않았다.
+- 관련 파일: addons/carrot_receiver/{receiver.py,config.yaml,CHANGELOG.md}, custom_components/carrot_ha/{telemetry.py,sensors_v3.py}, tests/test_display_soc_candidate.py. 실차 대조 양식: meb-can-research `docs/field-tests/display-soc-validation-2026-10-27.md`(`04e6f36`).
+- 검증: openpilot 신규 5개 통과, ha/tests 전체 81개 중 기존 실패 4개(camera_probe·camera_upgrade 모듈 로드, driving_logs, sync_workflows)는 변경 전과 동일. carrot-ha 신규 4개와 test_direct_receiver·test_new_sensors 35개, 회귀 게이트(test_cloud_live·test_incremental_sync·test_history_cache)와 trip/energy 관련 158개 통과. test_archive_compression(Windows 파일 잠금)·test_driving_logs_ai/v2 실패는 변경 파일과 무관하다.
+- 배포 상태: main 커밋·푸시. HA 직접 반영·버전 상승·태그·릴리즈 발행 없음(발행은 별도 승인 필요). 수신 앱 0.1.4는 사용자가 HAOS에서 업데이트, Comma는 사용자가 `git pull --ff-only` 후 재부팅.
+- 미확인: 실차 수신(Comma 업데이트 후 0x14A 값 도착), 계기판 사진 대조. 대조 전에는 표시 SOC를 기본값으로 쓰지 않는다.
+
 ## 2026-10-27 — 차계부 충전 위치 실패 사유 표시 설계·미리보기 (승인 대기)
 
 - 위치를 기록하지 못한 충전비 기록에 실패 단계·사유·근거 값을 보여 주는 설계와 승인용 미리보기 `vehicle-journal/review-location-diagnostics.html`을 추가했다. 상세 내용은 `vehicle-journal/CHANGELOG.md`에 있다.

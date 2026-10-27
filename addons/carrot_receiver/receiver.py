@@ -120,7 +120,21 @@ def trip_measurements(raw):
             number = value.get(key)
             return number if type(number) in (int, float) and math.isfinite(number) and 0 <= number <= maximum else None
         wh, soc = bounded('battery_wh', 150000), bounded('soc_percent', 100)
-        return None if wh is None and soc is None else {'at': value['at'], 'battery_wh': wh, 'soc_percent': soc}
+        if wh is None and soc is None:
+            return None
+        result = {'at': value['at'], 'battery_wh': wh, 'soc_percent': soc}
+        # Cluster-SOC candidate (bus1 0x14A) for comparison only. Added only when
+        # the collector sent it, so older trips keep their exact API output.
+        if 'display_soc_candidate_percent' in value:
+            display_at = value.get('display_soc_candidate_measured_at')
+            try:
+                datetime.fromisoformat(display_at.replace('Z', '+00:00'))
+            except (AttributeError, ValueError):
+                display_at = None
+            display = bounded('display_soc_candidate_percent', 100)
+            result.update(display_soc_candidate_percent=display if display_at else None,
+                          display_soc_candidate_measured_at=display_at if display is not None else None)
+        return result
     return {'start': point(raw.get('start')), 'end': point(raw.get('end')), 'complete': raw.get('complete') is True}
 
 
@@ -487,7 +501,7 @@ def create_app(config, store):
     async def handler(request):
         path = request.path
         if path == '/health' and request.method == 'GET':
-            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.3'})
+            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.4'})
         if path == '/api/source' and request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
         upload = (path in ('/api/telemetry', '/api/trips', '/api/settings/sync', '/api/params/ack') and request.method == 'POST'
@@ -599,7 +613,7 @@ def create_app(config, store):
                     LOG.error('Maintenance deferred (%s)', type(error).__name__)
         task = asyncio.create_task(loop())
         summary_task = asyncio.create_task(summaries())
-        LOG.info('receiver_started version=0.1.3 devices=%d database_limit_mb=%d log_level=%s',
+        LOG.info('receiver_started version=0.1.4 devices=%d database_limit_mb=%d log_level=%s',
                  len(devices), store.max_bytes // 1048576, logging.getLevelName(LOG.level))
         yield
         task.cancel()

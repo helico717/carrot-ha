@@ -20,6 +20,8 @@ SENSOR_FIELDS = {
     'battery_cell_voltage_delta_mv': ('셀 전압 차이', 'mV', 'mdi:battery-sync', 'voltage', 0),
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
     'dcdc_temperature_c': ('DC-DC 컨버터 온도', '°C', 'mdi:thermometer', 'temperature', 1),
+    # Comparison-only candidate; the Wh-based battery SOC remains the dashboard/journal basis.
+    'display_soc_candidate_percent': ('계기판 SOC 후보', '%', 'mdi:gauge', None, 1),
     'comma_cpu_temperature_c': ('콤마 CPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_gpu_temperature_c': ('콤마 GPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_cpu_usage_percent': ('콤마 CPU 평균 사용률', '%', 'mdi:chip', None, 1),
@@ -88,10 +90,11 @@ def charge_plug_indication(data):
 
 
 BATTERY_MONITOR_FIELDS = {key for key in SENSOR_FIELDS if key.startswith('battery_')}
+DISPLAY_SOC_CANDIDATE_FIELD = 'display_soc_candidate_percent'
 CHARGE_TEMPERATURE_DISPLAY = {'below_optimal': '적정 미만', 'optimal': '적정', 'above_optimal': '적정 초과'}
 
 def battery_monitor_attributes(key, data):
-    if key not in BATTERY_MONITOR_FIELDS:
+    if key not in BATTERY_MONITOR_FIELDS and key != DISPLAY_SOC_CANDIDATE_FIELD:
         return {}
     from datetime import datetime, timezone
     measured = (data.get('field_measured_at') or {}).get(key)
@@ -116,4 +119,9 @@ def battery_monitor_attributes(key, data):
             attrs[f'{label}_temperature_measured_at'] = details['measured_at']
             attrs[f'{label}_temperature_stale'] = details['stale']
         attrs['extrema_can_id'] = '0x16A954A6'
+    elif key == 'display_soc_candidate_percent':
+        attrs.update(can_id='0x14A', can_bus=1, signal='byte19_x0.5_percent',
+                     measurement_basis='instrument_cluster_soc_candidate',
+                     validation='retained_can_correlation_2026-10-05; cluster_photo_comparison_pending',
+                     used_for_dashboard_soc=False)
     return attrs
