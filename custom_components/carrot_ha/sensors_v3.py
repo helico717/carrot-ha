@@ -152,6 +152,11 @@ class VehicleSensor(VehicleEntity,SensorEntity):
             if self.data.get('range_estimated'):
                 attrs['estimated']=True
                 attrs['efficiency_basis']=self.data.get('range_efficiency_basis')
+                if self.data.get('range_efficiency_kpl') is not None:
+                    attrs.update(range_efficiency_kpl=self.data.get('range_efficiency_kpl'),
+                                 range_efficiency_trip_count=self.data.get('range_efficiency_trip_count'),
+                                 range_efficiency_distance_km=self.data.get('range_efficiency_distance_km'),
+                                 range_efficiency_method='30d_trips_10km_plus_weighted_p25_halflife14d')
                 recent_eff = self.data.get('recent_efficiency_kpl')
                 if recent_eff is not None:
                     attrs['recent_efficiency_kpl'] = recent_eff

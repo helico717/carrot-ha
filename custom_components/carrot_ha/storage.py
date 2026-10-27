@@ -312,6 +312,7 @@ class Archive(ChargeCosts):
         summary.update(self.driving_energy_summary(
             device, month, kst, rolling_distance, since=since, until=now, prefix='rolling30'))
         summary.update(self._recent_efficiency(device))
+        summary.update(self._range_efficiency(device, now))
 
         # Query today energy consumption from trip_energy cache
         with self.connect() as db:
@@ -378,6 +379,48 @@ class Archive(ChargeCosts):
             'recent_efficiency_kpl': round(total_km / total_kwh, 2),
             'recent_efficiency_trip_count': len(rows),
             'recent_efficiency_distance_km': round(total_km, 1),
+        }
+
+    def _range_efficiency(self, device, now, days=30, min_trip_km=10, half_life_days=14,
+                          quantile=0.25, min_trips=3, min_total_km=50):
+        """Conservative range efficiency: recency/distance weighted lower quartile.
+
+        Short trips are excluded because 0.05 kWh energy steps dominate their
+        efficiency. A lower quantile instead of the mean keeps range close to the
+        instrument cluster, and the half-life follows seasonal temperature drops.
+        """
+        since = (now - timedelta(days=days)).isoformat()
+        with self.connect() as db:
+            rows = db.execute(
+                """SELECT e.observed, te.distance_km, te.energy_kwh
+                   FROM trip_energy te
+                   JOIN events e ON te.device = e.device AND te.id = e.id
+                   WHERE te.device = ? AND te.energy_kwh > 0 AND te.distance_km >= ?
+                     AND e.observed >= ?""",
+                (device, min_trip_km, since)
+            ).fetchall()
+        samples = []
+        for observed, km, kwh in rows:
+            try:
+                age = (now - datetime.fromisoformat(observed.replace('Z', '+00:00'))).total_seconds()/86400
+            except (ValueError, TypeError):
+                continue
+            if math.isfinite(km) and math.isfinite(kwh):
+                samples.append((km/kwh, km*0.5**(max(0, age)/half_life_days), km))
+        total_km = sum(s[2] for s in samples)
+        if len(samples) < min_trips or total_km < min_total_km:
+            return {}
+        samples.sort()
+        target = sum(s[1] for s in samples)*quantile
+        cumulative = 0.0
+        for efficiency, weight, _ in samples:
+            cumulative += weight
+            if cumulative >= target:
+                break
+        return {
+            'range_efficiency_kpl': round(efficiency, 2),
+            'range_efficiency_trip_count': len(samples),
+            'range_efficiency_distance_km': round(total_km, 1),
         }
 
     def driving_energy_summary(self, device, month, tz, total_distance, *, since=None, until=None, prefix='month'):

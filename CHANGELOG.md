@@ -1,3 +1,11 @@
+## 2026-10-27 — 주행가능거리 보수적 전비 적용
+
+- 요청/이유: 주행가능거리가 계기판보다 40~50km 낙관적이라는 보고. 운영 DB를 읽기 전용으로 조회한 결과, 계산은 최근 20회 주행의 평균 전비 6.22 km/kWh × 잔량 40.15 kWh = 250km였다. 2주 주행거리계 기준 실적(6.5 km/kWh)과 일치해 계산 오류는 아니었지만, 평균 전비가 계기판의 보수적 추정보다 약 18% 높았다. 10km 미만 단거리는 0.05 kWh 측정 단위 때문에 전비가 과대(10월 평균 6.86)했다.
+- 변경: 최근 30일, 10km 이상 주행의 전비를 거리 × 반감기 14일 가중치로 정렬해 하위 25% 값을 `range_efficiency_kpl`로 계산한다. 3회·50km 이상일 때만 사용하며, 주행가능거리 계산에서 가장 먼저 적용한다(`range_efficiency_basis=conservative_recent_trips`). 자료가 부족하면 기존 월 전비·최근 평균·기본값 순서를 그대로 따른다. `recent_efficiency_kpl`와 월 전비 센서는 변경하지 않았다. 센서 속성에 보수 전비·주행 수·거리·방법을 추가했다.
+- 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py}, tests/test_range_efficiency.py, tests/test_new_sensors.py.
+- 검증: 운영 DB 읽기 전용 재계산 결과 28회, 1,565km, P25 5.63 km/kWh. SOC 51.5%에서 250→226km, 100% 485→439km, 15% 73→66km. 신규 테스트 3개 및 test_new_sensors·test_trip_repair·test_trip_energy 86개 통과. 회귀 게이트 test_cloud_live 1건(Windows cp949 인코딩)과 test_direct_receiver(aiohttp 미설치)는 변경 전에도 동일하게 실패하는 로컬 환경 문제다.
+- 배포 상태: main 커밋·푸시 후 HA SSH 직접 반영 예정. HA 재시작은 사용자가 수행한다. 계기판 값과의 실제 차이는 재시작 후 미확인. 버전 상승·태그·릴리즈 발행 없음.
+
 ## 2026-10-27 — 승인된 HA 기본 재질을 기존 vehicle.glb에 저장
 
 - 사용자 승인: 프리뷰 후보 그대로 적용하고 기존 파일명을 유지해 커밋·푸시하도록 명시했다.
