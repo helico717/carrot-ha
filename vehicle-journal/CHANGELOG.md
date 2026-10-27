@@ -1,3 +1,15 @@
+## 2026-10-27 — vehicle-journal: 충전 위치 실패 사유 표시 설계와 검토용 미리보기 (승인 대기)
+
+- 사용자 요청: 위치를 기록하지 못한 충전 기록에 실패 이유를 시각적으로 보여 줘 나중에 디버깅할 수 있게 해 달라. 프로덕션 수정 전에 사유 코드 저장과 상세 기록 표시를 설계하고 승인용 인터랙티브 HTML 미리보기를 먼저 만든다.
+- 조사 결과: `automatic_locations.save()`가 `location_lookup`(안내 문장·재조회 시각·연속 오류 횟수·후보 이름)과 `source_position`을 이미 저장한다. 하지만 `Journal.query()`가 이 두 필드를 응답에서 빼고, 프론트엔드도 쓰지 않아 화면에서 볼 수 없다. GPS 단계의 여러 실패 원인(샘플 없음·주행 중·정확도·측정 지연·주차 연속성)이 한 문장으로 합쳐져 있다. 기능 꺼짐·카카오 키 없음·전기차 아님·조회 대기 상태에는 아무 흔적도 남지 않는다.
+- 설계(미구현):
+  - 백엔드 저장(`location_lookup`, 조회 버전 5): `code`(`gps_no_samples`·`gps_missing`·`gps_moving`·`gps_inaccurate`·`gps_stale`·`gps_parking_unverified`·`station_ambiguous`·`station_far`·`station_incomplete`·`station_none`·`provider_error`·`address_failed`), `steps`(GPS·충전소·주소 단계별 `ok`/`fail`/`warn`/`skip`), `evidence`(조회 범위 샘플 수, GPS 포함 수, 충전 시작과 가장 가까운 GPS의 시각 차이, 정확도, 속도, 주행 상태, 측정 지연, 정차 연속성 끊김, 주소 지오코딩 거리), `address_reason`(`no_result`·`geocode_far`·`error`), `attempted_at`, `attempts`. 기존 `message`·`retry_after`·`failures`·`candidates`는 유지하고, 후보에는 거리를 함께 저장한다.
+  - 조회 API: 충전비 지출 행에 연결된 자동 충전 기록의 `location_lookup`을 `location_diagnostic`으로 붙인다(`state`: `failed`·`address`·`pending`·`setup`). 조회하지 않은 기록의 `pending`·`disabled`·`no_kakao_key`·`not_electric`은 저장하지 않고 조회 시점에 계산한다. 사유 코드가 없는 이전 기록은 `legacy`로 표시하고 저장된 문장만 보여 준다.
+  - 화면: 상세 기록 행 제목 아래 사유 필(빨강 `위치 실패 · GPS/충전소/주소`, 파랑 `주소로 기록 · 충전소 미확정/재조회 중`, 회색 `위치 조회 대기`·`위치 설정 필요`). 필을 누르면 행 안에서 단계 칩, 사유와 기준, 근거 값(기준을 넘은 값은 빨강), 주변 후보와 거리, 조회 이력(충전 시작·마지막 조회·다음 재조회·조회 방식), `위치 직접 지정`(기존 수정 창), `진단 정보 복사`(JSON)를 표시한다.
+- 변경: `vehicle-journal/review-location-diagnostics.html` 추가. 실제 `carrot-vehicle-journal.js`를 불러오고 합성 기록 15건(사유 코드별 사례 포함)을 주입한 뒤, 제안 표시는 하네스에서만 덧입힌다. 모두 펼치기 토글과 사유 코드 표를 제공한다. `.claude/launch.json`에 미리보기 서버 `journal-review`(저장소 루트 `python -m http.server 8765`)를 추가했다.
+- 검증: 내장 브라우저에서 데스크톱과 375px 모바일로 확인했다. 필 11개와 패널 11개가 렌더링됐고 문서·패널의 가로 넘침은 없었다. 펼침·접힘, 단계 칩 줄바꿈, `위치 직접 지정`으로 실제 충전 기록 수정 창이 열리는 것을 확인했고 콘솔 오류는 없었다. 클립보드 복사는 브라우저 권한에 따라 다를 수 있어 확인하지 않았다.
+- 상태: 프로덕션 코드(Python·JS) 변경 없음. HA 반영·버전·태그·릴리즈 없음. 사용자 승인 뒤 백엔드 사유 코드 저장, API 노출, 프론트 렌더러 이관, 회귀 테스트를 진행한다. 저장 형식 변경 이전의 기록은 다음 재조회 전까지 `legacy`로 보인다.
+
 ## 2026-10-27 — 전체 문서 연결 방식 재점검 및 잔존 표현 보완
 
 - 내용/이유: 앞선 49a5536 이후 전체 추적 문서를 다시 검색했다. 현행 엔티티/차계부 요구사항·지침/검증 계획/README의 잔존 cloud·D1/KV·Worker 설명을 수신기 기준으로 보완하고 과거 파라미터 안내의 문서 전체를 역사 기록으로 명시했다.
