@@ -19,8 +19,11 @@
 -->
 <style>
   :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
-  body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
-  .bar{position:sticky;top:0;z-index:5000;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  html,body{height:100%}
+  body{margin:0;display:flex;flex-direction:column;overflow:hidden;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  /* HA처럼 안쪽 컨테이너가 스크롤한다(문서 스크롤은 앱 내장 브라우저에서 화면이 깨짐). */
+  .scroller{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+  .bar{flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
   .bar b{color:var(--j-accent)} .bar small{color:var(--j-sub);flex:1 1 320px}
   .bar label{display:inline-flex;gap:6px;align-items:center;color:var(--j-sub);white-space:nowrap}
   .bar button{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:9999px;padding:5px 12px;font-size:12.5px;cursor:pointer}
@@ -35,12 +38,14 @@
 <body>
 <div class="bar">
   <b>충전 위치 실패 사유</b>
-  <small>상세 기록 탭의 충전비 행에서 사유 필을 눌러 보세요. 모든 기록과 좌표는 합성 데이터예요.</small>
+  <small>충전비 행 오른쪽의 작은 사유 표시를 눌러 보세요. 모든 기록과 좌표는 합성 데이터예요.</small>
   <label><input type="checkbox" id="expandAll"> 모두 펼치기</label>
   <button id="toLedger" type="button">상세 기록으로</button>
 </div>
+<div class="scroller" id="scroller">
 <details class="codes"><summary>제안 설계 — 사유 코드 표 (백엔드 저장값)</summary><div class="wrap"><table id="codeTable"></table></div></details>
 <main id="mount"></main>
+</div>
 <script>
 // file:// 로 열면 브라우저가 실제 모듈 import 를 막아 화면이 비므로 로컬 서버 주소를 안내한다.
 if(location.protocol==='file:')document.getElementById('mount').innerHTML='<p style="margin:24px 14px;padding:14px 16px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-surface);line-height:1.6">파일로 직접 열면 브라우저가 차계부 모듈을 불러오지 않아 화면이 비어요.<br>저장소 루트에서 <code>python -m http.server 8765</code> 를 실행한 뒤 <a style="color:var(--j-accent)" href="http://localhost:8765/vehicle-journal/review-location-diagnostics.html">http://localhost:8765/vehicle-journal/review-location-diagnostics.html</a> 로 열어 주세요.</p>';
@@ -132,13 +137,17 @@ const ICON={ok:'<path d="M5 12.5l4.2 4.2L19 7"/>',fail:'<path d="M7 7l10 10M17 7
 const svg=k=>`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
 const CSS=`
-.locdiag-pill{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;width:fit-content;max-width:100%;margin-top:5px;padding:3px 9px 3px 10px;min-height:24px;box-sizing:border-box;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:11.5px;font-weight:650;line-height:1.3;letter-spacing:-.1px;cursor:pointer;text-align:left;white-space:normal}
-.locdiag-pill svg{flex-shrink:0;transition:transform .18s ease}
-.locdiag-pill[aria-expanded="true"] svg{transform:rotate(90deg)}
-.locdiag-pill.fail{color:#ffadad;background:var(--j-red-bg,rgba(255,92,92,.15));border-color:rgba(255,92,92,.35)}
-.locdiag-pill.info{color:var(--j-blue,#7bb6ff);background:var(--j-blue-bg,rgba(123,182,255,.15));border-color:rgba(123,182,255,.35)}
-.locdiag-pill.muted{color:var(--j-sub);background:rgba(168,189,202,.1);border-color:var(--j-border)}
+.ledger-pill-wrap.has-locdiag{display:flex;width:100%;gap:6px}
+.locdiag-pill{display:inline-flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;height:18px;padding:0 7px 0 6px;box-sizing:border-box;border-radius:9999px;border:0;font:inherit;font-size:10.5px;font-weight:650;line-height:1;letter-spacing:-.1px;white-space:nowrap;cursor:pointer;opacity:.9}
+.locdiag-pill:hover,.locdiag-pill[aria-expanded="true"]{opacity:1}
+.locdiag-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.locdiag-pill.fail{color:#ff9b9b;background:rgba(255,92,92,.12)}
+.locdiag-pill.info{color:var(--j-blue,#7bb6ff);background:rgba(123,182,255,.12)}
+.locdiag-pill.muted{color:var(--j-sub);background:rgba(168,189,202,.1)}
 .locdiag-pill:focus-visible{outline:2px solid var(--j-accent);outline-offset:2px}
+/* 카드 공통 버튼 규칙(min-height 44px·padding)을 이긴다. 보이는 크기는 작게, 누르는 영역은 ::after로 넓힌다. */
+.memo-text-col .locdiag-pill{position:relative;min-height:0;min-width:0;height:18px;padding:0 7px 0 6px;margin-top:0}
+.memo-text-col .locdiag-pill::after{content:"";position:absolute;inset:-9px -6px}
 .locdiag-panel{margin-top:7px;padding:11px 12px 12px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-raised);font-size:12.5px;line-height:1.5;color:var(--j-ink);max-width:520px;box-sizing:border-box;overflow:hidden}
 .locdiag-title{font-weight:750;font-size:13px;margin:0 0 2px}
 .locdiag-hint{color:var(--j-sub);margin:0}
@@ -162,15 +171,16 @@ const CSS=`
 .locdiag-actions button{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:5px 11px;border-radius:9999px;border:1px solid var(--j-border);background:var(--j-surface);color:var(--j-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .locdiag-actions button.primary{background:var(--j-accent);border-color:var(--j-accent);color:#0b1014}
 .locdiag-actions button:focus-visible{outline:2px solid var(--j-accent);outline-offset:2px}
-@media (prefers-reduced-motion:reduce){.locdiag-pill svg{transition:none}}
 `;
 
+// 짧은 라벨: 행 높이를 늘리지 않도록 분류 필과 같은 줄 오른쪽에 둔다. 자세한 사유는 펼친 패널에서 본다.
+const SHORT={gps:'GPS',station:'검색',address:'주소'};
 function pillLabel(d){
-  const [base,tone]=PILL[d.state]||PILL.failed;
   const c=CODES[d.code]||{};
-  if(d.state==='address')return [`${base} · ${d.provisional?'충전소 재조회 중':'충전소 미확정'}`,tone];
-  if(d.state==='failed')return [`${base} · ${STAGE_NAME[c.stage]||''}`.replace(/ · $/,''),tone];
-  return [base,tone];
+  if(d.state==='address')return [d.provisional?'재조회 중':'주소만','info'];
+  if(d.state==='pending')return ['조회 대기','muted'];
+  if(d.state==='setup')return ['설정 필요','muted'];
+  return [`${SHORT[c.stage]||'위치'} 실패`,'fail'];
 }
 function panel(r){
   const d=r.location_diagnostic,c=CODES[d.code]||{title:d.code,hint:''};
@@ -206,8 +216,10 @@ function decorate(){
   [...body.rows].forEach((tr,i)=>{
     const r=list[i],col=tr.querySelector('.memo-text-col');
     if(!r||!col||!r.location_diagnostic||col.querySelector('.locdiag-pill'))return;
-    const [label,tone]=pillLabel(r.location_diagnostic),isOpen=all||open.has(r.id);
-    col.insertAdjacentHTML('beforeend',`<button type="button" class="locdiag-pill ${tone}" data-locdiag="${r.id}" aria-expanded="${isOpen}" aria-controls="locdiag-${r.id}">${esc(label)}${svg('chev')}</button>${isOpen?panel(r):''}`);
+    const [label,tone]=pillLabel(r.location_diagnostic),isOpen=all||open.has(r.id),wrap=col.querySelector('.ledger-pill-wrap');
+    wrap.classList.add('has-locdiag');
+    wrap.insertAdjacentHTML('beforeend',`<button type="button" class="locdiag-pill ${tone}" data-locdiag="${r.id}" aria-expanded="${isOpen}" aria-controls="locdiag-${r.id}" aria-label="위치 기록 진단: ${esc(label)}" title="위치 기록 진단 보기">${esc(label)}</button>`);
+    if(isOpen)col.insertAdjacentHTML('beforeend',panel(r));
   });
 }
 function install(){
@@ -218,7 +230,8 @@ function install(){
   body.addEventListener('click',e=>{
     const pill=e.target.closest('[data-locdiag]');
     if(pill){const id=pill.dataset.locdiag,r=visibleRecords().find(x=>x.id===id);const isOpen=pill.getAttribute('aria-expanded')==='true';
-      if(isOpen){open.delete(id);pill.nextElementSibling?.classList.contains('locdiag-panel')&&pill.nextElementSibling.remove();}else{open.add(id);pill.insertAdjacentHTML('afterend',panel(r));}
+      const col=pill.closest('.memo-text-col');
+      if(isOpen){open.delete(id);col.querySelector('.locdiag-panel')?.remove();}else{open.add(id);col.insertAdjacentHTML('beforeend',panel(r));}
       pill.setAttribute('aria-expanded',String(!isOpen));return;}
     const copy=e.target.closest('[data-locdiag-copy]');
     if(copy){const r=visibleRecords().find(x=>x.id===copy.dataset.locdiagCopy);const text=JSON.stringify({record_id:r.id,...r.location_diagnostic},null,2);
@@ -227,7 +240,7 @@ function install(){
   decorate();
 }
 install();
-document.getElementById('expandAll').onchange=e=>{all=e.target.checked;if(!all)open.clear();const body=card.shadowRoot.getElementById('records');body.querySelectorAll('.locdiag-pill,.locdiag-panel').forEach(x=>x.remove());decorate();};
+document.getElementById('expandAll').onchange=e=>{all=e.target.checked;if(!all)open.clear();const body=card.shadowRoot.getElementById('records');body.querySelectorAll('.locdiag-pill,.locdiag-panel').forEach(x=>x.remove());body.querySelectorAll('.has-locdiag').forEach(x=>x.classList.remove('has-locdiag'));decorate();};
 document.getElementById('toLedger').onclick=()=>card.selectTab(3);
 setTimeout(()=>card.selectTab(3),600);
 
