@@ -137,6 +137,13 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(res.get('range_km'), 240)  # 50.0 * 4.8
         self.assertEqual(res.get('range_efficiency_basis'), 'recent_trips')
 
+    def test_estimated_range_prefers_distance_window(self):
+        runtime = self._make_runtime({'battery_wh': 63500.0},
+            summary={'window_efficiency_kpl': 6.71, 'range_efficiency_kpl': 6.23})
+        res = values(runtime)
+        self.assertEqual(res.get('range_km'), 426)  # 63.5 * 6.71
+        self.assertEqual(res.get('range_efficiency_basis'), 'recent_distance_window')
+
     def test_estimated_range_prefers_weighted_recent_efficiency(self):
         runtime = self._make_runtime({'battery_wh': 40150.0},
             summary={'range_efficiency_kpl': 6.23, 'recent_efficiency_kpl': 6.22,

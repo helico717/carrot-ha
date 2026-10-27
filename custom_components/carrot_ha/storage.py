@@ -313,6 +313,7 @@ class Archive(ChargeCosts):
             device, month, kst, rolling_distance, since=since, until=now, prefix='rolling30'))
         summary.update(self._recent_efficiency(device))
         summary.update(self._range_efficiency(device, now))
+        summary.update(self._window_efficiency(device, now))
 
         # Query today energy consumption from trip_energy cache
         with self.connect() as db:
@@ -421,6 +422,47 @@ class Archive(ChargeCosts):
             'range_efficiency_trip_count': count,
             'range_efficiency_distance_km': round(total_km, 1),
         }
+
+    def _window_efficiency(self, device, now, window_km=50, min_km=20, max_days=7, max_rows=3000, page=500):
+        """Efficiency over the last window_km of odometer travel, like the cluster.
+
+        Walks state history backwards across trips, including the trip in
+        progress, so hills and driving style move range within minutes.
+        Charging/stale intervals and odometer/energy jumps are skipped; parked
+        drain is excluded, regeneration is kept as signed energy.
+        """
+        since = (now - timedelta(days=max_days)).isoformat()
+        km = wh = 0.0
+        newer = None
+        scanned = 0
+        with self.connect() as db:
+            while scanned < max_rows and km < window_km:
+                rows = db.execute(
+                    "SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? "
+                    "ORDER BY observed DESC LIMIT ? OFFSET ?", (device, since, page, scanned)).fetchall()
+                if not rows:
+                    break
+                scanned += len(rows)
+                for (body,) in rows:
+                    state = archive_codec.calculation_event(body)['data']
+                    point = (state.get('battery_wh'), state.get('odometer_km'),
+                             state.get('charging') is True or state.get('stale') is True,
+                             bool(state.get('driving') or state.get('onroad')))
+                    if newer is not None:
+                        (new_wh, new_km, new_bad, new_driving), (old_wh, old_km, old_bad, old_driving) = newer, point
+                        if (all(type(v) in (int, float) and math.isfinite(v) for v in (new_wh, new_km, old_wh, old_km))
+                                and not new_bad and not old_bad):
+                            moved, used = new_km - old_km, old_wh - new_wh
+                            if 0 <= moved <= 30 and abs(used) <= 15000 and (moved > 0 or new_driving or old_driving):
+                                km += moved
+                                wh += used
+                    newer = point
+                    if km >= window_km:
+                        break
+        if km < min_km or wh < 500:
+            return {}
+        return {'window_efficiency_kpl': round(min(10.0, max(3.0, km/(wh/1000))), 2),
+                'window_efficiency_distance_km': round(km, 1)}
 
     def driving_energy_summary(self, device, month, tz, total_distance, *, since=None, until=None, prefix='month'):
         """Persist matched trip energy independently of the 14-day raw state retention.

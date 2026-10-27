@@ -239,9 +239,14 @@ def values(runtime):
         coverage = data.get('month_energy_coverage_percent') or 0
         enough_data = (data.get('month_energy_distance_km') or 0) >= 20 and coverage >= 80
         data['range_estimated'] = True
-        # Recency-weighted trips of 10 km+ follow driving habit like the cluster.
+        # Like the cluster, follow the last ~50 km of driving (hills, style);
+        # recency-weighted trips of 10 km+ cover a short or missing window.
+        window = data.get('window_efficiency_kpl')
         weighted = data.get('range_efficiency_kpl')
-        if weighted is not None:
+        if window is not None:
+            data['range_km'] = int(round(data['battery_kwh'] * window))
+            data['range_efficiency_basis'] = 'recent_distance_window'
+        elif weighted is not None:
             data['range_km'] = int(round(data['battery_kwh'] * weighted))
             data['range_efficiency_basis'] = 'weighted_recent_trips'
         elif eff is not None and enough_data:
