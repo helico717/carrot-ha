@@ -6,7 +6,7 @@
 - 한계: 계기판 추정치는 충전·공조·배터리 온도에 따라 즉시 바뀐다. 같은 주행 기록으로 저녁(약 62% 표시)에는 차량 값이 더 낮았다는 보고가 있어 모든 시점에 일치시킬 수는 없다.
 - 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py}, tests/{test_range_efficiency.py,test_new_sensors.py}.
 - 검증: test_range_efficiency, test_new_sensors, test_trip_repair, test_trip_energy, test_history_cache, test_incremental_sync 92개 통과.
-- 배포 상태: main 커밋·푸시 후 HA SSH 직접 반영. HA 재시작은 사용자가 수행한다. 버전 상승·태그·릴리즈 없음.
+- 배포 상태: 커밋 `c38e411` main 푸시 확인. HA 설치 파일 3개가 직전 반영본 `cc7b3ba`과 해시가 일치함을 확인하고 `/config/carrot_ha/deployment-backups/c38e411/`에 백업한 뒤 직접 반영했다. 반영 후 해시가 커밋 파일과 일치(storage.py b5dfa14b…, vehicle.py 5dfd97bd…, sensors_v3.py 13fb94c5…)하고 구문 검사도 통과했다. HA 재시작과 재시작 후 센서 값은 미확인. 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-27 — 차계부 SOC 기준 64 실차 검증
 
