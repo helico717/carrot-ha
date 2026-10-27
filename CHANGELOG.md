@@ -1,3 +1,10 @@
+## 2026-10-27 — 절약 비교 화면 HA 직접 반영 완료
+
+- 배포 커밋: `34d6e3c` (main 푸시 확인). 기존 설치 파일 2개가 직전 Git 버전과 일치함을 확인한 뒤 `/config/carrot_ha/deployment-backups/34d6e3c/`에 각각 백업하고 화면 코드·디자인 파일 반영.
+- 검증: HA 설치 파일과 HTTP 200 응답 모두 로컬 커밋 파일 SHA-256 일치. `carrot-vehicle-journal.js`: `1b39622b3e5ce660e1931add47b1974e74a6c46d7b0b26fd1db18473b066c23a`, `carrot-journal-design.js`: `4585bdfc61843588d52ffb1ecf0dd7373b4eaa63328696cc479fdf3dd09ed58a`.
+- 상태: 운영 파일·HTTP 제공 확인 완료. 사용자 로그인 HA 브라우저의 최상위 로더 URL·실제 화면 적용은 미확인, 차계부 화면 새로고침 필요. Python/고정 로더 변경 없으며 HA 재시작 실행하지 않음. 버전·태그·릴리즈 발행 없음. Comma·수신기·과거 Cloudflare 코드 변경 없음.
+- 검증 한계: 기존 browser-check.cjs의 초기 42km 화면 대기 실패는 변경 전 코드에서도 동일. 이번 승인 UI의 실제 Chrome 합성 데이터 조작 검증은 통과(직전 항목 참조).
+
 ## 2026-10-27 — 승인한 절약 비교 화면 운영 반영 준비
 
 - 사용자 승인: “일단 이대로HA에 반영하자”. 앞선 로컬 프리뷰 변경을 운영 구현으로 이관.
