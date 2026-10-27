@@ -41,6 +41,10 @@
 </div>
 <details class="codes"><summary>제안 설계 — 사유 코드 표 (백엔드 저장값)</summary><div class="wrap"><table id="codeTable"></table></div></details>
 <main id="mount"></main>
+<script>
+// file:// 로 열면 브라우저가 실제 모듈 import 를 막아 화면이 비므로 로컬 서버 주소를 안내한다.
+if(location.protocol==='file:')document.getElementById('mount').innerHTML='<p style="margin:24px 14px;padding:14px 16px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-surface);line-height:1.6">파일로 직접 열면 브라우저가 차계부 모듈을 불러오지 않아 화면이 비어요.<br>저장소 루트에서 <code>python -m http.server 8765</code> 를 실행한 뒤 <a style="color:var(--j-accent)" href="http://localhost:8765/vehicle-journal/review-location-diagnostics.html">http://localhost:8765/vehicle-journal/review-location-diagnostics.html</a> 로 열어 주세요.</p>';
+</script>
 <script type="module">
 /* ---------- 합성 데이터 ---------- */
 const loc=(name,address,lat,lon,extra={})=>({name,address,latitude:lat,longitude:lon,provider:'kakao',station_type:'charging',...extra});
