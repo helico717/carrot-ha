@@ -412,6 +412,8 @@ class Journal:
             for row in records+recent_records:
                 price=unit_price(db,self.vehicle,row)
                 if price:row['unit_price']=price
+            from .automatic_locations import diagnostics
+            diagnostics(db,self.vehicle,records)
         totals={key:sum(r[key] for r in daily if r[key] is not None) if any(r[key] is not None for r in daily) else None
                 for key in (*METRICS,'charge_actual_krw','charge_estimated_krw','charge_effective_krw','slow_count','fast_count','unknown_count')}
         totals['efficiency_km_kwh']=totals['energy_distance_km']/totals['drive_energy_kwh'] if totals['drive_energy_kwh'] else None

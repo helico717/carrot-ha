@@ -10,12 +10,11 @@
   http://localhost:8765/vehicle-journal/review-location-diagnostics.html
   기록·좌표·사유는 모두 합성 데이터다.
 
-  제안(하네스에서만 덧입힘, 프로덕션 미반영):
-   - 백엔드가 충전비 지출 행에 location_diagnostic 을 붙여 보낸다(연결된 자동 충전 기록의 location_lookup 에서 생성).
-   - 상세 기록 행 제목 아래에 사유 필(위치 실패 / 주소로 기록 / 조회 대기 / 설정 필요)을 표시한다.
-   - 필을 누르면 행 안에서 단계(GPS 확인 → 충전소 검색 → 도로명 주소), 사유, 근거 값, 후보, 조회 이력이 펼쳐진다.
-   - "위치 직접 지정"은 기존 수정 버튼과 같은 동작(data-action="edit")이라 실제 수정 창이 열린다.
-   - "진단 정보 복사"는 원본 진단 JSON 을 클립보드에 복사한다(디버깅 공유용).
+  운영 반영된 동작을 그대로 보여준다(덧입히기 코드 없음):
+   - 쿼리 API가 충전비 지출 행에 location_diagnostic 을 붙여 보낸다(연결된 자동 충전 기록의 location_lookup 에서 생성).
+   - 분류 필과 같은 줄 오른쪽에 작은 사유 표시(GPS 실패 / 검색 실패 / 주소 실패 / 주소만 / 재조회 중 / 조회 대기 / 설정 필요).
+   - 누르면 행 안에서 단계, 사유, 근거 값, 후보, 조회 이력이 펼쳐진다. "위치 직접 지정"은 실제 수정 창을 연다.
+   - "진단 정보 복사"는 진단 JSON 을 클립보드에 복사한다(디버깅 공유용).
 -->
 <style>
   :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
@@ -43,7 +42,6 @@
   <button id="toLedger" type="button">상세 기록으로</button>
 </div>
 <div class="scroller" id="scroller">
-<details class="codes"><summary>제안 설계 — 사유 코드 표 (백엔드 저장값)</summary><div class="wrap"><table id="codeTable"></table></div></details>
 <main id="mount"></main>
 </div>
 <script>
@@ -76,7 +74,7 @@ const records=[
   rec('2026-10-17','10:02',4980,null,dx({state:'failed',code:'gps_stale',steps:{gps:'fail',station:'skip',address:'skip'},evidence:{samples:66,gps_samples:66,nearest_gap_s:-3,accuracy_m:5,speed_mps:0,onroad:false,measured_lag_s:342}})),
   rec('2026-10-16','08:40',6250,null,{state:'pending',code:'pending',steps:{gps:'skip',station:'skip',address:'skip'}}),
   rec('2026-10-14','20:15',8800,null,{state:'setup',code:'no_kakao_key',steps:{gps:'skip',station:'skip',address:'skip'}}),
-  rec('2026-10-12','11:30',2368,null,{state:'failed',code:'legacy',lookup_version:3,attempted_at:ts('2026-10-12T11:40:00+09:00'),retry_after:ts('2026-10-13T11:40:00+09:00'),message:'충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.',steps:{gps:'fail',station:'skip',address:'skip'}}),
+  rec('2026-10-12','11:30',2368,null,{state:'failed',code:'legacy',lookup_version:3,attempted_at:ts('2026-10-12T11:40:00+09:00'),retry_after:ts('2026-10-13T11:40:00+09:00'),message:'충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'}),
   rec('2026-10-05','17:45',4768,T,null),
 ];
 const unlocated=records.filter(r=>r.category==='charging'&&!r.location).length;
@@ -94,158 +92,12 @@ const hass={callWS:async msg=>{
 }};
 await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
 
-/* ---------- 제안 표시(프로덕션 반영 시 carrot-vehicle-journal.js 렌더러로 이동) ---------- */
-const CODES={
-  gps_no_samples:{stage:'gps',title:'충전 시작 전후 차량 상태 기록이 없어요',hint:'충전 시작 10분 전~2분 후 사이에 수신된 상태 기록이 하나도 없어요. 차량이 꺼져 있었거나 수신 앱 연결이 끊겼을 수 있어요.'},
-  gps_missing:{stage:'gps',title:'상태 기록에 GPS 좌표가 없어요',hint:'GPS를 아직 잡지 못했거나 실내·지하 주차장이었을 수 있어요.'},
-  gps_moving:{stage:'gps',title:'충전 시작 무렵 차량이 움직이는 중이었어요',hint:'정차(속도 1m/s 이하, 주행 아님)가 확인된 GPS만 위치로 써요.'},
-  gps_inaccurate:{stage:'gps',title:'GPS 정확도가 낮아요',hint:'충전 직전·직후 GPS는 오차 100m 이내만 써요.'},
-  gps_stale:{stage:'gps',title:'GPS 측정 시각이 오래됐어요',hint:'상태 수신 시각과 GPS 측정 시각이 60초 넘게 차이 나면 쓰지 않아요.'},
-  gps_parking_unverified:{stage:'gps',title:'주차 뒤 이동이 없었는지 확인하지 못했어요',hint:'충전 2~10분 전 GPS는 그 사이 끊김 없이(90초 이내 간격) 정차 기록이 이어져야 써요.'},
-  station_ambiguous:{stage:'station',title:'비슷한 거리에 충전소가 여러 곳 있어요',hint:'가장 가까운 두 곳의 거리 차이가 25m 미만이면 자동 확정하지 않아요.'},
-  station_far:{stage:'station',title:'150m 안에 충전소가 없어요',hint:'가장 가까운 충전소가 150m보다 멀면 자동 지정하지 않아요.'},
-  station_incomplete:{stage:'station',title:'주변 검색 결과가 너무 많아 확정하지 못했어요',hint:'검색 결과가 잘려 더 가까운 충전소가 있을 수 있어요.'},
-  station_none:{stage:'station',title:'주변에서 충전소를 찾지 못했어요',hint:'카카오 장소 검색 결과가 없었어요.'},
-  provider_error:{stage:'station',title:'카카오 장소 검색이 실패했어요',hint:'일시 오류는 15분부터 하루까지 간격을 늘려 다시 조회해요.'},
-  address_failed:{stage:'address',title:'충전소도 도로명 주소도 확정하지 못했어요',hint:''},
-  pending:{stage:'setup',title:'아직 위치를 조회하지 않았어요',hint:'동기화마다 최근 기록부터 3건씩 조회해요. 다음 동기화 때 조회돼요.'},
-  disabled:{stage:'setup',title:'자동 위치 기록이 꺼져 있어요',hint:'차계부 설정에서 자동 위치 기록을 켜면 조회해요.'},
-  no_kakao_key:{stage:'setup',title:'카카오 REST 키가 설정되지 않았어요',hint:'차계부 설정에 카카오 REST 키를 넣으면 다음 동기화 때 조회해요.'},
-  not_electric:{stage:'setup',title:'이 차량이 전기차로 설정되어 있지 않아요',hint:'충전 위치 자동 기록은 전기차에만 동작해요.'},
-  legacy:{stage:'gps',title:'이전 방식으로 조회한 기록이에요',hint:'사유 코드가 생기기 전 기록이라 저장된 안내 문장만 있어요. 다음 재조회 때 사유가 자세히 남아요.'},
-};
-const ADDRESS_REASONS={no_result:'좌표로 도로명 주소를 찾지 못했어요.',geocode_far:'찾은 주소의 위치가 GPS와 300m 넘게 떨어져 잘못된 주소로 보고 버렸어요.',error:'주소 조회 중 카카오 오류가 났어요.'};
-const PILL={failed:['위치 실패','fail'],address:['주소로 기록','info'],pending:['위치 조회 대기','muted'],setup:['위치 설정 필요','muted']};
-const STAGE_NAME={gps:'GPS',station:'충전소',address:'주소',setup:'설정'};
-const STEP_LABEL={gps:'정차 GPS 확인',station:'충전소 검색',address:'도로명 주소'};
-const STEP_TEXT={ok:'통과',fail:'실패',warn:'미확정',skip:'건너뜀'};
-const EVIDENCE=[
-  ['samples',v=>`${v}건`,'상태 기록 (충전 −10분~+2분)'],
-  ['gps_samples',v=>`${v}건`,'그중 GPS 포함'],
-  ['nearest_gap_s',v=>v===0?'충전 시작과 같음':`충전 시작 ${Math.abs(v)>=60?`${Math.floor(Math.abs(v)/60)}분 ${Math.abs(v)%60}초`:`${Math.abs(v)}초`} ${v<0?'전':'후'}`,'가장 가까운 GPS'],
-  ['accuracy_m',v=>`±${v}m`,'GPS 정확도',v=>v>100],
-  ['speed_mps',v=>`${v}m/s`,'GPS 속도',v=>v>1],
-  ['onroad',v=>v?'주행 중':'정차',`주행 상태`,v=>v===true],
-  ['measured_lag_s',v=>`${v}초`,'GPS 측정 지연',v=>v>60],
-  ['continuity_gap_s',v=>`${v}초 끊김`,'정차 기록 연속성',v=>v>90],
-  ['basis',v=>({charge_start_fresh_stationary_gps:'충전 시작 정차 GPS',charge_start_verified_parked_gps:'주차 확인 GPS'}[v]||v),'사용한 GPS'],
-  ['geocode_distance_m',v=>`${v}m`,'주소 위치와 GPS 거리',v=>v>300],
-];
-const kst=s=>new Date(s*1000).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ICON={ok:'<path d="M5 12.5l4.2 4.2L19 7"/>',fail:'<path d="M7 7l10 10M17 7L7 17"/>',warn:'<path d="M12 7v6M12 16.5v.5"/>',skip:'<path d="M7 12h10"/>',chev:'<path d="M9 6l6 6-6 6"/>',pin:'<path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0113 0c0 4.9-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 00-1.5-1.5H6A1.5 1.5 0 004.5 6v8A1.5 1.5 0 006 15.5h2.5"/>'};
-const svg=k=>`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
-
-const CSS=`
-.ledger-pill-wrap.has-locdiag{display:flex;width:100%;gap:6px}
-.locdiag-pill{display:inline-flex;align-items:center;gap:4px;margin-left:auto;flex-shrink:0;height:18px;padding:0 7px 0 6px;box-sizing:border-box;border-radius:9999px;border:0;font:inherit;font-size:10.5px;font-weight:650;line-height:1;letter-spacing:-.1px;white-space:nowrap;cursor:pointer;opacity:.9}
-.locdiag-pill:hover,.locdiag-pill[aria-expanded="true"]{opacity:1}
-.locdiag-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
-.locdiag-pill.fail{color:#ff9b9b;background:rgba(255,92,92,.12)}
-.locdiag-pill.info{color:var(--j-blue,#7bb6ff);background:rgba(123,182,255,.12)}
-.locdiag-pill.muted{color:var(--j-sub);background:rgba(168,189,202,.1)}
-.locdiag-pill:focus-visible{outline:2px solid var(--j-accent);outline-offset:2px}
-/* 카드 공통 버튼 규칙(min-height 44px·padding)을 이긴다. 보이는 크기는 작게, 누르는 영역은 ::after로 넓힌다. */
-.memo-text-col .locdiag-pill{position:relative;min-height:0;min-width:0;height:18px;padding:0 7px 0 6px;margin-top:0}
-.memo-text-col .locdiag-pill::after{content:"";position:absolute;inset:-9px -6px}
-.locdiag-panel{margin-top:7px;padding:11px 12px 12px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-raised);font-size:12.5px;line-height:1.5;color:var(--j-ink);max-width:520px;box-sizing:border-box;overflow:hidden}
-.locdiag-title{font-weight:750;font-size:13px;margin:0 0 2px}
-.locdiag-hint{color:var(--j-sub);margin:0}
-.locdiag-steps{display:flex;gap:4px;margin:10px 0 2px;padding:0;list-style:none;flex-wrap:wrap}
-.locdiag-steps li{display:inline-flex;align-items:center;gap:4px;padding:3px 8px 3px 6px;border-radius:9999px;font-size:11.5px;font-weight:600;background:var(--j-surface);border:1px solid var(--j-border);color:var(--j-sub);white-space:nowrap}
-.locdiag-steps li.ok{color:var(--j-accent);border-color:rgba(129,230,197,.35)}
-.locdiag-steps li.fail{color:#ffadad;border-color:rgba(255,92,92,.4)}
-.locdiag-steps li.warn{color:#f5c26b;border-color:rgba(245,158,11,.4)}
-.locdiag-steps li.skip{opacity:.6}
-.locdiag-dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:10px 0 0}
-.locdiag-dl dt{color:var(--j-sub);white-space:nowrap}
-.locdiag-dl dd{margin:0;font-variant-numeric:tabular-nums;word-break:break-word}
-.locdiag-dl dd.bad{color:#ffadad;font-weight:650}
-.locdiag-sec{margin:10px 0 0;padding-top:9px;border-top:1px solid var(--j-border)}
-.locdiag-sec h5{margin:0 0 4px;font-size:11.5px;font-weight:650;color:var(--j-sub);letter-spacing:0}
-.locdiag-cands{margin:0;padding:0;list-style:none}
-.locdiag-cands li{display:flex;justify-content:space-between;gap:10px}
-.locdiag-cands span:last-child{color:var(--j-sub);font-variant-numeric:tabular-nums;white-space:nowrap}
-.locdiag-msg{margin:0;color:var(--j-sub);font-style:normal}
-.locdiag-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
-.locdiag-actions button{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:5px 11px;border-radius:9999px;border:1px solid var(--j-border);background:var(--j-surface);color:var(--j-ink);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
-.locdiag-actions button.primary{background:var(--j-accent);border-color:var(--j-accent);color:#0b1014}
-.locdiag-actions button:focus-visible{outline:2px solid var(--j-accent);outline-offset:2px}
-`;
-
-// 짧은 라벨: 행 높이를 늘리지 않도록 분류 필과 같은 줄 오른쪽에 둔다. 자세한 사유는 펼친 패널에서 본다.
-const SHORT={gps:'GPS',station:'검색',address:'주소'};
-function pillLabel(d){
-  const c=CODES[d.code]||{};
-  if(d.state==='address')return [d.provisional?'재조회 중':'주소만','info'];
-  if(d.state==='pending')return ['조회 대기','muted'];
-  if(d.state==='setup')return ['설정 필요','muted'];
-  return [`${SHORT[c.stage]||'위치'} 실패`,'fail'];
-}
-function panel(r){
-  const d=r.location_diagnostic,c=CODES[d.code]||{title:d.code,hint:''};
-  let title=c.title,hint=c.hint;
-  if(d.code==='address_failed'){const s=CODES[d.station_code];title=c.title;hint=[s?`충전소: ${s.title}.`:'',`주소: ${ADDRESS_REASONS[d.address_reason]||'주소 조회에 실패했어요.'}`].filter(Boolean).join(' ');}
-  if(d.state==='address'){title=d.code==='provider_error'?'충전소 검색이 실패해 도로명 주소로 먼저 기록했어요':`${c.title} — 도로명 주소로 기록했어요`;hint=d.provisional?'검색이 성공하면 충전소 이름으로 자동으로 바뀌어요.':c.hint+' 실제 이용한 충전소를 지정하면 정확해져요.';}
-  const order=['gps','station','address'];
-  const steps=d.state==='pending'||d.state==='setup'?'':`<ol class="locdiag-steps" aria-label="조회 단계">${order.map((k,i)=>{const s=d.steps?.[k]||'skip';return `<li class="${s}">${svg(s)}${i+1}. ${STEP_LABEL[k]} <span class="sr">${STEP_TEXT[s]}</span></li>`;}).join('')}</ol>`;
-  const ev=d.evidence||{};
-  const rows=EVIDENCE.filter(([k])=>ev[k]!=null).map(([k,f,label,bad])=>`<dt>${label}</dt><dd class="${bad&&bad(ev[k])?'bad':''}">${esc(f(ev[k]))}</dd>`);
-  if(ev.latitude!=null)rows.push(`<dt>GPS 좌표</dt><dd>${ev.latitude.toFixed(5)}, ${ev.longitude.toFixed(5)}</dd>`);
-  const facts=rows.length?`<dl class="locdiag-dl">${rows.join('')}</dl>`:'';
-  const provider=d.provider?`<div class="locdiag-sec"><h5>제공사 오류</h5><p class="locdiag-msg">${esc(d.provider)}</p></div>`:'';
-  const cands=d.candidates?.length?`<div class="locdiag-sec"><h5>주변 후보</h5><ul class="locdiag-cands">${d.candidates.map(x=>`<li><span>${esc(x.name)}</span><span>${Math.round(x.distance_m)}m</span></li>`).join('')}</ul></div>`:'';
-  const legacy=d.message&&d.code==='legacy'?`<div class="locdiag-sec"><h5>저장된 안내</h5><p class="locdiag-msg">${esc(d.message)}</p></div>`:'';
-  const history=d.attempted_at?`<div class="locdiag-sec"><h5>조회 이력</h5><dl class="locdiag-dl" style="margin:0"><dt>충전 시작</dt><dd>${kst(Date.parse(d.charge_started_at)/1000)}</dd><dt>마지막 조회</dt><dd>${kst(d.attempted_at)} · ${d.attempts||1}회째${d.failures?` (연속 오류 ${d.failures}회)`:''}</dd><dt>다음 재조회</dt><dd>${d.retry_after?kst(d.retry_after):'없음'}</dd><dt>조회 방식</dt><dd>v${d.lookup_version}</dd></dl></div>`:`<div class="locdiag-sec"><dl class="locdiag-dl" style="margin:0"><dt>충전 시작</dt><dd>${kst(Date.parse(d.charge_started_at)/1000)}</dd></dl></div>`;
-  const actions=`<div class="locdiag-actions"><button class="primary" type="button" data-record="${r.id}" data-action="edit">${svg('pin')}위치 직접 지정</button><button type="button" data-locdiag-copy="${r.id}">${svg('copy')}진단 정보 복사</button></div>`;
-  return `<div class="locdiag-panel" id="locdiag-${r.id}" role="region" aria-label="위치 기록 진단"><p class="locdiag-title">${esc(title)}</p>${hint?`<p class="locdiag-hint">${esc(hint)}</p>`:''}${steps}${facts}${provider}${cands}${legacy}${history}${actions}</div>`;
-}
-
 const card=document.createElement('carrot-vehicle-journal');
 document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
-const open=new Set();let all=false;
-function visibleRecords(){
-  const d=card.data;if(!d)return [];
-  const v=d.records.filter(r=>(r.kind==='expense'||(r.kind==='trip'&&r.origin==='manual'))&&(!card.recordCategories?.size||card.recordCategories.has(card.recordCategory(r))));
-  if(card.recordSort&&card.recordSort!=='time')v.sort((a,b)=>{const av=a.actual_krw??a.estimated_krw,bv=b.actual_krw??b.estimated_krw;return av==null?(bv==null?0:1):bv==null?-1:(av-bv)*(card.recordSort==='amount_desc'?-1:1);});
-  return v;
-}
-function decorate(){
-  const body=card.shadowRoot?.getElementById('records');if(!body)return;
-  const list=visibleRecords();
-  [...body.rows].forEach((tr,i)=>{
-    const r=list[i],col=tr.querySelector('.memo-text-col');
-    if(!r||!col||!r.location_diagnostic||col.querySelector('.locdiag-pill'))return;
-    const [label,tone]=pillLabel(r.location_diagnostic),isOpen=all||open.has(r.id),wrap=col.querySelector('.ledger-pill-wrap');
-    wrap.classList.add('has-locdiag');
-    wrap.insertAdjacentHTML('beforeend',`<button type="button" class="locdiag-pill ${tone}" data-locdiag="${r.id}" aria-expanded="${isOpen}" aria-controls="locdiag-${r.id}" aria-label="위치 기록 진단: ${esc(label)}" title="위치 기록 진단 보기">${esc(label)}</button>`);
-    if(isOpen)col.insertAdjacentHTML('beforeend',panel(r));
-  });
-}
-function install(){
-  const root=card.shadowRoot;if(!root?.getElementById('records'))return setTimeout(install,100);
-  const style=document.createElement('style');style.textContent=CSS+'.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}';root.append(style);
-  const body=root.getElementById('records');
-  new MutationObserver(decorate).observe(body,{childList:true});
-  body.addEventListener('click',e=>{
-    const pill=e.target.closest('[data-locdiag]');
-    if(pill){const id=pill.dataset.locdiag,r=visibleRecords().find(x=>x.id===id);const isOpen=pill.getAttribute('aria-expanded')==='true';
-      const col=pill.closest('.memo-text-col');
-      if(isOpen){open.delete(id);col.querySelector('.locdiag-panel')?.remove();}else{open.add(id);col.insertAdjacentHTML('beforeend',panel(r));}
-      pill.setAttribute('aria-expanded',String(!isOpen));return;}
-    const copy=e.target.closest('[data-locdiag-copy]');
-    if(copy){const r=visibleRecords().find(x=>x.id===copy.dataset.locdiagCopy);const text=JSON.stringify({record_id:r.id,...r.location_diagnostic},null,2);
-      navigator.clipboard?.writeText(text).then(()=>{copy.lastChild.textContent='복사했어요';setTimeout(()=>copy.lastChild.textContent='진단 정보 복사',1500);},()=>{copy.lastChild.textContent='복사 실패';});}
-  });
-  decorate();
-}
-install();
-document.getElementById('expandAll').onchange=e=>{all=e.target.checked;if(!all)open.clear();const body=card.shadowRoot.getElementById('records');body.querySelectorAll('.locdiag-pill,.locdiag-panel').forEach(x=>x.remove());body.querySelectorAll('.has-locdiag').forEach(x=>x.classList.remove('has-locdiag'));decorate();};
+// 사유 표시·진단 패널은 운영 코드(carrot-vehicle-journal.js)가 그린다. 모두 펼치기는 열린 목록만 채워 다시 그린다.
+document.getElementById('expandAll').onchange=e=>{card.locDiagOpen=new Set(e.target.checked?records.filter(r=>r.location_diagnostic).map(r=>r.id):[]);card.renderData();};
 document.getElementById('toLedger').onclick=()=>card.selectTab(3);
 setTimeout(()=>card.selectTab(3),600);
-
-/* 사유 코드 표 */
-document.getElementById('codeTable').innerHTML='<tr><th>code</th><th>단계</th><th>화면 사유</th></tr>'+Object.entries(CODES).map(([k,v])=>`<tr><td><code>${k}</code></td><td>${STAGE_NAME[v.stage]}</td><td>${esc(v.title)}</td></tr>`).join('');
 </script>
 </body>
 </html>

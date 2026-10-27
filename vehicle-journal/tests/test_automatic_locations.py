@@ -57,6 +57,20 @@ class ParkingTests(unittest.TestCase):
         for gps in ({'latitude':37.501},{'accuracyM':80},{'speedMps':2},{'speedMps':-1}):
             with self.subTest(gps=gps):
                 self.clear();self.parked(gps=gps);self.assertIsNone(self.position())
+    def diagnosis(self):return auto.gps_diagnosis(self.a,self.j,self.start.isoformat())
+    def test_gps_diagnosis_names_the_rule_the_nearest_fix_broke(self):
+        self.assertEqual(self.diagnosis(),('gps_no_samples',{'samples':0,'gps_samples':0}))
+        self.a.put({'schema':1,'device_id':'car','event_id':'nogps','kind':'state','observed_at':self.start.isoformat(),'data':{'onroad':False}})
+        self.assertEqual(self.diagnosis()[0],'gps_missing')
+        for change,code in (({'onroad':True},'gps_moving'),({'gps':{'speedMps':2.8}},'gps_moving'),({'gps':{'accuracyM':180}},'gps_inaccurate'),({'gps':{'fresh':False}},'gps_stale')):
+            with self.subTest(code=code,change=change):
+                self.clear();self.state(-5,**change);code_found,evidence=self.diagnosis()
+                self.assertEqual(code_found,code);self.assertEqual(evidence['nearest_gap_s'],-5);self.assertEqual(evidence['samples'],1)
+        self.clear();self.state(0,-340);code,evidence=self.diagnosis()
+        self.assertEqual(code,'gps_stale');self.assertEqual(evidence['measured_lag_s'],340)
+        self.clear();self.state(-300);self.state(0,-300);code,evidence=self.diagnosis()
+        self.assertEqual(code,'gps_parking_unverified');self.assertEqual(evidence['continuity_gap_s'],300)
+        self.assertIsNone(self.position(),'diagnosis never relaxes the position rule')
     def test_other_device_not_used(self):
         self.state(0,device='other');self.assertIsNone(self.position())
     def test_failure_version_retries_once_and_override_preserved(self):
@@ -148,8 +162,8 @@ class TransientRetryTests(unittest.IsolatedAsyncioTestCase):
         with self.j.connect() as db:return json.loads(db.execute("SELECT extra_json FROM records WHERE kind='charge'").fetchone()[0])['location_lookup']
     async def run_enrich(self,nearby,address=None):
         from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
-        async def address_location(*a):return address
-        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=nearby,address_location=address_location))
+        async def address_lookup(*a):return (address,None,{}) if address else (None,'no_result',{})
+        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=nearby,address_lookup=address_lookup))
         hass=types.SimpleNamespace(async_add_executor_job=lambda f,*a:asyncio.sleep(0,f(*a)))
         point={'latitude':37.5,'longitude':127.0,'accuracy_m':2}
         with patch.object(auto,'position',return_value=point):await auto.enrich(hass,manager,self.a,self.j)
@@ -201,6 +215,27 @@ class TransientRetryTests(unittest.IsolatedAsyncioTestCase):
                 await self.run_enrich(unsettled,address);extra=self.extra()
                 self.assertEqual(extra['location']['selection_source'],'automatic_address');self.assertNotIn('failures',extra['location_lookup'])
                 self.expire();self.assertEqual(auto.pending(self.j),[])
+    async def test_reason_codes_steps_and_evidence_are_stored(self):
+        from custom_components.carrot_ha.vehicle_journal.stations import ProviderError
+        async def broken(*a):raise ProviderError('제공사 응답을 끝까지 확인하지 못했어요.')
+        await self.run_enrich(broken);lookup=self.lookup()
+        self.assertEqual((lookup['code'],lookup['station_code'],lookup['address_reason']),('address_failed','provider_error','no_result'))
+        self.assertEqual(lookup['steps'],{'gps':'ok','station':'fail','address':'fail'});self.assertEqual(lookup['provider'],'제공사 응답을 끝까지 확인하지 못했어요.')
+        self.assertEqual((lookup['version'],lookup['attempts']),(auto.LOOKUP_VERSION,1));self.assertEqual(lookup['evidence']['accuracy_m'],2)
+        self.expire();await self.run_enrich(broken);self.assertEqual(self.lookup()['attempts'],2)
+        with self.j.connect() as db:db.execute("UPDATE records SET extra_json='{}' WHERE kind='charge'")
+        address={'name':'주소','address':'주소','latitude':37.5,'longitude':127.0,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
+        near=[{'location':{'name':n},'distance_m':d} for n,d in (('A',41.2),('B',53.7))]
+        async def ambiguous(*a):return {'reason':'ambiguous','selected':None,'candidates':near,'message':'x'}
+        await self.run_enrich(ambiguous,address);lookup=self.lookup()
+        self.assertEqual((lookup['code'],lookup['steps']),('station_ambiguous',{'gps':'ok','station':'warn','address':'ok'}))
+        self.assertEqual(lookup['candidates'],[{'name':'A','distance_m':41},{'name':'B','distance_m':54}])
+    async def test_gps_failure_stores_diagnosis_without_provider_calls(self):
+        async def never(*a):raise AssertionError('no provider call without a verified GPS fix')
+        manager=types.SimpleNamespace(automatic_locations=True,kakao_rest_key='test',entries=lambda:[{'vehicle_id':self.j.vehicle,'fuel':'electric'}],stations=types.SimpleNamespace(nearby=never,address_lookup=never))
+        hass=types.SimpleNamespace(async_add_executor_job=lambda f,*a:asyncio.sleep(0,f(*a)))
+        await auto.enrich(hass,manager,self.a,self.j);lookup=self.lookup()
+        self.assertEqual((lookup['code'],lookup['steps']['gps'],lookup['evidence']['samples']),('gps_no_samples','fail',0))
     def test_records_parked_by_previous_lookup_version_are_retried(self):
         with self.j.connect() as db:db.execute("UPDATE records SET extra_json=? WHERE kind='charge'",(json.dumps({'location_lookup':{'version':3,'retry_after':time.time()+86400,'message':'Unterminated string'}}),))
         self.assertEqual(len(auto.pending(self.j)),1)
@@ -278,3 +313,48 @@ class AddressPropagationTests(unittest.TestCase):
         self.assertEqual(rows[billed]['unit_price'],{'krw':313,'unit':'kWh','approximate':False})
         self.assertNotIn('unit_price',rows[wash])
 
+
+
+class DiagnosticQueryTests(unittest.TestCase):
+    """The ledger query explains charging expenses whose linked automatic charge has no settled station."""
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory(ignore_cleanup_errors=True);self.j=Journal(Path(self.tmp.name)/'j.db','entry','car','Asia/Seoul')
+    def tearDown(self):self.tmp.cleanup()
+    def add(self,suffix,extra,expense_extra=None):
+        now='2026-10-25T00:00:00+00:00'
+        with self.j.lock,self.j.connect() as db:
+            for rid,kind,data in (('c'+suffix,'charge',extra),('x'+suffix,'expense',expense_extra or {})):
+                db.execute("INSERT INTO records(vehicle_id,id,kind,origin,source_kind,source_id,source_fingerprint,extra_json,created_at,updated_at) VALUES (?,?,?,'automatic','t',?,?,?,?,?)",(self.j.vehicle,rid,kind,rid,rid,json.dumps(data),now,now))
+            db.execute("INSERT INTO mobility(vehicle_id,record_id,started_at,ended_at,battery_charge_kwh) VALUES (?,?,'2026-10-25T03:00:00+00:00','2026-10-25T04:00:00+00:00',5)",(self.j.vehicle,'c'+suffix))
+            db.execute("INSERT INTO expenses(vehicle_id,record_id,accounting_date,category,actual_krw,payment_owner,payment_id,payment_version) VALUES (?,?,'2026-10-25','charging',1000,'ha_charge_payment',?,1)",(self.j.vehicle,'x'+suffix,'p'+suffix))
+            db.execute("INSERT INTO expense_members VALUES (?,?,?)",(self.j.vehicle,'x'+suffix,'c'+suffix))
+    def rows(self):return {r['id']:r for r in self.j.query('2026-10-01','2026-10-31')['records']}
+    def test_states(self):
+        station={'name':'충전소','address':'a','latitude':37.5,'longitude':127.0,'provider':'kakao','station_id':'1','station_type':'charging','selection_source':'automatic'}
+        address={'name':'주소','address':'주소','latitude':37.5,'longitude':127.0,'provider':'kakao','station_type':'charging','selection_source':'automatic_address'}
+        lookup={'version':5,'code':'gps_moving','steps':{'gps':'fail','station':'skip','address':'skip'},'evidence':{'samples':3},'retry_after':9,'attempted_at':8,'attempts':1,'message':'m'}
+        self.add('1',{'location_lookup':lookup})
+        self.add('2',{'location':address,'location_lookup':{**lookup,'code':'station_far','candidates':['옛 후보']}},{'location':address})
+        self.add('3',{'location':address,'location_lookup':{**lookup,'code':'provider_error','failures':2}},{'location':address})
+        self.add('4',{})
+        self.add('5',{'location':station,'location_lookup':lookup},{'location':station})
+        self.add('6',{'location_lookup':{'version':3,'retry_after':9,'message':'옛 안내'}})
+        self.add('7',{'location_user_override':True})
+        rows=self.rows()
+        self.assertEqual({k:rows[k]['location_diagnostic']['state'] for k in ('x1','x2','x3','x4','x6')},{'x1':'failed','x2':'address','x3':'address','x4':'pending','x6':'failed'})
+        failed=rows['x1']['location_diagnostic']
+        self.assertEqual((failed['code'],failed['steps']['gps'],failed['retry_after'],failed['charge_started_at']),('gps_moving','fail',9,'2026-10-25T03:00:00+00:00'))
+        self.assertEqual(rows['x2']['location_diagnostic']['candidates'],[{'name':'옛 후보'}])
+        self.assertIsNone(rows['x2']['location_diagnostic']['retry_after'],'a final road address is not looked up again')
+        self.assertTrue(rows['x3']['location_diagnostic']['provisional']);self.assertEqual(rows['x3']['location_diagnostic']['retry_after'],9)
+        self.assertEqual((rows['x6']['location_diagnostic']['code'],rows['x6']['location_diagnostic']['message']),('legacy','옛 안내'))
+        for key in ('x5','x7'):self.assertNotIn('location_diagnostic',rows[key])
+        for key in ('c1','c4'):self.assertNotIn('location_diagnostic',rows.get(key,{}))
+    def test_setup_issue(self):
+        journal=types.SimpleNamespace(vehicle='v')
+        def manager(**changes):
+            base=dict(automatic_locations=True,kakao_rest_key='k',entries=lambda:[{'vehicle_id':'v','fuel':'electric'}]);base.update(changes);return types.SimpleNamespace(**base)
+        self.assertIsNone(auto.setup_issue(manager(),journal))
+        self.assertEqual(auto.setup_issue(manager(automatic_locations=False),journal),'disabled')
+        self.assertEqual(auto.setup_issue(manager(kakao_rest_key=''),journal),'no_kakao_key')
+        self.assertEqual(auto.setup_issue(manager(entries=lambda:[{'vehicle_id':'v','fuel':'diesel'}]),journal),'not_electric')

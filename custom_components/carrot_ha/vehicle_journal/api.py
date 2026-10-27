@@ -82,6 +82,13 @@ async def query(hass,connection,msg):
             from ..vehicle import values
             live={} if r.get('manual_vehicle') else values(r)
             if r.get('manual_vehicle'):result['status']={'phase':'complete','manual':True}
+            else:
+                from .vehicles import manager
+                from .automatic_locations import setup_issue
+                issue=setup_issue(manager(hass),r['journal'])
+                for row in result['records']:
+                    found=row.get('location_diagnostic')
+                    if issue and found and found['state']=='pending':found.update(state='setup',code=issue)
             result['latest']={key:live.get(key) for key in ('soc_percent','range_km','range_estimated','driving','onroad','charging','doors_locked','odometer_km','outside_temp_c','last_received','measured_at')}
             result['sync_error']=r.get('journal_error')
             result['fuel_sensors']=discover_fuel_sensors(hass)

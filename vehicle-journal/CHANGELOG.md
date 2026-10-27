@@ -1,3 +1,34 @@
+## 2026-10-27 — vehicle-journal: 충전 위치 실패 사유 코드 저장·API 노출·상세 기록 표시
+
+- 커밋 제목: vehicle-journal: explain automatic charge location failures in the ledger
+- 사용자 승인: 미리보기 디자인 그대로 백엔드 사유 코드 저장, API 노출, 상세 기록 표시를 구현하고 HA에 반영하라.
+- 변경(백엔드):
+  - `automatic_locations.py`: 조회 버전을 4에서 5로 올렸다. 위치 조회 결과를 저장할 때 다음 정보를 함께 남긴다.
+    - 사유 코드 `code`: GPS 단계(`gps_no_samples`·`gps_missing`·`gps_moving`·`gps_inaccurate`·`gps_stale`·`gps_parking_unverified`), 충전소 단계(`station_ambiguous`·`station_far`·`station_incomplete`·`station_none`·`provider_error`), 주소 실패(`address_failed`, 이때 `station_code`·`address_reason`도 저장), 충전소 확정(`station_selected`)
+    - 단계별 결과 `steps`, 근거 값 `evidence`, 후보 이름과 거리 `candidates`, 제공사 오류 문구 `provider`, 마지막 조회 시각 `attempted_at`, 조회 횟수 `attempts`
+    - GPS가 위치 규칙을 통과하지 못하면 `gps_diagnosis()`가 충전 시작에 가장 가까운 GPS를 찾아, 어긴 첫 규칙과 근거 값(샘플 수·시각 차이·정확도·속도·주행 상태·측정 지연·정차 연속성 끊김)을 기록한다. 위치 사용 규칙(`position()`)은 바꾸지 않았다. 이 진단은 실패했을 때만 상태 기록을 한 번 더 읽고, 외부 호출은 하지 않는다.
+    - 도로명 주소 조회 중 카카오 일시 오류가 나면 이제 일시 오류로 보고 빠르게 다시 조회한다(이전에는 하루 뒤).
+  - `stations.py`: `address_lookup()`을 추가했다. 주소를 찾지 못한 이유(`no_result`, GPS와 300m 넘게 떨어진 `geocode_far`와 그 거리)를 함께 돌려준다. `address_location()`은 같은 결과를 쓰고, 반환 형식은 바뀌지 않았다.
+  - `automatic_locations.describe()`·`diagnostics()`, `store.py`: 상세 기록 조회에서 충전소가 확정되지 않은 충전비 지출 행에 `location_diagnostic`을 붙인다. 연결된 자동 충전 기록을 한 번에 묶어 읽는다(행마다 따로 조회하지 않음). 상태는 다음과 같다.
+    - `failed`: 위치 실패
+    - `address`: 도로명 주소로 기록. 카카오 오류로 임시 저장한 주소는 `provisional`로 표시한다. 확정된 주소에는 재조회 시각을 넣지 않는다.
+    - `pending`: 아직 조회하지 않음
+    - 사유 코드가 없는 이전 기록은 `legacy`로 표시하고 저장된 안내 문장을 함께 보낸다.
+    - 사용자가 직접 지정한 위치와 충전소가 확정된 기록은 제외한다.
+  - `api.py`: 조회 대기 기록 중 아예 조회가 돌지 않는 경우를 `setup` 상태로 바꿔 보낸다(`disabled`·`no_kakao_key`·`not_electric`, `setup_issue()`).
+- 변경(화면): `carrot-vehicle-journal.js`, `carrot-journal-design.js`.
+  - 분류 필과 같은 줄 오른쪽에 18px 사유 표시를 단다(`GPS 실패`·`검색 실패`·`주소 실패`·`주소만`·`재조회 중`·`조회 대기`·`설정 필요`·`위치 실패`).
+  - 누르면 행 안에 진단 패널을 넣거나 뺀다. 표 전체를 다시 그리지 않으므로 스크롤과 다른 열린 패널이 유지되고, 열림 상태는 다시 그려도 남는다.
+  - 패널 내용: 단계 칩, 사유와 기준, 근거 값(기준을 넘은 값은 빨강), 주변 후보와 거리, 조회 이력, `위치 직접 지정`(기존 수정 창), `진단 정보 복사`(JSON)
+  - 미리보기 하네스 `review-location-diagnostics.html`은 덧입히기 코드를 지우고 운영 코드를 그대로 보여 준다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/{automatic_locations.py,stations.py,store.py,api.py}`, `custom_components/carrot_ha/frontend/{carrot-vehicle-journal.js,carrot-journal-design.js}`, `vehicle-journal/tests/test_automatic_locations.py`, `vehicle-journal/review-location-diagnostics.html`.
+- 검증:
+  - `test_automatic_locations.py` 33건 실행. 신규 5건(GPS 진단 코드 6종(8사례), 사유 코드·단계·근거·조회 횟수 저장, GPS 실패 시 외부 호출 없음, 조회 API의 기록 7종 처리, 설정 문제 판정)이 통과했다. 오류 1건은 기존 Windows 임시 DB 정리 오류다.
+  - `vehicle-journal/tests` 전체 103건 실행. UTF-8 모드에서 오류 20건이 나왔고 모두 Windows 임시 파일 잠금(`PermissionError`)이다. 기본 모드에서는 cp949 인코딩 오류가 더해져 30건이다. 검증 실패(`AssertionError`)는 없다.
+  - `node --check` 통과. 내장 브라우저(데스크톱·375px 모바일)에서 실제 모듈을 확인했다. 사유 표시 11개가 모두 18px이고 분류 필과 겹치지 않았다. 펼침과 다시 그린 뒤의 유지, 펼칠 때 스크롤 유지, 가로 넘침 없음, 수정 창 열림을 확인했고 콘솔 오류는 없었다.
+- 분리: 같은 작업 폴더에 다른 작업(SOC 기준 재집계)의 미커밋 변경이 `store.py`, `carrot-vehicle-journal.js`, `runtime.py`, `source.py`와 테스트 파일에 있었다. 이 커밋에는 위치 진단 변경만 포함했다. 섞인 두 파일은 HEAD에 이 변경만 다시 적용한 내용으로 스테이징했다.
+- 제한: 이미 위치가 기록된 기록(도로명 주소 포함)은 재조회 대상이 아니라 `legacy`로 남는다. 위치 없는 기록은 조회 버전 5에 맞춰 다음 동기화부터 동기화마다 3건씩 다시 조회되며 사유 코드가 채워진다. GPS 실패 기록은 외부 호출 없이 다시 판정한다.
+
 ## 2026-10-27 — vehicle-journal: 위치 실패 사유 미리보기 스크롤 깨짐 수정, 사유 표시 축소·우측 정렬
 
 - 사용자 피드백: (1) 스크롤할 때 화면이 끊기고 깨진다. (2) 사유 표시(알약)가 너무 크고 문구가 길다. 오른쪽에 정렬하고 크기를 크게 줄여 차계부 화면이 산만해지지 않게 해 달라.

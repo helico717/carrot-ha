@@ -37,6 +37,79 @@ function leaflet(){
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('ko-KR',{maximumFractionDigits:digits}):'—';
 const money=value=>Number.isFinite(value)?numeric(value,0)+'원':'미확인';
+
+// Automatic charge location diagnostics shown in the ledger (location_diagnostic from the query API).
+const LOCDIAG_CODES={
+  gps_no_samples:{stage:'gps',title:'충전 시작 전후 차량 상태 기록이 없어요',hint:'충전 시작 10분 전~2분 후 사이에 수신된 상태 기록이 하나도 없어요. 차량이 꺼져 있었거나 수신 앱 연결이 끊겼을 수 있어요.'},
+  gps_missing:{stage:'gps',title:'상태 기록에 GPS 좌표가 없어요',hint:'GPS를 아직 잡지 못했거나 실내·지하 주차장이었을 수 있어요.'},
+  gps_moving:{stage:'gps',title:'충전 시작 무렵 차량이 움직이는 중이었어요',hint:'정차(속도 1m/s 이하, 주행 아님)가 확인된 GPS만 위치로 써요.'},
+  gps_inaccurate:{stage:'gps',title:'GPS 정확도가 낮아요',hint:'충전 직전·직후 GPS는 오차 100m 이내만 써요.'},
+  gps_stale:{stage:'gps',title:'GPS 측정 시각이 오래됐어요',hint:'상태 수신 시각과 60초 넘게 차이 나거나 충전 시작과 너무 떨어진 GPS는 쓰지 않아요.'},
+  gps_parking_unverified:{stage:'gps',title:'주차 뒤 이동이 없었는지 확인하지 못했어요',hint:'충전 2~10분 전 GPS는 그 사이 끊김 없이(90초 이내 간격) 정차 기록이 이어져야 써요.'},
+  station_ambiguous:{stage:'station',title:'비슷한 거리에 충전소가 여러 곳 있어요',hint:'가장 가까운 두 곳의 거리 차이가 25m 미만이면 자동 확정하지 않아요.'},
+  station_far:{stage:'station',title:'150m 안에 충전소가 없어요',hint:'가장 가까운 충전소가 150m보다 멀면 자동 지정하지 않아요.'},
+  station_incomplete:{stage:'station',title:'주변 검색 결과가 너무 많아 확정하지 못했어요',hint:'검색 결과가 잘려 더 가까운 충전소가 있을 수 있어요.'},
+  station_none:{stage:'station',title:'주변에서 충전소를 찾지 못했어요',hint:'카카오 장소 검색 결과가 없었어요.'},
+  provider_error:{stage:'station',title:'카카오 장소 검색이 실패했어요',hint:'일시 오류는 15분부터 하루까지 간격을 늘려 다시 조회해요.'},
+  address_failed:{stage:'address',title:'충전소도 도로명 주소도 확정하지 못했어요',hint:''},
+  pending:{stage:'setup',title:'아직 위치를 조회하지 않았어요',hint:'동기화마다 최근 기록부터 3건씩 조회해요. 다음 동기화 때 조회돼요.'},
+  disabled:{stage:'setup',title:'자동 위치 기록이 꺼져 있어요',hint:'차계부 설정에서 자동 위치 기록을 켜면 조회해요.'},
+  no_kakao_key:{stage:'setup',title:'카카오 REST 키가 설정되지 않았어요',hint:'차계부 설정에 카카오 REST 키를 넣으면 다음 동기화 때 조회해요.'},
+  not_electric:{stage:'setup',title:'이 차량이 전기차로 설정되어 있지 않아요',hint:'충전 위치 자동 기록은 전기차에만 동작해요.'},
+  legacy:{stage:'',title:'이전 방식으로 조회한 기록이에요',hint:'사유 코드가 생기기 전 기록이라 저장된 안내 문장만 있어요. 다음 재조회 때 사유가 자세히 남아요.'}
+};
+const LOCDIAG_ADDRESS={no_result:'좌표로 도로명 주소를 찾지 못했어요.',geocode_far:'찾은 주소의 위치가 GPS와 300m 넘게 떨어져 잘못된 주소로 보고 버렸어요.',error:'주소 조회 중 카카오 오류가 났어요.'};
+const LOCDIAG_STEPS={gps:'정차 GPS 확인',station:'충전소 검색',address:'도로명 주소'};
+const LOCDIAG_STEP_TEXT={ok:'통과',fail:'실패',warn:'미확정',skip:'건너뜀'};
+const LOCDIAG_ICONS={ok:'<path d="M5 12.5l4.2 4.2L19 7"/>',fail:'<path d="M7 7l10 10M17 7L7 17"/>',warn:'<path d="M12 7v6M12 16.5v.5"/>',skip:'<path d="M7 12h10"/>',copy:'<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 00-1.5-1.5H6A1.5 1.5 0 004.5 6v8A1.5 1.5 0 006 15.5h2.5"/>'};
+const locDiagIcon=name=>`<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LOCDIAG_ICONS[name]}</svg>`;
+const locDiagSeconds=v=>{const a=Math.abs(v);return a>=60?`${Math.floor(a/60)}분 ${a%60}초`:`${a}초`;};
+// [key, value formatter, label, out-of-rule test]
+const LOCDIAG_EVIDENCE=[
+  ['samples',v=>`${numeric(v,0)}건`,'상태 기록 (충전 −10분~+2분)'],
+  ['gps_samples',v=>`${numeric(v,0)}건`,'그중 GPS 포함',(v,e)=>v===0&&e.samples>0],
+  ['nearest_gap_s',v=>v===0?'충전 시작과 같음':`충전 시작 ${locDiagSeconds(v)} ${v<0?'전':'후'}`,'가장 가까운 GPS',v=>v<-600||v>120],
+  ['accuracy_m',v=>`±${numeric(v,0)}m`,'GPS 정확도',v=>v>100],
+  ['speed_mps',v=>`${numeric(v,1)}m/s`,'GPS 속도',v=>v>1],
+  ['onroad',v=>v===true?'주행 중':v===false?'정차':'알 수 없음','주행 상태',v=>v!==false],
+  ['measured_lag_s',v=>locDiagSeconds(v),'GPS 측정 지연',v=>Math.abs(v)>60],
+  ['continuity_gap_s',v=>`최대 ${locDiagSeconds(v)} 끊김`,'정차 기록 연속성',v=>v>90],
+  ['basis',v=>({charge_start_fresh_stationary_gps:'충전 시작 정차 GPS',charge_start_verified_parked_gps:'주차 확인 GPS'}[v]||v),'사용한 GPS'],
+  ['geocode_distance_m',v=>`${numeric(v,0)}m`,'주소 위치와 GPS 거리',v=>v>300]
+];
+// Short right-aligned label so the ledger row keeps its height; details open below on demand.
+function locDiagLabel(d){
+  if(d.state==='address')return [d.provisional?'재조회 중':'주소만','info'];
+  if(d.state==='pending')return ['조회 대기','muted'];
+  if(d.state==='setup')return ['설정 필요','muted'];
+  return [`${({gps:'GPS',station:'검색',address:'주소'})[LOCDIAG_CODES[d.code]?.stage]||'위치'} 실패`,'fail'];
+}
+function locDiagPill(record,open){
+  const [label,tone]=locDiagLabel(record.location_diagnostic);
+  return `<button type="button" class="locdiag-pill ${tone}" data-locdiag="${esc(record.id)}" aria-expanded="${open}" aria-controls="locdiag-${esc(record.id)}" aria-label="위치 기록 진단: ${esc(label)}" title="위치 기록 진단 보기">${esc(label)}</button>`;
+}
+function locDiagPanel(record,timeZone){
+  const d=record.location_diagnostic,c=LOCDIAG_CODES[d.code]||{title:d.code,hint:''};
+  const time=v=>{const t=typeof v==='number'?new Date(v*1000):new Date(v);return Number.isNaN(t.getTime())?'—':t.toLocaleString('ko-KR',{timeZone:timeZone||undefined,month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});};
+  let title=c.title,hint=c.hint;
+  if(d.code==='address_failed')hint=[LOCDIAG_CODES[d.station_code]?`충전소: ${LOCDIAG_CODES[d.station_code].title}.`:'',`주소: ${LOCDIAG_ADDRESS[d.address_reason]||'주소 조회에 실패했어요.'}`].filter(Boolean).join(' ');
+  if(d.state==='address'){title=d.code==='provider_error'?'충전소 검색이 실패해 도로명 주소로 먼저 기록했어요':d.code==='legacy'?'도로명 주소로 기록했어요':`${c.title} — 도로명 주소로 기록했어요`;hint=d.provisional?'검색이 성공하면 충전소 이름으로 자동으로 바뀌어요.':`${d.code==='legacy'?'':c.hint+' '}실제 이용한 충전소를 지정하면 정확해져요.`;}
+  const steps=d.steps?`<ol class="locdiag-steps" aria-label="조회 단계">${Object.keys(LOCDIAG_STEPS).map((k,i)=>{const s=d.steps[k]||'skip';return `<li class="${s}">${locDiagIcon(s)}${i+1}. ${LOCDIAG_STEPS[k]} <span class="locdiag-sr">${LOCDIAG_STEP_TEXT[s]}</span></li>`;}).join('')}</ol>`:'';
+  const e=d.evidence||{};
+  const rows=LOCDIAG_EVIDENCE.filter(([k])=>e[k]!==undefined).map(([k,f,label,bad])=>`<dt>${label}</dt><dd class="${bad&&bad(e[k],e)?'bad':''}">${esc(f(e[k]))}</dd>`);
+  if(Number.isFinite(e.latitude)&&Number.isFinite(e.longitude))rows.push(`<dt>GPS 좌표</dt><dd>${e.latitude.toFixed(5)}, ${e.longitude.toFixed(5)}</dd>`);
+  const section=(heading,body)=>`<div class="locdiag-sec"><h5>${heading}</h5>${body}</div>`;
+  const parts=[
+    `<p class="locdiag-title">${esc(title)}</p>`,hint?`<p class="locdiag-hint">${esc(hint)}</p>`:'',steps,
+    rows.length?`<dl class="locdiag-dl">${rows.join('')}</dl>`:'',
+    d.provider?section('제공사 오류',`<p class="locdiag-msg">${esc(d.provider)}</p>`):'',
+    d.candidates?.length?section('주변 후보',`<ul class="locdiag-cands">${d.candidates.map(x=>`<li><span>${esc(x.name)}</span><span>${Number.isFinite(x.distance_m)?`${numeric(x.distance_m,0)}m`:''}</span></li>`).join('')}</ul>`):'',
+    d.code==='legacy'&&d.message?section('저장된 안내',`<p class="locdiag-msg">${esc(d.message)}</p>`):'',
+    section(d.attempted_at?'조회 이력':'조회 상태',`<dl class="locdiag-dl locdiag-dl-flat"><dt>충전 시작</dt><dd>${d.charge_started_at?time(d.charge_started_at):'—'}</dd>${d.attempted_at?`<dt>마지막 조회</dt><dd>${time(d.attempted_at)} · ${numeric(d.attempts||1,0)}회째${d.failures?` (연속 오류 ${numeric(d.failures,0)}회)`:''}</dd>`:''}${d.state==='failed'||d.provisional?`<dt>다음 재조회</dt><dd>${d.retry_after?time(d.retry_after):'없음'}</dd>`:''}${d.lookup_version?`<dt>조회 방식</dt><dd>v${esc(d.lookup_version)}</dd>`:''}</dl>`),
+    `<div class="locdiag-actions"><button class="primary" type="button" data-record="${esc(record.id)}" data-action="edit">${jIcon('pin')}위치 직접 지정</button><button type="button" data-locdiag-copy="${esc(record.id)}">${locDiagIcon('copy')}<span>진단 정보 복사</span></button></div>`
+  ];
+  return `<div class="locdiag-panel" id="locdiag-${esc(record.id)}" role="region" aria-label="위치 기록 진단">${parts.join('')}</div>`;
+}
 const trendValue=(value,unit)=>unit==='원'?numeric(value,0):String(value);
 const categories={refueling:'주유비',charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',accident:'사고',other:'기타'};
 const recordTypeIcons={
@@ -382,7 +455,7 @@ export class VehicleJournal extends HTMLElement {
     if(actualInput)actualInput.oninput=e=>{const raw=e.target.value.replace(/[^\d]/g,'');e.target.value=raw?Number(raw).toLocaleString('ko-KR'):'';};
     if(this.$('previous'))this.$('previous').onclick=()=>{this.offset=Math.max(0,this.offset-100);this.load(true);};
     if(this.$('next'))this.$('next').onclick=()=>{this.offset+=100;this.load(true);};
-    if(this.$('records'))this.$('records').onclick=e=>{const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
+    if(this.$('records'))this.$('records').onclick=e=>{const diag=e.target.closest('[data-locdiag]');if(diag){this.toggleLocDiag(diag);return;}const copy=e.target.closest('[data-locdiag-copy]');if(copy){this.copyLocDiag(copy);return;}const button=e.target.closest('button[data-record]');if(!button)return;const record=this.data?.records?.find(r=>r.id===button.dataset.record);if(!record)return;if(button.dataset.action==='photos'){this.showPhotos(record);return;}if(button.dataset.action==='edit')this.openRecord(record);else this.changeStatus(record,button.dataset.action);};
     this.$('closeRecordType').onclick=()=>this.$('recordTypeDialog').close();
     this.$('recordTypeChoices').onclick=e=>{
       const button=e.target.closest('[data-record-type]');
@@ -838,8 +911,9 @@ export class VehicleJournal extends HTMLElement {
       }else if(r.odometer_km!=null&&r.kind!=='trip'){
         mainTitle=`${numeric(r.odometer_km,0)}km`;
       }
-      const pillHtml=`<div class="ledger-pill-wrap"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span></div>`;
-      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col">${pillHtml}${mainTitle?`<span class="ledger-main-title ${!r.subcategory&&placeName?'ledger-place-name':''}">${mainTitle}</span>`:''}${subTitle?`<span class="ledger-sub-title ${r.subcategory&&placeName?'ledger-place-name':''}">${subTitle}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">${jIcon('camera')}</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
+      const locDiagOpen=!!r.location_diagnostic&&!!this.locDiagOpen?.has(r.id);
+      const pillHtml=`<div class="ledger-pill-wrap${r.location_diagnostic?' has-locdiag':''}"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span>${r.location_diagnostic?locDiagPill(r,locDiagOpen):''}</div>`;
+      const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col">${pillHtml}${mainTitle?`<span class="ledger-main-title ${!r.subcategory&&placeName?'ledger-place-name':''}">${mainTitle}</span>`:''}${subTitle?`<span class="ledger-sub-title ${r.subcategory&&placeName?'ledger-place-name':''}">${subTitle}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}${locDiagOpen?locDiagPanel(r,d.timezone):''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">${jIcon('camera')}</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
 
       return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>${r.import_source?'마이클 이관':r.origin==='manual'?'직접 기록':'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small></td><td>${memoHtml}</td><td class="ledger-amount-col">${r.kind==='trip'&&r.odometer_km!=null?`${numeric(r.odometer_km,1)}km · 누적`:money(r.actual_krw??r.estimated_krw)}${r.unit_price?`<small class="ledger-unit-price">${r.unit_price.approximate?'약 ':''}${numeric(r.unit_price.krw,0)}원/${esc(r.unit_price.unit)}</small>`:''}</td><td>${actionButtons}</td></tr>`;
     }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
@@ -851,6 +925,23 @@ export class VehicleJournal extends HTMLElement {
     this.renderSavings();
     this.renderTrendsDashboard();
     this.loadThumbnails();
+  }
+  toggleLocDiag(pill){
+    const id=pill.dataset.locdiag,record=this.data?.records?.find(r=>r.id===id),col=pill.closest('.memo-text-col');
+    if(!record?.location_diagnostic||!col)return;
+    this.locDiagOpen??=new Set();
+    const open=!this.locDiagOpen.has(id);
+    // Insert/remove in place so the ledger keeps its scroll position and other open panels.
+    if(open){this.locDiagOpen.add(id);col.insertAdjacentHTML('beforeend',locDiagPanel(record,this.data?.timezone));}
+    else{this.locDiagOpen.delete(id);col.querySelector('.locdiag-panel')?.remove();}
+    pill.setAttribute('aria-expanded',String(open));
+  }
+  copyLocDiag(button){
+    const record=this.data?.records?.find(r=>r.id===button.dataset.locdiagCopy),label=button.querySelector('span');
+    if(!record?.location_diagnostic||!label)return;
+    const show=text=>{label.textContent=text;setTimeout(()=>{label.textContent='진단 정보 복사';},1500);};
+    const text=JSON.stringify({record_id:record.id,...record.location_diagnostic},null,2);
+    (navigator.clipboard?.writeText(text)||Promise.reject()).then(()=>show('복사했어요'),()=>show('복사하지 못했어요'));
   }
   selectedFuelPrice(fuel=this.$('fuel').value){
     const defaults={gasoline:'sensor.average_gasoline',premium:'sensor.average_premium_gasoline',diesel:'sensor.average_diesel'};
