@@ -6,7 +6,7 @@
 - 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py}, tests/{test_range_efficiency.py,test_new_sensors.py}.
 - 검증: test_range_efficiency(구간 경계·충전/주차 제외·최소 거리), test_new_sensors, test_trip_repair, test_trip_energy, test_history_cache, test_incremental_sync 95개 통과.
 - 한계: 이력 동기화(약 60초) 때 갱신되며, 상태 기록 간격과 정수 km 주행거리계 해상도를 따른다. 공조 예측 등 계기판 내부 요소는 반영하지 않는다.
-- 배포 상태: main 커밋·푸시 후 HA SSH 직접 반영. HA 재시작은 사용자가 수행한다. 버전 상승·태그·릴리즈 없음.
+- 배포 상태: 커밋 `1e79ad1` main 푸시 확인. HA 설치 파일 3개가 직전 반영본 `c38e411`과 해시가 일치함을 확인하고 `/config/carrot_ha/deployment-backups/1e79ad1/`에 백업한 뒤 직접 반영했다. 반영 후 해시가 커밋 파일과 일치(storage.py 5ebbd173…, vehicle.py a09da23e…, sensors_v3.py e53cf8b9…)하고 구문 검사도 통과했다. HA 재시작과 재시작 후 센서 값·실주행 반응은 미확인. 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-27 — 주행가능거리 계산을 최근 가중 평균 전비로 재조정
 
