@@ -1,3 +1,19 @@
+## 2026-10-27 — 승인된 HA 기본 재질을 기존 vehicle.glb에 저장
+
+- 사용자 승인: 프리뷰 후보 그대로 적용하고 기존 파일명을 유지해 커밋·푸시하도록 명시했다.
+- 변경/이유: 차체 색상 #333234, 유리 틴팅, 도장·반사판 재질을 기존 frontend/carrot-assets/models/vehicle.glb에 저장했다. 별도 모델 파일명·새 URL 없이 기존 파일을 교체한다. 재현 도구와 문서도 포함한다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-assets/models/vehicle.glb, tools/vehicle3d/model/bake_ha_materials.py, docs/VEHICLE_3D_MODEL.md.
+- 검증: 프리뷰 승인 모델과 교체 파일 일치. 원본 대비 바이너리 청크·형상·텍스처·애니메이션 보존 및 재질 저장 도구의 멱등성 확인. vehicle-3d-integration 25개와 git diff --check 통과.
+- 배포 상태: main 커밋·푸시로 반영한다. HA 직접 배포·재시작·버전 상승·태그·릴리즈 발행은 하지 않는다. 외부 뷰어의 조명·톤 매핑·환경 반사는 각 뷰어 설정을 따른다.
+
+## 2026-10-27 — HA 기본 재질을 GLB에 저장하는 후보 제작 (프리뷰 승인 대기)
+
+- 요청/이유: 일반 GLB 뷰어에서도 HA의 기본 차체 색상·유리 틴팅·도장 재질을 사용하도록 모델 재질 저장을 요청했다.
+- 변경: tools/vehicle3d/model/bake_ha_materials.py를 추가해 GLB JSON의 차체·반사판·유리 2종만 변경한다. Three.js의 sRGB→linear 변환을 적용한다. 프리뷰 후보는 .preview/vehicle-materials/after.glb(2,023,352바이트)이며 배포 모델은 아직 교체하지 않았다.
+- 검증: GLB의 바이너리 청크·형상·내장 텍스처·노드·문 애니메이션이 원본과 동일하고 재실행 결과도 동일함을 확인했다. 실제 전체 대시보드 모듈과 mockHass를 사용한 로컬 HTML에서 기존/후보 모델 및 흰색 옵션의 3D 뷰어 생성·렌더링을 확인했다. 네트워크 제약으로 브라우저 테스트는 로컬 파일을 route로 직접 제공했다.
+- 관련 파일: tools/vehicle3d/model/bake_ha_materials.py, .preview/vehicle-materials-preview.html 및 .preview/vehicle-materials/ (프리뷰는 Git 제외).
+- 상태: AGENTS.md의 UI 사전 프리뷰 승인 절차에 따라 사용자 검토 대기. 프로덕션 GLB 교체·커밋·푸시·HA 반영·릴리즈 없음. 조명·환경 반사 강도·톤 매핑은 뷰어 설정으로 남는다.
+
 ## 2026-10-27 — 전체 문서 연결 방식 재점검 및 잔존 표현 보완
 
 - 내용/이유: 앞선 49a5536 이후 전체 추적 문서를 다시 검색했다. 현행 엔티티/차계부 요구사항·지침/검증 계획/README의 잔존 cloud·D1/KV·Worker 설명을 수신기 기준으로 보완하고 과거 파라미터 안내의 문서 전체를 역사 기록으로 명시했다.
