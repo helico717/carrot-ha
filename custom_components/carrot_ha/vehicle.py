@@ -239,11 +239,11 @@ def values(runtime):
         coverage = data.get('month_energy_coverage_percent') or 0
         enough_data = (data.get('month_energy_distance_km') or 0) >= 20 and coverage >= 80
         data['range_estimated'] = True
-        # The mean over-states range against the cluster; prefer the lower quartile.
-        conservative = data.get('range_efficiency_kpl')
-        if conservative is not None:
-            data['range_km'] = int(round(data['battery_kwh'] * conservative))
-            data['range_efficiency_basis'] = 'conservative_recent_trips'
+        # Recency-weighted trips of 10 km+ follow driving habit like the cluster.
+        weighted = data.get('range_efficiency_kpl')
+        if weighted is not None:
+            data['range_km'] = int(round(data['battery_kwh'] * weighted))
+            data['range_efficiency_basis'] = 'weighted_recent_trips'
         elif eff is not None and enough_data:
             data['range_km'] = int(round(data['battery_kwh'] * eff))
             data['range_efficiency_basis'] = 'matched_trip_energy'

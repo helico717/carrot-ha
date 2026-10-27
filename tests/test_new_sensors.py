@@ -137,14 +137,14 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(res.get('range_km'), 240)  # 50.0 * 4.8
         self.assertEqual(res.get('range_efficiency_basis'), 'recent_trips')
 
-    def test_estimated_range_prefers_conservative_efficiency(self):
+    def test_estimated_range_prefers_weighted_recent_efficiency(self):
         runtime = self._make_runtime({'battery_wh': 40150.0},
-            summary={'range_efficiency_kpl': 5.63, 'recent_efficiency_kpl': 6.22,
+            summary={'range_efficiency_kpl': 6.23, 'recent_efficiency_kpl': 6.22,
                      'month_distance_km': 600.0, 'month_energy_distance_km': 600.0,
                      'month_drive_energy_kwh': 100.0, 'month_energy_coverage_percent': 100.0})
         res = values(runtime)
-        self.assertEqual(res.get('range_km'), 226)  # 40.15 * 5.63
-        self.assertEqual(res.get('range_efficiency_basis'), 'conservative_recent_trips')
+        self.assertEqual(res.get('range_km'), 250)  # 40.15 * 6.23
+        self.assertEqual(res.get('range_efficiency_basis'), 'weighted_recent_trips')
 
     def test_estimated_range_with_dynamic_efficiency(self):
         # 600 km / 120 kWh consumed = 5 km/kWh, regardless of charge amount.

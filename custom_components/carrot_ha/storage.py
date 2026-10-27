@@ -381,13 +381,14 @@ class Archive(ChargeCosts):
             'recent_efficiency_distance_km': round(total_km, 1),
         }
 
-    def _range_efficiency(self, device, now, days=30, min_trip_km=10, half_life_days=14,
-                          quantile=0.25, min_trips=3, min_total_km=50):
-        """Conservative range efficiency: recency/distance weighted lower quartile.
+    def _range_efficiency(self, device, now, days=30, min_trip_km=10, half_life_days=7,
+                          min_trips=3, min_total_km=50):
+        """Range efficiency that follows recent driving habits.
 
         Short trips are excluded because 0.05 kWh energy steps dominate their
-        efficiency. A lower quantile instead of the mean keeps range close to the
-        instrument cluster, and the half-life follows seasonal temperature drops.
+        efficiency. Energy-weighted mean (total km / total kWh) with a 7-day
+        half-life follows habit and seasonal changes without a pessimistic
+        quantile, which under-read the cluster by ~60 km at full charge.
         """
         since = (now - timedelta(days=days)).isoformat()
         with self.connect() as db:
@@ -399,27 +400,25 @@ class Archive(ChargeCosts):
                      AND e.observed >= ?""",
                 (device, min_trip_km, since)
             ).fetchall()
-        samples = []
+        weighted_km = weighted_kwh = total_km = 0.0
+        count = 0
         for observed, km, kwh in rows:
             try:
                 age = (now - datetime.fromisoformat(observed.replace('Z', '+00:00'))).total_seconds()/86400
             except (ValueError, TypeError):
                 continue
-            if math.isfinite(km) and math.isfinite(kwh):
-                samples.append((km/kwh, km*0.5**(max(0, age)/half_life_days), km))
-        total_km = sum(s[2] for s in samples)
-        if len(samples) < min_trips or total_km < min_total_km:
+            if not (math.isfinite(km) and math.isfinite(kwh)):
+                continue
+            weight = 0.5**(max(0, age)/half_life_days)
+            weighted_km += km*weight
+            weighted_kwh += kwh*weight
+            total_km += km
+            count += 1
+        if count < min_trips or total_km < min_total_km or weighted_kwh <= 0:
             return {}
-        samples.sort()
-        target = sum(s[1] for s in samples)*quantile
-        cumulative = 0.0
-        for efficiency, weight, _ in samples:
-            cumulative += weight
-            if cumulative >= target:
-                break
         return {
-            'range_efficiency_kpl': round(efficiency, 2),
-            'range_efficiency_trip_count': len(samples),
+            'range_efficiency_kpl': round(weighted_km/weighted_kwh, 2),
+            'range_efficiency_trip_count': count,
             'range_efficiency_distance_km': round(total_km, 1),
         }
 
