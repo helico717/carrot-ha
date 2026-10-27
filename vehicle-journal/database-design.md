@@ -37,7 +37,7 @@ SQLite 자체 날짜 검사만으로 달력 유효성·UTC 정규화를 보장�
 
 `records` 자동 identity는 (vehicle_id, source_kind, source_id) unique다.
 manual UUID는 journal이 발급하고 API 요청 idempotency key도 해당 UUID로 재시도한다.
-기존 mutable cloud event는 같은 source ID를 fingerprint 변경으로 갱신한다.
+기존 mutable receiver event는 같은 source ID를 fingerprint 변경으로 갱신한다.
 원본 장기 사실의 정상 자동 갱신과 사용자 보정은 별도다. 보정은 자동 원본 변경 후에도
 유지하며 변경 충돌을 표시한다. 특정 값 null 보정(값 제거)과 patch에 없는 값(유지)을 구분한다.
 

@@ -80,7 +80,7 @@ Comma 엔티티, 충전 전력/모드/남은시간·충전 여부·배터리·�
 주행횟수는 별도 엔티티를 만들지 않습니다. 기존 월간 엔티티는 호환성을 위해 유지합니다.
 두 엔티티 모두 `period_days=30`, `period_basis=rolling_720_hours`,
 `trip_time_basis=observed_at`, `summary_updated_at` 속성을 제공합니다.
-60초 주기의 기존 이력 동기화 후 HA 로컬 요약을 공유하며 별도 클라우드 요청은 없습니다.
+60초 주기의 기존 이력 동기화 후 HA 로컬 요약을 공유하며 별도 수신기 요청은 없습니다.
 동기화 실패 중에는 이전 요약이 유지되므로 `summary_updated_at`을 함께 확인합니다.
 
 주행과 검증된 에너지 캐시는 기본 90일 보존합니다. 원시 상태·상세 경로는 기본
@@ -252,7 +252,7 @@ HA 설정은 코드 동기화 대상에서 제외합니다.
 | 엔티티 키 | 센서 이름 | 단위 | 설명 |
 | :--- | :--- | :---: | :--- |
 | `cloud_status` | 차량 수신기 연결 상태 | - | 설정된 차량 수신 소스의 동기화 상태 (기존 `cloud_status` 식별자 유지) (`not_configured`, `syncing`, `ok`, `HTTP_<상태코드>`, `error`) |
-| `last_sync` | HA 동기화 시각 | `timestamp` | Home Assistant가 클라우드로부터 마지막 데이터를 성공적으로 동기화한 시각 |
+| `last_sync` | HA 동기화 시각 | `timestamp` | Home Assistant가 설정된 차량 수신 소스에서 마지막 데이터를 성공적으로 동기화한 시각 |
 | `measured_at` | 차량 측정 시각 | `timestamp` | 차량 CAN 버스에서 실제 데이터가 측정된 UTC 시각 |
 | `measurement_age_s` | 차량 데이터 경과시간 | `s` | 마지막 차량 측정 이후 경과된 시간 (차량이 슬립 중인지 판단에 사용) |
 | `parking_at` | 주차 위치 기록 시각 | `timestamp` | 차량이 마지막으로 기어를 P에 넣고 주차한 시각 |
@@ -279,7 +279,7 @@ HA 설정은 코드 동기화 대상에서 제외합니다.
 | `binary_sensor.<vehicle>_door_rear_driver_open` | 운전석 뒤 도어 열림 | `door` | 2열 좌측 도어가 열려 있을 때 `on` |
 | `binary_sensor.<vehicle>_door_rear_passenger_open` | 조수석 뒤 도어 열림 | `door` | 2열 우측 도어가 열려 있을 때 `on` |
 | `binary_sensor.<vehicle>_trunk_open` | 트렁크 열림 | `opening` | 트렁크(테일게이트)가 열려 있을 때 `on` |
-| `binary_sensor.<vehicle>_comma_online` | 콤마 연결 상태 | `connectivity` | Comma 4 장치가 온라인 상태로 HA와 웹소켓/클라우드 통신 중일 때 `on` |
+| `binary_sensor.<vehicle>_comma_online` | 콤마 연결 상태 | `connectivity` | HA의 최근 수신 확인과 장치 보고 시각으로 판정한다. 보고 경과 300초 미만이면 `on`, 이상이면 `off`; 수신 확인이나 시각이 유효하지 않으면 미확인. 물리 전원·WebSocket 연결의 직접 판정이 아님 |
 
 ---
 

@@ -27,13 +27,13 @@
 | 변경 이력 | 원본 사실 유지, CAS 충돌, soft delete 복원, 영구 삭제 개인정보 비복제 |
 | 비교·유가 | 단위 검증, historical 결측 표시, current와 당시 기준 구분, 음수 절감 허용 |
 | 백업·복원 | DB+사진+mapping 복원, integrity/FK/hash와 행수·합계 일치 |
-| 대량 기간·성능 | indexed range, bounded batch, query에서 이관 없음, cloud 추가 요청 0 |
+| 대량 기간·성능 | indexed range, bounded batch, query에서 이관 없음, 수신기 추가 요청 0 |
 
 실행 코드 변경 시 기존 freshness gates:
 `tests/dashboard-live-loading.test.mjs`, `tests/dashboard-lazy-runtime.test.mjs`,
 `tests/dashboard-view-state.test.mjs`, `tests/test_cloud_live.py`,
 `tests/test_incremental_sync.py`, `tests/test_history_cache.py`,
-`cloudflare/test_incremental_sync.mjs`, `cloudflare/benchmark_sync.mjs`,
+`tests/test_direct_receiver.py`,
 openpilot `ha/tests/test_param_polling.py`와 관련 auth/charge/trip/camera interlock을
 변경 영향에 맞춰 실행하고 기존 실패를 새 회귀와 구분한다. 이번 문서·미연결 SQL 작업은
 해당 실행 경로를 바꾸지 않으므로 전체 제품 테스트나 외부 배포를 하지 않는다.

@@ -13,7 +13,7 @@ connection status. SOC and estimated power remain available before confirmation.
 These thresholds are heuristics. Small real charging increases can take longer to
 confirm, and repeated BMS changes can still produce false positives. A periodic
 upload does not guarantee a fresh power estimate or an equally frequent HA notification;
-cloud polling and automation conditions also matter. Historical records are not
+receiver polling and automation conditions also matter. Historical records are not
 corrected. The SQLite schema is unchanged; candidate state is an additional JSON
 field. No comma deployment is performed by committing or publishing this branch.
 

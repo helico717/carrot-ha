@@ -14,9 +14,9 @@ ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른
 - [원격 터미널 설정 가이드](docs/TERMINAL_SETUP.md): 셀룰러 연결에서도 주차 중 Home Assistant에서 Comma 터미널을 열고 원클릭 Git Pull 및 재부팅을 수행하는 방법.
 - [대시보드·엔터티 상세 가이드](docs/GUIDE.md): 상태 배지의 문구·색상, 각 탭의 값, 모든 센서·위치 엔터티, 충전 추정과 미확인 값의 의미.
 - [파라미터 원격 제어 설정 가이드](docs/COMMA_PARAM_SETUP.md): HA에서 당근파일럿 설정을 원격 튜닝하는 방법과 안전 정책.
-- [파라미터 동기화 아키텍처 및 안전 정책](docs/PARAMETERS_0_6_1.md): 큐 ID 기반 적용 확인, 로컬 서버 유효성 검증, 우회 쓰기 배제 정책.
+- [과거 0.6.1 파라미터 설계 기록](docs/PARAMETERS_0_6_1.md) — 현행 설치에 실행하지 않음: 큐 ID 기반 적용 확인, 로컬 서버 유효성 검증, 우회 쓰기 배제 정책.
 - [Windows/Mac 수집기 복구 가이드](docs/REINSTALL.md): 콤마를 플래싱하거나 재설치했을 때 연결 정보 복구 절차.
-- [주차 카메라 설치·테스트](docs/CAMERA_SETUP.md): 실험적 광각·실내 camera 엔터티, 별도 콤마 서비스와 HTTPS 영상 연결.
+- [주차 카메라 설치·테스트](docs/CAMERA_SETUP.md): 광각·실내 영상과 360° 보기, Git 관리 Comma 서비스에서 HA로 직접 연결.
 
 ## 처음 설치·초기화 복구
 
@@ -37,7 +37,7 @@ ID.4에서 사용한 구현을 일반화한 버전입니다. ID. Buzz 등 다른
 
 ## 출처
 
-집 서버의 차량 수신 앱 및 CAN 참조 코드: `cloudflare/SOURCE.md`, `cloudflare/LICENSE.upstream`, `collector/LICENSE.reference`.
+폐기된 서버 구현의 출처·라이선스 및 CAN 참조 코드: `cloudflare/SOURCE.md`, `cloudflare/LICENSE.upstream`, `collector/LICENSE.reference`.
 지도: Leaflet 및 OpenStreetMap. 지도 출처 표시는 유지해야 합니다.
 첨부 브랜드 이미지: 프로젝트 소유자가 제공한 이미지입니다. Carrotpilot·Volkswagen·Home Assistant의 공식 제품이나 공식 인증 통합이 아닙니다.
 
