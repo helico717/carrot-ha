@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차계부 절약 비교 문구 검토</title>
+<!-- 실제 차계부 전체 모듈과 합성 데이터를 쓰는 로컬 검토용 하네스. 운영 소스는 승인 전 변경하지 않는다. -->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  .bar{position:sticky;top:0;z-index:5000;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)} .bar small{color:var(--j-sub)}
+  .bar button{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:10px;padding:7px 11px;font-size:12.5px;cursor:pointer}
+  .bar button[aria-pressed=true]{border-color:var(--j-accent);color:var(--j-accent)}
+</style>
+</head>
+<body>
+<div class="bar"><b>절약 비교 문구 검토 · 합성 데이터 · 운영 미적용</b><button id="theme">다크/라이트</button><small>차량·기간·탭·유종·연비를 직접 변경할 수 있어요.</small></div>
+<main id="mount"></main>
+<script type="module">
+const records=[{id:'demo-expense',kind:'expense',origin:'manual',status:'active',version:1,accounting_date:'2026-10-10',category:'refueling',actual_krw:178948,attachments:[],memo:'합성 주유 기록'}];
+const totals={distance_km:1852,drive_energy_kwh:308,billed_charge_kwh:308,battery_charge_kwh:308,charge_effective_krw:100000,efficiency_km_kwh:6,total_cost_krw:178948,categories:{refueling:{effective_krw:178948,actual_krw:178948}},energy_coverage_percent:100};
+const daily=[{day:'2026-10-10',...totals}];
+const hass={states:{'sensor.average_gasoline':{state:'1856',attributes:{unit_of_measurement:'원/L'}},'sensor.average_premium_gasoline':{state:'2100',attributes:{unit_of_measurement:'원/L'}},'sensor.average_diesel':{state:'1700',attributes:{unit_of_measurement:'원/L'}}},callWS:async msg=>{
+if(msg.type.endsWith('/entries'))return [{entry_id:'ice',title:'아테온 (합성)',fuel:'gasoline'},{entry_id:'ev',title:'ID.4 (합성)',fuel:'electric'}];
+if(msg.type.endsWith('/query'))return {totals,daily,records,recent_records:records,record_count:1,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{soc_percent:70},comparison:{fuel:'gasoline',economy_km_l:15},odometer_facts:{distance_km:1852},fuel_facts:{totals:{fuel_cost_krw:178948,fuel_count:1}},station_stats:{places:[],unlocated_records:0},expense_category_groups_supported:true,manual_trip_records_supported:true};
+if(msg.type.endsWith('/map/config'))return {key:'',rest_configured:false};
+return {};
+}};
+await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
+const card=document.createElement('carrot-vehicle-journal');
+// Uses the approved production implementation directly.
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
+document.getElementById('theme').onclick=()=>{hass.themes={darkMode:!hass.themes?.darkMode};card.hass=hass;};
+setTimeout(()=>card.selectTab(2),600);
+</script></body></html>

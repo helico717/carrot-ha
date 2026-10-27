@@ -846,7 +846,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=visibleRecords.length?`${this.offset+1}~${this.offset+visibleRecords.length}번째 기록`:'표시할 기록이 없어요.';
     if(!this.recordFiltersSupported)this.$('pageLabel').textContent+=' · 전체 기간 필터 적용을 위해 HA 재시작이 필요해요.';
     const comparisonKey=JSON.stringify([this.entry,this.$('month').value,this.scope]);
-    if(this.savingsKey!==comparisonKey){this.savingsKey=comparisonKey;this.compareAdjusted=false;this.$('fuel').value=d.comparison?.fuel||'gasoline';this.$('economy').value=d.comparison?.economy_km_l||15;this.$('compareDistance').max=Math.max(5000,this.recordedDistance()||0);this.$('compareDistance').value=this.recordedDistance()??0;this.useAveragePrice();}
+    if(this.savingsKey!==comparisonKey){this.savingsKey=comparisonKey;this.compareAdjusted=false;this.manualCompareDistance=false;this.$('fuel').value=d.comparison?.fuel||'gasoline';this.$('economy').value=d.comparison?.economy_km_l||15;this.$('compareDistance').max=Math.max(5000,this.recordedDistance()||0);this.$('compareDistance').value=this.recordedDistance()??0;this.useAveragePrice();}
     if(!this.compareAdjusted){this.$('compareDistance').value=this.recordedDistance()??0;this.useAveragePrice();}
     this.renderSavings();
     this.renderTrendsDashboard();
@@ -863,6 +863,57 @@ export class VehicleJournal extends HTMLElement {
   }
   useAveragePrice(){const current=this.selectedFuelPrice();this.averageMissing=current.price==null;if(current.price!=null){this.$('comparePrice').max=Math.max(5000,Math.ceil(current.price));this.$('comparePrice').value=current.price;}this.priceManual=false;}
   renderSavings(){
+    const fmt=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:1});
+
+    if(!this.data)return;
+    if(!this.$('distanceChoices')){
+
+     const slider=this.$('compareDistance');slider.type='hidden';
+     const choices=document.createElement('div');choices.id='distanceChoices';choices.className='distance-choices';
+     const recorded=this.$('recordedDistance');choices.append(recorded);
+     for(const n of [1000,5000,10000,100000]){const btn=document.createElement('button');btn.type='button';btn.className='compact';btn.dataset.distance=String(n);btn.textContent=fmt(n)+'km';choices.append(btn);btn.onclick=()=>{this.manualCompareDistance=false;this.compareAdjusted=true;slider.value=n;this.renderSavings();};}
+     const custom=document.createElement('button');custom.id='customDistance';custom.type='button';custom.className='compact';custom.textContent='직접 입력';choices.append(custom);
+     slider.after(choices);
+     const manual=document.createElement('div');manual.className='manual-distance';manual.id='manualDistance';manual.hidden=true;manual.innerHTML='<input id="distanceInput" type="text" inputmode="decimal" aria-label="직접 입력 주행거리" placeholder="예: 12,345.6"><span>km</span><button type="button" class="compact" id="applyDistance">적용</button>';choices.after(manual);
+     const apply=()=>{const input=this.$('distanceInput');const text=input.value.replaceAll(',','').trim();const value=Number(text);if(!text||!Number.isFinite(value)||value<0){input.setCustomValidity('0 이상의 주행거리를 입력해 주세요.');input.reportValidity();return;}input.setCustomValidity('');this.compareAdjusted=true;slider.value=value;input.value=fmt(value);this.renderSavings();};
+     this.$('applyDistance').onclick=apply;
+     this.$('distanceInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();apply();}};
+     this.$('distanceInput').oninput=e=>{e.target.setCustomValidity('');const pos=e.target.selectionStart;const prefix=e.target.value.slice(0,pos).replaceAll(',','').length;const raw=e.target.value.replaceAll(',','');if(!/^\d*(\.\d*)?$/.test(raw))return;const [whole,decimal]=raw.split('.');e.target.value=whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(decimal!==undefined?'.'+decimal:'');let seen=0,cursor=0;while(cursor<e.target.value.length&&seen<prefix){if(e.target.value[cursor]!==',')seen++;cursor++;}e.target.setSelectionRange(cursor,cursor);};
+     custom.onclick=()=>{this.manualCompareDistance=true;manual.hidden=false;this.$('distanceInput').value=fmt(slider.value);this.renderSavings();this.$('distanceInput').focus();};
+     recorded.onclick=()=>{this.manualCompareDistance=false;this.compareAdjusted=true;slider.value=this.recordedDistance()??0;this.renderSavings();};
+     const result=document.createElement('div');result.className='savings-result';this.$('saving').before(result);
+     const line=document.createElement('p');line.id='comparisonContext';result.append(line,this.$('saving'));
+    }
+    this.renderSavingsValues();
+    const costNote=this.$('compareDetail').querySelector('.note');
+    if(costNote)costNote.textContent='유류비만 비교한 금액이며, 전체 차량 유지비는 포함하지 않아요.';
+    this.shadowRoot.querySelector('.savings-hero h2').textContent='같은 거리를 다른 차로 달렸다면요.';
+    const fuel={gasoline:'휘발유',premium:'고급유',diesel:'경유'}[this.$('fuel').value];
+    this.$('comparisonContext').textContent=`연비 ${fmt(this.$('economy').value)}km/L인 ${fuel} 차량으로 달렸다면`;
+    for(const [id,unit] of [['comparePrice','원/L'],['economy','km/L']]){
+     const slider=this.$(id);let limits=this.$(id+'Limits');
+     if(!limits){limits=document.createElement('div');limits.id=id+'Limits';limits.className='slider-limits';limits.setAttribute('aria-hidden','true');limits.innerHTML='<span></span><span></span>';slider.before(limits);}
+     limits.firstElementChild.textContent=fmt(slider.min)+unit;
+     limits.lastElementChild.textContent=fmt(slider.max)+unit;
+    }
+    // Highlight fuel name and won amount; other controls highlight numbers only.
+    for(const id of ['distanceValue','priceValue','economyValue']){
+     const el=this.$(id);const text=el.textContent;
+     el.replaceChildren();let cursor=0;
+     const highlights=id==='priceValue'?/휘발유|고급유|경유|\d[\d,]*(?:\.\d+)?원/g:/\d[\d,]*(?:\.\d+)?/g;
+     for(const match of text.matchAll(highlights)){
+      el.append(document.createTextNode(text.slice(cursor,match.index)));
+      const number=document.createElement('span');number.className='selected-number';number.textContent=match[0];el.append(number);cursor=match.index+match[0].length;
+     }
+     el.append(document.createTextNode(text.slice(cursor)));
+    }
+    const distance=Number(this.$('compareDistance').value);
+    this.$('manualDistance').hidden=!this.manualCompareDistance;
+    this.$('recordedDistance').setAttribute('aria-pressed',String(!this.manualCompareDistance&&distance===this.recordedDistance()));
+    for(const btn of this.$('distanceChoices').querySelectorAll('[data-distance]'))btn.setAttribute('aria-pressed',String(!this.manualCompareDistance&&distance!==this.recordedDistance()&&Number(btn.dataset.distance)===distance));
+    this.$('customDistance').setAttribute('aria-pressed',String(!!this.manualCompareDistance));
+  }
+  renderSavingsValues(){
     if(!this.data)return;const t=this.data.totals||{},distance=Number(this.$('compareDistance').value),economy=Number(this.$('economy').value),fuel=this.$('fuel').value,labels={gasoline:'휘발유',premium:'고급유',diesel:'경유'};
     const average=this.selectedFuelPrice();const price=Number(this.$('comparePrice').value),priceKnown=!this.averageMissing||this.compareAdjusted&&this.shadowRoot.activeElement===this.$('comparePrice');
     if(this.shadowRoot.activeElement===this.$('comparePrice')){this.averageMissing=false;this.priceManual=true;}

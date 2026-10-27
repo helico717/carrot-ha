@@ -2001,5 +2001,22 @@ export const journalDesign = `:host {
 @media(min-width:851px){
   #recordDialog .fields textarea[name="memo"]{height:180px}
 }
+
+ #page2 .savings-hero{display:flex;flex-direction:column;gap:24px;min-height:450px}
+ #page2 .savings-result{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:18px 0}
+ #page2 #comparisonContext{font-size:20px;font-weight:600;line-height:1.5;margin:0;color:var(--j-sub)}
+ #page2 .savings-result .compare-value{padding:0;margin:0}
+ #page2 #distanceValue,#page2 #priceValue,#page2 #economyValue{color:var(--j-sub);font-weight:inherit}
+ #page2 .selected-number{color:var(--j-accent,#81e6c5);font-size:1.22em;font-weight:750;font-variant-numeric:tabular-nums}
+ #page2 #distanceInput{color:var(--j-accent,#81e6c5);font-weight:750}
+ #page2 .slider-limits{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--j-sub);opacity:.6;line-height:1.4;margin:14px 0 5px;font-variant-numeric:tabular-nums}
+ #page2 .distance-choices{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 12px}
+ #page2 .distance-choices button{border-radius:10px;padding:8px 11px;white-space:nowrap}
+ #page2 .distance-choices button[aria-pressed=true]{background:#81e6c5;color:#102c24;border-color:#81e6c5}
+ #page2 .manual-distance{display:flex;align-items:center;gap:8px;margin:10px 0}
+ #page2 .manual-distance[hidden]{display:none}
+ #page2 .manual-distance input{min-width:0;flex:1;width:100%;text-align:right}
+ @media(max-width:760px){#page2 #comparisonContext{font-size:18px}#page2 .savings-hero{min-height:400px}}
+
 `;
 
