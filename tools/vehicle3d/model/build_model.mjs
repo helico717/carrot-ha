@@ -1,5 +1,5 @@
 // Part of the optional 3D vehicle model pipeline (see docs/VEHICLE_3D_MODEL.md).
-// Input and output files live in the folder named by MODEL_WORK (default ./work); none are committed.
+// Intermediate files live in MODEL_WORK (default ./work); finished models may be committed separately.
 const WORK=process.env.MODEL_WORK||'./work';
 import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS,KHRMaterialsEmissiveStrength} from '@gltf-transform/extensions';
@@ -15,7 +15,7 @@ const root=doc.getRoot();
 for(const n of root.listNodes()){ if(/^INT_AIRBAGS|^INT_CUPHOLDER/.test(n.getName())) n.dispose(); }
 for(const a of root.listAnimations()){ if(/Airbags|Cupholder|Open all doors/.test(a.getName())) a.dispose(); }
 
-// ---- tail light bar transplant from the second model (CC BY-NC 4.0, BloxBloger) ----
+// ---- tail light bar transplant from the second input model ----
 {
   const d2=await io.read(`${WORK}/second.glb`);
   const barNode=d2.getRoot().listNodes().find(n=>n.getMesh()&&n.getMesh().listPrimitives().some(p=>/Red_Light22/.test(p.getMaterial()?.getName()||'')));

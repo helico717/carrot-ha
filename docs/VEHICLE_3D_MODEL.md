@@ -1,24 +1,26 @@
 # 인터랙티브 3D 차량 (선택 기능)
 
 내 차 탭의 차량 이미지를 3D 모델로 바꿔, 문·트렁크·하향등·주행 상태를 실시간으로 보여 줍니다.
-**모델 파일은 저장소에 포함되어 있지 않습니다.** 사용자가 직접 준비한 파일을 HA 서버에 두었을 때만 동작하며,
-파일이 없거나 WebGL을 쓸 수 없으면 기존 정적 이미지가 그대로 표시됩니다.
+기본 모델은 `custom_components/carrot_ha/frontend/carrot-assets/models/vehicle.glb`에 포함됩니다.
+파일을 불러올 수 없거나 WebGL을 쓸 수 없으면 기존 정적 이미지가 그대로 표시됩니다.
 
 ## 설치
 
-1. 모델 파일(`vehicle.glb`)을 HA 서버의 `/config/carrot_ha/models/vehicle.glb`에 둡니다.
-2. **HA를 재시작**합니다. (폴더는 시작 시점에 한 번만 등록됩니다.)
-3. 브라우저를 강력 새로고침(Ctrl/Cmd+Shift+R)합니다.
+통합 설치 시 기본 모델이 함께 설치됩니다. 별도의 모델 복사는 필요하지 않습니다.
+`vehicle_3d_model`을 지정하지 않으면 패키지의 기본 모델을 사용합니다.
+기존 `/config/carrot_ha/models/vehicle.glb`와 `/carrot_ha_models/vehicle.glb` 경로는
+사용자 지정 모델용으로 계속 지원합니다. 이 폴더를 새로 만들었을 때는 HA 재시작이 필요합니다.
 
-모델 파일을 제3자에게 재배포하지 마세요. 모델마다 라이선스가 다르며, 이 저장소는 모델 파일을 커밋하지 않도록
-`.gitignore`(`*.glb`)로 막아 두었습니다.
+사용자는 2026-10-27 이 모델이 본인의 모델임을 확인하고, 다른 사용자도 사용할 수 있도록
+저장소에 포함하는 것을 요청했습니다. 모델의 저장소 등록·공유를 금지하던 기존 정책은 철회했습니다.
+완성된 모델은 Git으로 관리할 수 있으며, 빌드 중간 파일 폴더만 제외합니다.
 
 ## 카드 옵션
 
 | 옵션 | 기본값 | 설명 |
 | --- | --- | --- |
 | `vehicle_3d` | 자동 | `false`이면 3D를 끄고 정적 이미지만 사용 |
-| `vehicle_3d_model` | `/carrot_ha_models/vehicle.glb` | 모델 주소를 바꿀 때 사용 |
+| `vehicle_3d_model` | 패키지의 `carrot-assets/models/vehicle.glb` | 모델 주소를 바꿀 때 사용 |
 | `vehicle_3d_color` | `#333234` | 차체 색 (예: `#333234`는 RGB 51, 50, 52) |
 | `openpilot_entity` | 자동(`binary_sensor.<차량>_enabled`) | 주행 중 차선 색에 쓸 오픈파일럿 작동 엔터티 |
 
@@ -85,11 +87,8 @@ MODEL_WORK=./work node build_model.mjs 0.35 0.002 8
 결과는 `work/vehicle.glb`입니다. 텍스처는 `sharp`가 설치되어 있으면 WebP로 압축하고(약 2MB), 없으면 PNG로 남습니다(약 3.5MB). 이를 위의 설치 위치에 복사합니다. 뷰어(`carrot-assets/vehicle-3d.js`)는
 `tools/vehicle3d/viewer.src.js`에서 `tools/vehicle3d/build.sh <node_modules 경로>`로 만듭니다.
 
-사용한 외부 모델의 출처와 조건:
-
-- 차체: Sketchfab 「Volkswagen ID.4 Pro (2025)」 geyges, Sketchfab Standard 라이선스(개인 사용)
-- 테일램프: Sketchfab 「2022 Volkswagen ID4」 BloxBloger, CC BY-NC 4.0 (저작자 표시, 비영리)
-- 휠 형상: Meshy로 생성한 모델. 사용 조건은 Meshy 약관을 확인하세요.
+이전 문서의 외부 모델 출처·개인 사용 제한은 원본 증빙과 대조되지 않은 에이전트 기록이므로
+현재 모델의 권리 조건으로 단정하지 않습니다. 사용자 확인에 따라 저장소 공유를 허용합니다.
 
 ## 알려진 한계
 

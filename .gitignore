@@ -16,8 +16,8 @@ cloudflare/wrangler.json
 
 .receiver-venv/
 
-# User-supplied 3D vehicle models are licensed separately and are never committed.
-*.glb
+# Intermediate model-building files stay local; shared finished models may be committed.
+tools/vehicle3d/model/work/
 
 # Offline tool dependencies
 node_modules/

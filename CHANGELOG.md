@@ -1,3 +1,12 @@
+## 2026-10-27 — 기본 3D 차량 모델 저장소 포함
+
+- 변경/이유: 사용자가 본인 모델임을 확인하고 다른 사용자와 공유하도록 요청했다. 모델 재배포 금지 문구와 모든 GLB 파일의 일괄 제외를 철회하고, HA에서 받은 완성 모델을 통합의 frontend/carrot-assets/models/vehicle.glb에 포함했다. 이전 개인 사용 확인·외부 출처 기록은 당시 에이전트 기록이며 이번 사용자 지시로 공유 정책을 정정한다.
+- 동작: 기본 모델은 프론트엔드와 함께 설치되고 버전이 붙은 패키지 주소로 로딩된다. vehicle_3d_model 사용자 지정 주소와 기존 HA 모델 경로는 유지한다. 모델 형상·텍스처·화면 디자인은 변경하지 않았다.
+- 관련 파일: .gitignore, custom_components/carrot_ha/{__init__.py,frontend/carrot-vehicle-3d.js,frontend/carrot-assets/models/vehicle.glb}, docs/{VEHICLE_3D_MODEL.md,DEBUG_DASHBOARD.md}, tools/vehicle3d/model/build_model.mjs, tests/vehicle-3d-integration.test.mjs.
+- 모델 확인: 운영 HA HTTPS에서 수신한 GLB v2, 2,023,208바이트. WebP 이미지 36개가 내장되어 외부 텍스처 파일이 필요 없다. 빌드 중간 파일 폴더만 Git에서 제외한다.
+- 검증: vehicle-3d-integration 테스트 25개 및 git diff --check 통과. 모델 SHA-256: 1f3c5488f32fbbeabf5b4e984a80b055d75eac34ab7bd6fb3e53411ec909e997.
+- 배포 상태: main 커밋·푸시 대상으로 준비. HA 직접 반영·재시작·새 태그·릴리즈 발행은 이번 요청 범위에 포함하지 않는다. 운영 HA의 새 패키지 경로 로딩은 미검증이다.
+
 ## 2026-10-27 — Cloudflare 과거 중계 설명과 현재 직접 연결 문서 분리
 
 - 변경/이유: 조사에서 멈추지 않고 현행 안내를 수정하라는 사용자 요청에 따라 AGENTS의 과거 구조도·Wrangler 실행 절차·D1/KV 무료 한도 규칙을 현재 수신기 구조로 교체했다. GUIDE의 클라우드 경로/60초 화면 조회 설명, entities의 저장 경로·cloud_status 설명, 모듈형 설계의 수집 계층과 부하 원칙을 수정했다.

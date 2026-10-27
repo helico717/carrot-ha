@@ -12,12 +12,11 @@
 type: custom:carrot-dashboard-debug-card
 vehicle_name: ID.4 PRO
 vehicle_image_layout: legacy_id4
-vehicle_3d_model: /carrot_ha_models/vehicle.glb
 ```
 
 `vehicle_name`은 표시 이름입니다. 기존 운영 카드에 `vehicle_image` 옵션이 있다면 같은 값을
-추가하면 모델이 없을 때 같은 차량 이미지가 보입니다. 모델은 사용자가 준비한 파일이며
-`/config/carrot_ha/models/vehicle.glb`에 있어야 합니다. 모델이 없어도 디버그 카드는 동작합니다.
+추가하면 모델이 없을 때 같은 차량 이미지가 보입니다. 기본 모델은 통합 패키지에 포함되어
+별도 복사 없이 사용합니다. 사용자 지정 모델은 `vehicle_3d_model`로 주소를 지정합니다.
 
 ## 카드를 찾을 수 없다고 표시되는 경우
 

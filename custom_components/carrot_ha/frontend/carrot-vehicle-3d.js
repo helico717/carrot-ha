@@ -7,8 +7,8 @@
 //
 // The shared viewer owns gestures on its canvas: swipes and wheel input stay there,
 // while scrolling outside the vehicle remains available in production and debug cards.
-// The model itself is a user-supplied file (see docs/VEHICLE_3D_MODEL.md) and is never shipped
-// in this repository; without it the card silently keeps the PNG.
+// Shared models may be tracked in this repository (see docs/VEHICLE_3D_MODEL.md).
+// Without an available model the card silently keeps the PNG.
 const version = new URL(import.meta.url).searchParams.get('v');
 const versioned = name => {
   const url = new URL(name, import.meta.url);
@@ -16,7 +16,7 @@ const versioned = name => {
   return url.href;
 };
 
-export const DEFAULT_MODEL_URL = '/carrot_ha_models/vehicle.glb';
+export const DEFAULT_MODEL_URL = versioned('./carrot-assets/models/vehicle.glb');
 
 let viewerModule = null;
 let webglBroken = false;

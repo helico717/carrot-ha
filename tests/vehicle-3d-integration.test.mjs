@@ -77,11 +77,18 @@ test('3D can be switched off and the viewer is released when the container disap
   assert.equal(disposed, 2);
 });
 
-test('default model location is a local path outside the repository', () => {
-  assert.equal(DEFAULT_MODEL_URL, '/carrot_ha_models/vehicle.glb');
-  assert.equal(fs.existsSync(new URL('carrot-assets/vehicle.glb', frontend)), false);
-  const ignored = fs.readFileSync(new URL('../../../.gitignore', frontend), 'utf8');
-  assert.match(ignored, /\*\.glb/);
+test('default model ships with the frontend and embeds its texture images', () => {
+  assert.equal(DEFAULT_MODEL_URL, new URL('carrot-assets/models/vehicle.glb', frontend).href);
+  const bytes = fs.readFileSync(new URL(DEFAULT_MODEL_URL));
+  assert.equal(bytes.toString('ascii', 0, 4), 'glTF');
+  assert.equal(bytes.readUInt32LE(4), 2);
+  assert.equal(bytes.readUInt32LE(8), bytes.length);
+  const model = JSON.parse(bytes.toString('utf8', 20, 20 + bytes.readUInt32LE(12)));
+  assert.ok(model.images.length > 0);
+  for (const image of model.images) {
+    assert.equal(image.uri, undefined, 'textures must not require external image files');
+    assert.ok(model.bufferViews[image.bufferView]?.byteLength > 0);
+  }
 });
 
 for (const lang of ['ko', 'en']) {
