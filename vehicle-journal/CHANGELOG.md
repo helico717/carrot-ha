@@ -1,3 +1,12 @@
+## 2026-10-27 — vehicle-journal: 충전 위치 실패 사유 표시 HA 직접 반영
+
+- 배포 커밋: `dfa203e` (vehicle-journal: explain automatic charge location failures in the ledger), main 푸시 확인.
+- 반영 전 확인: HA에 설치된 6개 파일의 SHA-256이 직전 커밋 `78afb2d`의 파일과 모두 일치했다(다른 작업이 덮어쓴 흔적 없음).
+- 백업: `/config/carrot_ha/deployment-backups/dfa203ea4f02aa59faa5e7f3f044ba19baeb6d02/`에 기존 6개 파일을 백업했다.
+- 설치 SHA-256(커밋 파일과 일치): `automatic_locations.py` `c685fea7…`, `stations.py` `96c4fed0…`, `store.py` `b94c3003…`, `api.py` `d1bf5f17…`, `carrot-vehicle-journal.js` `741e7a38…`, `carrot-journal-design.js` `dfe53ef3…`. HA Python으로 4개 Python 파일의 구문을 검사했고(`ast`, 캐시 파일 미생성) 통과했다. HA HTTP(`/carrot_ha_static/`)가 새 화면 파일 2개를 같은 해시로 제공함을 확인했다.
+- 상태: Python 변경이라 **사용자의 HA 재시작 전까지 사유 코드 저장과 `location_diagnostic` 응답이 동작하지 않는다.** 재시작 전에는 새 화면에 사유 표시가 나타나지 않을 뿐, 오류는 나지 않는다. 사용자 로그인 브라우저의 실제 화면과 재시작 뒤의 재조회 결과는 미확인이다. 운영 DB는 수정하지 않았다. 버전·태그·릴리즈 없음.
+- 분리: 같은 폴더의 다른 미커밋 작업(SOC 기준 재집계)은 이 배포에 포함하지 않았다. HA의 `store.py`와 `carrot-vehicle-journal.js`는 `dfa203e` 커밋 버전이며 그 작업의 변경은 없다.
+
 ## 2026-10-27 — vehicle-journal: 충전 위치 실패 사유 코드 저장·API 노출·상세 기록 표시
 
 - 커밋 제목: vehicle-journal: explain automatic charge location failures in the ledger
