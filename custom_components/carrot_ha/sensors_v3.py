@@ -82,7 +82,8 @@ async def async_setup_entry(hass,entry,async_add_entities):
 ID4_DIAGNOSTIC_KEYS = {
     'aux_voltage', 'hv_voltage', 'recirc', 'blower_level', 'blower_volt',
     'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
-    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'display_soc_candidate_percent'
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'display_soc_candidate_percent',
+    'hv_aux_power_w', 'climate_power_request_w'
 }
 
 class VehicleSensor(VehicleEntity,SensorEntity):
@@ -148,6 +149,9 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                          calculation_version=2)
         elif self.key=='gear':
             attrs['raw_gear']=self.data.get('gear')
+        elif self.key in ('hv_aux_power_w','climate_power_request_w'):
+            attrs.update(observation_only=True, source='0x5AC HVEM_02 '+('HVEM_IstLeistungNA' if self.key=='hv_aux_power_w' else 'HVEM_Leistung_Klima_Vorgabe'),
+                         meaning='auxiliary load candidate (unverified for HVAC share)' if self.key=='hv_aux_power_w' else 'climate power request, not measured consumption')
         elif self.key=='range_km':
             if self.data.get('range_estimated'):
                 attrs['estimated']=True

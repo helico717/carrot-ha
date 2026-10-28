@@ -1,3 +1,14 @@
+## 2026-10-28 — 관찰용 엔터티: 보조 장치 소비 전력, 공조 전력 요청 (주행가능거리에는 미반영)
+
+- 요청: 원시 CAN 분석(연구 저장소 `docs/aux-power-analysis-2026-10-28.md`)에서 `0x5AC HVEM_02`의 `HVEM_IstLeistungNA`가 모터 출력이 없는 구간의 배터리 전력과 일치했다. 장기 관찰을 위해 별도 엔터티로만 추가하고 주행가능거리 계산에는 넣지 않는다.
+- Comma(`helico717/openpilot`, `carrot-wip-model_selector-ha`, 커밋 `a07274381`): 이미 파싱하던 `HVEM_02`에서 `hv_aux_power_w`(IstLeistungNA, 0~25,450 W)와 `climate_power_request_w`(Leistung_Klima_Vorgabe, 0~12,650 W)를 읽는다. 초기값·오류 코드(raw 510/511, 254/255)와 미수신은 값으로 쓰지 않고 0은 값으로 유지한다. 새 CAN 송신 없음. 관련 파일은 `openpilot/selfdrive/carrot/ha/telemetry_fields.py`, 테스트 `tests/test_hvem_observation.py`(3건).
+- HA: `보조 장치 소비 전력 (관찰용)`, `공조 전력 요청 (관찰용)` 센서를 W 단위, 진단 범주로 추가했다. 다른 하드웨어 필드처럼 180초가 지나면 만료된다. 속성에 `observation_only`와 출처 신호, 의미 설명을 둔다. 두 값은 `range_km` 계산에 쓰이지 않으며 테스트로 확인한다.
+- 의미: `보조 장치 소비 전력`은 보조 장치 부하 후보이며 공조 소비가 포함되는지는 미검증이다. `공조 전력 요청`은 요청값으로 공조를 껐을 때도 1 kW대가 나온 값이고 실제 소비나 공조 사용 지표가 아니다.
+- 한계: 값은 수집기 샘플링 시점의 순간값이다(1분 평균 아님). 정밀 분석은 원시 CAN 기록을 계속 사용한다.
+- 관련 파일: custom_components/carrot_ha/{telemetry.py,sensors_v3.py,entity_migration.py}, tests/test_new_sensors.py.
+- 검증: Comma 쪽 ha 테스트 6개 파일 통과(신규 3건 포함), HA 쪽 test_new_sensors(신규 1건 포함), entity_migration, range_efficiency, trip_repair, trip_energy, history_cache, incremental_sync, optional_telemetry 104개 통과. 실제 차량에서 값이 들어오는지는 미확인.
+- 배포 상태: 아래 별도 기록. Comma는 사용자가 `git pull --ff-only` 후 재부팅해야 새 값이 수집된다.
+
 ## 2026-10-28 — 주행가능거리가 항상 수치를 갖도록: 최근 50 km를 시점 제한 없이 + 부족하면 있는 만큼 + 참고 전비 옵션
 
 - 요청: 기록이 부족해도 주행가능거리를 "알 수 없음"으로 두지 말고 항상 수치를 표시. 코드에 숨겨진 고정 기본값에 의존하지 않는다.

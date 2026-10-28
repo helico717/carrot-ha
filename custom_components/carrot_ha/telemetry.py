@@ -20,6 +20,9 @@ SENSOR_FIELDS = {
     'battery_cell_voltage_delta_mv': ('셀 전압 차이', 'mV', 'mdi:battery-sync', 'voltage', 0),
     'bms_mode': ('BMS 하드웨어 모드', None, 'mdi:ev-station', None, None),
     'dcdc_temperature_c': ('DC-DC 컨버터 온도', '°C', 'mdi:thermometer', 'temperature', 1),
+    # Observation only: never an input to the driving range. NA = HV auxiliary load; the climate value is a request.
+    'hv_aux_power_w': ('보조 장치 소비 전력 (관찰용)', 'W', 'mdi:flash-outline', 'power', 0),
+    'climate_power_request_w': ('공조 전력 요청 (관찰용)', 'W', 'mdi:hvac', 'power', 0),
     # Comparison-only candidate; the Wh-based battery SOC remains the dashboard/journal basis.
     'display_soc_candidate_percent': ('계기판 SOC 후보', '%', 'mdi:gauge', None, 1),
     'comma_cpu_temperature_c': ('콤마 CPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),

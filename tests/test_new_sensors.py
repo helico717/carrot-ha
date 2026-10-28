@@ -46,6 +46,27 @@ class TestNewSensors(unittest.TestCase):
             'summary': summary or {}
         }
 
+    def test_aux_observation_sensors_are_diagnostic_fresh_only_and_not_range_inputs(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
+        now = datetime.now(timezone.utc)
+        stale = (now - timedelta(seconds=600)).isoformat()
+        for key, value in (('hv_aux_power_w', 450.0), ('climate_power_request_w', 0.0)):
+            runtime = self._make_runtime({key: value, 'battery_wh': 55000.0, 'field_measured_at': {key: now.isoformat()}})
+            entry = runtime['entry']; entry.entry_id = 'aux-test'
+            sensor = VehicleSensor(entry, key, *FIELDS[key])
+            sensor.hass = types.SimpleNamespace(data={'carrot_ha': {'aux-test': runtime}})
+            self.assertEqual(sensor.native_value, value)  # zero is a value
+            self.assertEqual(getattr(sensor._attr_entity_category, 'value', sensor._attr_entity_category), 'diagnostic')
+            self.assertTrue(sensor.extra_state_attributes['observation_only'])
+            self.assertIn('관찰용', FIELDS[key][0])
+            # Neither value may influence the range: same result with and without them.
+            plain = values(self._make_runtime({'battery_wh': 55000.0}))
+            with_obs = values(runtime)
+            self.assertEqual(with_obs['range_km'], plain['range_km'])
+            self.assertEqual(with_obs['range_efficiency_basis'], plain['range_efficiency_basis'])
+            old = self._make_runtime({key: value, 'field_measured_at': {key: stale}})
+            self.assertIsNone(values(old).get(key))  # expires like other hardware fields
+
     def test_battery_monitoring_entities_freshness_and_attributes(self):
         from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
         from custom_components.carrot_ha.telemetry import BATTERY_MONITOR_FIELDS

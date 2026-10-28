@@ -19,7 +19,7 @@ REMOVED_SENSORS = {
 DIAGNOSTIC_KEYS = {
     'aux_voltage', 'emergency_charging', 'hv_voltage', 'recirc', 'blower_level',
     'blower_volt', 'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
-    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh'
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'hv_aux_power_w', 'climate_power_request_w'
 }
 ESTIMATED_OBJECT_IDS = {
     'range_km': 'estimated_range_km',
