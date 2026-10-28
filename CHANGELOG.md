@@ -1,3 +1,12 @@
+## 2026-10-28 — 대시보드 배터리 카드가 주행가능거리 엔터티 값을 사용하도록 수정
+
+- 증상: 대시보드 배터리 카드는 약 370km, `주행가능거리 (추정)` 엔터티는 344km로 서로 달랐다.
+- 원인: 카드가 존재하지 않는 키 `v.estimated_range_km`만 읽어(백엔드는 `range_km`만 생성, `estimated_` 접두어는 엔터티 ID에만 붙음) 항상 대체식 `SOC × 4.6`으로 표시했다. 최근 주행가능거리 계산 개선이 카드에 반영되지 않았다.
+- 변경: 한국어·영어·디버그 대시보드가 `v.range_km`, `v.estimated_range_km` 순으로 유효한 숫자를 사용하고, 둘 다 없을 때만 SOC 근사값을 쓴다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-dashboard-{ko,en,debug}.js, tests/dashboard-calculation-regressions.test.mjs.
+- 검증: dashboard-calculation-regressions(신규 1건 포함 11), live-loading, lazy-runtime, view-state 통과. 브라우저 실표시는 미확인.
+- 배포 상태: 아래 커밋 후 HA 직접 반영 결과는 별도 기록. 버전 상승·태그·릴리즈 없음.
+
 ## 2026-10-28 — 자동 충전·주유 기록에도 사진 업로드 허용
 
 - 증상: 자동 충전 기록(origin=automatic) 수정 화면에서 사진을 골라 저장하면 "기록은 저장했지만 사진을 저장하지 못했어요" 오류. 운영 HA 브라우저에서 `POST …/attachments`가 400으로 실패하는 것을 직접 재현했고, 해당 기록은 `kind: expense`, `origin: automatic`이었다.

@@ -1367,8 +1367,9 @@ class CarrotDashboard extends HTMLElement {
         ?`<div class="sweep-overlay"><div class="sweep-clipper"><div class="sweep-beam driving"></div></div></div>`
         :'');
 
-    const rangeKm = typeof v.estimated_range_km === 'number' && Number.isFinite(v.estimated_range_km)
-      ? v.estimated_range_km
+    const rangeSource = [v.range_km, v.estimated_range_km].find(x => typeof x === 'number' && Number.isFinite(x));
+    const rangeKm = rangeSource != null
+      ? rangeSource
       : Math.round((soc ?? 0) * 4.6);
 
     const energyHeadHtml = charging

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {mergeConsecutiveTrips, mergeConsecutiveCharges, tripTimeline, tripDays} from '../custom_components/carrot_ha/frontend/carrot-trip-days.js';
@@ -201,3 +202,10 @@ test('merged trips with 3 trips preserve end SoC across intermediate and final s
   assert.equal(merged.merge_count, 3);
 });
 
+
+test('battery card range reads the range_km entity value before the SOC approximation', () => {
+  for (const name of ['ko', 'en', 'debug']) {
+    const src = fs.readFileSync(new URL(`../custom_components/carrot_ha/frontend/carrot-dashboard-${name}.js`, import.meta.url), 'utf8');
+    assert.match(src, /\[v\.range_km, v\.estimated_range_km\]\.find/, name);
+  }
+});
