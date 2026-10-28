@@ -21,8 +21,12 @@ class OptionsTests(unittest.IsolatedAsyncioTestCase):
         package = types.ModuleType('options_test_component')
         package.__path__ = [str(Path('custom_components/carrot_ha').resolve())]
         sys.modules[package.__name__] = package
+        constants = {}
+        for assignment in ast.parse(Path('custom_components/carrot_ha/battery.py').read_text(encoding='utf-8')).body:
+            if isinstance(assignment, ast.Assign) and isinstance(assignment.targets[0], ast.Name) and assignment.targets[0].id in {'DEFAULT_SOC_CAPACITY_KWH', 'DEFAULT_REFERENCE_EFFICIENCY_KPL'}:
+                constants[assignment.targets[0].id] = ast.literal_eval(assignment.value)
         namespace = {'__name__': package.__name__ + '.config_flow', '__package__': package.__name__,
-                     'vol': vol, 'DEFAULT_SOC_CAPACITY_KWH': 77,
+                     'vol': vol, **constants,
                      'config_entries': SimpleNamespace(OptionsFlow=Base)}
         exec(compile(ast.Module(body=[node], type_ignores=[]), '<actual-options>', 'exec'), namespace)
         flow = namespace['BatteryOptionsFlow']()
