@@ -1,3 +1,8 @@
+## 2026-10-28 — Windows beta.2 준비 검증 상태 점검
+
+- 운영 HA 로그 코드와 main fb1ef34는 줄바꿈 제외 동일. 기존 격리 Python 환경의 전체 스위트 점검에서 AI/V2 각 cereal 실행 검사가 numpy 미설치로 실패했다. CI b258662의 Python 3.14 Alpine radar-ha-python은 성공했으나 regression은 실패해 전체 검증 완료로 해석하지 않는다.
+- 상세 범위·결과는 루트 CHANGELOG Windows beta.2 사전 점검 항목 참조. 운영 로그/DB 변경·배포·재시작·버전/태그/Release 발행 없음.
+
 ## 2026-10-28 — beta.2 준비 현재 HA 로그 보관·분석 실행 흔적 재점검
 
 - 사용자 요청으로 현재 HA를 읽기 전용 조사했다. 기준 main `b258662`. 로그 실행 코드·화면 파일은 최신 main과 동일하며 `http.py`, 카드, generated/logs.js, logs.html의 바이트 차이는 CRLF/LF 줄바꿈뿐이다.
