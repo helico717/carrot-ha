@@ -1,3 +1,9 @@
+## 2026-10-28 — CAN 표시 SOC 전환 후 CI 전체 성공 확인
+
+- 실행 코드 57ead34 및 검증 보완 b8e9eda를 포함한 새 Actions https://github.com/helico717/carrot-ha/actions/runs/40690379321 완료 success. radar-ha-python·regression 모두 success 확인. 이전 실행 40689714991의 실패와 구분한다.
+- HA 설치 코드는 57ead34의 14개 파일과 동일하고 b8e9eda 이후 운영 코드 추가 변경은 없다. 파일 백업/원자 교체/해시·HTTP 4개 파일 제공 확인 완료, 사용자 HA 재시작과 기존 sensor.id_4_battery의 실제 CAN SOC·Recorder 및 화면·차계부 확인은 대기다.
+- 별도 관찰 엔터티 정의를 제거했고 기존 배터리 unique_id/entity_id를 보존한다. 원본 0.5%·정수 반올림 표시, 에너지/전비/비용/주행가능거리/충전 ETA 에너지 모델 유지. CAN이 없는 과거 기록은 출처를 구분해 보존한다. 버전 상승·태그·pre-release 없음.
+
 ## 2026-10-28 — 기존 배터리 엔터티의 표시 SOC를 CAN으로 전환
 
 - 최신 지시가 이전 다일 검증 후 전환 보류보다 우선한다. 지금 표시 SOC를 CAN bus1 0x14A byte19×0.5%로 바꾸고 기존 sensor.id_4_battery를 유지한다. 별도 관찰용 엔터티는 제거한다. 며칠 실사용 후 별도 승인으로 beta.2를 발행하며 지금 발행하지 않는다.
