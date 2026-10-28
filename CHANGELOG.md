@@ -5,7 +5,7 @@
 - 변경: 한국어·영어·디버그 대시보드가 `v.range_km`, `v.estimated_range_km` 순으로 유효한 숫자를 사용하고, 둘 다 없을 때만 SOC 근사값을 쓴다.
 - 관련 파일: custom_components/carrot_ha/frontend/carrot-dashboard-{ko,en,debug}.js, tests/dashboard-calculation-regressions.test.mjs.
 - 검증: dashboard-calculation-regressions(신규 1건 포함 11), live-loading, lazy-runtime, view-state 통과. 브라우저 실표시는 미확인.
-- 배포 상태: 아래 커밋 후 HA 직접 반영 결과는 별도 기록. 버전 상승·태그·릴리즈 없음.
+- 배포 상태: 커밋 `dce6204` main 푸시 확인. HA 설치 대시보드 3개가 직전 커밋 파일과 해시가 일치함을 확인하고 `/homeassistant/carrot_ha/deployment-backups/dce6204-frontend/before`에 백업한 뒤 직접 반영했다. 반영 후 해시가 커밋 파일과 일치(ko a87931bb…, en 6954e4a7…, debug 5dd20d60…). 브라우저 강력 새로고침 후 실표시는 미확인. HA 재시작 불필요(프론트엔드만). 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-28 — 자동 충전·주유 기록에도 사진 업로드 허용
 
