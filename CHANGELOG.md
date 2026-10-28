@@ -5,7 +5,8 @@
 - 변경: 한국어·영어 대시보드의 기본 `.mini-condition` 규칙에 `align-items:center`만 추가했다(`carrot-dashboard-ko.js`, `carrot-dashboard-en.js` 각 1줄). 디버그 대시보드는 두 클래스를 상속하므로 별도 수정이 없다. 12V 색상·라벨 변경은 포함하지 않는다(미승인).
 - 영향 범위: 폭 820px 이상은 이미 같은 값이라 변화 없음. 좁은 화면의 줄 높이·줄바꿈은 바꾸지 않았다. 영어 390px 계열에서 항목이 많아 카메라 버튼이 다음 줄로 넘어가는 동작은 그대로 둔다(사용자 결정).
 - 검증: 운영 CSS만으로(프리뷰 임시 보정 제거) 한국어·영어 × 주차·충전·주행·데이터 지연·통신 지연에서 항목 글자 세로 중심 편차 0px(보정 전 데이터 지연 11px). 필수 회귀 `dashboard-live-loading`, `dashboard-lazy-runtime`, `dashboard-view-state`, `dashboard-calculation-regressions` 통과.
-- 배포 상태: 아래 커밋 푸시 후 HA SSH 직접 반영 결과를 이어서 기록한다. 브라우저 새로고침 필요(HA 재시작 불필요, 프런트엔드 캐시 갱신).
+- 배포 상태: 커밋 `f3f8e8e` main 푸시 확인. HA SSH 직접 반영(2026-10-28): 반영 전 `carrot-dashboard-ko.js`·`carrot-dashboard-en.js`를 `/homeassistant/carrot_ha/deployment-backups/f3f8e8e/before/`에 백업(`SHA256SUMS.before` 포함)하고, 두 파일의 설치본 SHA-256이 저장소 `f3f8e8e` 버전과 일치함을 확인했다(ko `cdb60b44…`, en `4bfc27bd…`). 반영 전 설치본은 직전 커밋 `4fa6a66`과 해시가 같아 드리프트가 없었다. 디버그 대시보드 파일은 바뀌지 않았다. 버전 번호(`0.9.0-beta.1`)·pre-release는 그대로이며 발행하지 않았다.
+- 미확인: 사용자 브라우저/HA 앱에서의 실제 표시. 버전이 같아 캐시가 남아 있을 수 있으므로 강력 새로고침(Ctrl+F5, 모바일 앱은 캐시 삭제 후 재진입)이 필요하다. HA 재시작은 필요 없다. 실제 HA 폰 폭에서의 영어 줄바꿈 동작도 미확인.
 
 ## 2026-10-28 — 12V 배터리 전압 색상 표시: 기준 분석과 인터랙티브 프리뷰 (운영 미반영)
 
