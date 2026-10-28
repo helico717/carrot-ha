@@ -232,7 +232,7 @@ def values(runtime):
             and distance >= 1 and energy >= 0.5 else None
         )
 
-    DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, conservative default for VW ID.4 in Korea
+    DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, last-resort fallback when no driving history exists
 
     if data.get('range_km') is None and data.get('battery_kwh') is not None:
         eff = data.get('month_efficiency_kpl')
