@@ -128,42 +128,21 @@ class TestNewSensors(unittest.TestCase):
         self.assertTrue(res.get('range_estimated'))
         self.assertEqual(res.get('range_efficiency_basis'), 'default_efficiency')
 
-    def test_estimated_range_with_recent_efficiency(self):
-        # Month data insufficient, but recent_efficiency available from trip_energy cache.
+    def test_estimated_range_ignores_long_term_averages(self):
+        # Without a 50 km window, month/recent trip averages must not set the range.
         runtime = self._make_runtime({'battery_wh': 50000.0},
-            summary={'recent_efficiency_kpl': 4.8, 'recent_efficiency_trip_count': 5,
-                     'recent_efficiency_distance_km': 120.0})
+            summary={'recent_efficiency_kpl': 4.8, 'month_distance_km': 600.0, 'month_energy_distance_km': 600.0,
+                     'month_drive_energy_kwh': 120.0, 'month_energy_coverage_percent': 100.0})
         res = values(runtime)
-        self.assertEqual(res.get('range_km'), 240)  # 50.0 * 4.8
-        self.assertEqual(res.get('range_efficiency_basis'), 'recent_trips')
+        self.assertEqual(res.get('range_km'), 250)  # 50.0 * default 5.0
+        self.assertEqual(res.get('range_efficiency_basis'), 'default_efficiency')
 
     def test_estimated_range_prefers_distance_window(self):
         runtime = self._make_runtime({'battery_wh': 63500.0},
-            summary={'window_efficiency_kpl': 6.71, 'range_efficiency_kpl': 6.23})
+            summary={'window_efficiency_kpl': 6.71, 'recent_efficiency_kpl': 6.22, 'month_efficiency_kpl': 5.0})
         res = values(runtime)
         self.assertEqual(res.get('range_km'), 426)  # 63.5 * 6.71
         self.assertEqual(res.get('range_efficiency_basis'), 'recent_distance_window')
-
-    def test_estimated_range_prefers_weighted_recent_efficiency(self):
-        runtime = self._make_runtime({'battery_wh': 40150.0},
-            summary={'range_efficiency_kpl': 6.23, 'recent_efficiency_kpl': 6.22,
-                     'month_distance_km': 600.0, 'month_energy_distance_km': 600.0,
-                     'month_drive_energy_kwh': 100.0, 'month_energy_coverage_percent': 100.0})
-        res = values(runtime)
-        self.assertEqual(res.get('range_km'), 250)  # 40.15 * 6.23
-        self.assertEqual(res.get('range_efficiency_basis'), 'weighted_recent_trips')
-
-    def test_estimated_range_with_dynamic_efficiency(self):
-        # 600 km / 120 kWh consumed = 5 km/kWh, regardless of charge amount.
-        runtime = self._make_runtime({
-            'battery_wh': 50000.0,
-            'charge_months': {datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m'): {'slow_kwh': 100.0, 'fast_kwh': 0.0, 'cost_krw': 28000}}
-        }, summary={'month_distance_km': 600.0, 'month_energy_distance_km': 600.0, 'month_drive_energy_kwh': 120.0, 'month_energy_coverage_percent': 100.0})
-        res = values(runtime)
-        self.assertEqual(res.get('month_efficiency_kpl'), 5.0)
-        self.assertEqual(res.get('range_km'), 250)
-        self.assertTrue(res.get('range_estimated'))
-        self.assertEqual(res.get('range_efficiency_basis'), 'matched_trip_energy')
 
     def test_charging_cannot_change_driving_efficiency(self):
         summary = {'month_distance_km': 480.5, 'month_energy_distance_km': 480.5,

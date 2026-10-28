@@ -1,3 +1,12 @@
+## 2026-10-28 — 주행가능거리에서 장기 평균 제거, 전비 하한 3 → 1 완화
+
+- 요청: 장기 평균 전비로 주행가능거리를 계산하는 로직을 제거하고, 겨울철 전비가 3 미만일 수 있으므로 하한 3이 높다는 지적 반영.
+- 변경: 주행가능거리는 최근 50 km 주행 전비(`recent_distance_window`)만 사용한다. 30일 가중 평균(`_range_efficiency` 삭제), 월 전비, 최근 20회 주행 평균 대체 경로를 제거했다. 50 km 구간 기록이 부족하면(20 km 미만) 기본 전비 5.0 km/kWh를 쓴다(`default_efficiency`). 센서의 `range_efficiency_*`·`recent_efficiency_*` 속성은 주행가능거리 센서에서 제거했다. 월·최근 전비 센서/대시보드 표시는 그대로다.
+- 전비 클램프를 3~10에서 1~10 km/kWh로 바꿨다. 센서 오류 같은 이상치만 걸러내고 겨울철 실제 저전비(예: 2.5)는 그대로 반영한다. 신규 시즌이라 실제 겨울 전비 분포는 미확인이다.
+- 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py}, tests/{test_range_efficiency.py,test_new_sensors.py}.
+- 검증: test_range_efficiency(겨울 2.5 보존 신규), test_new_sensors(장기 평균 무시 신규), test_trip_repair, test_trip_energy, test_history_cache, test_incremental_sync 91개 통과.
+- 배포 상태: 이 항목의 HA 직접 반영 여부는 아래 별도 기록.
+
 ## 2026-10-28 — 주행가능거리 기본 전비 주석의 차종 고정 표현 제거
 
 - 요청: `vehicle.py`의 기본 전비 상수 주석에 특정 차종·국가 기준이 고정 개념처럼 적혀 있어 제거.

@@ -235,34 +235,15 @@ def values(runtime):
     DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, last-resort fallback when no driving history exists
 
     if data.get('range_km') is None and data.get('battery_kwh') is not None:
-        eff = data.get('month_efficiency_kpl')
-        coverage = data.get('month_energy_coverage_percent') or 0
-        enough_data = (data.get('month_energy_distance_km') or 0) >= 20 and coverage >= 80
         data['range_estimated'] = True
-        # Like the cluster, follow the last ~50 km of driving (hills, style);
-        # recency-weighted trips of 10 km+ cover a short or missing window.
+        # Like the cluster, follow only the last ~50 km of driving (hills, style, season).
         window = data.get('window_efficiency_kpl')
-        weighted = data.get('range_efficiency_kpl')
         if window is not None:
             data['range_km'] = int(round(data['battery_kwh'] * window))
             data['range_efficiency_basis'] = 'recent_distance_window'
-        elif weighted is not None:
-            data['range_km'] = int(round(data['battery_kwh'] * weighted))
-            data['range_efficiency_basis'] = 'weighted_recent_trips'
-        elif eff is not None and enough_data:
-            data['range_km'] = int(round(data['battery_kwh'] * eff))
-            data['range_efficiency_basis'] = 'matched_trip_energy'
         else:
-            recent = data.get('recent_efficiency_kpl')
-            if recent is not None:
-                data['range_km'] = int(round(data['battery_kwh'] * recent))
-                data['range_efficiency_basis'] = 'recent_trips'
-            elif eff is not None:
-                data['range_km'] = int(round(data['battery_kwh'] * eff))
-                data['range_efficiency_basis'] = 'low_coverage_trip_energy'
-            else:
-                data['range_km'] = int(round(data['battery_kwh'] * DEFAULT_RANGE_EFFICIENCY))
-                data['range_efficiency_basis'] = 'default_efficiency'
+            data['range_km'] = int(round(data['battery_kwh'] * DEFAULT_RANGE_EFFICIENCY))
+            data['range_efficiency_basis'] = 'default_efficiency'
 
     # Never present stale locks/doors/health as current, including older collectors.
     for key in OPTIONAL_FIELDS:

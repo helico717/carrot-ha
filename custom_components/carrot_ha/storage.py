@@ -312,7 +312,6 @@ class Archive(ChargeCosts):
         summary.update(self.driving_energy_summary(
             device, month, kst, rolling_distance, since=since, until=now, prefix='rolling30'))
         summary.update(self._recent_efficiency(device))
-        summary.update(self._range_efficiency(device, now))
         summary.update(self._window_efficiency(device, now))
 
         # Query today energy consumption from trip_energy cache
@@ -382,47 +381,6 @@ class Archive(ChargeCosts):
             'recent_efficiency_distance_km': round(total_km, 1),
         }
 
-    def _range_efficiency(self, device, now, days=30, min_trip_km=10, half_life_days=7,
-                          min_trips=3, min_total_km=50):
-        """Range efficiency that follows recent driving habits.
-
-        Short trips are excluded because 0.05 kWh energy steps dominate their
-        efficiency. Energy-weighted mean (total km / total kWh) with a 7-day
-        half-life follows habit and seasonal changes without a pessimistic
-        quantile, which under-read the cluster by ~60 km at full charge.
-        """
-        since = (now - timedelta(days=days)).isoformat()
-        with self.connect() as db:
-            rows = db.execute(
-                """SELECT e.observed, te.distance_km, te.energy_kwh
-                   FROM trip_energy te
-                   JOIN events e ON te.device = e.device AND te.id = e.id
-                   WHERE te.device = ? AND te.energy_kwh > 0 AND te.distance_km >= ?
-                     AND e.observed >= ?""",
-                (device, min_trip_km, since)
-            ).fetchall()
-        weighted_km = weighted_kwh = total_km = 0.0
-        count = 0
-        for observed, km, kwh in rows:
-            try:
-                age = (now - datetime.fromisoformat(observed.replace('Z', '+00:00'))).total_seconds()/86400
-            except (ValueError, TypeError):
-                continue
-            if not (math.isfinite(km) and math.isfinite(kwh)):
-                continue
-            weight = 0.5**(max(0, age)/half_life_days)
-            weighted_km += km*weight
-            weighted_kwh += kwh*weight
-            total_km += km
-            count += 1
-        if count < min_trips or total_km < min_total_km or weighted_kwh <= 0:
-            return {}
-        return {
-            'range_efficiency_kpl': round(weighted_km/weighted_kwh, 2),
-            'range_efficiency_trip_count': count,
-            'range_efficiency_distance_km': round(total_km, 1),
-        }
-
     def _window_efficiency(self, device, now, window_km=50, min_km=20, max_days=7, max_rows=3000, page=500):
         """Efficiency over the last window_km of odometer travel, like the cluster.
 
@@ -461,7 +419,7 @@ class Archive(ChargeCosts):
                         break
         if km < min_km or wh < 500:
             return {}
-        return {'window_efficiency_kpl': round(min(10.0, max(3.0, km/(wh/1000))), 2),
+        return {'window_efficiency_kpl': round(min(10.0, max(1.0, km/(wh/1000))), 2),
                 'window_efficiency_distance_km': round(km, 1)}
 
     def driving_energy_summary(self, device, month, tz, total_distance, *, since=None, until=None, prefix='month'):
