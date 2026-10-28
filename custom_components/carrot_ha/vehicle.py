@@ -6,7 +6,7 @@ from .telemetry import combined_lock_state
 import math
 from .location import location_values
 from .telemetry import OPTIONAL_FIELDS, FRESHNESS_SECONDS
-from . import aux_battery
+from . import aux_battery, display_soc
 
 def values(runtime):
     latest = runtime.get('latest', {})
@@ -17,13 +17,13 @@ def values(runtime):
                     charge_power_kw=None, charging=None)
     capacity = runtime['entry'].options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)
     if type(data.get('battery_wh')) in (int, float) and math.isfinite(data['battery_wh']) and data['battery_wh'] >= 0:
-        data['soc_percent'] = calibrated_soc(data['battery_wh'], capacity)
         data['battery_kwh'] = round(data['battery_wh'] / 1000, 1)
     else:
         data['battery_kwh'] = None
     for source, target in [('measured_capacity_wh','measured_capacity_kwh'),('capacity_wh','capacity_kwh')]:
         if isinstance(data.get(source), (int,float)): data[target] = round(data[source] / 1000, 1)
     data['soc_capacity_kwh'] = round(capacity, 1)
+    display_soc.live(data, datetime.now(timezone.utc))
     power_w = data.get('charge_power_w')
     if isinstance(power_w, (int, float)):
         data['charge_power_kw'] = round(power_w / 1000, 1)
@@ -118,9 +118,15 @@ def values(runtime):
         data['session_charge_cost'] = int(round(session_kwh * unit_price))
         data['session_charge_price'] = unit_price
         data['session_charge_type'] = 'DC_FAST' if is_fast_charge else 'AC_SLOW'
-        data['session_start_soc'] = calibrated_soc(session_start_wh, capacity)
+        point = display_soc.measurement(data, now_utc, max_age=30)
+        if runtime.get('charge_session_soc_start_wh') != session_start_wh:
+            runtime['charge_session_soc_start_wh'] = session_start_wh
+            runtime['charge_session_start_soc'] = point['value'] if point else None
+        data['session_start_soc'] = runtime.get('charge_session_start_soc')
     elif not is_charging:
         runtime['charge_session_start_wh'] = None
+        runtime.pop('charge_session_soc_start_wh', None)
+        runtime.pop('charge_session_start_soc', None)
         runtime['charge_session_fast'] = False
         data['session_charge_kwh'] = None
         data['session_charge_cost'] = None

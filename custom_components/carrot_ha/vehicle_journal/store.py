@@ -1,3 +1,4 @@
+from ..display_soc import VERSION as DISPLAY_SOC_VERSION
 """Durable local facts, daily allocations and administrator manual records."""
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
@@ -275,7 +276,7 @@ class Journal:
                     self._dirty(db,[r[0] for r in db.execute('SELECT day FROM day_parts WHERE vehicle_id=? AND record_id=?',(self.vehicle,key))])
                 self._dirty(db,old_days)
                 basis=getattr(self,'soc_capacity_kwh',None)
-                if basis!=self.synced_soc_basis(db):
+                if basis!=self.synced_soc_basis(db) or self.synced_display_soc_version(db)!=DISPLAY_SOC_VERSION:
                     # Re-aggregate every day so SOC coverage follows the new basis.
                     self._dirty(db,[r[0] for r in db.execute('SELECT DISTINCT day FROM day_parts WHERE vehicle_id=?',(self.vehicle,))])
             self.aggregate()
@@ -283,7 +284,13 @@ class Journal:
                 db.execute('''INSERT INTO sync_state VALUES (?,?,?,'complete',NULL,?)
                     ON CONFLICT(vehicle_id,source_kind) DO UPDATE SET cursor_json=excluded.cursor_json,
                     phase='complete',last_error=NULL,updated_at=excluded.updated_at''',
-                    (self.vehicle,'archive',encode({'generation':generation,'soc_capacity_kwh':basis}),now()))
+                    (self.vehicle,'archive',encode({'generation':generation,'soc_capacity_kwh':basis,'display_soc_version':DISPLAY_SOC_VERSION}),now()))
+
+    def synced_display_soc_version(self, db=None):
+        if db is None:
+            with self.connect() as db:return self.synced_display_soc_version(db)
+        row=db.execute("SELECT cursor_json FROM sync_state WHERE vehicle_id=? AND source_kind='archive'",(self.vehicle,)).fetchone()
+        return json.loads(row[0]).get('display_soc_version') if row else None
 
     def synced_soc_basis(self, db=None):
         if db is None:

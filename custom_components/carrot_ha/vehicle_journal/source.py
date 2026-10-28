@@ -2,7 +2,7 @@
 from datetime import timedelta
 import json
 from .store import number, stamp
-from .. import trip_repair, archive_codec
+from .. import trip_repair, archive_codec, display_soc
 from ..charge_costs import is_fast_charge
 from ..battery import DEFAULT_SOC_CAPACITY_KWH
 
@@ -43,18 +43,22 @@ def snapshot(archive, journal):
                     distance,kwh=energy[source]
                     kwh=number(kwh)
             a,b=data.get('start_soc_percent'),data.get('end_soc_percent')
-            valid_soc=number(a) is not None and number(b) is not None and a<=100 and b<=100
+            valid_soc=(number(a) is not None and number(b) is not None and a<=100 and b<=100
+                       and data.get('start_soc_source') == data.get('end_soc_source'))
             quality={'origin':'automatic','energy':'measured' if kwh is not None else 'missing',
                      'distance':'estimated' if data.get('distance_estimated') else 'measured',
-                     'soc':'boundary' if valid_soc else 'missing','partial':bool(data.get('partial'))}
+                     'soc':'boundary' if valid_soc else 'missing',
+                     'soc_source':data.get('start_soc_source') if data.get('start_soc_source') == data.get('end_soc_source') else 'mixed','partial':bool(data.get('partial'))}
             value=dict(started_at=start.isoformat(),ended_at=end.isoformat(),distance_km=distance,
                        drive_energy_kwh=kwh,drive_soc_used_pp=max(0,a-b) if valid_soc else None,
                        soc_start_percent=a if valid_soc else None,soc_end_percent=b if valid_soc else None)
             trips.append((source,value,quality))
         excluded={key for key, in db.execute('SELECT event_id FROM charge_exclusions WHERE device=? AND excluded=1',(journal.device,))}
         deleted=[key for key, in db.execute('SELECT event_id FROM charge_deletions WHERE device=?',(journal.device,))]
-        for source,body in db.execute('SELECT id,body FROM charge_summaries WHERE device=? ORDER BY started,id',(journal.device,)):
-            data=json.loads(body)
+        charge_rows = list(db.execute('SELECT id,body FROM charge_summaries WHERE device=? ORDER BY started,id',(journal.device,)))
+        enriched = archive.enrich_charges_soc(journal.device, [{'data':json.loads(body)} for _,body in charge_rows], capacity)
+        for (source,_), charge in zip(charge_rows, enriched):
+            data=charge['data']
             mode='fast' if data.get('can_mode')==6 else 'slow' if data.get('can_mode')==4 else (
                 ('fast' if is_fast_charge(data) else 'slow') if data.get('duration_s',0)>0 and number(data.get('energy_kwh')) is not None else 'unknown')
             value=dict(started_at=data['started_at'],ended_at=data['ended_at'],battery_charge_kwh=number(data.get('energy_kwh')),
@@ -73,7 +77,7 @@ def sync(archive, journal, force=False):
         reconcile(archive,journal)
         with archive.connect() as db:
             row=db.execute('SELECT generation,acknowledged FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
-        if not force and row and row[0]==row[1] and journal.synced_soc_basis()==soc_basis(journal):return False
+        if not force and row and row[0]==row[1] and journal.synced_soc_basis()==soc_basis(journal) and journal.synced_display_soc_version()==display_soc.VERSION:return False
         archive._ensure_derivations(journal.device)
         facts=snapshot(archive,journal)
         journal.import_snapshot(*facts)

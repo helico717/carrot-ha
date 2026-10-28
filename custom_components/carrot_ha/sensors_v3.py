@@ -19,7 +19,7 @@ GEAR_DISPLAY = {
 
 FIELDS = {
  'gear':('현재 기어',None,'mdi:car-shift-pattern',None,None),
- 'soc_percent':('배터리 잔량','%','mdi:battery','battery',1),
+ 'soc_percent':('배터리 잔량','%','mdi:battery','battery',0),
  'odometer_km':('총 주행거리','km','mdi:counter','distance',0),
  'outside_temp_c':('외기 온도','°C','mdi:thermometer','temperature',1),
  'aux_voltage':('12V 배터리 전압','V','mdi:car-battery','voltage',2),
@@ -82,7 +82,7 @@ async def async_setup_entry(hass,entry,async_add_entities):
 ID4_DIAGNOSTIC_KEYS = {
     'aux_voltage', 'hv_voltage', 'recirc', 'blower_level', 'blower_volt',
     'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
-    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'display_soc_candidate_percent',
+    'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh',
     'hv_aux_power_w', 'climate_power_request_w'
 }
 
@@ -117,7 +117,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if self._attr_device_class=='timestamp' and value:
             try:return datetime.fromisoformat(value.replace('Z','+00:00'))
             except (ValueError,AttributeError):return None
-        if getattr(self,'_attr_suggested_display_precision',None)==0 and isinstance(value,float):
+        if self.key != 'soc_percent' and getattr(self,'_attr_suggested_display_precision',None)==0 and isinstance(value,float):
             return int(round(value))
         return value
     @property
@@ -163,7 +163,12 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                 if self.data.get('reference_efficiency_kpl') is not None:
                     attrs['reference_efficiency_kpl']=self.data.get('reference_efficiency_kpl')
         elif self.key=='soc_percent':
-            attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
+            data = self.data
+            attrs.update(soc_source=data.get('soc_source'), can_id='0x14A', can_bus=1,
+                         signal='byte19_x0.5_percent', measured_at=data.get('soc_measured_at'),
+                         field_measured_at=data.get('soc_measured_at'),
+                         measurement_age_s=data.get('soc_measurement_age_s'),
+                         stale=data.get('soc_stale'), freshness_limit_s=180)
         elif self.key == 'month_charge_kwh':
             attrs.update(slow_kwh=self.data.get('month_slow_kwh'),
                          fast_kwh=self.data.get('month_fast_kwh'))

@@ -1019,7 +1019,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     const batteryItems=[
-      row(batteryIconName(v.soc_percent),'Battery level',n(v.soc_percent),'%'),
+      row(batteryIconName(v.soc_percent),'Battery level',n(v.soc_percent,0),'%'),
       row('car-electric','Range (estimated)',n(v.range_km),'km'),
       row('flash','Battery energy',n(v.battery_kwh),'kWh'),
       row('ev-station','Charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW'),

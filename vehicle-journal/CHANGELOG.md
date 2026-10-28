@@ -1,3 +1,14 @@
+## 2026-10-28 — 기존 배터리 엔터티의 표시 SOC를 CAN으로 전환
+
+- 최신 지시가 이전 다일 검증 후 전환 보류보다 우선한다. 지금 표시 SOC를 CAN bus1 0x14A byte19×0.5%로 바꾸고 기존 sensor.id_4_battery를 유지한다. 별도 관찰용 엔터티는 제거한다. 며칠 실사용 후 별도 승인으로 beta.2를 발행하며 지금 발행하지 않는다.
+- 범위: 현재 SOC·주행/충전 경계·배터리 사용 이력·차계부의 SOC 표시/집계. Wh/kWh/전비/충전량/비용/주행가능거리·기존 충전 ETA 에너지 모델은 유지한다. ETA 목표 정합성은 별도 검증 사항이다.
+- 과거 CAN 값 없는 기록은 기존 환산 출처로 보존하고 현재 CAN 값으로 소급 채우지 않는다. 서로 다른 SOC 출처 사이의 증감은 계산하지 않는다. 원본 0.5%를 보존하고 정수 표시는 기존 반올림 계열로 유지한다.
+- 구현: display_soc.py로 수신 CAN SOC 유효 범위/측정시각/last-known 정책을 공유한다. vehicle.py·sensors_v3.py는 기존 배터리 엔터티에 CAN SOC와 측정/출처/stale 속성을 제공하고 정수 표시만 적용한다. telemetry.py의 별도 엔터티 정의를 제거하고 entity_migration.py에서 기존 관찰 엔터티가 생겼으면 제거한다.
+- 기록: trip_repair.py의 기존 배치 조회에 표시 SOC를 더해 Wh 파생과 독립적으로 양쪽 경계를 보존한다. storage.py·battery_history.py·vehicle_journal/{source,store}.py와 frontend/{carrot-trip-days,carrot-dashboard-ko,carrot-dashboard-en,carrot-vehicle-journal}.js에 적용. 차계부 출처 정책 버전으로 한 번 재동기화·재집계하며 원본 이벤트/수동 SOC는 덮어쓰지 않는다. 양쪽 CAN 경계가 없으면 기록 전체를 기존 환산 출처로 유지하고, source가 다른 시간 구간의 사용량/주행 병합은 막는다. 프론트엔드 변경은 데이터 선택/표시 자릿수이며 레이아웃·디자인 변경 없음.
+- 에너지 불변: CAN SOC를 Wh로 역산하지 않는다. 기존 tripDisplayEnergyWh의 SOC 기반 에너지 대체식에는 교체 전 에너지 SOC만 전달한다. 충전량·비용·실측 전비·최근50km 전비·주행가능거리·충전 ETA 모델은 변경하지 않았다. 표시 SOC와 기존 ETA 목표의 정합성은 실사용 확인 대상이다.
+- 검증: 관련 Python 13스위트 162개 실행 통과(신규 CAN 현재값/무효/미수신/미래/오래된 측정, 주행·충전 경계와 에너지 불변, SOC 사용 이력 및 기존 엔터티 ID 보존 포함). Node 41개 통과. 차계부 test_journal 26개는 Windows SQLite 잠금으로 기본 cleanup에 오류가 나며, 기존 코드 변경 없이 cleanup 직전 gc.collect를 수행하는 실행기에서 기능·신규 CAN 재집계 모두 26개 통과. runtime_schedule 1개 통과. tests/{test_display_soc_switch,test_display_soc_candidate,test_new_sensors,test_charging_smoothing,test_entity_migration}.py 및 display-soc-switch.test.mjs·vehicle-journal/tests/test_journal.py에 검증 근거를 보존. 전체 CI 통과로 확대하지 않는다.
+- 배포 상태: 로컬 검증 완료, 커밋·푸시 후 운영 파일을 기존 main과 대조/백업/원자 교체할 예정. 사용자 HA 재시작·실제 엔터티/화면 검증은 대기. 버전/태그/Release 발행 없음.
+
 ## 2026-10-28 — 전체 보관 SOC 후보 비교·64kWh 계산 영향·정수 표시 검토
 
 - 사용자 요청: 이미 수집한 전체 기록에서 후보 신뢰도를 비교하고 전비·차계부 등 64kWh SOC 사용처 영향과 정수 표시의 소수 처리 방식을 검토한다. 운영 계산 변경은 하지 않는다.

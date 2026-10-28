@@ -159,7 +159,8 @@ export function tripDisplayEnergyWh(data, capacity = DEFAULT_SOC_CAPACITY_KWH) {
     && ![102250,102300,102350,102375].includes(v);
   const a = data.start_battery_wh, b = data.end_battery_wh;
   if (validWh(a) && validWh(b)) return a-b;
-  const start = data.start_soc_percent, end = data.end_soc_percent;
+  const start = data.start_soc_source === 'can_0x14a_byte19' ? data.start_energy_soc_percent : data.start_soc_percent;
+  const end = data.end_soc_source === 'can_0x14a_byte19' ? data.end_energy_soc_percent : data.end_soc_percent;
   if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && start <= 100
       && end >= 0 && end <= 100 && capacity >= 20 && capacity <= 150)
     return (start-end) * capacity * 10;
@@ -183,6 +184,8 @@ export function tripEnergyLabel(data, english = false, capacity = DEFAULT_SOC_CA
   return english ? 'Efficiency missing' : '전비 기록 누락';
 }
 export function tripSoc(data, boundary, capacity = DEFAULT_SOC_CAPACITY_KWH) {
+  const candidate = data[boundary + '_display_soc_percent'];
+  if (data[boundary + '_soc_source'] === 'can_0x14a_byte19' && Number.isFinite(candidate) && candidate >= 0 && candidate <= 100) return candidate;
   const wh = data[boundary + '_battery_wh'];
   const soc = Number.isFinite(wh) && wh >= 0 && capacity > 0
     ? wh / (capacity * 1000) * 100 : data[boundary + '_soc_percent'];
@@ -206,7 +209,8 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
     // Preserve the existing day boundary and charging discontinuity guard.
     const a = pd?.end_soc_percent, b = td.start_soc_percent;
     const noCharge = !Number.isFinite(a) || !Number.isFinite(b) || b <= a + 1;
-    if (!prev || gap < 0 || gap > maxGapSeconds || !noCharge
+    const sameSocSource = !pd?.start_soc_source || !td.end_soc_source || pd.start_soc_source === td.end_soc_source;
+    if (!prev || gap < 0 || gap > maxGapSeconds || !noCharge || !sameSocSource
         || tripDateKey(start(event),timeZone) !== tripDateKey(start(prev),timeZone)) {
       merged.push({...event, data:{...td, merged:false, merge_count:1,
         started_at:td.started_at || new Date(start(event)).toISOString(),
@@ -221,6 +225,9 @@ export function mergeConsecutiveTrips(rawTrips, timeZone, maxGapSeconds = 1800) 
     pd.distance_m = pd.merge_parts.reduce((sum,p)=>sum+(p.distance_m || 0),0);
     // Never substitute an intermediate boundary for a missing outer endpoint.
     pd.end_soc_percent = td.end_soc_percent ?? null;
+    pd.end_display_soc_percent = td.end_display_soc_percent ?? null;
+    pd.end_soc_source = td.end_soc_source;
+    pd.end_energy_soc_percent = td.end_energy_soc_percent ?? null;
     pd.end_battery_wh = td.end_battery_wh ?? null;
     pd.soc_used_percent = Number.isFinite(pd.start_soc_percent) && Number.isFinite(pd.end_soc_percent)
       ? Math.round((pd.start_soc_percent-pd.end_soc_percent)*10)/10 : null;

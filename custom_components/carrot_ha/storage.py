@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from .protocol import validate
-from . import archive_codec
+from . import archive_codec, display_soc
 import logging
 import shutil
 
@@ -668,9 +668,20 @@ class Archive(ChargeCosts):
                 # Out-of-range Wh must not silently clamp a historical trip to 100%.
                 data[boundary+'_soc_percent'] = None
                 data[boundary+'_battery_wh'] = None
+        use_can = all(display_soc.valid(data.get(boundary+'_display_soc_percent')) for boundary in ('start', 'end'))
+        for boundary in ('start', 'end'):
+            candidate = data.get(boundary+'_display_soc_percent')
+            if use_can:
+                data.setdefault(boundary+'_energy_soc_percent', data.get(boundary+'_soc_percent'))
+                data[boundary+'_soc_percent'] = candidate
+                data[boundary+'_soc_source'] = display_soc.SOURCE
+            else:
+                data[boundary+'_soc_source'] = 'legacy_energy_calibration'
         a, b = data.get('start_soc_percent'), data.get('end_soc_percent')
-        if trip_repair.finite(a) and trip_repair.finite(b):
+        if trip_repair.finite(a) and trip_repair.finite(b) and data.get('start_soc_source') == data.get('end_soc_source'):
             data['soc_used_percent'] = round(a-b, 1)
+        else:
+            data.pop('soc_used_percent', None)
         if data.get('energy_rejected'):
             data.pop('energy_wh', None)
             data.pop('efficiency_km_kwh', None)
@@ -711,6 +722,8 @@ class Archive(ChargeCosts):
 
         samples = []
         sample_times = []
+        can_samples = []
+        can_sample_times = []
         if parsed:
             from datetime import timedelta
             min_time = (min(parsed) - timedelta(minutes=5)).isoformat()
@@ -727,48 +740,61 @@ class Archive(ChargeCosts):
                             observed
                         ) AS ts,
                         json_extract(body, '$.data.soc_percent') AS soc,
-                        json_extract(body, '$.data.battery_wh') AS wh
+                        json_extract(body, '$.data.battery_wh') AS wh,
+                        json_extract(body, '$.data.display_soc_candidate_percent') AS candidate,
+                        json_extract(body, '$.data.field_measured_at.display_soc_candidate_percent') AS candidate_at,
+                        observed
                     FROM events
                     WHERE device=? AND kind='state'
                         AND julianday(observed) >= julianday(?) AND julianday(observed) <= julianday(?)
                         AND (json_extract(body, '$.data.soc_percent') IS NOT NULL
-                             OR json_extract(body, '$.data.battery_wh') IS NOT NULL)
+                             OR json_extract(body, '$.data.battery_wh') IS NOT NULL
+                             OR json_extract(body, '$.data.display_soc_candidate_percent') IS NOT NULL)
                     ORDER BY observed""",
                     (device, min_time, max_time)
                 ).fetchall()
 
-            for ts_str, soc, wh in rows:
-                if soc is None and wh is None:
+            for ts_str, soc, wh, candidate, candidate_at, observed in rows:
+                if soc is None and wh is None and candidate is None:
                     continue
                 try:
+                    point = display_soc.measurement({display_soc.KEY:candidate, 'field_measured_at':{display_soc.KEY:candidate_at}}, observed, max_age=180)
+                    if point:
+                        can_samples.append((_parse_ts(point['at']).timestamp(), point['value'], display_soc.SOURCE))
+                    if soc is None and wh is None:
+                        continue
                     t = _parse_ts(ts_str).timestamp()
                     if wh is not None:
                         wh_val = float(wh)
                         soc_val = min(100.0, max(0.0, wh_val / (capacity_kwh * 1000) * 100))
                     else:
                         soc_val = float(soc)
-                    samples.append((t, soc_val))
+                    samples.append((t, soc_val, 'legacy_energy_calibration'))
                 except (ValueError, TypeError):
                     continue
 
             samples.sort(key=lambda s: s[0])
             sample_times = [s[0] for s in samples]
+            can_samples.sort(key=lambda s: s[0])
+            can_sample_times = [s[0] for s in can_samples]
 
-        def _nearest_soc(target_ts, max_gap_s=300):
-            if not samples:
+        def _nearest_soc(target_ts, max_gap_s=300, can=False):
+            points = can_samples if can else samples
+            times = can_sample_times if can else sample_times
+            if not points:
                 return None
             try:
                 t = _parse_ts(target_ts).timestamp()
             except (ValueError, TypeError):
                 return None
-            idx = bisect.bisect_left(sample_times, t)
+            idx = bisect.bisect_left(times, t)
             best_soc = None
             best_gap = max_gap_s + 1
             for i in (idx - 1, idx):
-                if 0 <= i < len(samples):
-                    gap = abs(samples[i][0] - t)
+                if 0 <= i < len(points):
+                    gap = abs(points[i][0] - t)
                     if gap < best_gap:
-                        best_soc = samples[i][1]
+                        best_soc = (points[i][1], points[i][2])
                         best_gap = gap
             return best_soc if best_gap <= max_gap_s else None
 
@@ -777,13 +803,20 @@ class Archive(ChargeCosts):
             started = data.get('started_at')
             ended = data.get('ended_at')
 
-            start_soc = _nearest_soc(started) if started else None
-            end_soc = _nearest_soc(ended) if ended else None
+            start_soc = _nearest_soc(started, can=True) if started else None
+            end_soc = _nearest_soc(ended, can=True) if ended else None
+            if start_soc is None or end_soc is None:
+                start_soc = _nearest_soc(started) if started else None
+                end_soc = _nearest_soc(ended) if ended else None
 
             if start_soc is not None and end_soc is not None:
+                data['start_soc_source'], data['end_soc_source'] = start_soc[1], end_soc[1]
+                start_soc, end_soc = start_soc[0], end_soc[0]
                 data['start_soc_percent'] = round(min(100.0, max(0.0, start_soc)), 1)
                 data['end_soc_percent'] = round(min(100.0, max(0.0, end_soc)), 1)
                 data['soc_charged_percent'] = round(max(0.0, data['end_soc_percent'] - data['start_soc_percent']), 1)
+                if data.get('start_soc_source') != data.get('end_soc_source'):
+                    data['soc_charged_percent'] = None
                 data['soc_retroactive_estimated'] = False
             elif data.get('energy_kwh'):
                 try:

@@ -220,8 +220,10 @@ class TestChargingRegression(unittest.TestCase):
 
     def test_recorded_capacity_mismatch(self):
         runtime = self.runtime()
+        runtime['latest']['data']['display_soc_candidate_percent'] = 79.5
+        runtime['latest']['data'].setdefault('field_measured_at', {})['display_soc_candidate_percent'] = self.base_time.isoformat()
         first = values(runtime)
-        self.assertEqual(first['soc_percent'], 77.8)
+        self.assertEqual(first['soc_percent'], 79.5)
         self.assertGreater(first['time_to_80_s'], 0)
         runtime['latest']['data']['measured_capacity_wh'] = 100518
         second = values(runtime)

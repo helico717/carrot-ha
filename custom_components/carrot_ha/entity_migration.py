@@ -14,7 +14,7 @@ BATTERY_TEMPERATURE_DETAILS = {'battery_min_temperature_c', 'battery_max_tempera
 BATTERY_TEMPERATURE_COMPACTION_KEY = 'battery_temperature_compaction_version'
 REMOVED_SENSORS = {
     'charge_power_w', 'charge_connection_evidence', 'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
-    'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
+    'display_soc_candidate_percent', 'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
 }
 DIAGNOSTIC_KEYS = {
     'aux_voltage', 'emergency_charging', 'hv_voltage', 'recirc', 'blower_level',

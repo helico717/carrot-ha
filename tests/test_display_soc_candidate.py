@@ -44,14 +44,10 @@ class ReceiverTripMeasurementTests(unittest.TestCase):
 
 class HaSensorTests(unittest.TestCase):
     def test_sensor_is_optional_fresh_checked_and_labelled_candidate(self):
-        self.assertIn(KEY, telemetry.SENSOR_FIELDS)
+        self.assertNotIn(KEY, telemetry.SENSOR_FIELDS)  # no parallel observation entity
         self.assertIn(KEY, telemetry.OPTIONAL_FIELDS)  # expires after FRESHNESS_SECONDS
-        measured = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
-        attrs = telemetry.battery_monitor_attributes(KEY, {KEY: 60.5, 'field_measured_at': {KEY: measured}})
-        self.assertEqual(attrs['can_id'], '0x14A'); self.assertEqual(attrs['can_bus'], 1)
-        self.assertIs(attrs['used_for_dashboard_soc'], False)
-        self.assertFalse(attrs['stale']); self.assertEqual(attrs['measured_at'], measured)
-        self.assertIn('pending', attrs['validation'])
+        self.assertEqual(telemetry.battery_monitor_attributes(KEY, {}), {})
+
 
 
 if __name__ == '__main__':

@@ -1019,7 +1019,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     const batteryItems=[
-      row(batteryIconName(v.soc_percent),'배터리 잔량',n(v.soc_percent),'%'),
+      row(batteryIconName(v.soc_percent),'배터리 잔량',n(v.soc_percent,0),'%'),
       row('car-electric','주행가능거리 (추정)',n(v.range_km),'km'),
       row('flash','배터리 에너지',n(v.battery_kwh),'kWh'),
       row('ev-station','충전 전력',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW'),

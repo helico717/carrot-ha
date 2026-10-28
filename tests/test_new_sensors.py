@@ -367,8 +367,9 @@ class TestNewSensors(unittest.TestCase):
                         'data': {
                             'charging': True,
                             'charge_can_bms_request_bus1': 6,
-                            'field_measured_at': {'charge_can_bms_request_bus1': datetime.now(timezone.utc).isoformat()},
+                            'field_measured_at': {'charge_can_bms_request_bus1': datetime.now(timezone.utc).isoformat(), 'display_soc_candidate_percent': datetime.now(timezone.utc).isoformat()},
                             'soc_percent': 65.0,
+                            'display_soc_candidate_percent': 65.0,
                             'session_start_soc': 25.0,
                             'session_charge_kwh': 18.2,
                             'session_charge_cost': 5820,

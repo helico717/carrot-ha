@@ -90,6 +90,13 @@ class MigrationTest(unittest.TestCase):
         self.assertIsNone(registry.async_get('sensor.other_eta').disabled_by)
         self.assertEqual(entry.options['soc_capacity_kwh'], 77)
 
+    def test_soc_switch_preserves_battery_id_and_removes_only_observation_entity(self):
+        registry = Registry({'soc_percent':'sensor.id_4_battery',
+            'display_soc_candidate_percent':'sensor.id_4_soc_candidate'})
+        self.migrate(registry)
+        self.assertEqual(registry.async_get('sensor.id_4_battery').unique_id,'car_soc_percent')
+        self.assertIsNone(registry.async_get('sensor.id_4_soc_candidate'))
+
     def test_migration_and_repeat(self):
         registry = Registry({
             'range_km': 'sensor.id_4_range_km',

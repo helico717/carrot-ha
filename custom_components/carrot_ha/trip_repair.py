@@ -3,11 +3,11 @@ from .battery import MEB_INVALID_ENERGY_WH
 import bisect
 import hashlib
 import json
-from . import archive_codec
+from . import archive_codec, display_soc
 import math
 from datetime import datetime, timezone
 
-VERSION = 6
+VERSION = 7
 
 
 def timestamp(value):
@@ -79,14 +79,20 @@ def route_summary(route, start, end):
 
 class Samples:
     def __init__(self, rows):
-        self.fields = {'odometer_km': {}, 'battery_wh': {}, 'soc_percent': {}}
+        self.fields = {'odometer_km': {}, 'battery_wh': {}, 'soc_percent': {}, display_soc.KEY: {}}
         self.invalid = {key: set() for key in self.fields}
         for row in rows:
             observed, odo, odo_at, wh, wh_at, measured, stale, charging, driving = row[:9]
-            soc, soc_at = row[9:] if len(row) > 9 else (None, None)
-            for key, value, at in [('odometer_km', odo, odo_at), ('battery_wh', wh, wh_at), ('soc_percent', soc, soc_at)]:
+            soc, soc_at = row[9:11] if len(row) > 9 else (None, None)
+            candidate, candidate_at = row[11:13] if len(row) >= 13 else (None, None)
+            for key, value, at in [('odometer_km', odo, odo_at), ('battery_wh', wh, wh_at), ('soc_percent', soc, soc_at), (display_soc.KEY, candidate, candidate_at)]:
+                if key == display_soc.KEY and (not at or not display_soc.valid(value)):
+                    continue
                 t = timestamp(at or measured or observed)
                 if t is None:
+                    continue
+                observed_t = timestamp(observed)
+                if key == display_soc.KEY and observed_t is not None and t > observed_t+5:
                     continue
                 if not finite(value) or value < 0 or stale:
                     if value is not None:
@@ -185,6 +191,16 @@ def derive(data, samples, old=None):
             if (finite(wh) and 0 <= wh <= 150000) or (finite(soc) and 0 <= soc <= 100):
                 result[boundary+'_measurement'] = {'battery_wh':wh if finite(wh) and 0 <= wh <= 150000 else None,
                     'soc_percent':soc if finite(soc) and 0 <= soc <= 100 else None, 'at':at}
+
+    # Display-only boundaries never affect the independently derived Wh energy.
+    for boundary, target in (('start', start), ('end', end)):
+        candidate = samples.nearest(display_soc.KEY, target, maximum=30)
+        point = measured.get(boundary) or {}
+        candidate_at = timestamp(point.get('display_soc_candidate_measured_at'))
+        if display_soc.valid(point.get(display_soc.KEY)) and candidate_at is not None and abs(candidate_at-target) <= 30:
+            candidate = {'value': point[display_soc.KEY], 'at': candidate_at}
+        if candidate:
+            result[boundary+'_display_soc'] = {'value': candidate['value'], 'at': candidate['at']}
 
     # Distance-only revisions do not change the battery measurement window.
     # Preserve its endpoints separately from the distance fingerprint.
@@ -301,7 +317,8 @@ def refresh(db, device):
         json_extract(body,'$.data.battery_wh'), json_extract(body,'$.data.field_measured_at.battery_wh'),
         json_extract(body,'$.data.measured_at'), json_extract(body,'$.data.stale'),
         json_extract(body,'$.data.charging'), json_extract(body,'$.data.driving'),
-        json_extract(body,'$.data.soc_percent'), json_extract(body,'$.data.field_measured_at.soc_percent')
+        json_extract(body,'$.data.soc_percent'), json_extract(body,'$.data.field_measured_at.soc_percent'),
+        json_extract(body,'$.data.display_soc_candidate_percent'), json_extract(body,'$.data.field_measured_at.display_soc_candidate_percent')
         FROM events WHERE device=? AND kind='state' ORDER BY observed""", (device,)).fetchall()
     samples = Samples(rows)
     old = {key: json.loads(body) for key,body in db.execute('SELECT id,body FROM trip_derivations WHERE device=?',(device,))}
@@ -320,6 +337,11 @@ def apply(event, derived):
     if (not derived or derived.get('fingerprint') != fingerprint(data)
             or derived.get('source_fingerprint', source_fingerprint(data)) != source_fingerprint(data)):
         return event
+    for boundary in ('start', 'end'):
+        point = derived.get(boundary+'_display_soc')
+        if point and display_soc.valid(point.get('value')):
+            data[boundary+'_display_soc_percent'] = point['value']
+            data[boundary+'_display_soc_measured_at'] = datetime.fromtimestamp(point['at'], timezone.utc).isoformat()
     data['energy_charging'] = derived.get('energy_charging', False)
     data['energy_rejected'] = derived.get('energy_rejected', False)
     data['distance_incomplete'] = derived.get('distance_incomplete', False)

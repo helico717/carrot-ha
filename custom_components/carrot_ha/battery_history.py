@@ -1,6 +1,6 @@
 """Fourteen local days, measured samples only; gaps are never interpolated."""
 import json
-from . import archive_codec
+from . import archive_codec, display_soc
 import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -49,13 +49,22 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                     rd['received_samples'] += 1
                     if v.get('stale'):
                         rd['stale_samples'] += 1
-                stamp = (v.get('field_measured_at') or {}).get('battery_wh') or v.get('measured_at') or e['observed_at']
-                t = datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp()
-                # Reject samples timestamped >5 minutes ahead of observation or beyond now
+                point = display_soc.measurement(v, e['observed_at'], max_age=180)
+                if point:
+                    soc = point['value']
+                    t = display_soc.timestamp(point['at']).timestamp()
+                    source = display_soc.SOURCE
+                elif display_soc.KEY not in v:
+                    stamp = (v.get('field_measured_at') or {}).get('battery_wh') or v.get('measured_at') or e['observed_at']
+                    t = datetime.fromisoformat(stamp.replace('Z', '+00:00')).timestamp()
+                    energy = float(v['battery_wh'])
+                    soc = energy / (float(capacity) * 1000) * 100
+                    source = 'legacy_energy_calibration'
+                else:
+                    continue
                 if t > obs_dt.timestamp() + 300 or t > now.timestamp():
                     continue
-                energy = float(v['battery_wh'])
-                soc = energy / (float(capacity) * 1000) * 100
+                v = {**v, '_display_soc_source': source}
                 if not math.isfinite(soc) or not 0 <= soc <= 110 or v.get('stale'):
                     continue
             except (ValueError, TypeError, KeyError):
@@ -76,8 +85,9 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
             day['valid_samples'] += 1
             if charging:
                 day['charge_hours'][local.hour] = True
-            day['hours'][local.hour] = {'soc': min(100, soc), 'charging': charging, 'driving': driving}
-        if previous and t > previous[0] and t - previous[0] <= 300:
+            day['hours'][local.hour] = {'soc': min(100, soc), 'charging': charging, 'driving': driving, 'soc_source': v['_display_soc_source']}
+        if (previous and t > previous[0] and t - previous[0] <= 300
+                and previous[2].get('_display_soc_source') == v.get('_display_soc_source')):
             pt, ps, pv = previous
             dt = t - pt
             cursor = max(pt, start)

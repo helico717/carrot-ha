@@ -175,6 +175,21 @@ class JournalTests(unittest.TestCase):
         self.assertAlmostEqual(self.journal.query('2026-09-01','2026-09-30')['totals']['drive_soc_used_pp'],10.2,places=6)
         self.assertFalse(sync(self.archive,self.journal))
 
+    def test_can_display_soc_projection_does_not_recalculate_energy(self):
+        point=lambda at,wh,soc:{'at':at,'battery_wh':wh,'soc_percent':None,
+            'display_soc_candidate_percent':soc,'display_soc_candidate_measured_at':at}
+        self.archive.put(self.event('trip','can-soc',{'started_at':'2026-09-01T00:00:00Z','ended_at':'2026-09-01T01:00:00Z',
+            'distance_m':10000,'trip_measurements':{'start':point('2026-09-01T00:00:00Z',50000,80),
+            'end':point('2026-09-01T01:00:00Z',48000,78.5),'complete':True}}))
+        self.journal.soc_capacity_kwh=64
+        sync(self.archive,self.journal)
+        result=self.journal.query('2026-09-01','2026-09-30')
+        self.assertEqual(result['totals']['drive_soc_used_pp'],1.5)
+        self.assertEqual(result['totals']['drive_energy_kwh'],2)
+        self.assertEqual(result['totals']['distance_km'],10)
+        self.assertEqual(self.journal.synced_display_soc_version(),1)
+        self.assertFalse(sync(self.archive,self.journal))
+
     def test_zero_payment_and_deletion(self):
         self.archive.put(self.charge())
         sync(self.archive,self.journal)

@@ -23,8 +23,6 @@ SENSOR_FIELDS = {
     # Observation only: never an input to the driving range. NA = HV auxiliary load; the climate value is a request.
     'hv_aux_power_w': ('보조 장치 소비 전력 (관찰용)', 'W', 'mdi:flash-outline', 'power', 0),
     'climate_power_request_w': ('공조 전력 요청 (관찰용)', 'W', 'mdi:hvac', 'power', 0),
-    # Comparison-only candidate; the Wh-based battery SOC remains the dashboard/journal basis.
-    'display_soc_candidate_percent': ('계기판 SOC 후보', '%', 'mdi:gauge', None, 1),
     'comma_cpu_temperature_c': ('콤마 CPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_gpu_temperature_c': ('콤마 GPU 최고 온도', '°C', 'mdi:thermometer', 'temperature', 1),
     'comma_cpu_usage_percent': ('콤마 CPU 평균 사용률', '%', 'mdi:chip', None, 1),
@@ -48,7 +46,7 @@ CHARGE_CAN_SIGNALS = {
 }
 CHARGE_CAN_KEYS = {f'charge_can_{name}_bus{bus}' for name in CHARGE_CAN_SIGNALS for bus in (0, 1)}
 BMS_ACTUAL_KEYS = {f'bms_{field}_bus{bus}' for field in ('actual_mode', 'power_w', 'voltage_v') for bus in (0, 1)}
-OPTIONAL_FIELDS = set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | BMS_ACTUAL_KEYS | LIGHT_FIELDS
+OPTIONAL_FIELDS = {'display_soc_candidate_percent'} | set(SENSOR_FIELDS) | CHARGE_CAN_KEYS | BMS_ACTUAL_KEYS | LIGHT_FIELDS
 REFRESH_FIELDS = OPTIONAL_FIELDS | {'actual_charge_power_w', 'hv_voltage', 'charge_mode', 'charging', 'can_capture_storage', 'can_capture_last_received', 'can_capture_enabled'}
 FRESHNESS_SECONDS = 180
 
@@ -93,11 +91,10 @@ def charge_plug_indication(data):
 
 
 BATTERY_MONITOR_FIELDS = {key for key in SENSOR_FIELDS if key.startswith('battery_')}
-DISPLAY_SOC_CANDIDATE_FIELD = 'display_soc_candidate_percent'
 CHARGE_TEMPERATURE_DISPLAY = {'below_optimal': '적정 미만', 'optimal': '적정', 'above_optimal': '적정 초과'}
 
 def battery_monitor_attributes(key, data):
-    if key not in BATTERY_MONITOR_FIELDS and key != DISPLAY_SOC_CANDIDATE_FIELD:
+    if key not in BATTERY_MONITOR_FIELDS:
         return {}
     from datetime import datetime, timezone
     measured = (data.get('field_measured_at') or {}).get(key)
@@ -122,9 +119,4 @@ def battery_monitor_attributes(key, data):
             attrs[f'{label}_temperature_measured_at'] = details['measured_at']
             attrs[f'{label}_temperature_stale'] = details['stale']
         attrs['extrema_can_id'] = '0x16A954A6'
-    elif key == 'display_soc_candidate_percent':
-        attrs.update(can_id='0x14A', can_bus=1, signal='byte19_x0.5_percent',
-                     measurement_basis='instrument_cluster_soc_candidate',
-                     validation='retained_can_correlation_2026-10-05; cluster_photo_comparison_pending',
-                     used_for_dashboard_soc=False)
     return attrs
