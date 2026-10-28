@@ -7,7 +7,7 @@
 - 한계: 값은 수집기 샘플링 시점의 순간값이다(1분 평균 아님). 정밀 분석은 원시 CAN 기록을 계속 사용한다.
 - 관련 파일: custom_components/carrot_ha/{telemetry.py,sensors_v3.py,entity_migration.py}, tests/test_new_sensors.py.
 - 검증: Comma 쪽 ha 테스트 6개 파일 통과(신규 3건 포함), HA 쪽 test_new_sensors(신규 1건 포함), entity_migration, range_efficiency, trip_repair, trip_energy, history_cache, incremental_sync, optional_telemetry 104개 통과. 실제 차량에서 값이 들어오는지는 미확인.
-- 배포 상태: 아래 별도 기록. Comma는 사용자가 `git pull --ff-only` 후 재부팅해야 새 값이 수집된다.
+- 배포 상태: Comma 커밋 `a07274381` 원격 브랜치 푸시 확인(사용자의 `git pull --ff-only` 후 재부팅 필요). HA는 커밋 `785133a` main 푸시 확인 후 직접 반영했고 `/homeassistant/carrot_ha/deployment-backups/785133a/before`에 백업했다. `sensors_v3.py`·`entity_migration.py`는 직전 커밋과 일치함을 확인한 뒤 커밋 파일로 교체했다(해시 f2c267e7…, f509608f…). **`telemetry.py`는 HA 설치본에 계기판 SOC 후보 변경(`b972426`)이 아직 없어서, 이 항목 변경과 무관한 그 작업이 함께 배포되지 않도록 설치본에 이번 센서 정의 두 줄만 더해 반영했다(해시 649a5e52…).** 따라서 설치된 `telemetry.py`는 저장소 파일과 해시가 다르며 차이는 `b972426`의 계기판 SOC 후보 부분뿐이다. 다음에 `b972426`을 배포할 때 저장소 파일로 교체하면 정리된다. HA 구문 검사는 `__pycache__` 권한 문제로 HA에서 실행하지 못했고 반영한 `telemetry.py`는 로컬 컴파일만 확인했다. **Python 변경이므로 HA 재시작 전에는 적용되지 않는다.** 재시작 후 엔터티 생성과 차량 값 수신은 미확인. 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-28 — 주행가능거리가 항상 수치를 갖도록: 최근 50 km를 시점 제한 없이 + 부족하면 있는 만큼 + 참고 전비 옵션
 
