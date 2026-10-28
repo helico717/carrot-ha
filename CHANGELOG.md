@@ -10,7 +10,10 @@
 - 관련 파일: custom_components/carrot_ha/{aux_battery.py,vehicle.py,__init__.py,frontend/carrot-dashboard-ko.js,frontend/carrot-dashboard-en.js,frontend/carrot-dashboard-debug.js}, tests/{test_aux_battery.py,dashboard-aux-battery.test.mjs}, preview/aux-voltage/index.html.
 - 검증: Python 신규 14개와 기존 test_new_sensors(22)·history_cache·incremental_sync·cloud_live·range_efficiency·trip_energy 통과. 프런트 신규 6개와 필수 회귀(`dashboard-live-loading`, `dashboard-lazy-runtime`, `dashboard-view-state`, `dashboard-calculation-regressions`) 통과. 운영 코드로 한국어·영어 × 다크·라이트 × 상태 5종·단계 10경우를 폭 1280/768/430/390px에서 점검(색·점·간격·기준선·넘침·라벨) 이상 없음. 사전 실패(수정 전 HEAD에서도 동일): `camera-360`·`charging-curve`·`debug-freshness`·`range-c3-and-fixes`(Node의 `export` 구문 오류), `motion-status`(단언 실패), Python `test_direct_receiver`(이 Mac에 `aiohttp` 없음). 이 중 `debug-freshness`는 실행되지 않아 디버그 대시보드 변경은 브라우저로 확인했다.
 - 한계·미확인: 실제 차량에서의 경고 발생 시점과 HA 재시작 후 복원 결과, 사용자 브라우저에서의 실제 표시. 경고 기준(12.0V, 10분)은 이 차 2주 기록과 AGM 일반 특성에 기반하며 불량 배터리의 전압은 관찰된 적이 없다. 겨울 기록이 쌓이면 주의 경계(12.2V)를 다시 본다. 영어 390px 계열에서 카메라 버튼이 다음 줄로 넘어가는 동작은 사용자 결정으로 유지.
-- 배포 상태: (아래에 이어서 기록)
+- 배포 상태: 커밋 `371d7fa` main 푸시 확인. HA SSH 직접 반영(2026-10-28): 반영 전 설치본 5개(`__init__.py`, `vehicle.py`, ko/en/debug 대시보드)를 `/homeassistant/carrot_ha/deployment-backups/371d7fa/before/`에 백업(`SHA256SUMS.before`, 신규 파일 표시 `NEW_FILES_ABSENT_BEFORE` 포함)했다. 반영 전 설치본은 `vehicle.py`·ko·en·debug가 직전 커밋과 해시 동일, `__init__.py`는 23행 주석 한 줄만 달랐다(코드 동일, 이전 커밋의 주석 변경 미반영). 반영 후 6개 파일(`aux_battery.py` 신규 포함)의 크기와 SHA-256이 저장소 `371d7fa` 원본과 일치하고 Python 3개 파일 문법 검사를 통과했다.
+- 배포 사고(복구 완료): 첫 반영 시 zsh가 `$SHA:custom_components/…`를 변수 수정자로 해석해 `git show`가 실패했고, 빈 내용이 위 6개 HA 파일에 약 수 분간 덮어써졌다. 그 검증은 빈 파일끼리 해시를 비교해 "일치"로 잘못 나왔다. 곧바로 로컬에서 내용·크기를 확인한 파일로 재반영해 복구했고, 이번 검증은 크기 0 초과와 원본 해시 일치로 다시 했다. 그 사이 HA 재시작은 없었고 이미 메모리에 올라간 Python 코드는 영향이 없었다. 대시보드 JS는 그 시간에 불러온 화면이 있었다면 새로고침 전까지 비정상일 수 있었다. 재발 방지: 배포 스크립트는 `${변수}:경로` 형태와 "비어 있지 않음" 확인을 필수로 한다.
+- 사용자 조치: HA를 **재시작**해야 Python 변경(12V 단계 계산)이 적용된다. 재시작 전에는 새 대시보드가 `aux_level`을 받지 못해 12V 줄이 회색으로 보인다. 브라우저는 강력 새로고침(Ctrl+F5)이 필요하다. 버전 번호(`0.9.0-beta.1`)·pre-release는 그대로이며 발행하지 않았다.
+- 미확인: 재시작 후 실제 계산·복원 결과와 실제 화면. 재시작 직후 `values()`가 내려주는 `aux_level`/`aux_low_minutes`를 확인해야 한다.
 
 ## 2026-10-28 — 개요 `외기 / 배터리 / 카메라` 줄 세로 정렬 보정 (좁은 화면)
 
