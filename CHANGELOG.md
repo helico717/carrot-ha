@@ -8,7 +8,7 @@
 - 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,battery.py,config_flow.py,sensors_v3.py,strings.json,translations/ko.json}, tests/{test_range_efficiency.py,test_new_sensors.py}.
 - 검증: Python 94개(range_efficiency, new_sensors, trip_repair, trip_energy, history_cache, incremental_sync) 통과. 전체 discover는 로컬에 `voluptuous`가 없어 기존 오류 10건(변경 전과 동일)이 있고 설정 화면 테스트(test_receiver_options)는 로컬에서 실행하지 못했다. `config_flow.py`는 컴파일만 확인했다.
 - 한계: 주행 기록이 적을 때는 값이 크게 흔들릴 수 있다. 상태 기록 방식과 주행 기록 방식의 구간 선택은 거리가 더 많은 쪽 기준이다. 외기온 보정은 이번 범위가 아니다.
-- 배포 상태: 아래 별도 기록.
+- 배포 상태: 커밋 `081df77` main 푸시 확인. HA 설치 파일 9개가 직전 커밋과 해시 일치함을 확인하고 `/homeassistant/carrot_ha/deployment-backups/081df77/before`에 백업한 뒤 직접 반영했다. 반영 후 해시가 로컬 파일과 모두 일치. 이 항목의 이전 항목(`c4a0841` 방식)은 HA에 반영된 적이 없다. **Python·설정 화면 변경이므로 HA 재시작 전에는 적용되지 않음.** 재시작 후 센서 값과 옵션 화면은 미확인. 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-28 — 주행가능거리 고정 대체값(5.0 km/kWh, SOC×4.6) 제거
 
