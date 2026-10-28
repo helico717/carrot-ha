@@ -1,3 +1,10 @@
+## 2026-10-28 — 수신 앱 SOC 설명 정정 및 기존 배터리 엔터티 실제 적용 확인
+
+- 사용자 지적: 수신 앱 0.1.4 공지의 '비교 전용' 문구가 '기존 배터리 엔터티의 표시 SOC로 즉시 전환, 관찰 엔터티 없음'이라는 최신 지시와 맞지 않았다. addons/carrot_receiver/CHANGELOG.md를 CAN 표시 SOC 전달·기존 엔터티 사용·Wh/에너지 유지 안내로 바로잡았다. 수신 앱 실행 코드·버전·태그·Release 변경 없음.
+- 운영 확인: /health에서 수신 앱 0.1.4 및 ok=True 확인. HA Recorder 최신 sensor.id_4_battery 값 58.5%, soc_source=can_0x14a_byte19, can_id=0x14A, signal=byte19_x0.5_percent를 확인했다. 기존 엔터티에 실제 새 코드가 적용돼 기록되고 있다. 관찰용 display_soc_candidate_percent unique_id 엔터티 등록은 없음.
+- 시각/신선도: 새 Recorder 행은 2026-10-28 23:25 KST, 실제 후보 측정은 18:29:56 KST이며 stale=True다. 새 Recorder 행을 새 CAN 측정으로 해석하지 않는다. 58.5 원본 저장과 정수 화면 표시는 구분한다. 실제 사용자 브라우저의 렌더/클릭을 이번에 새로 검증하지 않았다.
+- 검증/상태: 읽기 전용 DB·등록부·health 확인 및 문서 정정, diff 검사. 운영 DB·계산·설정·재시작·새 릴리즈 변경 없음. 이전의 '사용자 재시작 후 엔터티 확인 대기'는 이번 실제 기록 확인 범위에서 해소됐다.
+
 ## 2026-10-28 — CAN 표시 SOC 전환 후 CI 전체 성공 확인
 
 - 실행 코드 57ead34 및 검증 보완 b8e9eda를 포함한 새 Actions https://github.com/helico717/carrot-ha/actions/runs/40690379321 완료 success. radar-ha-python·regression 모두 success 확인. 이전 실행 40689714991의 실패와 구분한다.
