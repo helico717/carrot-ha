@@ -118,6 +118,13 @@ async def async_setup_entry(hass, entry):
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
     await refresh_runtime_costs(hass, runtime)
+    try:
+        # Rebuild the 12V level/low-run state from the last hour so a restart does not reset it.
+        from . import aux_battery
+        recent = await hass.async_add_executor_job(archive.history, entry.data['device_id'], 'state', 60)
+        aux_battery.seed(runtime, reversed(recent))
+    except Exception:
+        _LOGGER.debug('12V level seed skipped', exc_info=True)
     from .driving_logs.runtime import setup as setup_driving_logs
     setup_driving_logs(hass, entry, runtime)
     from .vehicle_journal.runtime import setup as setup_journal

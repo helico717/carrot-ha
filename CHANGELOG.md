@@ -1,3 +1,17 @@
+## 2026-10-28 — 12V 배터리 전압 색상 표시 운영 반영 (HA 저전압 지속 시간·히스테리시스 포함)
+
+- 요청: 프리뷰로 확정한 기준을 운영 대시보드에 반영한다. 라벨은 `배터리`(영어 `Battery`), 주행 중은 색 없음, 주차 중만 색 표시, 저전압 지속 시간 계산과 히스테리시스를 HA 쪽에 포함한다.
+- 근거: 2026-10-14~28 기록 분석(아래 프리뷰 항목). Comma가 꺼질 때의 마지막 값(약 11.8V)은 방전이 아니라 차량 기상 순간의 강하이고, 정차 중에도 약 65~70분마다 1~4분 강하(최대 4분)가 반복된다. 그래서 낮은 값은 지속될 때만 경고로 올리고, 오래된 값은 색을 입히지 않는다.
+- HA(`aux_battery.py` 신규, `vehicle.values()`에서 호출): 표시 자릿수와 같은 0.1V 단위로 판정한다. 12.2V 이상 정상, 12.0~12.2V 주의, 12.0V 미만은 10분 이상 이어질 때 경고(그 전에는 주의 `low-pending`), 주차 중 13.0V 이상(`dcdc`)과 주행·충전 중(`active`)은 판정하지 않는다. 히스테리시스: 좋은 쪽으로 돌아갈 때는 0.1V를 더 올라야 한다(주의→정상 12.3V, 경고→주의 12.1V). 정상→주의는 12.1V에서 바로. 그래서 하루 이상 주차 때 12.1/12.2V를 오가도 색이 깜빡이지 않는다. 측정이 3분 넘게 끊기면 저전압 지속 시간과 기억한 단계를 모두 지운다. 같은 측정 시각의 중복·과거 측정은 무시하므로 어느 클라이언트가 몇 번 읽어도 계산은 한 번이며 DB 조회가 없다(수신기 요청·쓰기 추가 없음). HA 시작 때 최근 1시간 상태 기록 60건으로 한 번 복원한다(실패해도 시작은 계속).
+- 추가 값(`values()`): `aux_level`(ok/caution/warn/없음), `aux_level_reason`, `aux_low_minutes`, `aux_age_s`(측정 후 경과 초). `aux_voltage`는 기존처럼 마지막 알려진 값을 유지한다.
+- 대시보드(`carrot-dashboard-ko.js`, `-en.js`, `-debug.js`): `auxBatteryView`/`auxBatterySpan`이 12V 줄을 그린다. 주행·충전은 색 없음, 주차는 서버 단계 색, 그 외 상태(데이터 지연·통신 지연·오프라인·확인 불가)와 측정 후 10분 초과, 전압 없음, DC-DC는 회색(오래된 값은 `N분/시간 전` 표기). 값은 항상 소수 한 자리(`12.0V`). 점은 값에 붙이고 라벨과 6px 띄웠으며 `외기`도 같은 간격으로 맞췄다. 글자색 선택자는 폭 820px 이상에서만 쓰이는 `.overview-col-visual .mini-condition span b`보다 우선하도록 `.mini-condition .aux-battery b[...]`로 지정했다. 디버그 시뮬레이터는 상태별 12V 값과 단계 필드를 내려준다. 센서 이름 `12V 배터리 전압`은 그대로다.
+- 발견·수정: `aux_age_s`가 `null`이면 JS에서 `null>=0`이 참이라 측정 시각을 모르는 값이 최신으로 처리될 뻔했다(테스트가 잡음). 숫자인 경우만 신선도를 인정한다.
+- 프리뷰(`preview/aux-voltage/`): 운영 코드가 줄을 그리고 슬라이더는 위 필드를 흉내 내 넘기는 검증 도구가 됐다. 온도 보정 입력은 판정 함수에 선택 기능(기본 꺼짐)으로 남아 있고 운영에는 넣지 않았다(이 차 기록의 온도 효과는 신뢰하기 어려움: +0.008 V/°C, 하루 단위 온도 변화와 섞임).
+- 관련 파일: custom_components/carrot_ha/{aux_battery.py,vehicle.py,__init__.py,frontend/carrot-dashboard-ko.js,frontend/carrot-dashboard-en.js,frontend/carrot-dashboard-debug.js}, tests/{test_aux_battery.py,dashboard-aux-battery.test.mjs}, preview/aux-voltage/index.html.
+- 검증: Python 신규 14개와 기존 test_new_sensors(22)·history_cache·incremental_sync·cloud_live·range_efficiency·trip_energy 통과. 프런트 신규 6개와 필수 회귀(`dashboard-live-loading`, `dashboard-lazy-runtime`, `dashboard-view-state`, `dashboard-calculation-regressions`) 통과. 운영 코드로 한국어·영어 × 다크·라이트 × 상태 5종·단계 10경우를 폭 1280/768/430/390px에서 점검(색·점·간격·기준선·넘침·라벨) 이상 없음. 사전 실패(수정 전 HEAD에서도 동일): `camera-360`·`charging-curve`·`debug-freshness`·`range-c3-and-fixes`(Node의 `export` 구문 오류), `motion-status`(단언 실패), Python `test_direct_receiver`(이 Mac에 `aiohttp` 없음). 이 중 `debug-freshness`는 실행되지 않아 디버그 대시보드 변경은 브라우저로 확인했다.
+- 한계·미확인: 실제 차량에서의 경고 발생 시점과 HA 재시작 후 복원 결과, 사용자 브라우저에서의 실제 표시. 경고 기준(12.0V, 10분)은 이 차 2주 기록과 AGM 일반 특성에 기반하며 불량 배터리의 전압은 관찰된 적이 없다. 겨울 기록이 쌓이면 주의 경계(12.2V)를 다시 본다. 영어 390px 계열에서 카메라 버튼이 다음 줄로 넘어가는 동작은 사용자 결정으로 유지.
+- 배포 상태: (아래에 이어서 기록)
+
 ## 2026-10-28 — 개요 `외기 / 배터리 / 카메라` 줄 세로 정렬 보정 (좁은 화면)
 
 - 증상: 폭 820px 미만에서 `데이터 지연`(또는 카메라 상태) 항목만 약 11px 아래로 처져 보이고, 주차 중 카메라 버튼도 `외기`·`배터리` 글자와 높이가 맞지 않았다.

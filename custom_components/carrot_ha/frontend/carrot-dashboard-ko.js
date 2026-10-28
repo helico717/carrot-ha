@@ -12,6 +12,7 @@ const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEne
 const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const AUX_STALE_S=600; // 12V 측정이 이보다 오래되면 색을 입히지 않는다
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';
 const time = (v, tz) => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:tz||undefined}) : '기록 없음';
 const timeOnly = (v, tz) => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('ko-KR',{hour:'2-digit',minute:'2-digit',timeZone:tz||undefined}) : '기록 없음';
@@ -478,6 +479,16 @@ class CarrotDashboard extends HTMLElement {
       :host([data-theme="light"]) .parking-chip-badge.driving{background:#e6f7ec;color:#187845;border-color:#a3e2b9}
     `;
     themeStyle.textContent+=`
+      .mini-condition .aux-sib b::before,.mini-condition .aux-battery b::before{content:"";display:inline-block;height:8px;vertical-align:.05em}
+      .mini-condition .aux-sib b::before{width:0;margin:0 0 0 6px}
+      .mini-condition .aux-battery b::before{width:8px;border-radius:50%;margin:0 4px 0 6px;background:transparent}
+      .mini-condition .aux-battery b[data-aux="ok"]::before{background:#22c55e}
+      .mini-condition .aux-battery b[data-aux="caution"]{color:#fbbf24}.mini-condition .aux-battery b[data-aux="caution"]::before{background:#f59e0b}
+      .mini-condition .aux-battery b[data-aux="warn"]{color:#f87171}.mini-condition .aux-battery b[data-aux="warn"]::before{background:#ef4444}
+      .mini-condition .aux-battery b[data-aux="unknown"]{color:var(--muted,#8b949e)}.mini-condition .aux-battery b[data-aux="unknown"]::before{background:var(--muted,#8b949e);opacity:.6}
+      .mini-condition .aux-battery small.aux-age{font-size:11px;color:var(--muted,#8b949e);margin-left:6px;font-weight:500}
+      :host([data-theme="light"]) .mini-condition .aux-battery b[data-aux="caution"]{color:#b45309}
+      :host([data-theme="light"]) .mini-condition .aux-battery b[data-aux="warn"]{color:#dc2626}
       .hero{background:#777b80;color:#fff;min-height:280px;display:flex;flex-direction:column;border:0;min-width:0}
       .hero-copy{padding:16px 20px 0}.hero-copy h2{font-size:28px;margin:0;max-width:none}
       .hero .vehicle3d,.hero .vehicle3d .v3d-stage{pointer-events:auto}.hero .hero-copy{pointer-events:none}
@@ -1436,7 +1447,7 @@ class CarrotDashboard extends HTMLElement {
 
     if(v.charge_mode_evidence?.delayed) etaCardSubText += ` · 갱신 지연 (${Math.round(v.charge_mode_evidence.measurement_age_s ?? 0)}s)`;
     if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · 마지막 추정 유지 (${v.charging_eta_hold_age_s ?? 0}s)`;
-    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span>외기 <b>${n(v.outside_temp_c)}°C</b></span><span>12V <b>${n(v.aux_voltage,1)}V</b></span>${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at, tz)}</small>${v.parking_estimated?'<small>주차 위치 추정 · 마지막 GPS 기준</small>':''}</span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
+    return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span class="aux-sib">외기 <b>${n(v.outside_temp_c)}°C</b></span>${this.auxBatterySpan(v)}${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at, tz)}</small>${v.parking_estimated?'<small>주차 위치 추정 · 마지막 GPS 기준</small>':''}</span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';
@@ -1455,6 +1466,22 @@ class CarrotDashboard extends HTMLElement {
   syncVehicle3d(v,state){
     if(!this.shadowRoot.querySelector('.vehicle3d')&&!this._v3d)return;
     import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.syncVehicle3d(this,{v,status:state,dark:this.getAttribute('data-theme')==='dark'})).catch(()=>{});
+  }
+  auxBatteryView(v){
+    const volt=v?.aux_voltage,known=typeof volt==='number'&&Number.isFinite(volt),key=this.vehicleStatus(v).key,age=v?.aux_age_s;
+    const view={text:known?volt.toFixed(1)+'V':'--',level:'unknown',reason:'state',age};
+    if(key==='driving'||key==='charging'){view.level='none';view.reason='active';}
+    else if(key!=='parked'){view.reason='state';}
+    else if(!known){view.reason='no-data';}
+    else if(!(typeof age==='number'&&age>=0&&age<=AUX_STALE_S)){view.reason='stale';}
+    else if(['ok','caution','warn'].includes(v.aux_level)){view.level=v.aux_level;view.reason=v.aux_level_reason||v.aux_level;}
+    else{view.reason=v.aux_level_reason==='dcdc'?'dcdc':'state';}
+    return view;
+  }
+  auxBatterySpan(v){
+    const a=this.auxBatteryView(v),titles={"ok": "정상", "caution": "주의 · 평소보다 낮아요", "low-pending": "주의 · 저전압을 확인하는 중이에요 (일시 강하일 수 있어요)", "warn": "경고 · 저전압이 계속되고 있어요", "active": "주행·충전 중에는 배터리 상태로 판단하지 않아요", "stale": "측정이 오래돼 판단하지 않아요", "dcdc": "차량이 12V를 충전하는 중이라 판단하지 않아요", "state": "차량 상태를 확인할 수 없어 판단하지 않아요", "no-data": "전압 값이 없어요"};
+    const ago=a.reason==='stale'&&a.age>=60?`<small class="aux-age">${a.age>=3600?Math.floor(a.age/3600)+'시간 전':Math.floor(a.age/60)+'분 전'}</small>`:'';
+    return `<span class="aux-battery" title="${esc(titles[a.reason]||'')}">배터리 <b data-aux="${a.level}">${a.text}</b>${ago}</span>`;
   }
   vehicleStatus(v){
     const online=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;

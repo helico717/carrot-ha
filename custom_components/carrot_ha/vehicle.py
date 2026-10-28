@@ -6,6 +6,7 @@ from .telemetry import combined_lock_state
 import math
 from .location import location_values
 from .telemetry import OPTIONAL_FIELDS, FRESHNESS_SECONDS
+from . import aux_battery
 
 def values(runtime):
     latest = runtime.get('latest', {})
@@ -257,4 +258,6 @@ def values(runtime):
         except (ValueError, TypeError, AttributeError):
             data[key] = None
 
+    # Observation only: shared 12V level with hysteresis and sustained-low duration.
+    aux_battery.apply(runtime, data, now_utc)
     return data

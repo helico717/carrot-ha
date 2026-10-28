@@ -593,7 +593,12 @@ export default class CarrotDebugDashboard extends HTMLElement {
       month_slow_kwh: 45.5,
       month_fast_kwh: 110.4,
       outside_temp_c: 24,
-      aux_voltage: 13.8,
+      // Simulated 12V: DC-DC voltage while the car is active, a normal resting value otherwise.
+      aux_voltage: (isCharging || isDriving) ? 13.8 : 12.5,
+      aux_level: (isCharging || isDriving) ? null : 'ok',
+      aux_level_reason: (isCharging || isDriving) ? 'active' : 'ok',
+      aux_low_minutes: 0,
+      aux_age_s: measuredAt ? Math.max(0, Math.round((now - Date.parse(measuredAt)) / 1000)) : null,
       ac_on: true,
       blower_level: 2,
       parking_latitude: 37.5665,
@@ -3197,8 +3202,8 @@ export default class CarrotDebugDashboard extends HTMLElement {
             ${card.vehicleImage()}
           </section>
           <div class="mini-condition">
-            <span>${isEn ? 'Outside' : '외기'} <b>${n(v.outside_temp_c)}°C</b></span>
-            <span>12V <b>${n(v.aux_voltage, 1)}V</b></span>
+            <span class="aux-sib">${isEn ? 'Outside' : '외기'} <b>${n(v.outside_temp_c)}°C</b></span>
+            ${card.auxBatterySpan(v)}
             ${cameraConditionSlotHtml}
           </div>
         </div>

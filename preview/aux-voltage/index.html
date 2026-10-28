@@ -56,8 +56,8 @@
 <body>
 <header>
   <h1>🥕 12V 배터리 전압 색상 프리뷰</h1>
-  <span class="tag">운영 미반영</span>
-  <span class="note">실제 디버그 대시보드 카드 위에서 <b>개요 탭 → 외기 / 배터리</b> 줄만 색을 입혀 비교합니다.</span>
+  <span class="tag">검증용</span>
+  <span class="note">실제 대시보드 코드가 <b>개요 탭 → 외기 / 배터리</b> 줄을 그립니다. 슬라이더 값은 HA가 내려주는 필드로 넘어갑니다.</span>
 </header>
 
 <div class="layout">
@@ -194,23 +194,7 @@ const REASONS = {
 };
 
 // --- 대시보드 렌더 후크: 전압/측정시각 주입 + 12V 줄 장식 ---
-const STYLE_ID='aux-preview-style';
-const AUX_CSS = `
-/* 기존 대시보드 결함 보정: 세로 가운데 정렬(align-items:center)이 폭 820px 이상 미디어쿼리 안에만 있어,
-   더 좁은 화면에서는 38px로 늘어난 줄의 위쪽에 글자가 붙고 '데이터 지연'(안쪽 가운데 정렬)만 아래로 처져 보인다. */
-.mini-condition{align-items:center}
-/* 값(b)은 inline 그대로 둔다: flex로 바꾸면 기준선이 라벨과 어긋난다. 점은 숫자 중앙 높이에 맞추고, 라벨과는 띄우고 숫자에는 붙인다. */
-.aux-pill b[data-aux]::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px 0 6px;vertical-align:.05em;background:transparent}
-.aux-pill b[data-aux="ok"]::before{background:#22c55e}
-.aux-pill b[data-aux="caution"]{color:#fbbf24}.aux-pill b[data-aux="caution"]::before{background:#f59e0b}
-.aux-pill b[data-aux="warn"]{color:#f87171}.aux-pill b[data-aux="warn"]::before{background:#ef4444}
-.aux-pill b[data-aux="unknown"]{color:var(--muted,#8b949e)}.aux-pill b[data-aux="unknown"]::before{background:var(--muted,#8b949e);opacity:.6}
-/* 외기 등 이웃 항목: 라벨과 숫자 사이를 배터리의 '라벨-점' 간격(6px + 공백)과 똑같이 둔다 */
-.aux-sib b::before{content:"";display:inline-block;width:0;height:8px;margin:0 0 0 6px;vertical-align:.05em}
-.aux-pill small.aux-age{font-size:11px;color:var(--muted,#8b949e);margin-left:6px;font-weight:500}
-:host([data-theme="light"]) .aux-pill b[data-aux="caution"]{color:#b45309}
-:host([data-theme="light"]) .aux-pill b[data-aux="warn"]{color:#dc2626}
-`;
+// 12V 줄은 이제 운영 대시보드 코드(auxBatterySpan)가 그린다. 프리뷰는 슬라이더 값을 운영 코드가 받는 필드로 넘기기만 한다.
 let last = { level:'unknown', reason:'state' };
 function currentJudgement(v){
   const state = v?.display_state || 'unknown';
@@ -220,26 +204,15 @@ function currentJudgement(v){
   return { state, ageMin, res: judgeAuxVoltage({ state, voltage:sim.voltage, tempC:sim.tempC, ageMin, lowForMin:sim.lowForMin }, cfg) };
 }
 function decorate(card){
-  const root = card.shadowRoot; if(!root) return;
-  let st = root.getElementById(STYLE_ID);
-  if(!st){ st=document.createElement('style'); st.id=STYLE_ID; }
-  st.textContent = AUX_CSS; root.appendChild(st);
-  const { ageMin, res } = currentJudgement(card.v);
-  last = res;
-  const pill=root.querySelector('.mini-condition .aux-pill')||[...root.querySelectorAll('.mini-condition span')].find(s=>/^\s*12V/.test(s.firstChild?.textContent||s.textContent));
-  if(!pill) return;
-  pill.classList.add('aux-pill');
-  [...pill.parentElement.children].forEach(el=>{ if(el!==pill && el.querySelector(':scope > b')) el.classList.add('aux-sib'); });
-  // 제목 '12V' -> '배터리' (영어: Battery). 첫 텍스트 노드만 바꾼다.
-  const label=pill.firstChild; if(label&&label.nodeType===3) label.textContent=isEn()?'Battery ':'배터리 ';
-  const b=pill.querySelector('b'); if(!b) return;
-  b.dataset.aux = res.level;
-  const [title,desc]=REASONS[res.reason]||['',''];
-  pill.title=`${title} — ${desc}`;
-  pill.querySelectorAll('small.aux-age').forEach(n=>n.remove());
-  if(res.level==='unknown' && res.reason==='stale'){
-    const s=document.createElement('small'); s.className='aux-age'; s.textContent=ageText(ageMin); pill.appendChild(s);
-  }
+  last=currentJudgement(card.v).res;
+}
+// 서버(HA)가 내려주는 필드를 슬라이더 값으로 흉내 낸다. 히스테리시스·지속 시간 계산은 HA 쪽 실제 코드(aux_battery.py)가 한다.
+function serverFields(){
+  const res=judgeAuxVoltage({ state:'parked', voltage:sim.voltage, tempC:sim.tempC, ageMin:0, lowForMin:sim.lowForMin }, cfg);
+  const known=['ok','caution','warn'].includes(res.level);
+  return { aux_voltage:sim.voltage, outside_temp_c:sim.tempC,
+    aux_level: known?res.level:null, aux_level_reason: known?res.reason:(res.reason==='dcdc'?'dcdc':'active'),
+    aux_low_minutes: sim.lowForMin, aux_age_s: Math.round(sim.ageMin*60) };
 }
 let hooked=null;
 function hook(){
@@ -250,7 +223,7 @@ function hook(){
   card.render=()=>{
     if(card.v){
       const measuredAt=new Date(Date.now()-sim.ageMin*60000).toISOString();
-      card.v={...card.v, aux_voltage:sim.voltage, outside_temp_c:sim.tempC, field_measured_at:{...(card.v.field_measured_at||{}), aux_voltage:measuredAt}};
+      card.v={...card.v, ...serverFields(), field_measured_at:{...(card.v.field_measured_at||{}), aux_voltage:measuredAt}};
     }
     orig(); decorate(card); updateVerdict();
   };
