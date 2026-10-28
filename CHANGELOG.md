@@ -1,3 +1,12 @@
+## 2026-10-28 — 자동 충전·주유 기록의 사진 삭제 저장 오류 수정
+
+- 증상: 자동 충전 기록 수정 화면에서 사진을 지우고 저장하면 "입력한 충전 금액을 확인해 주세요."가 표시되며 저장되지 않는다(사용자 보고).
+- 원인: `store.py` `save_manual()`이 `remove_attachment_ids`가 있을 때 `origin='manual'` 기록만 허용하고 자동 기록은 `ValueError('직접 기록의 사진만 수정할 수 있어요.')`로 거부했다. `api.py`가 모든 ValueError를 `invalid_input`/"입력한 충전 금액을 확인해 주세요."로 바꿔 원인과 무관한 문구가 나왔다. 사진 업로드 수정(`934205d`)과 같은 origin 규칙 불일치다.
+- 변경: 사진 삭제 허용 대상을 `manual`과 `automatic` 기록으로 넓히고 문구를 '사진을 수정할 수 없는 기록이에요.'로 변경. 사진 존재·활성 검증은 그대로다. `api.py`의 ValueError 일괄 문구는 이번에 바꾸지 않았다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/store.py`, `vehicle-journal/tests/test_journal.py`(자동 기록 사진 업로드·삭제 회귀 테스트 추가; 수정 전 코드에서 실패, 수정 후 통과 확인).
+- 검증: `test_journal.py` 25개 통과(Python 3.9 + Pillow venv). 전체 스위트의 기존 9개 에러는 Python 3.9의 `ignore_cleanup_errors` 미지원 등 이번 변경과 무관하다.
+- 배포 상태: 커밋 후 HA 직접 반영 예정(Python 변경, 사용자 HA 재시작 필요). 운영 화면 검증은 미확인.
+
 ## 2026-10-28 — 12V 배터리 전압 색상 표시 운영 반영 (HA 저전압 지속 시간·히스테리시스 포함)
 
 - 요청: 프리뷰로 확정한 기준을 운영 대시보드에 반영한다. 라벨은 `배터리`(영어 `Battery`), 주행 중은 색 없음, 주차 중만 색 표시, 저전압 지속 시간 계산과 히스테리시스를 HA 쪽에 포함한다.
@@ -104,7 +113,7 @@
 - 원인: `vehicle_journal/photos.py`의 `save_photo()`가 `origin='manual'` 기록에만 사진을 허용해 자동 기록은 `Manual record required`(ValueError)로 거부되었고, 업로드 뷰가 이를 400 `invalid_photo`로 변환했다. 기록 저장(`record/save`)은 자동 기록도 허용해 두 규칙이 어긋나 있었다.
 - 변경: 대상 기록 조회를 `origin IN ('manual','automatic') AND status='active'`로 넓히고 오류 문구를 `Active record required`로 변경. 장수 제한은 기존 DB 트리거(`attachments_limit_insert`)가 origin과 무관하게 계속 적용한다.
 - 관련 파일: `custom_components/carrot_ha/vehicle_journal/photos.py`.
-- 검증·배포: `py_compile` 통과. 자동 기록 사진 업로드 실동작은 미검증. 커밋·푸시 후 HA SSH 직접 반영과 사용자 HA 재시작(Python 변경) 필요하며 현재 HA 미반영.
+- 검증·배포: `py_compile` 통과. 2026-10-28 `photos.py` 한 파일을 HA에 SSH 직접 반영했다(배포 커밋 `934205d`, 반영 전 HA 해시가 직전 배포 `ae7c424`와 일치 확인, 백업 `/config/carrot_ha/deployment-backups/934205d/photos.py`, 로컬·HA SHA-256 `112ac492…` 일치). 사용자 HA 재시작 후 사진 업로드 자체는 동작한다고 사용자가 보고했다. 운영 화면의 `POST …/attachments` 200 캡처는 미확인.
 
 ## 2026-10-27 — 주행가능거리를 최근 50km 주행 전비로 계산
 

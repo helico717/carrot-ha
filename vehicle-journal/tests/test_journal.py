@@ -326,6 +326,19 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):ns['load_photo'](self.journal,photo['attachment_id'])
         with self.assertRaises((ValueError,OSError)):ns['save_photo'](self.journal,key,b'<script>bad</script>','file.jpg')
 
+    def test_automatic_record_photo_upload_and_removal(self):
+        ns,Image,BytesIO=self.photo_functions()
+        self.archive.put(self.charge());sync(self.archive,self.journal)
+        record=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        output=BytesIO();Image.new('RGB',(20,20),'blue').save(output,format='PNG')
+        photo=ns['save_photo'](self.journal,record['id'],output.getvalue(),'receipt.png')
+        payload={'kind':'expense','date':'2026-09-02','category':'charging','actual_krw':1234,'remove_attachment_ids':[photo['attachment_id']]}
+        self.journal.save_manual(record['id'],record['version'],payload)
+        sync(self.archive,self.journal,True)
+        after=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertEqual(after.get('attachments',[]),[])
+        with self.assertRaises(FileNotFoundError):ns['load_photo'](self.journal,photo['attachment_id'])
+
     def test_photo_limit_cleans_failed_file(self):
         ns,Image,BytesIO=self.photo_functions()
         key=str(uuid4());self.journal.save_manual(key,0,{'kind':'expense','date':'2026-09-02','category':'other'})

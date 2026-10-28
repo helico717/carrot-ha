@@ -493,7 +493,7 @@ class Journal:
             if old and ((old[1]!='manual' and kind!='expense') or old[0]!=expected) or not old and expected!=0:raise Conflict('기록이 바뀌었어요. 새로고침해 주세요.')
             quality={'origin':'manual','energy':'manual','soc':'manual'}
             if removals:
-                if not old or old[1]!='manual':raise ValueError('직접 기록의 사진만 수정할 수 있어요.')
+                if not old or old[1] not in ('manual','automatic'):raise ValueError('사진을 수정할 수 없는 기록이에요.')
                 for attachment in removals:
                     if not db.execute("SELECT 1 FROM attachments WHERE vehicle_id=? AND record_id=? AND id=? AND status='active'",(self.vehicle,key,attachment)).fetchone():raise Conflict('사진이 바뀌었어요. 새로고침해 주세요.')
                 for attachment in removals:db.execute("UPDATE attachments SET status='deleted' WHERE vehicle_id=? AND record_id=? AND id=?",(self.vehicle,key,attachment))
