@@ -27,7 +27,7 @@ def save_photo(journal, record_id, content, filename):
     directory=Path(journal.path).with_suffix('')/'attachments'
     directory.mkdir(parents=True,exist_ok=True)
     with journal.lock,journal.connect() as db:
-        if not db.execute("SELECT 1 FROM records WHERE vehicle_id=? AND id=? AND origin='manual' AND status='active'",(journal.vehicle,record_id)).fetchone():raise ValueError('Manual record required')
+        if not db.execute("SELECT 1 FROM records WHERE vehicle_id=? AND id=? AND origin IN ('manual','automatic') AND status='active'",(journal.vehicle,record_id)).fetchone():raise ValueError('Active record required')
         existing=db.execute("SELECT id FROM attachments WHERE vehicle_id=? AND record_id=? AND sha256=? AND status='active'",(journal.vehicle,record_id,digest)).fetchone()
         if existing:return {'attachment_id':existing[0]}
         key=str(uuid4());name=key+'.'+extension;path=directory/name

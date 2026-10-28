@@ -1,3 +1,11 @@
+## 2026-10-28 — 자동 충전·주유 기록에도 사진 업로드 허용
+
+- 증상: 자동 충전 기록(origin=automatic) 수정 화면에서 사진을 골라 저장하면 "기록은 저장했지만 사진을 저장하지 못했어요" 오류. 운영 HA 브라우저에서 `POST …/attachments`가 400으로 실패하는 것을 직접 재현했고, 해당 기록은 `kind: expense`, `origin: automatic`이었다.
+- 원인: `vehicle_journal/photos.py`의 `save_photo()`가 `origin='manual'` 기록에만 사진을 허용해 자동 기록은 `Manual record required`(ValueError)로 거부되었고, 업로드 뷰가 이를 400 `invalid_photo`로 변환했다. 기록 저장(`record/save`)은 자동 기록도 허용해 두 규칙이 어긋나 있었다.
+- 변경: 대상 기록 조회를 `origin IN ('manual','automatic') AND status='active'`로 넓히고 오류 문구를 `Active record required`로 변경. 장수 제한은 기존 DB 트리거(`attachments_limit_insert`)가 origin과 무관하게 계속 적용한다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/photos.py`.
+- 검증·배포: `py_compile` 통과. 자동 기록 사진 업로드 실동작은 미검증. 커밋·푸시 후 HA SSH 직접 반영과 사용자 HA 재시작(Python 변경) 필요하며 현재 HA 미반영.
+
 ## 2026-10-27 — vehicle-journal: 100% 급속 충전으로 SOC 기준 64 실차 검증·HA 재계산 확인
 
 - 근거: 2026-10-27 21:53~22:37 KST 급속 충전 1회(충전 기록 25.2kWh, 8,064원). HA 운영 DB와 원시 CAN 파일은 읽기 전용으로 조회했다.
@@ -126,6 +134,7 @@
 - 내용/이유: 앞선 49a5536 이후 전체 추적 문서를 다시 검색했다. 현행 엔티티/차계부 요구사항·지침/검증 계획/README의 잔존 cloud·D1/KV·Worker 설명을 수신기 기준으로 보완하고 과거 파라미터 안내의 문서 전체를 역사 기록으로 명시했다.
 - 관련 파일/근거: docs/connection-document-audit-2026-10-27.md에 전체 파일 목록·검색 범위·잔존 이유를 기록했다. 독립 HTML 프리뷰에 남은 합성 Cloudflare 문구 1곳은 현행 연결 안내가 아니며 UI 수정 범위에서 제외했다.
 - 검증/한계: 문서 검색·상대 링크·diff 검사. 과거 사건·라이선스·changelog 및 호환 식별자는 보존. 운영 연결 검증·실행 코드 변경·배포·재시작·릴리즈 없음. 문서 전용 커밋·main 푸시로 반영한다.
+
 
 ## 2026-10-27 — 절약 비교 화면 HA 직접 반영 완료
 

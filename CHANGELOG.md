@@ -1,3 +1,11 @@
+## 2026-10-28 — 자동 충전·주유 기록에도 사진 업로드 허용
+
+- 증상: 자동 충전 기록(origin=automatic) 수정 화면에서 사진을 골라 저장하면 "기록은 저장했지만 사진을 저장하지 못했어요" 오류. 운영 HA 브라우저에서 `POST …/attachments`가 400으로 실패하는 것을 직접 재현했고, 해당 기록은 `kind: expense`, `origin: automatic`이었다.
+- 원인: `vehicle_journal/photos.py`의 `save_photo()`가 `origin='manual'` 기록에만 사진을 허용해 자동 기록은 `Manual record required`(ValueError)로 거부되었고, 업로드 뷰가 이를 400 `invalid_photo`로 변환했다. 기록 저장(`record/save`)은 자동 기록도 허용해 두 규칙이 어긋나 있었다.
+- 변경: 대상 기록 조회를 `origin IN ('manual','automatic') AND status='active'`로 넓히고 오류 문구를 `Active record required`로 변경. 장수 제한은 기존 DB 트리거(`attachments_limit_insert`)가 origin과 무관하게 계속 적용한다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/photos.py`.
+- 검증·배포: `py_compile` 통과. 자동 기록 사진 업로드 실동작은 미검증. 커밋·푸시 후 HA SSH 직접 반영과 사용자 HA 재시작(Python 변경) 필요하며 현재 HA 미반영.
+
 ## 2026-10-27 — 주행가능거리를 최근 50km 주행 전비로 계산
 
 - 요청/이유: 30일 동안 10km 이상 주행한 기록을 쓰면 반응이 느리다는 지적. 계기판은 오르막·주행 습관에 따라 주행가능거리가 바로 바뀐다.
@@ -97,6 +105,7 @@
 - 내용: 독립 수신 앱 경로와 HA Core 직접 경로, 외부/내부 URL, 키 구분, 60초 이력·15초 최신 조회, HA Core 재시작 영향, 과거 호환 분기와 자동 fallback 부재를 명시했다. 과거 릴리즈·changelog·archive·라이선스와 원본 서버 소스는 보존했다.
 - 검증: 코드 근거 대조 및 12개 문서의 상대 링크와 폐기 명령 잔존 검사 및 git diff --check 통과. 실행 코드 변경이 없어 런타임 테스트·배포·버전 상승·재시작은 해당하지 않는다. 운영 프록시/차량 상태 및 차량 최신 소스는 미검증이다.
 - 배포 상태: 문서 전용 커밋·main 푸시 대상으로 준비했다. 다른 작업 파일은 제외했다. 최초 FETCH_HEAD 권한 오류 후 승인된 git fetch가 성공했고 원격 main과 HEAD가 일치함을 확인했다. 실행 배포·버전·태그·릴리즈·재시작 없음.
+
 
 ## 2026-10-27 — 절약 비교 화면 HA 직접 반영 완료
 
