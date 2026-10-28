@@ -381,23 +381,39 @@ class Archive(ChargeCosts):
             'recent_efficiency_distance_km': round(total_km, 1),
         }
 
-    def _window_efficiency(self, device, now, window_km=50, min_km=20, max_days=7, max_rows=3000, page=500):
-        """Efficiency over the last window_km of odometer travel, like the cluster.
+    def _window_efficiency(self, device, now, window_km=50, min_wh=300, max_rows=3000, page=500):
+        """Efficiency over the most recent window_km of driving, like the cluster.
 
-        Walks state history backwards across trips, including the trip in
-        progress, so hills and driving style move range within minutes.
-        Charging/stale intervals and odometer/energy jumps are skipped; parked
-        drain is excluded, regeneration is kept as signed energy.
+        Whenever that driving happened: state history is walked backwards first
+        (it includes the trip in progress), then persisted trip energy covers
+        what raw state retention no longer holds. Less than window_km of total
+        driving is used as it is. Charging/stale intervals and odometer/energy
+        jumps are skipped; parked drain is excluded, regeneration is kept as
+        signed energy.
         """
-        since = (now - timedelta(days=max_days)).isoformat()
+        states = self._window_from_states(device, window_km, max_rows, page)
+        if states[0] < window_km:
+            trips = self._window_from_trips(device, window_km)
+            best = trips if trips[0] > states[0] else states
+            source = 'trips' if best is trips else 'states'
+        else:
+            best, source = states, 'states'
+        km, wh = best
+        if km < 1 or wh < min_wh:
+            return {}
+        return {'window_efficiency_kpl': round(min(10.0, max(1.0, km/(wh/1000))), 2),
+                'window_efficiency_distance_km': round(km, 1),
+                'window_efficiency_source': source}
+
+    def _window_from_states(self, device, window_km, max_rows, page):
         km = wh = 0.0
         newer = None
         scanned = 0
         with self.connect() as db:
             while scanned < max_rows and km < window_km:
                 rows = db.execute(
-                    "SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? "
-                    "ORDER BY observed DESC LIMIT ? OFFSET ?", (device, since, page, scanned)).fetchall()
+                    "SELECT body FROM events WHERE device=? AND kind='state' "
+                    "ORDER BY observed DESC LIMIT ? OFFSET ?", (device, page, scanned)).fetchall()
                 if not rows:
                     break
                 scanned += len(rows)
@@ -417,10 +433,26 @@ class Archive(ChargeCosts):
                     newer = point
                     if km >= window_km:
                         break
-        if km < min_km or wh < 500:
-            return {}
-        return {'window_efficiency_kpl': round(min(10.0, max(1.0, km/(wh/1000))), 2),
-                'window_efficiency_distance_km': round(km, 1)}
+        return km, wh
+
+    def _window_from_trips(self, device, window_km):
+        """Newest trips first until window_km; the last trip counts proportionally."""
+        with self.connect() as db:
+            rows = db.execute(
+                """SELECT te.distance_km, te.energy_kwh FROM trip_energy te
+                   JOIN events e ON te.device = e.device AND te.id = e.id
+                   WHERE te.device = ? AND te.energy_kwh > 0 AND te.distance_km >= 1
+                   ORDER BY e.observed DESC""", (device,)).fetchall()
+        km = kwh = 0.0
+        for trip_km, trip_kwh in rows:
+            if not (math.isfinite(trip_km) and math.isfinite(trip_kwh)):
+                continue
+            share = min(1.0, (window_km - km)/trip_km)
+            km += trip_km*share
+            kwh += trip_kwh*share
+            if km >= window_km:
+                break
+        return km, kwh*1000
 
     def driving_energy_summary(self, device, month, tz, total_distance, *, since=None, until=None, prefix='month'):
         """Persist matched trip energy independently of the 14-day raw state retention.

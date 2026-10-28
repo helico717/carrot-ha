@@ -24,6 +24,7 @@
         "description": "Set the SOC calculation capacity for your vehicle. This is not a battery degradation measurement.",
         "data": {
           "soc_capacity_kwh": "SOC calculation capacity (kWh)",
+          "reference_efficiency_kpl": "Reference efficiency (km/kWh), used for the range only until this car has driving records",
           "vehicle_model": "Vehicle model (e.g. ID. Buzz)",
           "driving_logs_nas_path": "30-day log archive: NAS path ending in /driving-logs (optional)",
           "camera_enabled": "Enable parked cameras (experimental)",

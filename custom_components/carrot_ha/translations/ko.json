@@ -24,6 +24,7 @@
         "description": "차량에 맞는 SOC 계산 용량을 입력하세요. 차량별 용량이 다르며 열화율 측정값이 아닙니다.",
         "data": {
           "soc_capacity_kwh": "SOC 계산 용량 (kWh)",
+          "reference_efficiency_kpl": "참고 전비 (km/kWh) - 이 차의 주행 기록이 전혀 없을 때만 주행가능거리에 사용",
           "vehicle_model": "차량 모델 (예: ID. Buzz)",
           "camera_enabled": "주차 카메라 사용 (실험 기능)",
           "camera_token": "영상 전용 토큰 (기존 토큰과 다른 32자 이상)",

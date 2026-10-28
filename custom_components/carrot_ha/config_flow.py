@@ -1,4 +1,4 @@
-from .battery import DEFAULT_SOC_CAPACITY_KWH
+from .battery import DEFAULT_REFERENCE_EFFICIENCY_KPL, DEFAULT_SOC_CAPACITY_KWH
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -27,6 +27,7 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
         from .driving_logs.runtime import configured_path
         nas_path = await self.hass.async_add_executor_job(configured_path, self.hass, self.config_entry)
         schema = vol.Schema({vol.Optional('vehicle_model', default=self.config_entry.options.get('vehicle_model', 'Volkswagen MEB')): str,vol.Required('soc_capacity_kwh', default=self.config_entry.options.get('soc_capacity_kwh', DEFAULT_SOC_CAPACITY_KWH)): vol.All(vol.Coerce(float), vol.Range(min=20, max=150)),
+                             vol.Required('reference_efficiency_kpl', default=self.config_entry.options.get('reference_efficiency_kpl', DEFAULT_REFERENCE_EFFICIENCY_KPL)): vol.All(vol.Coerce(float), vol.Range(min=1, max=10)),
                              vol.Optional('receiver_url', default=self.config_entry.options.get('receiver_url', '')): str,
                              vol.Optional('receiver_view_token', default=self.config_entry.options.get('receiver_view_token', '')): str,
                              vol.Optional('receiver_upload_token', default=self.config_entry.options.get('receiver_upload_token', '')): str,
@@ -49,7 +50,7 @@ class BatteryOptionsFlow(config_entries.OptionsFlow):
                         errors['base'] = 'invalid_log_archive'
                         return self.async_show_form(step_id='init', data_schema=schema, errors=errors)
                 import math
-                if not math.isfinite(data['soc_capacity_kwh']):
+                if not math.isfinite(data['soc_capacity_kwh']) or not math.isfinite(data['reference_efficiency_kpl']):
                     raise vol.Invalid('finite required')
                 from urllib.parse import urlsplit
                 data['cloud_url'] = data.get('cloud_url', '').strip().rstrip('/')

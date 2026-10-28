@@ -38,9 +38,31 @@ class RangeEfficiencyTests(fixtures.TestTripEnergy):
         result = self.archive._window_efficiency(self.device, self.now)
         self.assertEqual(result['window_efficiency_kpl'], 2.5)
 
-    def test_window_requires_enough_distance(self):
+    def test_window_uses_short_history_as_it_is(self):
         self.state('a', 20, 50000, 1000, driving=True)
-        self.state('b', 10, 48000, 1010, driving=True)
+        self.state('b', 10, 47000, 1010, driving=True)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['window_efficiency_kpl'], 3.33)  # 10 km / 3 kWh
+        self.assertEqual(result['window_efficiency_distance_km'], 10)
+
+    def test_window_has_no_age_limit_on_states(self):
+        # Driving ended 10 days ago; the car has been parked since.
+        base = 10*24*60
+        for i in range(7):
+            self.state(f'old{i}', base - i*10, 69000 - i*10000/6, 1040 + i*10, driving=True)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['window_efficiency_kpl'], 6.0)
+        self.assertEqual(result['window_efficiency_source'], 'states')
+
+    def test_window_falls_back_to_trips_when_states_lack_distance(self):
+        self.put('t_old', 30, 40, 40/5)
+        self.put('t_new', 20, 30, 30/6)   # newest: all 30 km; then 20 km of the 40 km trip
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['window_efficiency_source'], 'trips')
+        self.assertEqual(result['window_efficiency_distance_km'], 50)
+        self.assertEqual(result['window_efficiency_kpl'], 5.56)  # 50 km / (5 + 4) kWh
+
+    def test_window_without_any_driving_returns_nothing(self):
         self.assertEqual(self.archive._window_efficiency(self.device, self.now), {})
 
 

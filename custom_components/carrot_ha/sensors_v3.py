@@ -154,7 +154,10 @@ class VehicleSensor(VehicleEntity,SensorEntity):
                 attrs['efficiency_basis']=self.data.get('range_efficiency_basis')
                 if self.data.get('window_efficiency_kpl') is not None:
                     attrs.update(window_efficiency_kpl=self.data.get('window_efficiency_kpl'),
-                                 window_efficiency_distance_km=self.data.get('window_efficiency_distance_km'))
+                                 window_efficiency_distance_km=self.data.get('window_efficiency_distance_km'),
+                                 window_efficiency_source=self.data.get('window_efficiency_source'))
+                if self.data.get('reference_efficiency_kpl') is not None:
+                    attrs['reference_efficiency_kpl']=self.data.get('reference_efficiency_kpl')
         elif self.key=='soc_percent':
             attrs.update(nominal_net_kwh=78,nominal_gross_kwh=82,soc_capacity_kwh=self.entry.options.get('soc_capacity_kwh',DEFAULT_SOC_CAPACITY_KWH),soc_source='energy_based_calibration')
         elif self.key == 'month_charge_kwh':

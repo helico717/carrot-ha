@@ -1,3 +1,15 @@
+## 2026-10-28 — 주행가능거리가 항상 수치를 갖도록: 최근 50 km를 시점 제한 없이 + 부족하면 있는 만큼 + 참고 전비 옵션
+
+- 요청: 기록이 부족해도 주행가능거리를 "알 수 없음"으로 두지 말고 항상 수치를 표시. 코드에 숨겨진 고정 기본값에 의존하지 않는다.
+- 변경(A): 최근 50 km 구간 계산(`_window_efficiency`)의 7일 제한을 제거했다. 상태 기록(보관 약 14일)을 먼저 보고 50 km가 안 되면 보관 기간과 무관하게 남는 주행별 거리·에너지 기록(`trip_energy`)에서 최신 주행부터 50 km까지 모은다(마지막 주행은 비례 반영). 둘 중 거리가 더 많은 쪽을 쓰며 센서 속성 `window_efficiency_source`(states/trips)에 표시한다. 장기 평균이 아니라 "마지막으로 달린 50 km"이다.
+- 변경(B): 총 주행 기록이 50 km 미만이어도 있는 만큼으로 계산한다. 최소 조건은 1 km·0.3 kWh이고 전비는 1~10으로 제한한다.
+- 변경(C): 이 차의 주행 기록이 전혀 없을 때만 통합 옵션 "참고 전비(km/kWh)"(`reference_efficiency_kpl`, 범위 1~10, 옵션 화면에 표시되는 기본값 5.0)를 쓴다. 코드 안의 숨은 상수를 `battery.py`의 옵션 기본값으로 옮기고 사용자가 설정 화면에서 바꿀 수 있게 했다. 이 경우 `efficiency_basis`는 `reference_efficiency`이다.
+- 대시보드 배터리 카드는 `range_km`를 쓰며, 배터리 값이 아예 없을 때만 `—`로 표시한다(`SOC × 4.6` 대체식은 제거 유지).
+- 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,battery.py,config_flow.py,sensors_v3.py,strings.json,translations/ko.json}, tests/{test_range_efficiency.py,test_new_sensors.py}.
+- 검증: Python 94개(range_efficiency, new_sensors, trip_repair, trip_energy, history_cache, incremental_sync) 통과. 전체 discover는 로컬에 `voluptuous`가 없어 기존 오류 10건(변경 전과 동일)이 있고 설정 화면 테스트(test_receiver_options)는 로컬에서 실행하지 못했다. `config_flow.py`는 컴파일만 확인했다.
+- 한계: 주행 기록이 적을 때는 값이 크게 흔들릴 수 있다. 상태 기록 방식과 주행 기록 방식의 구간 선택은 거리가 더 많은 쪽 기준이다. 외기온 보정은 이번 범위가 아니다.
+- 배포 상태: 아래 별도 기록.
+
 ## 2026-10-28 — 주행가능거리 고정 대체값(5.0 km/kWh, SOC×4.6) 제거
 
 - 요청: 기본 전비를 임의 숫자로 지정하는 방식이 부적절하므로 쓰지 않는다.
@@ -5,7 +17,7 @@
 - 영향: 최근 7일 안에 20 km 이상의 주행 기록이 없으면(예: 오래 주차, 설치 직후) 값이 비어 있다. 이 구간을 다른 방법으로 메울지는 미결정.
 - 관련 파일: custom_components/carrot_ha/{vehicle.py,frontend/carrot-dashboard-ko.js,frontend/carrot-dashboard-en.js}, tests/test_new_sensors.py.
 - 검증: Python 91개와 대시보드 JS 테스트(calculation-regressions 11, live-loading 6, lazy-runtime 1, view-state 3) 통과. 브라우저 실표시는 미확인.
-- 배포 상태: 아래 별도 기록.
+- 배포 상태: HA에 반영하지 않았고, 사용자가 "알 수 없음은 절대 안 된다"고 하여 바로 위 항목의 방식으로 대체되었다(`range_km` 없음 방식은 폐기).
 
 ## 2026-10-28 — 주행가능거리에서 장기 평균 제거, 전비 하한 3 → 1 완화
 

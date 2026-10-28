@@ -1,4 +1,4 @@
-from .battery import DEFAULT_SOC_CAPACITY_KWH, MEB_INVALID_ENERGY_WH
+from .battery import DEFAULT_REFERENCE_EFFICIENCY_KPL, DEFAULT_SOC_CAPACITY_KWH, MEB_INVALID_ENERGY_WH
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
 from .charging_power import charging_power
@@ -232,13 +232,20 @@ def values(runtime):
             and distance >= 1 and energy >= 0.5 else None
         )
 
-    # Like the cluster, follow only the last ~50 km of driving (hills, style, season).
-    # Without enough recent driving the range is unknown rather than guessed.
-    window = data.get('window_efficiency_kpl')
-    if data.get('range_km') is None and data.get('battery_kwh') is not None and window is not None:
+    # Like the cluster, follow only the most recent ~50 km of driving (hills, style, season).
+    # Only a car with no driving record at all uses the user-set reference efficiency.
+    if data.get('range_km') is None and data.get('battery_kwh') is not None:
+        window = data.get('window_efficiency_kpl')
+        reference = runtime['entry'].options.get('reference_efficiency_kpl', DEFAULT_REFERENCE_EFFICIENCY_KPL)
         data['range_estimated'] = True
-        data['range_km'] = int(round(data['battery_kwh'] * window))
-        data['range_efficiency_basis'] = 'recent_distance_window'
+        if window is not None:
+            efficiency = window
+            data['range_efficiency_basis'] = 'recent_distance_window'
+        else:
+            efficiency = reference
+            data['range_efficiency_basis'] = 'reference_efficiency'
+            data['reference_efficiency_kpl'] = reference
+        data['range_km'] = int(round(data['battery_kwh'] * efficiency))
 
     # Never present stale locks/doors/health as current, including older collectors.
     for key in OPTIONAL_FIELDS:

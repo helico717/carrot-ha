@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 MEB_INVALID_ENERGY_WH = {102250, 102300, 102350, 102375}
 
 DEFAULT_SOC_CAPACITY_KWH = 64.0
+# Used for the range only while this car has no driving record at all; editable in options.
+DEFAULT_REFERENCE_EFFICIENCY_KPL = 5.0
 NET_CAPACITY_KWH = 78.0
 GROSS_CAPACITY_KWH = 82.0
 

@@ -120,20 +120,23 @@ class TestNewSensors(unittest.TestCase):
         self.assertIsNone(res.get('month_efficiency_kpl'))
 
     def test_estimated_range_without_measured_efficiency(self):
-        # No recent driving window → range is unknown, never a guessed efficiency.
+        # A car with no driving record at all uses the user's reference efficiency.
         runtime = self._make_runtime({'battery_wh': 55000.0})
         res = values(runtime)
         self.assertEqual(res.get('battery_kwh'), 55.0)
-        self.assertIsNone(res.get('range_km'))
-        self.assertIsNone(res.get('range_efficiency_basis'))
+        self.assertEqual(res.get('range_km'), 275)  # 55.0 * option default 5.0
+        self.assertEqual(res.get('range_efficiency_basis'), 'reference_efficiency')
+        runtime['entry'].options['reference_efficiency_kpl'] = 4.0
+        self.assertEqual(values(runtime).get('range_km'), 220)
 
     def test_estimated_range_ignores_long_term_averages(self):
-        # Without a 50 km window, month/recent trip averages must not set the range.
+        # Month/recent trip averages must never set the range.
         runtime = self._make_runtime({'battery_wh': 50000.0},
             summary={'recent_efficiency_kpl': 4.8, 'month_distance_km': 600.0, 'month_energy_distance_km': 600.0,
                      'month_drive_energy_kwh': 120.0, 'month_energy_coverage_percent': 100.0})
         res = values(runtime)
-        self.assertIsNone(res.get('range_km'))
+        self.assertEqual(res.get('range_km'), 250)  # long-term averages ignored: reference 5.0
+        self.assertEqual(res.get('range_efficiency_basis'), 'reference_efficiency')
 
     def test_estimated_range_prefers_distance_window(self):
         runtime = self._make_runtime({'battery_wh': 63500.0},
