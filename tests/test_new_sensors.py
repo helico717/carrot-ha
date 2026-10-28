@@ -120,13 +120,12 @@ class TestNewSensors(unittest.TestCase):
         self.assertIsNone(res.get('month_efficiency_kpl'))
 
     def test_estimated_range_without_measured_efficiency(self):
-        # No trip energy at all → falls back to default efficiency (5.0 km/kWh).
+        # No recent driving window → range is unknown, never a guessed efficiency.
         runtime = self._make_runtime({'battery_wh': 55000.0})
         res = values(runtime)
         self.assertEqual(res.get('battery_kwh'), 55.0)
-        self.assertEqual(res.get('range_km'), 275)  # 55.0 * 5.0
-        self.assertTrue(res.get('range_estimated'))
-        self.assertEqual(res.get('range_efficiency_basis'), 'default_efficiency')
+        self.assertIsNone(res.get('range_km'))
+        self.assertIsNone(res.get('range_efficiency_basis'))
 
     def test_estimated_range_ignores_long_term_averages(self):
         # Without a 50 km window, month/recent trip averages must not set the range.
@@ -134,8 +133,7 @@ class TestNewSensors(unittest.TestCase):
             summary={'recent_efficiency_kpl': 4.8, 'month_distance_km': 600.0, 'month_energy_distance_km': 600.0,
                      'month_drive_energy_kwh': 120.0, 'month_energy_coverage_percent': 100.0})
         res = values(runtime)
-        self.assertEqual(res.get('range_km'), 250)  # 50.0 * default 5.0
-        self.assertEqual(res.get('range_efficiency_basis'), 'default_efficiency')
+        self.assertIsNone(res.get('range_km'))
 
     def test_estimated_range_prefers_distance_window(self):
         runtime = self._make_runtime({'battery_wh': 63500.0},

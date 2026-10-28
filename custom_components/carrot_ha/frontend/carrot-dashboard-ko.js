@@ -1368,9 +1368,8 @@ class CarrotDashboard extends HTMLElement {
         :'');
 
     const rangeSource = [v.range_km, v.estimated_range_km].find(x => typeof x === 'number' && Number.isFinite(x));
-    const rangeKm = rangeSource != null
-      ? rangeSource
-      : Math.round((soc ?? 0) * 4.6);
+    const rangeKm = rangeSource ?? null;
+    const rangeText = rangeKm != null ? `${rangeKm} km` : '—';
 
     const energyHeadHtml = charging
       ? `<div class="energy-head charging-left range-c3">
@@ -1383,7 +1382,7 @@ class CarrotDashboard extends HTMLElement {
                </div>
                <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
                <div class="range-sub-c3">
-                 <span>예상 주행가능거리 <b>${rangeKm} km</b></span>
+                 <span>예상 주행가능거리 <b>${rangeText}</b></span>
                </div>
              </div>
            </div>
@@ -1396,7 +1395,7 @@ class CarrotDashboard extends HTMLElement {
            <div class="soc-stack-c3">
              <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
              <div class="range-sub-c3">
-               <span>주행가능거리 약 <b>${rangeKm} km</b></span>
+               <span>주행가능거리 약 <b>${rangeText}</b></span>
              </div>
            </div>
          </div>`;

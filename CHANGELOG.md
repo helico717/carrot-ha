@@ -1,3 +1,12 @@
+## 2026-10-28 — 주행가능거리 고정 대체값(5.0 km/kWh, SOC×4.6) 제거
+
+- 요청: 기본 전비를 임의 숫자로 지정하는 방식이 부적절하므로 쓰지 않는다.
+- 변경: 최근 50 km 주행 전비를 계산할 수 없으면 주행가능거리를 추정하지 않고 알 수 없음으로 둔다(`range_km` 없음, 센서 unknown). `DEFAULT_RANGE_EFFICIENCY`를 삭제했다. 한국어·영어 대시보드 배터리 카드는 값이 없을 때 `SOC × 4.6` 대신 `—`를 표시한다. 디버그 대시보드의 시뮬레이션 표기는 그대로 둔다.
+- 영향: 최근 7일 안에 20 km 이상의 주행 기록이 없으면(예: 오래 주차, 설치 직후) 값이 비어 있다. 이 구간을 다른 방법으로 메울지는 미결정.
+- 관련 파일: custom_components/carrot_ha/{vehicle.py,frontend/carrot-dashboard-ko.js,frontend/carrot-dashboard-en.js}, tests/test_new_sensors.py.
+- 검증: Python 91개와 대시보드 JS 테스트(calculation-regressions 11, live-loading 6, lazy-runtime 1, view-state 3) 통과. 브라우저 실표시는 미확인.
+- 배포 상태: 아래 별도 기록.
+
 ## 2026-10-28 — 주행가능거리에서 장기 평균 제거, 전비 하한 3 → 1 완화
 
 - 요청: 장기 평균 전비로 주행가능거리를 계산하는 로직을 제거하고, 겨울철 전비가 3 미만일 수 있으므로 하한 3이 높다는 지적 반영.

@@ -232,18 +232,13 @@ def values(runtime):
             and distance >= 1 and energy >= 0.5 else None
         )
 
-    DEFAULT_RANGE_EFFICIENCY = 5.0  # km/kWh, last-resort fallback when no driving history exists
-
-    if data.get('range_km') is None and data.get('battery_kwh') is not None:
+    # Like the cluster, follow only the last ~50 km of driving (hills, style, season).
+    # Without enough recent driving the range is unknown rather than guessed.
+    window = data.get('window_efficiency_kpl')
+    if data.get('range_km') is None and data.get('battery_kwh') is not None and window is not None:
         data['range_estimated'] = True
-        # Like the cluster, follow only the last ~50 km of driving (hills, style, season).
-        window = data.get('window_efficiency_kpl')
-        if window is not None:
-            data['range_km'] = int(round(data['battery_kwh'] * window))
-            data['range_efficiency_basis'] = 'recent_distance_window'
-        else:
-            data['range_km'] = int(round(data['battery_kwh'] * DEFAULT_RANGE_EFFICIENCY))
-            data['range_efficiency_basis'] = 'default_efficiency'
+        data['range_km'] = int(round(data['battery_kwh'] * window))
+        data['range_efficiency_basis'] = 'recent_distance_window'
 
     # Never present stale locks/doors/health as current, including older collectors.
     for key in OPTIONAL_FIELDS:
