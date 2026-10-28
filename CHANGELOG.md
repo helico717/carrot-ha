@@ -5,7 +5,7 @@
 - 전비 클램프를 3~10에서 1~10 km/kWh로 바꿨다. 센서 오류 같은 이상치만 걸러내고 겨울철 실제 저전비(예: 2.5)는 그대로 반영한다. 신규 시즌이라 실제 겨울 전비 분포는 미확인이다.
 - 관련 파일: custom_components/carrot_ha/{storage.py,vehicle.py,sensors_v3.py}, tests/{test_range_efficiency.py,test_new_sensors.py}.
 - 검증: test_range_efficiency(겨울 2.5 보존 신규), test_new_sensors(장기 평균 무시 신규), test_trip_repair, test_trip_energy, test_history_cache, test_incremental_sync 91개 통과.
-- 배포 상태: 이 항목의 HA 직접 반영 여부는 아래 별도 기록.
+- 배포 상태: 커밋 `7851220` main 푸시 확인. HA 설치 파일 3개가 직전 커밋과 일치함(vehicle.py는 주석 한 줄 차이)을 해시로 확인하고 `/homeassistant/carrot_ha/deployment-backups/7851220/before`에 백업한 뒤 직접 반영했다. 반영 후 해시가 커밋 파일과 일치(storage 8f6087d3…, vehicle ac3853d1…, sensors_v3 28b5b424…). HA의 구문 검사는 hassio 계정의 `__pycache__` 쓰기 권한 오류로 실행되지 못했고 로컬 py_compile만 통과했다. **Python 변경이므로 HA 재시작 전에는 적용되지 않음.** 재시작 후 센서 값은 미확인. 버전 상승·태그·릴리즈 없음.
 
 ## 2026-10-28 — 주행가능거리 기본 전비 주석의 차종 고정 표현 제거
 
