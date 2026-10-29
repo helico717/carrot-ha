@@ -4,7 +4,7 @@
 - 변경: carrot-journal-design.js의 `#page2 .distance-choices` 스타일만 바꿨다. 한 묶음 바탕(`--j-bg`)과 테두리(`--j-border`) 안에 버튼을 한 줄로 배치하고, 선택한 칸은 `--j-raised` 바탕과 그림자, 굵은 글씨로 표시한다. 기존 민트 채움은 쓰지 않는다. 절약 비교 패널이 540px 이하이면 container query로 3칸×2줄로 바꿔 가로 잘림과 스크롤을 막는다. 버튼 구성·aria-pressed 상태·거리 계산·직접 입력 동작은 바꾸지 않았다.
 - 프리뷰: vehicle-journal/review-distance-selector.html. 저장소 루트에서 `python -m http.server`로 연다. 실제 차계부 모듈에 합성 mockHass를 넣었고, 현재/A/B 스타일 전환과 데스크톱·모바일 폭 전환을 제공한다.
 - 검증: 프리뷰에서 실제 디자인 파일을 불러와 확인했다. 2000px 폭에서는 한 줄로 표시되고(clientWidth=scrollWidth), 375px 폭에서는 3×2 grid로 표시되며 페이지 가로 넘침이 없다. 10,000km 선택 시 값과 aria-pressed가 갱신되고, 직접 입력 선택 시 입력칸이 열린다. `node --check` 통과. vehicle-journal/tests/browser-check.cjs는 이 Windows PC에 playwright가 없어 실행하지 못했다. 실제 HA 화면은 아직 확인하지 않았다.
-- 배포 상태: 화면 모듈만 바뀌었으므로 HA 재시작이 필요 없다. 커밋·푸시 후 HA SSH 직접 반영 예정이다. 버전 상승·태그·Release는 없다.
+- 배포 상태: 커밋 b15c8059382dde9cb59f063625c47182ed2fbeb7을 main에 푸시했다. 반영 전 HA 설치본 SHA-256(dfe53ef3…)이 직전 커밋 bf781c4의 파일과 일치함을 확인했다. 기존 파일을 /config/carrot_ha/deployment-backups/b15c8059382dde9cb59f063625c47182ed2fbeb7/에 백업하고, 임시 파일을 쓴 뒤 mv로 바꿔 carrot-journal-design.js 한 개만 반영했다. 설치본과 HTTP 제공본(200)의 SHA-256 46a77813…이 커밋과 일치하고, frontend-version은 0.9.0-beta.1-9a7dc0026046으로 바뀌었다. 화면 모듈만 바뀌었으므로 HA 재시작은 필요 없고 차계부를 새로고침하면 된다. 실제 사용자 브라우저 화면은 아직 확인하지 않았다. 버전 상승·태그·Release는 없다.
 
 ## 2026-10-28 — 수신 앱 SOC 설명 정정 및 기존 배터리 엔터티 실제 적용 확인
 
