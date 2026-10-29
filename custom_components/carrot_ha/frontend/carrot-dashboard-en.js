@@ -44,9 +44,11 @@ const tripDurationEn = s => {
   if(h > 0) return `${h}h`;
   return `${m}m`;
 };
+// Integer SOC display truncates the 0.5% CAN value (58.5 -> 58); stored values keep the decimal.
+const socDisplay = soc => typeof soc === 'number' && Number.isFinite(soc) ? Math.floor(Math.max(0, Math.min(100, soc)) + 1e-6) : null;
 const batteryIconName = soc => {
   if(typeof soc !== 'number' || !Number.isFinite(soc)) return 'battery';
-  const level = Math.max(0, Math.min(100, Math.round(soc)));
+  const level = socDisplay(soc);
   if(level >= 95) return 'battery';
   if(level <= 5) return 'battery-outline';
   return `battery-${Math.round(level / 10) * 10}`;
@@ -895,7 +897,7 @@ class CarrotDashboard extends HTMLElement {
         else if(v.aux_voltage<12.4)auxStatus='Normal · Stable voltage';
       }
       const tiles=`
-        ${metric('Battery level',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh,1)} kWh stored`)}
+        ${metric('Battery level',n(socDisplay(v.soc_percent),0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh,1)} kWh stored`)}
         ${metric('Odometer',n(v.odometer_km,0),'km','counter','Odometer reading')}
         ${isDriving?metric('Current speed',n(v.speed_kph,0),'km/h','speedometer','Live cluster speed'):metric('12V battery',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
         ${metric('Outside temp',n(v.outside_temp_c,1),'°C','thermometer','Ambient temp')}
@@ -986,7 +988,7 @@ class CarrotDashboard extends HTMLElement {
               `${metric('Avg speed',spdVal,'km/h','speedometer-medium')}`;
       }
     }else{
-      tiles=`${metric('Battery level',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW','ev-station',v.charging?'Vehicle CAN measurement':'Based on observations')}`;
+      tiles=`${metric('Battery level',n(socDisplay(v.soc_percent),0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('Odometer',n(v.odometer_km,0),'km','counter',v.stale?'Last measured':'Vehicle display')}${metric('Distance this month',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)} trips Trips`)}${metric('Charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW','ev-station',v.charging?'Vehicle CAN measurement':'Based on observations')}`;
     }
 
     const panelTitle=isTrip
@@ -1019,7 +1021,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     const batteryItems=[
-      row(batteryIconName(v.soc_percent),'Battery level',n(v.soc_percent,0),'%'),
+      row(batteryIconName(v.soc_percent),'Battery level',n(socDisplay(v.soc_percent),0),'%'),
       row('car-electric','Range (estimated)',n(v.range_km),'km'),
       row('flash','Battery energy',n(v.battery_kwh),'kWh'),
       row('ev-station','Charging power',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW'),
@@ -1100,7 +1102,7 @@ class CarrotDashboard extends HTMLElement {
     }
     const selected=days.find(d=>d.key===this.chargeDay);
     const labels=d=>d.date.toLocaleDateString('en-US',{day:'numeric',weekday:'short',timeZone:'UTC'});
-    return `<section class="panel charge-history"><div class="paneltitle"><h2>Charging records</h2><span class="sub">${esc(days[0]?.key||'')} ~ ${esc(days.at(-1)?.key||'')}</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} charges"><span class="trip-today charge-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} charges</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=(ed.can_mode!=null?ed.can_mode===6:Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11)));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):null;const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):null;const chargedSoc=ed.soc_charged_percent!=null?Math.round(ed.soc_charged_percent):((startSoc!=null&&endSoc!=null)?Math.max(0,endSoc-startSoc):null);const isRetro=Boolean(ed.soc_retroactive_estimated);const batterySocIcon = soc => `<ha-icon class="charge-soc-icon" icon="mdi:${batteryIconName(soc)}" aria-hidden="true"></ha-icon>`;const batterySvg=`<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;const socBadgeHtml=startSoc!=null&&endSoc!=null?`<span class="charge-soc">${batterySocIcon(startSoc)} ${startSoc}% → ${batterySocIcon(endSoc)} ${endSoc}% (+${chargedSoc!=null?chargedSoc:endSoc-startSoc}%)</span>`:(chargedSoc!=null?`<span class="charge-soc ${isRetro?'retro-mode':''}">${batterySvg} +${chargedSoc}%${isRetro?' <small class="retro-tag">(est.)</small>':''}</span>`:'');const chargeEnd=ed.ended_at||(ed.started_at&&ed.duration_s?new Date(new Date(ed.started_at).getTime()+(ed.duration_s*1000)).toISOString():null);const timeRangeStr=chargeEnd?`<span>${timeOnly(ed.started_at,this._hass?.config?.time_zone)}</span> ~ <span>${timeOnly(chargeEnd,this._hass?.config?.time_zone)}</span>`:timeOnly(ed.started_at,this._hass?.config?.time_zone);const unitPrice=ed.actual_cost_krw!=null?(ed.energy_kwh>0?Math.round(ed.actual_cost_krw/ed.energy_kwh):null):ed.unit_price_krw!=null?Math.round(ed.unit_price_krw):(ed.cost_krw!=null&&ed.energy_kwh>0?Math.round(ed.cost_krw/ed.energy_kwh):(fast?320:280));const cost=ed.effective_cost_krw??(ed.cost_krw!=null?Math.round(ed.cost_krw):Math.round((ed.energy_kwh||0)*unitPrice));return `<div class="row charge-row" data-charge-record="${i}" tabindex="0"><button class="charge-delete-action" data-charge-delete="${i}" hidden>${'Delete'}</button><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeRangeStr}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'Fast':'Slow'}</span><span class="charge-dur">${ed.unknown_duration_s>0?`Confirmed ${formatDuration(ed.confirmed_duration_s??ed.duration_s)} · Signal gap ${formatDuration(ed.unknown_duration_s)}`:formatDuration(ed.duration_s)}</span>${ed.gap_corrected?`<span class="merge-badge">Gap estimate ${n(ed.corrected_energy_kwh,2)} kWh</span>`:''}${socBadgeHtml}${ed.merged?`<span class="merge-badge">${ed.merge_count} merged</span>`:''}</div></div></div><div class="charge-val"><div class="charge-actions"><details class="charge-menu"><summary aria-label="Charge record menu">⋮</summary><button data-charge-menu-delete="${i}" type="button">Delete</button></details>${ed.payment_id?`<button class="charge-payment-pill" data-charge-payment="${i}" aria-label="Edit charge payment">${ed.actual_cost_krw!=null?'Edit':'Enter amount'}</button>`:''}</div><strong>₩${n(cost,0)} <small>${ed.actual_cost_krw!=null?'(actual)':'(est.)'}</small></strong><strong title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub">${ed.actual_cost_krw!=null?'Rate':'Est. rate'} ₩${n(unitPrice,0)}/kWh</span></div></div>`;}).join(''):'<div class="empty">No charges recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its charges.</div>'}</section>`;
+    return `<section class="panel charge-history"><div class="paneltitle"><h2>Charging records</h2><span class="sub">${esc(days[0]?.key||'')} ~ ${esc(days.at(-1)?.key||'')}</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} charges"><span class="trip-today charge-today">${d.today?'Today':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} charges</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=(ed.can_mode!=null?ed.can_mode===6:Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11)));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;const startSoc=ed.start_soc_percent!=null?socDisplay(ed.start_soc_percent):null;const endSoc=ed.end_soc_percent!=null?socDisplay(ed.end_soc_percent):null;const chargedSoc=(startSoc!=null&&endSoc!=null)?Math.max(0,endSoc-startSoc):(ed.soc_charged_percent!=null?socDisplay(ed.soc_charged_percent):null);const isRetro=Boolean(ed.soc_retroactive_estimated);const batterySocIcon = soc => `<ha-icon class="charge-soc-icon" icon="mdi:${batteryIconName(soc)}" aria-hidden="true"></ha-icon>`;const batterySvg=`<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;const socBadgeHtml=startSoc!=null&&endSoc!=null?`<span class="charge-soc">${batterySocIcon(startSoc)} ${startSoc}% → ${batterySocIcon(endSoc)} ${endSoc}% (+${chargedSoc!=null?chargedSoc:endSoc-startSoc}%)</span>`:(chargedSoc!=null?`<span class="charge-soc ${isRetro?'retro-mode':''}">${batterySvg} +${chargedSoc}%${isRetro?' <small class="retro-tag">(est.)</small>':''}</span>`:'');const chargeEnd=ed.ended_at||(ed.started_at&&ed.duration_s?new Date(new Date(ed.started_at).getTime()+(ed.duration_s*1000)).toISOString():null);const timeRangeStr=chargeEnd?`<span>${timeOnly(ed.started_at,this._hass?.config?.time_zone)}</span> ~ <span>${timeOnly(chargeEnd,this._hass?.config?.time_zone)}</span>`:timeOnly(ed.started_at,this._hass?.config?.time_zone);const unitPrice=ed.actual_cost_krw!=null?(ed.energy_kwh>0?Math.round(ed.actual_cost_krw/ed.energy_kwh):null):ed.unit_price_krw!=null?Math.round(ed.unit_price_krw):(ed.cost_krw!=null&&ed.energy_kwh>0?Math.round(ed.cost_krw/ed.energy_kwh):(fast?320:280));const cost=ed.effective_cost_krw??(ed.cost_krw!=null?Math.round(ed.cost_krw):Math.round((ed.energy_kwh||0)*unitPrice));return `<div class="row charge-row" data-charge-record="${i}" tabindex="0"><button class="charge-delete-action" data-charge-delete="${i}" hidden>${'Delete'}</button><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeRangeStr}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'Fast':'Slow'}</span><span class="charge-dur">${ed.unknown_duration_s>0?`Confirmed ${formatDuration(ed.confirmed_duration_s??ed.duration_s)} · Signal gap ${formatDuration(ed.unknown_duration_s)}`:formatDuration(ed.duration_s)}</span>${ed.gap_corrected?`<span class="merge-badge">Gap estimate ${n(ed.corrected_energy_kwh,2)} kWh</span>`:''}${socBadgeHtml}${ed.merged?`<span class="merge-badge">${ed.merge_count} merged</span>`:''}</div></div></div><div class="charge-val"><div class="charge-actions"><details class="charge-menu"><summary aria-label="Charge record menu">⋮</summary><button data-charge-menu-delete="${i}" type="button">Delete</button></details>${ed.payment_id?`<button class="charge-payment-pill" data-charge-payment="${i}" aria-label="Edit charge payment">${ed.actual_cost_krw!=null?'Edit':'Enter amount'}</button>`:''}</div><strong>₩${n(cost,0)} <small>${ed.actual_cost_krw!=null?'(actual)':'(est.)'}</small></strong><strong title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub">${ed.actual_cost_krw!=null?'Rate':'Est. rate'} ₩${n(unitPrice,0)}/kWh</span></div></div>`;}).join(''):'<div class="empty">No charges recorded.</div>'}</div>`:'<div class="empty">Choose a date to see its charges.</div>'}</section>`;
   }
   tripHistory(isTrip){
     const v = this.v || {};
@@ -1136,11 +1138,11 @@ class CarrotDashboard extends HTMLElement {
       const {leftPct, widthPct} = tripTimeline(e, currentTz);
       const isSel = isTrip && i === this.selected;
       const startSoc = ed.start_soc_percent != null
-        ? Math.round(ed.start_soc_percent)
-        : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+        ? socDisplay(ed.start_soc_percent)
+        : (ed.start_battery_wh != null ? socDisplay(ed.start_battery_wh / (capacity * 1000) * 100) : null);
       const endSoc = ed.end_soc_percent != null
-        ? Math.round(ed.end_soc_percent)
-        : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
+        ? socDisplay(ed.end_soc_percent)
+        : (ed.end_battery_wh != null ? socDisplay(ed.end_battery_wh / (capacity * 1000) * 100) : null);
       const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
       const usedStr = drain > 0 ? `${drain}% used` : (drain < 0 ? `+${Math.abs(drain)}% regen` : '0% used');
       const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count} merged)` : ''}`;
@@ -1180,8 +1182,8 @@ class CarrotDashboard extends HTMLElement {
         const ed = e?.data || {};
         const durText = tripDurationEn(ed.duration_s);
         const startValue = tripSoc(ed, 'start', capacity), endValue = tripSoc(ed, 'end', capacity);
-          const startSoc = startValue == null ? null : Math.round(startValue);
-          const endSoc = endValue == null ? null : Math.round(endValue);
+          const startSoc = startValue == null ? null : socDisplay(startValue);
+          const endSoc = endValue == null ? null : socDisplay(endValue);
           const drain = startSoc == null || endSoc == null ? null : startSoc - endSoc;
         const usedStr = drain > 0 ? `${drain}% used` : (drain < 0 ? `+${Math.abs(drain)}% regen` : '0% used');
         const isSel = isTrip && i === this.selected;
@@ -1327,7 +1329,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     // Card 2: ETA to 80% / 100%
-    const isUnder80 = soc == null || Math.round(soc) < 80;
+    const isUnder80 = soc == null || socDisplay(soc) < 80;
     const targetPercent = isUnder80 ? 80 : 100;
     const etaCardTitle = `Time to ${targetPercent}%`;
     const targetSec = isUnder80 ? v.time_to_80_s : v.time_to_100_s;
@@ -1368,7 +1370,7 @@ class CarrotDashboard extends HTMLElement {
         `${metric('Charge cost this month', n(v.charge_cost_totals?.effective_cost_krw ?? v.month_charge_cost, 0), 'KRW', 'cash', chargeCostLabel(v.charge_cost_totals,true))}`;
 
     const markersHtml=charging
-      ?`${(soc==null||Math.round(soc)<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
+      ?`${(soc==null||socDisplay(soc)<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
        `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
       :'';
 
@@ -1391,7 +1393,7 @@ class CarrotDashboard extends HTMLElement {
                  <span class="charge-status-label">${chargeLabel}</span>
                  ${powerKw != null ? `<span class="charge-power-tag ${isFast ? 'fast' : 'slow'}">${n(powerKw,isFast?0:1)} kW</span>` : ''}
                </div>
-               <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+               <strong class="soc-value">${n(socDisplay(soc), 0)}<small>%</small></strong>
                <div class="range-sub-c3">
                  <span>Est. driving range <b>${rangeText}</b></span>
                </div>
@@ -1404,7 +1406,7 @@ class CarrotDashboard extends HTMLElement {
              <span>Battery level</span>
            </div>
            <div class="soc-stack-c3">
-             <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+             <strong class="soc-value">${n(socDisplay(soc), 0)}<small>%</small></strong>
              <div class="range-sub-c3">
                <span>Est. driving range <b>${rangeText}</b></span>
              </div>
@@ -1550,7 +1552,7 @@ class CarrotDashboard extends HTMLElement {
     this.batteryDay=start+idx;
     const d=days[idx],max=Math.max(100,Math.ceil(Math.max(...days.map(x=>x.used??0))/50)*50),color=d.used>100?'#ffc247':'#479cff';
     const bars=days.map((x,i)=>`<button data-day="${start+i}" data-date="${x.date}" aria-label="${x.date} Usage ${x.used??'No records'}" aria-pressed="${idx===i}" style="--bar-end:${x.used>100?'#ffe480':'#65c4ff'};--bar:${idx===i?(x.used>100?'#ffc247':'#479cff'):'#626267'}"><i style="height:${(x.used??0)/max*100}%"></i><span>${new Date(x.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short'})}<small>${x.date.slice(5).replace('-','/')}</small></span></button>`).join('');
-    const hours=(()=>{const runs=[];let start=null;for(let h=0;h<d.hours.length;h++){const ch=!!d.charge_hours?.[h]||!!d.hours[h]?.charging;if(ch&&start===null)start=h;if(!ch&&start!==null){runs.push([start,h-1]);start=null;}}if(start!==null)runs.push([start,d.hours.length-1]);let out='',ridx=0;for(let h=0;h<d.hours.length;h++){const x=d.hours[h],run=runs[ridx],charging=!!d.charge_hours?.[h]||!!x?.charging;if(run&&h===run[0])out+=`<div class="charge-run-wrap" style="--span:${run[1]-run[0]+1}"><em aria-hidden="true"><svg viewBox="0 0 32 40"><path d="M19 5 Q21 3 20 7 L17 17 H25 Q27 17 25 20 L13 35 Q11 37 12 33 L15 23 H7 Q5 23 7 20 Z" fill="#5ad46d" stroke="var(--bolt-outline)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg></em>`;out+=`<div title="${h}:00 ${x?(x.last_known?'Last known ':'Measured ')+Math.round(x.soc)+'%':'No SOC record'}${charging?' · Charging recorded during this hour':''}" class="hour ${charging?'charging':x?.last_known?'last-known':x?.driving?'driving':'parked'} ${!charging&&x?(x.soc<15?'soc-critical':x.soc<30?'soc-low':''):''}">${x?`<i style="height:${x.soc}%"></i>`:''}</div>`;if(run&&h===run[1]){out+='</div>';ridx++;}}return out;})();
+    const hours=(()=>{const runs=[];let start=null;for(let h=0;h<d.hours.length;h++){const ch=!!d.charge_hours?.[h]||!!d.hours[h]?.charging;if(ch&&start===null)start=h;if(!ch&&start!==null){runs.push([start,h-1]);start=null;}}if(start!==null)runs.push([start,d.hours.length-1]);let out='',ridx=0;for(let h=0;h<d.hours.length;h++){const x=d.hours[h],run=runs[ridx],charging=!!d.charge_hours?.[h]||!!x?.charging;if(run&&h===run[0])out+=`<div class="charge-run-wrap" style="--span:${run[1]-run[0]+1}"><em aria-hidden="true"><svg viewBox="0 0 32 40"><path d="M19 5 Q21 3 20 7 L17 17 H25 Q27 17 25 20 L13 35 Q11 37 12 33 L15 23 H7 Q5 23 7 20 Z" fill="#5ad46d" stroke="var(--bolt-outline)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg></em>`;out+=`<div title="${h}:00 ${x?(x.last_known?'Last known ':'Measured ')+socDisplay(x.soc)+'%':'No SOC record'}${charging?' · Charging recorded during this hour':''}" class="hour ${charging?'charging':x?.last_known?'last-known':x?.driving?'driving':'parked'} ${!charging&&x?(x.soc<15?'soc-critical':x.soc<30?'soc-low':''):''}">${x?`<i style="height:${x.soc}%"></i>`:''}</div>`;if(run&&h===run[1]){out+='</div>';ridx++;}}return out;})();
     return `<section class="battery-history"><div class="battery-history-heading"><h2>Battery usage</h2><div class="battery-page-controls"><button type="button" data-battery-page="1" aria-label="Previous 7 days" title="Previous 7 days" ${this.batteryPage>=maxPage?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><button type="button" data-battery-page="-1" aria-label="Next 7 days" title="Next 7 days" ${this.batteryPage===0?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button></div></div><div class="usage-total" style="color:${color}"><strong>${d.used==null?'—':n(d.used,1)+'%'}${d.used==null?'':'<small class="usage-caption">used</small>'}</strong><span>${esc(d.date)}</span></div><div class="history-plot"><div class="week-bars">${bars}</div><div class="axis"><span>${max}%</span><span>${max/2}%</span><span>0%</span></div></div><p class="chart-key">${esc(days[0].date)} ~ ${esc(days.at(-1).date)} · Select a day for details · Yellow indicates over 100%</p><h3>Battery level on selected day</h3><div class="history-plot"><div class="hours">${hours}</div><div class="axis"><span>100%</span><span>50%</span><span>0%</span></div></div><div class="hours-label"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div><p class="chart-key"><b style="color:#5ad46d">● Charging</b>　<span class="driving-key">● Driving</span>　<span class="parking-key">● Parked / last known</span> · <span style="color:#e58a31">Below 30%</span> · <span style="color:#ed6269">Below 15%</span> · Gaps: no records</p><div class="usage-stats"><div>Recorded driving time<strong>${shortDuration(d.drive_s)}</strong></div><div>Recorded charging time<strong>${shortDuration(d.charge_s)}</strong></div></div><p class="chart-key">Received ${d.received_samples??0} samples · Valid SOC ${d.valid_samples??0} samples · Stale samples ${d.stale_samples??0} samples · Recorded coverage ${shortDuration(d.covered_s)} · Usage estimates sum recorded SOC decreases, excluding gaps over 5 minutes. Gray bars show parked readings or last known values. Carried values are excluded from consumption. Green means charging occurred within the hour, not throughout it. Without SOC data, only the charging background is shown. Durations use saved sessions and exclude ongoing or missing sessions.</p></section>`;
   }
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}

@@ -5,6 +5,7 @@ from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import SENSOR_FIELDS, CHARGE_TEMPERATURE_DISPLAY, battery_monitor_attributes
 from .entity_migration import COMPACT_SENSORS, BATTERY_TEMPERATURE_DETAILS
+from .display_soc import display_integer as soc_display
 
 GEAR_DISPLAY = {
     'park': 'P',
@@ -117,7 +118,10 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         if self._attr_device_class=='timestamp' and value:
             try:return datetime.fromisoformat(value.replace('Z','+00:00'))
             except (ValueError,AttributeError):return None
-        if self.key != 'soc_percent' and getattr(self,'_attr_suggested_display_precision',None)==0 and isinstance(value,float):
+        if self.key == 'soc_percent':
+            # Truncate the 0.5% CAN display SOC (58.5 -> 58); raw value stays in attributes.
+            return soc_display(value)
+        if getattr(self,'_attr_suggested_display_precision',None)==0 and isinstance(value,float):
             return int(round(value))
         return value
     @property
@@ -165,6 +169,7 @@ class VehicleSensor(VehicleEntity,SensorEntity):
         elif self.key=='soc_percent':
             data = self.data
             attrs.update(soc_source=data.get('soc_source'), can_id='0x14A', can_bus=1,
+                         raw_soc_percent=data.get('soc_percent'), display_rounding='truncate',
                          signal='byte19_x0.5_percent', measured_at=data.get('soc_measured_at'),
                          field_measured_at=data.get('soc_measured_at'),
                          measurement_age_s=data.get('soc_measurement_age_s'),

@@ -11,6 +11,13 @@ def valid(value):
     return type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 100
 
 
+def display_integer(value):
+    """Integer shown to users: truncate the 0.5% CAN value (58.5 -> 58), never round up."""
+    if not valid(value):
+        return None
+    return int(math.floor(value + 1e-6))
+
+
 def timestamp(value):
     try:
         result = datetime.fromisoformat(value.replace('Z', '+00:00'))

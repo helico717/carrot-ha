@@ -51,7 +51,8 @@ for (const [name, DashClass, durExpected] of [
   assert(!html.includes('동안 주행'), `${name}: Should not include 동안 주행`);
   assert(!html.includes('Drove for'), `${name}: Should not include Drove for`);
   assert(html.includes('class="trip-soc"'), `${name}: Missing trip-soc`);
-  assert(html.includes('76% → 74%'), `${name}: Missing 76% → 74%`);
+  // Integer SOC truncates (76.2 -> 76, 73.5 -> 73), matching the cluster-style display.
+  assert(html.includes('76% → 73%'), `${name}: Missing truncated 76% → 73%`);
   assert(html.includes('class="trip-eff"'), `${name}: Missing trip-eff`);
   assert(html.includes('7.4 km/kWh'), `${name}: Missing 7.4 km/kWh`);
 

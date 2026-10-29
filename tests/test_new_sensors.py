@@ -455,5 +455,22 @@ class ActualPowerEntityTests(unittest.TestCase):
                 self.assertEqual(sensor.native_value,expected)
                 self.assertEqual(sensor.suggested_display_precision,precision)
 
+    def test_battery_soc_entity_truncates_display_and_keeps_raw(self):
+        from custom_components.carrot_ha.sensors_v3 import VehicleSensor, FIELDS
+        from custom_components.carrot_ha.display_soc import display_integer
+        for raw, shown in ((58.5, 58), (58.0, 58), (99.5, 99), (100, 100), (0.5, 0), (79.99999999, 80), (None, None), (101, None)):
+            self.assertEqual(display_integer(raw), shown)
+        now = datetime.now(timezone.utc).isoformat()
+        runtime = TestNewSensors._make_runtime(self, {'display_soc_candidate_percent': 79.5,
+                                      'field_measured_at': {'display_soc_candidate_percent': now}})
+        runtime['entry'].entry_id = 'soc-truncate-test'
+        sensor = VehicleSensor(runtime['entry'], 'soc_percent', *FIELDS['soc_percent'])
+        sensor.hass = types.SimpleNamespace(data={'carrot_ha': {'soc-truncate-test': runtime}})
+        self.assertEqual(sensor.native_value, 79)
+        attrs = sensor.extra_state_attributes
+        self.assertEqual(attrs['raw_soc_percent'], 79.5)
+        self.assertEqual(attrs['display_rounding'], 'truncate')
+
+
 if __name__ == '__main__':
     unittest.main()

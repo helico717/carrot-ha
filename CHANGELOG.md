@@ -1,3 +1,16 @@
+## 2026-10-30 — SOC % 정수 표시를 반올림에서 버림으로 변경
+
+- 요청/이유: 사용자가 SOC % 정수 표시에서 소수점을 반올림하지 말고 버리도록 요청했다. 표시 SOC 원본은 CAN 0x14A의 0.5% 단위라서, 기존에는 58.5가 59, 99.5가 100으로 올라가 보였다.
+- 변경: 사용자에게 보이는 정수 SOC를 모두 버림으로 바꿨다(58.5→58, 99.5→99). 부동소수 오차로 80이 79.999…가 되는 경우를 막으려고 1e-6을 더한 뒤 버린다.
+  - 차량 대시보드(ko/en): 현재 SOC 큰 숫자·타일·상세 행, 주행 카드·타임라인의 시작/종료 SOC(Wh 대체 계산 포함), 충전 기록의 시작/종료 SOC, 시간별 막대 툴팁, 배터리 아이콘 단계, 80% 표시 판단. 충전 기록에 시작/종료가 모두 있으면 충전 %p를 표시된 두 정수의 차이로 보여 줘 숫자끼리 어긋나지 않게 했다.
+  - 차계부: 현재 상태의 `배터리 SOC`.
+  - HA 엔터티 `sensor.id_4_battery`: 상태값을 버림 정수로 바꾸고(HA 기본 표시는 반올림이라 상태값에서 처리), 원본을 속성 `raw_soc_percent`, 방식을 `display_rounding=truncate`로 남겼다.
+- 변경하지 않음: 저장·계산 값(0.5% 원본, 주행/충전 기록의 소수 첫째 자리 SOC, 에너지·전비·주행가능거리·ETA), 차계부의 %p 소모량 같은 계산 지표의 소수 표시, 디버그 대시보드. 레이아웃·디자인 변경 없음(숫자 처리만 바뀌어 프리뷰 절차는 적용하지 않았다).
+- 관련 파일: custom_components/carrot_ha/{display_soc.py,sensors_v3.py}, frontend/{carrot-dashboard-ko.js,carrot-dashboard-en.js,carrot-vehicle-journal.js}, tests/{dashboard-soc-truncate.test.mjs,test_new_sensors.py,trip-ui.test.mjs}. trip-ui는 73.5%를 74가 아니라 73으로 기대하도록 갱신했다.
+- 검증: 신규 JS 3개·Python 1개 통과. JS 전체 124개 중 118개 통과, 실패 6개(camera-360·charging-curve·debug-freshness·motion-status·range-c3-and-fixes·frontend-revision-bootstrap)는 HEAD 스냅숏에서도 똑같이 실패한다. Python: test_new_sensors 23개와 SOC·주행·충전·회귀 게이트 194개가 각각 통과. 같이 실행하면 test_new_sensors의 기존 3개와 신규 1개가 모듈 스텁 충돌로 실패하는 기존 격리 문제가 있다.
+- 배포 상태: main 커밋·푸시 후 HA 직접 반영(아래 반영 기록 참조). 버전 상승·태그·릴리즈 없음.
+- 미확인: 사용자 HA 재시작·브라우저 새로고침 후 실제 화면, 계기판의 표시 방식이 실제로 버림인지(실차 대조 양식의 값 전이 기록으로 확인).
+
 ## 2026-10-29 — 주유 영수증 OCR을 여러 번 인식·계산 검증 방식으로 개선
 
 - 사용자 보고: 내연기관 주유 영수증을 찍어도 인식이 잘 안 돼 직접 입력하고 있었다. 목표는 대충 찍어도 날짜·금액·주유량·단가·주유소가 맞게 자동 입력되는 것이다.

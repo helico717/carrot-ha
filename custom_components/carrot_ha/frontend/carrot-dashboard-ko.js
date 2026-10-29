@@ -44,9 +44,11 @@ const tripDurationKo = s => {
   if(h > 0) return `${h}시간`;
   return `${m}분`;
 };
+// Integer SOC display truncates the 0.5% CAN value (58.5 -> 58); stored values keep the decimal.
+const socDisplay = soc => typeof soc === 'number' && Number.isFinite(soc) ? Math.floor(Math.max(0, Math.min(100, soc)) + 1e-6) : null;
 const batteryIconName = soc => {
   if(typeof soc !== 'number' || !Number.isFinite(soc)) return 'battery';
-  const level = Math.max(0, Math.min(100, Math.round(soc)));
+  const level = socDisplay(soc);
   if(level >= 95) return 'battery';
   if(level <= 5) return 'battery-outline';
   return `battery-${Math.round(level / 10) * 10}`;
@@ -895,7 +897,7 @@ class CarrotDashboard extends HTMLElement {
         else if(v.aux_voltage<12.4)auxStatus='보통 · 전압 안정';
       }
       const tiles=`
-        ${metric('배터리 잔량',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh,1)} kWh 저장`)}
+        ${metric('배터리 잔량',n(socDisplay(v.soc_percent),0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh,1)} kWh 저장`)}
         ${metric('총 주행거리',n(v.odometer_km,0),'km','counter','계기판 누적거리')}
         ${isDriving?metric('현재 속도',n(v.speed_kph,0),'km/h','speedometer','실시간 계기판 속도'):metric('12V 배터리',n(v.aux_voltage,1),'V','car-battery',auxStatus)}
         ${metric('외부 온도',n(v.outside_temp_c,1),'°C','thermometer','차량 주변 기온')}
@@ -986,7 +988,7 @@ class CarrotDashboard extends HTMLElement {
               `${metric('평균속도',spdVal,'km/h','speedometer-medium')}`;
       }
     }else{
-      tiles=`${metric('배터리 잔량',n(v.soc_percent,0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW','ev-station',v.charging?'차량 CAN 측정':'관측값 기준')}`;
+      tiles=`${metric('배터리 잔량',n(socDisplay(v.soc_percent),0),'%',batteryIconName(v.soc_percent),`${n(v.battery_kwh)} / ${n(v.soc_capacity_kwh)} kWh`)}${metric('총 주행거리',n(v.odometer_km,0),'km','counter',v.stale?'마지막 측정값':'차량 계기판')}${metric('이번 달 주행거리',n(v.month_distance_km),'km','routes',`${n(v.month_trip_count,0)}회 주행`)}${metric('충전 전력',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW','ev-station',v.charging?'차량 CAN 측정':'관측값 기준')}`;
     }
 
     const panelTitle=isTrip
@@ -1019,7 +1021,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     const batteryItems=[
-      row(batteryIconName(v.soc_percent),'배터리 잔량',n(v.soc_percent,0),'%'),
+      row(batteryIconName(v.soc_percent),'배터리 잔량',n(socDisplay(v.soc_percent),0),'%'),
       row('car-electric','주행가능거리 (추정)',n(v.range_km),'km'),
       row('flash','배터리 에너지',n(v.battery_kwh),'kWh'),
       row('ev-station','충전 전력',n(v.charge_power_kw??(v.charge_power_w==null?null:v.charge_power_w/1000),v.charge_mode==='dc_charging'?0:1),'kW'),
@@ -1100,7 +1102,7 @@ class CarrotDashboard extends HTMLElement {
     }
     const selected=days.find(d=>d.key===this.chargeDay);
     const labels=d=>d.date.getUTCDate()+'일('+['일','월','화','수','목','금','토'][d.date.getUTCDay()]+')';
-    return `<section class="panel charge-history"><div class="paneltitle"><h2>충전 기록</h2><span class="sub">${esc(days[0]?.key||'')} ~ ${esc(days.at(-1)?.key||'')}</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} 회 충전"><span class="trip-today charge-today">${d.today?'오늘':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} 회 충전</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=(ed.can_mode!=null?ed.can_mode===6:Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11)));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;const startSoc=ed.start_soc_percent!=null?Math.round(ed.start_soc_percent):null;const endSoc=ed.end_soc_percent!=null?Math.round(ed.end_soc_percent):null;const chargedSoc=ed.soc_charged_percent!=null?Math.round(ed.soc_charged_percent):((startSoc!=null&&endSoc!=null)?Math.max(0,endSoc-startSoc):null);const isRetro=Boolean(ed.soc_retroactive_estimated);const batterySocIcon = soc => `<ha-icon class="charge-soc-icon" icon="mdi:${batteryIconName(soc)}" aria-hidden="true"></ha-icon>`;const batterySvg=`<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;const socBadgeHtml=startSoc!=null&&endSoc!=null?`<span class="charge-soc">${batterySocIcon(startSoc)} ${startSoc}% → ${batterySocIcon(endSoc)} ${endSoc}% (+${chargedSoc!=null?chargedSoc:endSoc-startSoc}%)</span>`:(chargedSoc!=null?`<span class="charge-soc ${isRetro?'retro-mode':''}">${batterySvg} +${chargedSoc}%${isRetro?' <small class="retro-tag">(소급 추산)</small>':''}</span>`:'');const chargeEnd=ed.ended_at||(ed.started_at&&ed.duration_s?new Date(new Date(ed.started_at).getTime()+(ed.duration_s*1000)).toISOString():null);const timeRangeStr=chargeEnd?`<span>${timeOnly(ed.started_at,this._hass?.config?.time_zone)}</span> ~ <span>${timeOnly(chargeEnd,this._hass?.config?.time_zone)}</span>`:timeOnly(ed.started_at,this._hass?.config?.time_zone);const unitPrice=ed.actual_cost_krw!=null?(ed.energy_kwh>0?Math.round(ed.actual_cost_krw/ed.energy_kwh):null):ed.unit_price_krw!=null?Math.round(ed.unit_price_krw):(ed.cost_krw!=null&&ed.energy_kwh>0?Math.round(ed.cost_krw/ed.energy_kwh):(fast?320:280));const cost=ed.effective_cost_krw??(ed.cost_krw!=null?Math.round(ed.cost_krw):Math.round((ed.energy_kwh||0)*unitPrice));return `<div class="row charge-row" data-charge-record="${i}" tabindex="0"><button class="charge-delete-action" data-charge-delete="${i}" hidden>${'삭제'}</button><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeRangeStr}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'급속':'완속'}</span><span class="charge-dur">${ed.unknown_duration_s>0?`충전 확인 ${formatDuration(ed.confirmed_duration_s??ed.duration_s).replace(/ 소요$/,'')} · 신호 공백 ${formatDuration(ed.unknown_duration_s).replace(/ 소요$/,'')}`:formatDuration(ed.duration_s)}</span>${ed.gap_corrected?`<span class="merge-badge">공백 보정 ${n(ed.corrected_energy_kwh,2)} kWh</span>`:''}${socBadgeHtml}${ed.merged?`<span class="merge-badge">${ed.merge_count}회 병합</span>`:''}</div></div></div><div class="charge-val"><div class="charge-actions"><details class="charge-menu"><summary aria-label="충전 기록 메뉴">⋮</summary><button data-charge-menu-delete="${i}" type="button">삭제</button></details>${ed.payment_id?`<button class="charge-payment-pill" data-charge-payment="${i}" aria-label="충전 결제 금액 입력 또는 수정">${ed.actual_cost_krw!=null?'수정':'직접 입력'}</button>`:''}</div><strong>${n(cost,0)}원 <small>${ed.actual_cost_krw!=null?'(실제)':'(추정)'}</small></strong><strong title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub">${ed.actual_cost_krw!=null?'단가':'추정 단가'} ${n(unitPrice,0)}원/kWh</span></div></div>`;}).join(''):'<div class="empty">기록된 충전이 없습니다.</div>'}</div>`:'<div class="empty">날짜를 선택하면 해당 날짜의 충전 기록이 표시됩니다.</div>'}</section>`;
+    return `<section class="panel charge-history"><div class="paneltitle"><h2>충전 기록</h2><span class="sub">${esc(days[0]?.key||'')} ~ ${esc(days.at(-1)?.key||'')}</span></div><div class="trip-days charge-days">${days.map(d=>`<button class="trip-day charge-day" data-charge-day="${d.key}" aria-pressed="${d.key===this.chargeDay}" aria-label="${d.key}, ${d.indices.length} 회 충전"><span class="trip-today charge-today">${d.today?'오늘':'&nbsp;'}</span><b>${labels(d)}</b><span class="trip-count charge-count">${icon('power-plug')}${d.indices.length}</span></button>`).join('')}</div>${selected?`<div class="trip-day-heading">${selected.key} · ${selected.indices.length} 회 충전</div><div class="scroll">${selected.indices.length?selected.indices.map(i=>{const e=this.charges[i],ed=e?.data||e||{};const fast=(ed.can_mode!=null?ed.can_mode===6:Boolean(ed.energy_kwh&&ed.duration_s&&(ed.energy_kwh/(ed.duration_s/3600)>11)));const boltSvg=fast?`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M3.2,4V12.8H5.6V20L11.2,10.4H8L11.2,4Z"/><path d="M12.8,4V12.8H15.2V20L20.8,10.4H17.6L20.8,4Z"/></svg>`:`<svg viewBox="0 0 24 24" class="charge-bolt" fill="currentColor" aria-hidden="true"><path d="M7,2V13H10V22L17,10H13L17,2H7Z"/></svg>`;const startSoc=ed.start_soc_percent!=null?socDisplay(ed.start_soc_percent):null;const endSoc=ed.end_soc_percent!=null?socDisplay(ed.end_soc_percent):null;const chargedSoc=(startSoc!=null&&endSoc!=null)?Math.max(0,endSoc-startSoc):(ed.soc_charged_percent!=null?socDisplay(ed.soc_charged_percent):null);const isRetro=Boolean(ed.soc_retroactive_estimated);const batterySocIcon = soc => `<ha-icon class="charge-soc-icon" icon="mdi:${batteryIconName(soc)}" aria-hidden="true"></ha-icon>`;const batterySvg=`<svg class="charge-soc-icon" viewBox="0 0 24 24"><path d="M16 4h-2V2h-4v2H8C6.9 4 6 4.9 6 6v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/></svg>`;const socBadgeHtml=startSoc!=null&&endSoc!=null?`<span class="charge-soc">${batterySocIcon(startSoc)} ${startSoc}% → ${batterySocIcon(endSoc)} ${endSoc}% (+${chargedSoc!=null?chargedSoc:endSoc-startSoc}%)</span>`:(chargedSoc!=null?`<span class="charge-soc ${isRetro?'retro-mode':''}">${batterySvg} +${chargedSoc}%${isRetro?' <small class="retro-tag">(소급 추산)</small>':''}</span>`:'');const chargeEnd=ed.ended_at||(ed.started_at&&ed.duration_s?new Date(new Date(ed.started_at).getTime()+(ed.duration_s*1000)).toISOString():null);const timeRangeStr=chargeEnd?`<span>${timeOnly(ed.started_at,this._hass?.config?.time_zone)}</span> ~ <span>${timeOnly(chargeEnd,this._hass?.config?.time_zone)}</span>`:timeOnly(ed.started_at,this._hass?.config?.time_zone);const unitPrice=ed.actual_cost_krw!=null?(ed.energy_kwh>0?Math.round(ed.actual_cost_krw/ed.energy_kwh):null):ed.unit_price_krw!=null?Math.round(ed.unit_price_krw):(ed.cost_krw!=null&&ed.energy_kwh>0?Math.round(ed.cost_krw/ed.energy_kwh):(fast?320:280));const cost=ed.effective_cost_krw??(ed.cost_krw!=null?Math.round(ed.cost_krw):Math.round((ed.energy_kwh||0)*unitPrice));return `<div class="row charge-row" data-charge-record="${i}" tabindex="0"><button class="charge-delete-action" data-charge-delete="${i}" hidden>${'삭제'}</button><div class="charge-meta"><span class="charge-icon-wrap ${fast?'fast':''}">${boltSvg}</span><div><b class="charge-date">${timeRangeStr}</b><div class="charge-info-sub"><span class="speed-badge ${fast?'fast':'slow'}">${fast?'급속':'완속'}</span><span class="charge-dur">${ed.unknown_duration_s>0?`충전 확인 ${formatDuration(ed.confirmed_duration_s??ed.duration_s).replace(/ 소요$/,'')} · 신호 공백 ${formatDuration(ed.unknown_duration_s).replace(/ 소요$/,'')}`:formatDuration(ed.duration_s)}</span>${ed.gap_corrected?`<span class="merge-badge">공백 보정 ${n(ed.corrected_energy_kwh,2)} kWh</span>`:''}${socBadgeHtml}${ed.merged?`<span class="merge-badge">${ed.merge_count}회 병합</span>`:''}</div></div></div><div class="charge-val"><div class="charge-actions"><details class="charge-menu"><summary aria-label="충전 기록 메뉴">⋮</summary><button data-charge-menu-delete="${i}" type="button">삭제</button></details>${ed.payment_id?`<button class="charge-payment-pill" data-charge-payment="${i}" aria-label="충전 결제 금액 입력 또는 수정">${ed.actual_cost_krw!=null?'수정':'직접 입력'}</button>`:''}</div><strong>${n(cost,0)}원 <small>${ed.actual_cost_krw!=null?'(실제)':'(추정)'}</small></strong><strong title="${ed.merged?(ed.merge_parts||[]).map(p=>`${n(p.energy_kwh,1)} kWh`).join(' + '):''}">${n(ed.energy_kwh,2)} <small>kWh</small></strong><span class="charge-sub">${ed.actual_cost_krw!=null?'단가':'추정 단가'} ${n(unitPrice,0)}원/kWh</span></div></div>`;}).join(''):'<div class="empty">기록된 충전이 없습니다.</div>'}</div>`:'<div class="empty">날짜를 선택하면 해당 날짜의 충전 기록이 표시됩니다.</div>'}</section>`;
   }
   tripHistory(isTrip){
     const v = this.v || {};
@@ -1136,11 +1138,11 @@ class CarrotDashboard extends HTMLElement {
       const {leftPct, widthPct} = tripTimeline(e, currentTz);
       const isSel = isTrip && i === this.selected;
       const startSoc = ed.start_soc_percent != null
-        ? Math.round(ed.start_soc_percent)
-        : (ed.start_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.start_battery_wh / (capacity * 1000) * 100))) : null);
+        ? socDisplay(ed.start_soc_percent)
+        : (ed.start_battery_wh != null ? socDisplay(ed.start_battery_wh / (capacity * 1000) * 100) : null);
       const endSoc = ed.end_soc_percent != null
-        ? Math.round(ed.end_soc_percent)
-        : (ed.end_battery_wh != null ? Math.round(Math.min(100, Math.max(0, ed.end_battery_wh / (capacity * 1000) * 100))) : null);
+        ? socDisplay(ed.end_soc_percent)
+        : (ed.end_battery_wh != null ? socDisplay(ed.end_battery_wh / (capacity * 1000) * 100) : null);
       const drain = (startSoc != null && endSoc != null) ? (startSoc - endSoc) : null;
       const usedStr = drain > 0 ? `${drain}% 사용` : (drain < 0 ? `+${Math.abs(drain)}% 회생` : '0% 사용');
       const segTitle = `${timeOnly(ed.started_at || e.observed_at, currentTz)} ~ ${timeOnly(ed.ended_at || e.observed_at, currentTz)} · ${n((ed.distance_m || 0) / 1000, 2)}km · 🔋${startSoc ?? '—'}%→${endSoc ?? '—'}% (${usedStr}) · ${n(ed.efficiency_km_kwh, 1)} km/kWh${ed.merged ? ` (${ed.merge_count}건 병합)` : ''}`;
@@ -1180,8 +1182,8 @@ class CarrotDashboard extends HTMLElement {
         const ed = e?.data || {};
         const durText = tripDurationKo(ed.duration_s);
         const startValue = tripSoc(ed, 'start', capacity), endValue = tripSoc(ed, 'end', capacity);
-          const startSoc = startValue == null ? null : Math.round(startValue);
-          const endSoc = endValue == null ? null : Math.round(endValue);
+          const startSoc = startValue == null ? null : socDisplay(startValue);
+          const endSoc = endValue == null ? null : socDisplay(endValue);
           const drain = startSoc == null || endSoc == null ? null : startSoc - endSoc;
         const usedStr = drain > 0 ? `${drain}% 사용` : (drain < 0 ? `+${Math.abs(drain)}% 회생` : '0% 사용');
         const isSel = isTrip && i === this.selected;
@@ -1327,7 +1329,7 @@ class CarrotDashboard extends HTMLElement {
     };
 
     // Card 2: ETA to 80% / 100%
-    const isUnder80 = soc == null || Math.round(soc) < 80;
+    const isUnder80 = soc == null || socDisplay(soc) < 80;
     const targetPercent = isUnder80 ? 80 : 100;
     const etaCardTitle = `${targetPercent}%까지 걸리는 시간`;
     const targetSec = isUnder80 ? v.time_to_80_s : v.time_to_100_s;
@@ -1368,7 +1370,7 @@ class CarrotDashboard extends HTMLElement {
         `${metric('이번 달 충전요금', n(v.charge_cost_totals?.effective_cost_krw ?? v.month_charge_cost, 0), '원', 'cash', chargeCostLabel(v.charge_cost_totals))}`;
 
     const markersHtml=charging
-      ?`${(soc==null||Math.round(soc)<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
+      ?`${(soc==null||socDisplay(soc)<80)?`<div class="charge-marker marker-80" data-top="80%" data-bottom="${chargeDuration(v.time_to_80_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`:''}`+
        `<div class="charge-marker marker-100" data-top="100%" data-bottom="${chargeDuration(v.time_to_100_s)}"><span class="marker-cap cap-top"></span><span class="marker-cap cap-bottom"></span></div>`
       :'';
 
@@ -1391,7 +1393,7 @@ class CarrotDashboard extends HTMLElement {
                  <span class="charge-status-label">${chargeLabel}</span>
                  ${powerKw != null ? `<span class="charge-power-tag ${isFast ? 'fast' : 'slow'}">${n(powerKw,isFast?0:1)} kW</span>` : ''}
                </div>
-               <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+               <strong class="soc-value">${n(socDisplay(soc), 0)}<small>%</small></strong>
                <div class="range-sub-c3">
                  <span>예상 주행가능거리 <b>${rangeText}</b></span>
                </div>
@@ -1404,7 +1406,7 @@ class CarrotDashboard extends HTMLElement {
              <span>배터리 잔량</span>
            </div>
            <div class="soc-stack-c3">
-             <strong class="soc-value">${n(soc, 0)}<small>%</small></strong>
+             <strong class="soc-value">${n(socDisplay(soc), 0)}<small>%</small></strong>
              <div class="range-sub-c3">
                <span>주행가능거리 약 <b>${rangeText}</b></span>
              </div>
@@ -1552,7 +1554,7 @@ class CarrotDashboard extends HTMLElement {
     this.batteryDay=start+idx;
     const d=days[idx],max=Math.max(100,Math.ceil(Math.max(...days.map(x=>x.used??0))/50)*50),color=d.used>100?'#ffc247':'#479cff';
     const bars=days.map((x,i)=>`<button data-day="${start+i}" data-date="${x.date}" aria-label="${x.date} 사용량 ${x.used??'기록 없음'}" aria-pressed="${idx===i}" style="--bar-end:${x.used>100?'#ffe480':'#65c4ff'};--bar:${idx===i?(x.used>100?'#ffc247':'#479cff'):'#626267'}"><i style="height:${(x.used??0)/max*100}%"></i><span>${new Date(x.date+'T12:00:00').toLocaleDateString('ko-KR',{weekday:'short'})}<small>${x.date.slice(5).replace('-','/')}</small></span></button>`).join('');
-    const hours=(()=>{const runs=[];let start=null;for(let h=0;h<d.hours.length;h++){const ch=!!d.charge_hours?.[h]||!!d.hours[h]?.charging;if(ch&&start===null)start=h;if(!ch&&start!==null){runs.push([start,h-1]);start=null;}}if(start!==null)runs.push([start,d.hours.length-1]);let out='',ridx=0;for(let h=0;h<d.hours.length;h++){const x=d.hours[h],run=runs[ridx],charging=!!d.charge_hours?.[h]||!!x?.charging;if(run&&h===run[0])out+=`<div class="charge-run-wrap" style="--span:${run[1]-run[0]+1}"><em aria-hidden="true"><svg viewBox="0 0 32 40"><path d="M19 5 Q21 3 20 7 L17 17 H25 Q27 17 25 20 L13 35 Q11 37 12 33 L15 23 H7 Q5 23 7 20 Z" fill="#5ad46d" stroke="var(--bolt-outline)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg></em>`;out+=`<div title="${h}시 ${x?(x.last_known?'마지막 확인값 ':'실측 ')+Math.round(x.soc)+'%':'SOC 기록 없음'}${charging?' · 해당 시간 충전 기록 있음':''}" class="hour ${charging?'charging':x?.last_known?'last-known':x?.driving?'driving':'parked'} ${!charging&&x?(x.soc<15?'soc-critical':x.soc<30?'soc-low':''):''}">${x?`<i style="height:${x.soc}%"></i>`:''}</div>`;if(run&&h===run[1]){out+='</div>';ridx++;}}return out;})();
+    const hours=(()=>{const runs=[];let start=null;for(let h=0;h<d.hours.length;h++){const ch=!!d.charge_hours?.[h]||!!d.hours[h]?.charging;if(ch&&start===null)start=h;if(!ch&&start!==null){runs.push([start,h-1]);start=null;}}if(start!==null)runs.push([start,d.hours.length-1]);let out='',ridx=0;for(let h=0;h<d.hours.length;h++){const x=d.hours[h],run=runs[ridx],charging=!!d.charge_hours?.[h]||!!x?.charging;if(run&&h===run[0])out+=`<div class="charge-run-wrap" style="--span:${run[1]-run[0]+1}"><em aria-hidden="true"><svg viewBox="0 0 32 40"><path d="M19 5 Q21 3 20 7 L17 17 H25 Q27 17 25 20 L13 35 Q11 37 12 33 L15 23 H7 Q5 23 7 20 Z" fill="#5ad46d" stroke="var(--bolt-outline)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg></em>`;out+=`<div title="${h}시 ${x?(x.last_known?'마지막 확인값 ':'실측 ')+socDisplay(x.soc)+'%':'SOC 기록 없음'}${charging?' · 해당 시간 충전 기록 있음':''}" class="hour ${charging?'charging':x?.last_known?'last-known':x?.driving?'driving':'parked'} ${!charging&&x?(x.soc<15?'soc-critical':x.soc<30?'soc-low':''):''}">${x?`<i style="height:${x.soc}%"></i>`:''}</div>`;if(run&&h===run[1]){out+='</div>';ridx++;}}return out;})();
     return `<section class="battery-history"><div class="battery-history-heading"><h2>배터리 사용량</h2><div class="battery-page-controls"><button type="button" data-battery-page="1" aria-label="이전 7일" title="이전 7일" ${this.batteryPage>=maxPage?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><button type="button" data-battery-page="-1" aria-label="다음 7일" title="다음 7일" ${this.batteryPage===0?'disabled':''}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button></div></div><div class="usage-total" style="color:${color}"><strong>${d.used==null?'—':n(d.used,1)+'%'}${d.used==null?'':'<small class="usage-caption">사용됨</small>'}</strong><span>${esc(d.date)}</span></div><div class="history-plot"><div class="week-bars">${bars}</div><div class="axis"><span>${max}%</span><span>${max/2}%</span><span>0%</span></div></div><p class="chart-key">${esc(days[0].date)} ~ ${esc(days.at(-1).date)} · 날짜를 눌러 상세 보기 · 100% 초과는 노랑</p><h3>선택한 날짜의 배터리 잔량</h3><div class="history-plot"><div class="hours">${hours}</div><div class="axis"><span>100%</span><span>50%</span><span>0%</span></div></div><div class="hours-label"><span>00시</span><span>06시</span><span>12시</span><span>18시</span><span>24시</span></div><p class="chart-key"><b style="color:#5ad46d">● 충전중</b>　<span class="driving-key">● 주행 중</span>　<span class="parking-key">● 주차·마지막 확인값</span> · <span style="color:#e58a31">30% 미만</span> · <span style="color:#ed6269">15% 미만</span> · 빈 구간: 기록 없음</p><div class="usage-stats"><div>기록된 주행 시간<strong>${shortDuration(d.drive_s)}</strong></div><div>기록된 충전 시간<strong>${shortDuration(d.charge_s)}</strong></div></div><p class="chart-key">수신 ${d.received_samples??0}건 · 유효 SOC ${d.valid_samples??0}건 · 오래된 값 ${d.stale_samples??0}건 · 수집된 구간 ${shortDuration(d.covered_s)} · 사용량은 기록된 SOC 감소량의 합계이며 추정값입니다. 5분 초과 공백은 계산하지 않습니다. 회색 막대는 주차 중 측정값 또는 마지막 확인값입니다. 새 측정이 없는 시간에 유지한 값은 사용량 계산에서 제외합니다. 초록색은 해당 시간에 충전 기록이 있다는 뜻이며, 한 시간 내내 충전했다는 뜻은 아닙니다. SOC 기록이 없으면 충전 배경만 표시합니다. 주행·충전 시간은 저장된 세션 구간 기준이며 진행 중이거나 누락된 세션은 포함되지 않습니다.</p></section>`;
   }
   maxSpeed(route){const speeds=(route||[]).map(p=>p.speedMps??p.speed_mps).filter(Number.isFinite);return speeds.length?Math.max(...speeds)*3.6:null;}
