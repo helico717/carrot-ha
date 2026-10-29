@@ -3,7 +3,7 @@
 - 사용자 요청: HA 사이드바의 차계부 메뉴가 차량 아이콘(`mdi:car-electric`)이라 차량 대시보드(ID.4)와 구분되지 않고 차계부답지 않았다.
 - 변경: custom_components/carrot_ha/__init__.py의 `async_register_panel` 호출에서 `sidebar_icon`을 `mdi:notebook-edit-outline`(기록하는 노트)으로 바꿨다. 패널 URL·제목·관리자 제한·모듈은 그대로다. 사이드바의 "ID.4" 메뉴는 이 통합이 등록한 패널이 아니라 HA 대시보드 설정 항목이라 이번 변경 대상이 아니다.
 - 검증: `python -m py_compile` 통과. 이 아이콘을 검사하는 테스트는 없다.
-- 배포 상태: 아래 커밋을 main에 푸시한 뒤 HA에 __init__.py 한 개를 백업 후 직접 반영한다. 패널 등록은 통합 시작 시 실행되므로 사용자 HA 재시작 후 적용된다. 버전 상승·태그·Release는 없다.
+- 배포 상태: 커밋 f8a9b439b4feb33e16293e2a968bfbc5a0709ec8을 main에 푸시했다. 반영 전 HA 설치본 SHA-256(561bb306…)이 직전 커밋 bd401b3의 파일과 일치함을 확인했다. 기존 파일을 /config/carrot_ha/deployment-backups/f8a9b439b4feb33e16293e2a968bfbc5a0709ec8/에 백업하고, 임시 파일을 쓴 뒤 mv로 바꿔 __init__.py 한 개만 반영했다. 설치본 SHA-256 0c444c20…이 커밋과 일치한다. 패널 등록은 통합 시작 시 실행되므로 사용자 HA 재시작 후 적용되며, 실제 사이드바 표시는 아직 확인하지 않았다. 버전 상승·태그·Release는 없다.
 
 ## 2026-10-29 — 높은 모니터에서 차계부 배경이 화면 끝까지 이어지지 않던 문제 수정
 
