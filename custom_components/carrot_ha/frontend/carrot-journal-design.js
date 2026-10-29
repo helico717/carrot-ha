@@ -2046,9 +2046,13 @@ export const journalDesign = `:host {
  #page2 .selected-number{color:var(--j-accent,#81e6c5);font-size:1.22em;font-weight:750;font-variant-numeric:tabular-nums}
  #page2 #distanceInput{color:var(--j-accent,#81e6c5);font-weight:750}
  #page2 .slider-limits{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--j-sub);opacity:.6;line-height:1.4;margin:14px 0 5px;font-variant-numeric:tabular-nums}
- #page2 .distance-choices{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 12px}
- #page2 .distance-choices button{border-radius:10px;padding:8px 11px;white-space:nowrap}
- #page2 .distance-choices button[aria-pressed=true]{background:#81e6c5;color:#102c24;border-color:#81e6c5}
+ /* 주행거리 선택: 월별·연도별과 같은 세그먼트 선택기. 좁은 패널은 3칸×2줄로 바꿔 잘림을 막는다. */
+ #page2 .savings-controls{container-type:inline-size}
+ #page2 .distance-choices{display:flex;gap:3px;padding:3px;margin:16px 0 12px;background:var(--j-bg);border:1px solid var(--j-border);border-radius:12px}
+ #page2 .distance-choices button{flex:1 0 auto;min-height:36px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:var(--j-sub);font-size:13.5px;font-weight:600;white-space:nowrap;box-shadow:none;transition:background .15s ease,color .15s ease}
+ #page2 .distance-choices button:hover{color:var(--j-ink)}
+ #page2 .distance-choices button[aria-pressed=true]{background:var(--j-raised);color:var(--j-ink);box-shadow:0 2px 8px rgba(0,0,0,.3);font-weight:750}
+ @container (max-width:540px){#page2 .distance-choices{display:grid;grid-template-columns:repeat(3,1fr)}#page2 .distance-choices button{min-width:0;padding:6px 2px}}
  #page2 .manual-distance{display:flex;align-items:center;gap:8px;margin:10px 0}
  #page2 .manual-distance[hidden]{display:none}
  #page2 .manual-distance input{min-width:0;flex:1;width:100%;text-align:right}

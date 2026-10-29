@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>주행거리 선택기 프리뷰</title>
+<style>
+  body{margin:0;background:#0b0f12;color:#e8eef0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+  .sim{position:sticky;top:0;z-index:50;display:flex;flex-wrap:nowrap;gap:8px;align-items:center;padding:10px 16px;background:#11181c;border-bottom:1px solid #26323a;font-size:13px}
+  .sim b{margin-right:4px}
+  .sim button{background:#1b252b;color:#cfd8dc;border:1px solid #2c3a42;border-radius:8px;padding:6px 10px;cursor:pointer}
+  .sim button[aria-pressed=true]{background:#81e6c5;color:#102c24;border-color:#81e6c5}
+  .wrap{max-width:none;margin:0 auto;padding:0 16px}
+  .wrap.narrow{max-width:390px}
+</style>
+</head>
+<body>
+<div class="sim">
+  <b>스타일</b>
+  <button data-style="current">현재(칩)</button>
+  <button data-style="tabs" aria-pressed="true">A. 상단 탭형</button>
+  <button data-style="segment">B. 월별·연도별형</button>
+  <span style="width:12px"></span>
+  <b>폭</b>
+  <button data-width="wide" aria-pressed="true">데스크톱</button>
+  <button data-width="narrow">모바일</button>
+</div>
+<div class="wrap" id="wrap"><carrot-vehicle-journal id="card"></carrot-vehicle-journal></div>
+
+<script type="module">
+const day=(d,km,kwh)=>({date:`2026-10-${String(d).padStart(2,'0')}`,distance_km:km,drive_energy_kwh:kwh});
+const totals={distance_km:4171.1,energy_distance_km:4171.1,drive_energy_kwh:702.4,drive_soc_used_pp:910,battery_charge_kwh:690,billed_charge_kwh:720,charge_effective_krw:198000,efficiency_km_kwh:5.9,total_cost_krw:248000,fast_count:6,slow_count:9,fuel_price_krw_l:null,categories:{charging:198000,maintenance:30000,washing:20000,tuning:0,other:0}};
+const query={record_count:15,status:{phase:'complete'},timezone:'Asia/Seoul',records:[],recent_records:[],daily:Array.from({length:28},(_,i)=>day(i+1,140+i%5*12,24)),totals,
+  previous:{totals:{...totals,distance_km:3890},daily:[],fuel_facts:null,odometer_facts:null},
+  fuel_facts:null,odometer_facts:{distance_km:4171.1},station_stats:[],
+  comparison:{fuel:'diesel',economy_km_l:15,sensor_entities_json:'{}'},fuel_price:{price:1842},fuel_sensors:{}};
+const hass={
+  language:'ko',themes:{darkMode:true},user:{id:'u',is_admin:true},
+  states:{'sensor.average_gasoline':{state:'1712',attributes:{unit_of_measurement:'원/L'}},'sensor.average_premium_gasoline':{state:'1975',attributes:{unit_of_measurement:'원/L'}},'sensor.average_diesel':{state:'1842',attributes:{unit_of_measurement:'원/L'}}},
+  async callWS(msg){
+    if(msg.type==='carrot_ha/journal/entries')return [{entry_id:'id4',title:'ID.4',fuel:'electric',is_default:true,linked:true}];
+    if(msg.type.endsWith('/query'))return structuredClone(query);
+    return {};
+  },
+  async fetchWithAuth(){return new Response('{}',{status:404});},
+};
+const STYLES={
+  current:'',segment:'',
+  tabs:`
+  #page2 .distance-choices{display:flex;flex-wrap:nowrap;gap:4px;padding:5px;margin:16px 0 12px;background:var(--j-bg);border-radius:14px;overflow-x:auto;scrollbar-width:none}
+  #page2 .distance-choices::-webkit-scrollbar{display:none}
+  #page2 .distance-choices button{flex:1 0 auto;min-height:38px;padding:6px 8px;border:0;border-radius:10px;background:transparent;color:var(--j-sub);font-size:13.5px;font-weight:500;white-space:nowrap;box-shadow:none;transition:background .15s ease,color .15s ease}
+  #page2 .distance-choices button:hover{color:var(--j-ink)}
+  #page2 .distance-choices button[aria-pressed=true]{background:var(--j-raised);color:var(--j-ink);border-color:transparent;font-weight:700}
+  #page2 .savings-controls{container-type:inline-size}
+  @container (max-width:540px){#page2 .distance-choices{display:grid;grid-template-columns:repeat(3,1fr);overflow:visible}#page2 .distance-choices button{min-width:0;padding:6px 2px}}`,
+  segmentOld:`
+  #page2 .distance-choices{display:flex;flex-wrap:nowrap;gap:3px;padding:3px;margin:16px 0 12px;background:var(--j-bg);border:1px solid var(--j-border);border-radius:12px;overflow-x:auto;scrollbar-width:none}
+  #page2 .distance-choices::-webkit-scrollbar{display:none}
+  #page2 .distance-choices button{flex:1 0 auto;min-height:36px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:var(--j-sub);font-size:13.5px;font-weight:600;white-space:nowrap;box-shadow:none;transition:background .15s ease,color .15s ease}
+  #page2 .distance-choices button:hover{color:var(--j-ink)}
+  #page2 .distance-choices button[aria-pressed=true]{background:var(--j-raised);color:var(--j-ink);border-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.3);font-weight:750}
+  #page2 .savings-controls{container-type:inline-size}
+  @container (max-width:540px){#page2 .distance-choices{display:grid;grid-template-columns:repeat(3,1fr);overflow:visible}#page2 .distance-choices button{min-width:0;padding:6px 2px}}`,
+};
+await import('/custom_components/carrot_ha/frontend/carrot-vehicle-journal.js?v=preview-'+Date.now());
+const card=document.getElementById('card');
+card.setConfig?.({type:'custom:carrot-vehicle-journal'});
+card.hass=hass;
+const applyStyle=key=>{
+  const root=card.shadowRoot;if(!root)return;
+  let el=root.getElementById('previewStyle');
+  if(!el){el=document.createElement('style');el.id='previewStyle';root.append(el);}
+  el.textContent=STYLES[key];
+  document.querySelectorAll('[data-style]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.style===key)));
+};
+let style='segment';
+const openSavings=()=>{const tab=card.shadowRoot?.getElementById('tab2');if(tab&&tab.getAttribute('aria-selected')!=='true')tab.click();};
+const timer=setInterval(()=>{if(card.shadowRoot?.getElementById('distanceChoices')||card.shadowRoot?.getElementById('tab2')){openSavings();applyStyle(style);}if(card.shadowRoot?.getElementById("distanceChoices")){clearInterval(timer);setTimeout(()=>{card.shadowRoot.getElementById("tab2").click();applyStyle(style);},300);}},200);
+document.querySelectorAll('[data-style]').forEach(b=>b.onclick=()=>{style=b.dataset.style;applyStyle(style);});
+document.querySelectorAll('[data-width]').forEach(b=>b.onclick=()=>{document.getElementById('wrap').classList.toggle('narrow',b.dataset.width==='narrow');document.querySelectorAll('[data-width]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));});
+window.__card=card;
+</script>
+</body>
+</html>
