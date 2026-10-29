@@ -61,7 +61,7 @@ async def async_setup(hass, config):
     from homeassistant.components.panel_custom import async_register_panel
     await async_register_panel(hass, frontend_url_path='carrot-journal',
         webcomponent_name='carrot-journal-panel', sidebar_title='차계부',
-        sidebar_icon='mdi:car-electric', require_admin=True,
+        sidebar_icon='mdi:notebook-edit-outline', require_admin=True,
         module_url=f'/carrot_ha_static/carrot-journal-panel.js?v={version}')
 
     async def async_handle_purge(call):
