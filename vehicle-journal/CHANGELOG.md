@@ -4,7 +4,7 @@
 - 원인: carrot-journal-panel-runtime.js의 패널 `:host`가 `min-height:100%`였다. HA가 커스텀 패널을 넣는 상위 요소에는 정해진 높이가 없어서 브라우저가 이 퍼센트 값을 무시했다. 그래서 내용이 화면보다 짧을 때만 문제가 보였다.
 - 변경: `min-height:100vh;min-height:100dvh`로 바꿔 화면 높이를 최소 높이로 쓴다. 모바일 주소창 높이 변화는 dvh로 반영하고, 지원하지 않는 브라우저는 vh를 쓴다. 내용이 길면 지금처럼 늘어난다. 레이아웃·카드·색상 변경은 없다.
 - 프리뷰·검증: vehicle-journal/review-panel-height.html은 높이가 정해지지 않은 밝은 상위 요소 안에 실제 패널 runtime과 차계부를 띄운다. 2000×1500 화면에서 예전 값은 패널 높이가 1133px에서 끝나 문제가 재현됐고, 새 값은 1500px까지 채웠다. 가로 넘침은 없었다. `node --check` 통과. 실제 HA 화면은 아직 확인하지 않았다.
-- 배포 상태: 화면 runtime만 바뀌었으므로 HA 재시작이 필요 없다. 커밋·푸시 후 HA SSH 직접 반영 예정이다. 버전 상승·태그·Release는 없다.
+- 배포 상태: 커밋 e0a1bbb4abffc663585dc19b928c7e561d6221c6을 main에 푸시했다. 반영 전 HA 설치본 SHA-256(266ed944…)이 직전 커밋 4a2cbad의 파일과 일치함을 확인했다. 기존 파일을 /config/carrot_ha/deployment-backups/e0a1bbb4abffc663585dc19b928c7e561d6221c6/에 백업하고, 임시 파일을 쓴 뒤 mv로 바꿔 carrot-journal-panel-runtime.js 한 개만 반영했다. 설치본과 HTTP 제공본(200)의 SHA-256 20951b10…이 커밋과 일치하고, frontend-version은 0.9.0-beta.1-4374fee9fea2로 바뀌었다. HA 재시작 없이 새로고침하면 적용된다. 실제 사용자 브라우저 화면은 아직 확인하지 않았다. 버전 상승·태그·Release는 없다.
 
 ## 2026-10-29 — 절약 비교 주행거리 선택을 세그먼트 선택기로 변경
 
