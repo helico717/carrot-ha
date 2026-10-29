@@ -8,7 +8,7 @@
 - 변경하지 않음: 저장·계산 값(0.5% 원본, 주행/충전 기록의 소수 첫째 자리 SOC, 에너지·전비·주행가능거리·ETA), 차계부의 %p 소모량 같은 계산 지표의 소수 표시, 디버그 대시보드. 레이아웃·디자인 변경 없음(숫자 처리만 바뀌어 프리뷰 절차는 적용하지 않았다).
 - 관련 파일: custom_components/carrot_ha/{display_soc.py,sensors_v3.py}, frontend/{carrot-dashboard-ko.js,carrot-dashboard-en.js,carrot-vehicle-journal.js}, tests/{dashboard-soc-truncate.test.mjs,test_new_sensors.py,trip-ui.test.mjs}. trip-ui는 73.5%를 74가 아니라 73으로 기대하도록 갱신했다.
 - 검증: 신규 JS 3개·Python 1개 통과. JS 전체 124개 중 118개 통과, 실패 6개(camera-360·charging-curve·debug-freshness·motion-status·range-c3-and-fixes·frontend-revision-bootstrap)는 HEAD 스냅숏에서도 똑같이 실패한다. Python: test_new_sensors 23개와 SOC·주행·충전·회귀 게이트 194개가 각각 통과. 같이 실행하면 test_new_sensors의 기존 3개와 신규 1개가 모듈 스텁 충돌로 실패하는 기존 격리 문제가 있다.
-- 배포 상태: main 커밋·푸시 후 HA 직접 반영(아래 반영 기록 참조). 버전 상승·태그·릴리즈 없음.
+- 배포 상태: 커밋 `9b44244` main 푸시 확인. 반영 전 HA 설치 파일 5개의 SHA-256이 직전 커밋 `1889fb8`과 일치함을 확인했다. `/config/carrot_ha/deployment-backups/9b442441168e63cc3dcffa320773d936def9a722-soc-truncate/before`에 백업하고(before.sha256 포함) HA SSH(`sudo`)로 임시 파일+mv 교체했다. 반영 후 5개 모두 커밋 해시와 일치(display_soc.py d551774c…, sensors_v3.py b5c16cfb…, carrot-dashboard-ko.js 20a62d6e…, carrot-dashboard-en.js ddaa1754…, carrot-vehicle-journal.js 64b35de0…), 권한 644 root 유지, Python 컴파일 통과, 임시 파일 없음. 첫 시도는 권한 거부·BusyBox chmod 옵션 미지원으로 파일을 바꾸지 못했고 백업 후 재시도했다. 버전 상승·태그·릴리즈 없음.
 - 미확인: 사용자 HA 재시작·브라우저 새로고침 후 실제 화면, 계기판의 표시 방식이 실제로 버림인지(실차 대조 양식의 값 전이 기록으로 확인).
 
 ## 2026-10-29 — 주유 영수증 OCR을 여러 번 인식·계산 검증 방식으로 개선
