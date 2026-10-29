@@ -375,4 +375,158 @@ GS칼텍스 삼거리주유소
   print('✓ Test 20 Passed: Competing gas stations disambiguation behavior');
 }
 
-print('\nALL RECEIPT PARSER TESTS (20/20) PASSED SUCCESSFULLY!');
+// Synthetic receipts below follow a real GS-style layout and real Tesseract misreads;
+// station, address, phone and card details are fictitious.
+const GS_LAYOUT = `
+매 출 전 표
+( 고 객 용 )
+2026-03-16 18:56:50 (054-321-7788)
+ODT No : 35
+매장명 : 한빛들 주유소
+대표자 : 홍길동
+사업자번호 : 1234567890
+주소 : (712345) 경상북도 예시시 시험면 가
+온로 4321 (시험리, 한빛들주유소(GS))
+순번 제품명 노즐번호(Nozzle No)
+구분 수량 단가 금액
+01 경유 09
+44.077 1,815 80,000
+부가세 과세 물품가액 72,727
+부가세 7,273
+합 계 (주유금액) 80,000원
+[신용카드]
+거래 일시 : 2026/03/16 18:55:10
+카드 번호 : 1234-5600-****-111*
+승인 번호 : 12345678
+승인  금액 : 80,000원
+`;
+
+// 21. Test: Quantity / price / amount on their own line under a separate item name
+{
+  const result = parseFuelReceipt(GS_LAYOUT);
+  assertEquals(result.date, '2026-03-16', 'Date');
+  assertEquals(result.fuel_type, 'diesel', 'Diesel');
+  assertEquals(result.unit_price_krw, 1815, 'Unit price from column row');
+  assertEquals(result.fuel_liters, 44.077, 'Quantity before price is read as quantity');
+  assertEquals(result.actual_krw, 80000, 'Spaced 합 계 / 승인  금액 labels read');
+  assert(result.confidence.consistency_passed, 'Consistency passed');
+  assertEquals(result.station_name, '한빛들 주유소', 'Station name');
+  assertEquals(result.station_address, '경상북도 예시시 시험면 가온로 4321', 'Full province name and wrapped road name joined');
+  assertEquals(result.station_phone, '054-321-7788', 'Station phone from header');
+  print('✓ Test 21 Passed: Column layout, spaced labels and wrapped address');
+}
+
+// 22. Test: Cancelled pre-authorisation must never become the paid amount
+{
+  const text = `
+01 경유 09
+4.408 1,815 8,000
+합 계 (주유금액) 8,000원
+선승인금액 : 149,900원 (취소)
+실승인금액 : 8,000원
+※ 실 주유금액으로 수정승인 완료
+`;
+  const result = parseFuelReceipt(text);
+  assertEquals(result.actual_krw, 8000, 'Real approved amount, not the cancelled 149,900 pre-auth');
+  assertEquals(result.fuel_liters, 4.408, 'Liters');
+  assert(result.confidence.consistency_passed, 'Consistency passed');
+  assertEquals(extractTotalAmount('선승인금액 : 149,900원 (취소)\n승인금액 : 8,000원'), 8000, 'Pre-auth line skipped even with plain 승인금액');
+  print('✓ Test 22 Passed: Cancelled pre-authorisation excluded');
+}
+
+// 23. Test: Several noisy OCR passes vote; only the squashed pass reads the big digits
+{
+  const normalPass = `
+2026-03-18 18:56:50 (054-321-7788)
+매장명 : 한빛들 주유소
+주소 : (712345) 경상북도 예시시 시험면 가
+온로 4321 (시험리, 한빛들주유소(69))
+01 Ar 09
+44.07 100 50,000
+합 계 (주유금액) aD 0(원
+`;
+  const squashedPass = `
+2026-03-16 18:56:50 (054-321-7788)
+매장명 : 한빛틀 주유소
+44.077    1,815        80,000
+부가세 파세 물풀가램 72,727
+할 계 <주유금여? 80, 0002
+신용카등| . 2026/03/16 18:55:10
+`;
+  const adaptivePass = `
+2026-03-16 18:56:50 - (054-321-7788)
+| 44.077 1,815 80,000 §
+한 계 <주유금애> 80,000원 |
+`;
+  const result = parseFuelReceipt([normalPass, squashedPass, adaptivePass]);
+  assertEquals(result.date, '2026-03-16', 'Majority date wins over a single misread 18');
+  assertEquals(result.unit_price_krw, 1815, 'Unit price from squashed passes');
+  assertEquals(result.fuel_liters, 44.077, 'Liters from squashed passes');
+  assertEquals(result.actual_krw, 80000, 'Amount, with "80,0002" (원 misread) understood');
+  assert(result.confidence.consistency_passed, 'Consistency passed');
+  assertEquals(result.station_address, '경상북도 예시시 시험면 가온로 4321', 'Address from the normal pass');
+  assertEquals(result.confidence.passes, 3, 'Three passes combined');
+
+  const single = parseFuelReceipt(normalPass);
+  assertEquals(single.unit_price_krw, null, 'Misread digits that break price × quantity are not filled');
+  assertEquals(single.fuel_liters, null, 'Unverified liters stay empty');
+  print('✓ Test 23 Passed: Multi-pass voting and verified numbers');
+}
+
+// 24. Test: A misread card total does not override a verified fuel row without a discount
+{
+  const text = `
+01 휘발유
+30.303 1,650 50,000
+합계 60,000
+`;
+  const result = parseFuelReceipt(text);
+  assertEquals(result.actual_krw, 50000, 'Verified row amount wins when nothing explains the difference');
+  print('✓ Test 24 Passed: Misread total overridden by verified row');
+}
+
+// 25. Test: Numbers that cannot form price × quantity = amount are never combined
+{
+  const text = `
+2026-03-16 18:56:50
+발생포인트 : 44
+가용포인트 : 585
+부가세 과세 물품가액 72,727
+부가세 7,273
+ODT No : 35
+`;
+  const result = parseFuelReceipt(text);
+  assertEquals(result.unit_price_krw, null, 'No price invented');
+  assertEquals(result.fuel_liters, null, 'No liters invented');
+  assertEquals(solveFuelTriple(text), null, 'Solver finds nothing');
+  print('✓ Test 25 Passed: No triple invented from unrelated numbers');
+}
+
+// 26. Test: OCR variants of fuel name and impossible building numbers
+{
+  assertEquals(extractFuelType('01 경우                     09').fuel_type, 'diesel', '경우 on an item row is diesel');
+  assertEquals(extractFuelType('카드 결제 경우 적립').fuel_type, null, '경우 in a sentence is not a fuel');
+  assertEquals(extractStationLocation('경상북도 예시시 시험면 가온로 0022').station_address, null, 'Building number starting with 0 is a misread');
+  print('✓ Test 26 Passed: Fuel name OCR variant and building number sanity');
+}
+
+// 27. Test: Phone number match and name-only match
+{
+  const candidates = [
+    { place_name: 'GS칼텍스 한빛들주유소', road_address_name: '경북 예시시 시험면 가온로 4321', phone: '054-321-7788', latitude: 36.1, longitude: 128.1 },
+    { place_name: '한빛들마트', road_address_name: '경북 예시시 시험면 가온로 4320', phone: '054-321-0000', latitude: 36.1, longitude: 128.1 }
+  ];
+  const byPhone = matchStationFromReceipt({ station_name: null, station_address: '예시시 가온로 0021', station_phone: '054-321-7788' }, candidates);
+  assert(byPhone !== null, 'Unique phone match adopted even with a wrong address');
+  assertEquals(byPhone.name, 'GS칼텍스 한빛들주유소', 'Phone matched station');
+
+  const byName = matchStationFromReceipt({ station_name: '한빛들 주유소', station_address: null }, candidates);
+  assert(byName !== null, 'Unique distinctive station name adopted without address');
+  assertEquals(byName.name, 'GS칼텍스 한빛들주유소', 'Name matched station (spaces ignored)');
+
+  const generic = matchStationFromReceipt({ station_name: '주유소', station_address: null }, candidates);
+  assertEquals(generic, null, 'Generic name alone never matches');
+  print('✓ Test 27 Passed: Phone and name-only station matching');
+}
+
+print('\nALL RECEIPT PARSER TESTS (27/27) PASSED SUCCESSFULLY!');

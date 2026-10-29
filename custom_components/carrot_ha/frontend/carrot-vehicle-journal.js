@@ -1616,7 +1616,7 @@ export class VehicleJournal extends HTMLElement {
         this.fuelQuantitySource='reported';
         this.markAutoFilled('fuelLitersField',f.fuel_liters);
       }
-      if(parsed.station_name||parsed.station_address){
+      if(parsed.station_name||parsed.station_address||parsed.station_phone){
         await this.matchAndApplyReceiptStation(parsed,signal);
       }
       this.suppressFuelEstimation=false;
@@ -1658,18 +1658,26 @@ export class VehicleJournal extends HTMLElement {
     try{
       const maps=await this.kakaoMaps();
       if(signal.aborted||!this.$('recordDialog')?.open)return;
-      const query=(parsed.station_address||parsed.station_name||'').slice(0,60);
-      if(!query)return;
-      let places=[];
-      if(this.kakaoRestConfigured){
-        places=await this.call('location/search',{query});
-      }else if(maps?.services?.Places){
-        places=await new Promise(resolve=>{
-          new maps.services.Places().keywordSearch(query,(data,status)=>{resolve(status===maps.services.Status.OK?data:[]);});
-        });
+      // Phone identifies the business, then address, then name; stop at the first confident match.
+      const queries=[...new Set([parsed.station_phone,parsed.station_address,parsed.station_name].filter(q=>q&&q.length>=2).map(q=>q.slice(0,60)))];
+      const info={station_name:parsed.station_name,station_address:parsed.station_address,station_phone:parsed.station_phone};
+      let matched=null;
+      for(const [index,query] of queries.entries()){
+        let places=[];
+        if(this.kakaoRestConfigured){
+          // The HA search endpoint accepts one query per second
+          if(index)await new Promise(r=>setTimeout(r,1100));
+          if(signal.aborted||!this.$('recordDialog')?.open)return;
+          places=await this.call('location/search',{query}).catch(()=>[]);
+        }else if(maps?.services?.Places){
+          places=await new Promise(resolve=>{
+            new maps.services.Places().keywordSearch(query,(data,status)=>{resolve(status===maps.services.Status.OK?data:[]);});
+          });
+        }
+        if(signal.aborted||!this.$('recordDialog')?.open)return;
+        matched=matchStationFromReceipt(info,places||[]);
+        if(matched)break;
       }
-      if(signal.aborted||!this.$('recordDialog')?.open)return;
-      const matched=matchStationFromReceipt({station_name:parsed.station_name,station_address:parsed.station_address},places);
       if(matched){
         this.draftLocation={
           name:matched.name,

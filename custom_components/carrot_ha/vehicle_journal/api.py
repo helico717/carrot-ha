@@ -314,7 +314,8 @@ async def location_search(hass,connection,msg):
                 if response.status!=200:
                     connection.send_error(msg['id'],'provider_error','카카오 API 활성화·키·쿼터 설정을 확인해 주세요.');return
                 result=await response.json()
-            places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x']),'provider':'kakao','station_id':str(p['id']),'selection_source':'manual'} for p in result.get('documents',[])[:10]]
+            # phone and category let receipt OCR confirm the exact station
+            places=[{'name':p['place_name'],'address':p.get('road_address_name') or p.get('address_name',''),'latitude':float(p['y']),'longitude':float(p['x']),'provider':'kakao','station_id':str(p['id']),'phone':p.get('phone',''),'category_name':p.get('category_name',''),'selection_source':'manual'} for p in result.get('documents',[])[:10]]
             if not places:
                 async with session.get('https://dapi.kakao.com/v2/local/search/address.json',params={'query':query,'size':10},headers=headers) as response:
                     # Address lookup is best-effort: a keyword miss must stay an empty result, not an error.
