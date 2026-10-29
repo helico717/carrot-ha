@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>차계부 패널 높이 프리뷰</title>
+<style>
+  /* HA 기본 밝은 배경과 높이가 정해지지 않은 패널 상위 요소를 흉내 낸다. */
+  html,body{margin:0;background:#e9eaec}
+  #haPanelHost{display:block}
+</style>
+</head>
+<body>
+<div id="haPanelHost"></div>
+<script type="module">
+const v='preview-'+Date.now();
+const realFetch=window.fetch.bind(window);
+window.fetch=(url,opts)=>String(url).includes('/api/carrot_ha/frontend-version')?Promise.resolve(new Response(JSON.stringify({version:'0.0.0-'+v}))):realFetch(url,opts);
+const hass={
+  language:'ko',themes:{darkMode:true},user:{id:'u',is_admin:true},states:{},
+  async callWS(msg){
+    if(msg.type==='carrot_ha/journal/entries')return [{entry_id:'id4',title:'ID.4',fuel:'electric',is_default:true,linked:true}];
+    if(msg.type.endsWith('/query'))return {record_count:1,status:{phase:'complete'},timezone:'Asia/Seoul',records:[],recent_records:[],daily:[],totals:{distance_km:42,categories:{}},fuel_facts:null,odometer_facts:null,station_stats:[],comparison:{fuel:'gasoline',economy_km_l:15,sensor_entities_json:'{}'},fuel_price:{price:1700},fuel_sensors:{}};
+    return {};
+  },
+  async fetchWithAuth(){return new Response('{}',{status:404});},
+};
+class PreviewPanel extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'});}}
+customElements.define('preview-journal-panel',PreviewPanel);
+const panel=document.createElement('preview-journal-panel');panel._hass=hass;
+document.getElementById('haPanelHost').append(panel);
+const {mountJournalPanel}=await import('/custom_components/carrot_ha/frontend/carrot-journal-panel-runtime.js?v='+v);
+await mountJournalPanel(panel,'0.0.0-'+v);
+window.__panel=panel;
+</script>
+</body>
