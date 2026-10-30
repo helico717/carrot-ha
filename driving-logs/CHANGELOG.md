@@ -1,3 +1,10 @@
+## 2026-10-30 — 사용자 승인 정식 v0.9.0 누적 발행 준비
+
+- 사용자가 현재 사용에 불만 없음을 확인하고 정식 0.9.0 발행 및 앞서 제시한 14개 분야 전체 변경 목록 포함을 명시 승인했다. 이전 베타 승인 재사용이 아니다.
+- 기준 정식 v0.8.12, 최신 베타 v0.9.0-beta.1, 기능 기준 b69da6c. 정식 이후 383커밋/502파일 및 베타 이후 183커밋을 Git log/diff와 네 변경 기록으로 대조했다. .github/release-notes/v0.9.0.md에 14개 분야 전체 기능·수정·문서·검증/제약·업데이트를 기록하고 docs/releases/0.9.0-audit.md에 전체 커밋/파일/변경 기록 제목을 보존한다.
+- manifest를 0.9.0으로 변경. 현재 HA와의 3D 차이는 동일 모델의 기본 재질 내장이며 메모리 bake SHA-256 완전 일치로 해소했다. HACS 설치 시 패키지 모델을 기본 사용하고 명시적인 사용자 모델 URL은 유지한다. UI 실행 코드 수정 없음.
+- 운영 확인: 통합 loaded, 전송 OFF API 활성화 및 begin/chunk/commit 403. 최신 코드 CI 40982887630 success. 발행 준비 커밋 CI·태그·GitHub 정식 Release/Actions 결과는 후속 기록으로 확정한다. HA/Comma 재시작·기기 소스 수정·운영 자료 변경 없음.
+
 ## 2026-10-30 — 토글 비활성·실행 API 구버전 잔존 확인
 
 - 사용자 화면: 전송 설정 조회 실패, 회색 OFF 모양/disabled wait 커서. 운영 읽기 전용 확인: Carrot HA 엔트리loaded, switch.caryang_id_4_driving_log_transfer=off, 정책 파일0개(기본OFF).
@@ -947,3 +954,8 @@
 - HA 실행 커밋24d8d9001b90e7aff418afbddb75b5a465d2e0d8 main 푸시. Actions40976946905 전체 success 확인: https://github.com/helico717/carrot-ha/actions/runs/40976946905 . Comma 원격5ec4868a12a9038547b373eb95be3a5fa86d30aa 확인.
 - HA 실행4파일을 기존 경로로 직접 반영하고 SHA-256 전부 일치, Python3 compile() 메모리 검사 통과. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-24d8d9001b90/before 및 상위 DEPLOYMENT.json에 실제 이전 해시·대상 해시·커밋 기록. http.py preflight 차이는 CRLF445개뿐이며 정규화SHA0b921103…가 기준과 일치함을 확인. 배포 도구는 CRLF만 정규화한 기준 해시 일치도 허용하도록 보강했다. 다른 내용 변경은 계속 거부한다.
 - 정책 파일은 아직0개이며 새 코드 활성 시 기본OFF. HA Core 재시작·Comma Git Pull/재부팅·실차ON/OFF 검증은 사용자 단계로 남아 있다. 에이전트는 재시작하지 않았고 기존 원본 로그/보관 데이터/원시CAN 설정을 변경하지 않았다. 새 태그·버전·Release 없음.
+## 2026-10-30 — 운영 신규 로그 전송 OFF 차단 실검증
+
+- 사용자 요청으로 10:10 KST 운영 API 확인: 인증된 state HTTP 200, transfer.enabled=false, complete 0, floor 0. 업로드 begin/commit의 빈 JSON과 가상 세그먼트 chunk 요청 모두 HTTP 403 및 `Driving log transfer disabled or expired` 응답. 실제 로그 생성·저장·정책 변경 없이 새 API 활성화와 OFF 차단을 확인했다.
+- HA 엔트리 loaded, 전송 switch off, 조회한 최근 Core 로그 100줄에 Carrot 경고/오류 0건. 기존 구버전 API 잔존 상태는 해소됨. ON 신규 로그 수신·Comma 정책 ACK/실기 설치까지 확인한 것은 아니다.
+- 사용자 현재 불만 없음은 정식 후보 실사용 수용 근거로 기록. 최신 실행 코드 CI 40982887630 success. HA/Comma 재시작·배포·버전·태그·릴리즈 발행 없음. 전체 발행 대상과 운영본의 3D 모델 차이는 루트 CHANGELOG에 별도 기록.

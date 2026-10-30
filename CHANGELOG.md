@@ -1,3 +1,10 @@
+## 2026-10-30 — 사용자 승인 정식 v0.9.0 누적 발행 준비
+
+- 사용자가 현재 사용에 불만 없음을 확인하고 정식 0.9.0 발행 및 앞서 제시한 14개 분야 전체 변경 목록 포함을 명시 승인했다. 이전 베타 승인 재사용이 아니다.
+- 기준 정식 v0.8.12, 최신 베타 v0.9.0-beta.1, 기능 기준 b69da6c. 정식 이후 383커밋/502파일 및 베타 이후 183커밋을 Git log/diff와 네 변경 기록으로 대조했다. .github/release-notes/v0.9.0.md에 14개 분야 전체 기능·수정·문서·검증/제약·업데이트를 기록하고 docs/releases/0.9.0-audit.md에 전체 커밋/파일/변경 기록 제목을 보존한다.
+- manifest를 0.9.0으로 변경. 현재 HA와의 3D 차이는 동일 모델의 기본 재질 내장이며 메모리 bake SHA-256 완전 일치로 해소했다. HACS 설치 시 패키지 모델을 기본 사용하고 명시적인 사용자 모델 URL은 유지한다. UI 실행 코드 수정 없음.
+- 운영 확인: 통합 loaded, 전송 OFF API 활성화 및 begin/chunk/commit 403. 최신 코드 CI 40982887630 success. 발행 준비 커밋 CI·태그·GitHub 정식 Release/Actions 결과는 후속 기록으로 확정한다. HA/Comma 재시작·기기 소스 수정·운영 자료 변경 없음.
+
 ## 2026-10-30 — 디버그 대시보드 미니 지도 깜빡임·테마 드롭다운 선택 불가 수정
 
 - 사용자 보고(화면 녹화): 디버그 대시보드를 가만히 둬도 개요 탭의 주차 위치·최근 주행 미니 지도가 1초에 약 2번 회색으로 비었다가 다시 그려졌고, 같은 이유로 화면 테마(라이트/다크) 드롭다운을 고를 수 없었다. 운영 대시보드에는 없는 현상.
@@ -738,3 +745,16 @@
 - HA 실행 커밋24d8d9001b90e7aff418afbddb75b5a465d2e0d8 main 푸시. Actions40976946905 전체 success 확인: https://github.com/helico717/carrot-ha/actions/runs/40976946905 . Comma 원격5ec4868a12a9038547b373eb95be3a5fa86d30aa 확인.
 - HA 실행4파일을 기존 경로로 직접 반영하고 SHA-256 전부 일치, Python3 compile() 메모리 검사 통과. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-24d8d9001b90/before 및 상위 DEPLOYMENT.json에 실제 이전 해시·대상 해시·커밋 기록. http.py preflight 차이는 CRLF445개뿐이며 정규화SHA0b921103…가 기준과 일치함을 확인. 배포 도구는 CRLF만 정규화한 기준 해시 일치도 허용하도록 보강했다. 다른 내용 변경은 계속 거부한다.
 - 정책 파일은 아직0개이며 새 코드 활성 시 기본OFF. HA Core 재시작·Comma Git Pull/재부팅·실차ON/OFF 검증은 사용자 단계로 남아 있다. 에이전트는 재시작하지 않았고 기존 원본 로그/보관 데이터/원시CAN 설정을 변경하지 않았다. 새 태그·버전·Release 없음.
+## 2026-10-30 — 정식 0.9.0 적합성 및 운영 전송 차단 재검증
+
+- 사용자 요청으로 HA 운영 상태를 읽기 전용 확인. 10:10 KST 차량 state API 200, transfer.enabled=false, complete 0, floor 0. 인증된 begin/commit 빈 요청 및 가상 경로 chunk 요청 모두 403 `Driving log transfer disabled or expired`. 설정·재시작·기기 변경 없음. 앞선 구버전 API 잔존 미확인 상태는 이번 실응답으로 해소됐다. ON 전송·실제 Comma 적용은 별도 검증이다.
+- Carrot HA 엔트리 loaded/disabled_by=null, 전송 스위치 off. 조회한 최근 Core 로그 100줄에 Carrot 경고/오류 0건. 전체 과거 로그의 무오류를 뜻하지 않는다. 사용자 현재 불만 없음은 실사용 수용 근거로 반영한다.
+- Git HEAD b69da6c 기준 통합 파일 322개 대조: 317개 SHA-256 일치, 3개 줄바꿈만 차이, 기본 vehicle.glb 1개 미설치, carrot-vehicle-3d.js 1개 실질 차이. HA 기본 URL은 /carrot_ha_models/vehicle.glb(200), Git은 패키지 모델. 두 모델 해시도 다름. 현재 HA 그대로와 main 발행본은 3D 기본 모델에서 동일하지 않으므로 발행 전 범위를 맞추거나 의도한 차이를 확인해야 한다. 운영 파일 덮어쓰기 없음.
+- 최신 실행 코드 9244a4a의 Direct receiver validation 40982887630 success 확인. 현재 manifest 0.9.0-beta.1 유지. 정식 발행 후보로 판단하되 모델 차이 정리·0.9.0 메타데이터/누적 노트 준비는 남음. 버전·태그·Release 발행 없음.
+
+## 2026-10-30 — 패키지 3D 모델과 실제 HA 모델의 내부 일치 검증
+
+- 사용자 요청으로 Git HEAD의 패키지 GLB와 HA `/config/carrot_ha/models/vehicle.glb`, 실제 HTTP `/carrot_ha_models/vehicle.glb`를 읽기 전용 비교. HA 디스크와 HTTP SHA-256 동일(1f3c5488…); 패키지는 61914d35…로 원본 파일 자체는 다르다.
+- GLB 바이너리 청크 완전 동일. meshes 135개·nodes 314개·animations 5개·images/textures 각 36개 및 accessors/bufferViews/scenes/extensions 모두 동일. 차이는 재질 45개 중 도장·주황 반사판·유리 2종 총 4개뿐이다.
+- 현재 viewer가 실행 중 적용하는 기본 색·도장·유리·반사판 값을 패키지에 미리 저장한 차이임을 기존 viewer 코드와 bake_ha_materials.py로 대조. HA 원본에 bake()를 메모리에서 적용한 결과 2,023,352B 및 SHA-256 61914d356a99a9c6a82e8f303049ce6af0ecdd8411c879b33bb1b1d7983dc7f7로 Git 패키지와 완전 일치했다. 운영 파일·설정 쓰기 없음.
+- 판단 정정: 앞선 해시 차이는 다른 형상의 모델이라는 근거가 아니다. 같은 형상/텍스처/애니메이션에 HA 기본 재질을 내장한 모델이다. 현재 viewer의 동일 설정에서 외관을 바꾸는 차이는 확인되지 않았고 모델 해시 차이만으로 정식 발행을 보류할 필요는 없다. 사용자 브라우저 IndexedDB/실제 렌더 픽셀 비교는 수행하지 않았으므로 화면 픽셀 완전 일치를 주장하지 않는다. 버전·태그·릴리즈·배포 없음.
