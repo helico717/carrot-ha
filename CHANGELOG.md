@@ -1,3 +1,10 @@
+## 2026-10-30 — HA 재시작 후 Carrot HA setup_error 읽기 전용 진단
+
+- 사용자 보고: HA 재시작 후 구성요소 로딩 실패, Comma 업데이트/재부팅 전. 현재 운영 로그·Core 엔트리 상태·DB 잠금을 읽기 전용으로 조사했다.
+- 오류: 2026-10-30 08:42:41.653 KST homeassistant.config_entries, async_setup_entry->__init__.py:113 Archive 생성->storage.py:31/58 transaction commit에서 sqlite3.OperationalError: database is locked. 이후 camera no-entries 경고는 통합 미로딩의 후속 증상. switch/transfer_policy/Comma 호환 오류 traceback은 확인되지 않았다. 오류시각은 토글 실행 커밋24d8d90(09:00:57 KST)과 직접 반영보다 이전이다.
+- 현재09:06 KST API domain carrot_ha state=setup_error, disabled_by=null, supports_unload=true. 원본 archive414,400,512B, journal_mode=delete, WAL/rollback journal 없음. mode=ro/query_only 스키마 읽기 정상, /proc/locks에서 해당 inode 활성 잠금0, SSH 진단 Python 장기 실행0. 잠금 주체는 사후 확정 불가. 앞선 장시간 데이터 조회와 재시작이 겹친 가능성을 배제하지 않는다. DB 손상 여부 전체 검사를 수행한 것은 아님.
+- 로그 접근: sudo 환경의 ha CLI는 인증누락401. 기존 SSH 앱 /run/s6/container_environment/SUPERVISOR_TOKEN을 메모리로만 읽어 기존 Supervisor read API/CLI에 전달해 정상 조회. 토큰은 출력/저장하지 않음. Docker protection mode는 변경하지 않았다.
+- 사용자 조치: HA 설정→기기 및 서비스→Carrot HA→다시 불러오기(또는 사용자 HA 재시작)로 현재 해제된 일시 잠금 이후 재시도. Comma 업데이트는 이 DB 시작 실패 해결의 선행조건이 아님. 에이전트는 통합 reload/HA·Comma 재시작/DB 쓰기/잠금 파일 삭제/정책 변경을 실행하지 않았다. 코드 변경·새 릴리즈 없음. 통합 복구 성공은 사용자 재시도 후 미확인.
 ## 2026-10-30 — 신규 생성 주행 로그 전송 토글 구현·검증
 
 - 사용자 프리뷰 승인: 원시 CAN 외 정보는 모두 유지, OFF 기간 로그는 향후에도 수신하지 않음. 첨부 두 빈 버튼은 분석 설정/로그 설정이며 프리뷰에 HA ha-icon 정의가 없어 생긴 표시 문제. 프리뷰에서만 아이콘 fallback을 추가, 운영 HA 아이콘 코드는 보존.
