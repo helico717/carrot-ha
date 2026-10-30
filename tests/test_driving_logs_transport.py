@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import types
 import unittest
 
@@ -22,6 +23,7 @@ sys.modules.setdefault('homeassistant.components.http', http_stub)
 from driving_logs_transport.http import BrowserView, DeviceView, SessionView, ToolsView, upload_token
 from driving_logs_transport.store import LogStore
 from driving_logs_transport.tiered import TieredLogStore
+from driving_logs_transport.transfer_policy import set_enabled
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):
@@ -88,6 +90,10 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         async with self.client.post(str(base)+'/begin',json=manifest) as response:
             self.assertEqual(response.status,401)
         headers={'Authorization':'Bearer '+upload_token('t'*64)}
+        async with self.client.post(str(base)+'/begin',json=manifest,headers=headers) as response:
+            self.assertEqual(response.status,403, 'uploads default to disabled, including legacy senders')
+        policy=await set_enabled(self.hass,self.runtime,True)
+        headers.update({'X-Transfer-Generation':policy['generation'],'X-Recording-Started':str(time.time())})
         async with self.client.post(str(base)+'/begin',json=manifest,headers=headers) as response:
             self.assertEqual(response.status,200)
         for filename, data in {'rlog.zst':b'log!','qcamera.mp4':b'video123'}.items():
@@ -200,9 +206,39 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         working=root/'working';working.mkdir()
         base=str(self.server.make_url('/api/carrot_ha/v1/driving_logs_upload/comma'))
         async with ClientSession(headers={'Authorization':'Bearer '+sender.credential('t'*64)}) as client:
-            await sender.transfer(client,base,directory,2000,rlog,video,working)
+            policy=await set_enabled(self.hass,self.runtime,True)
+            await sender.transfer(client,base,directory,2000,rlog,video,working,generation=policy['generation'],started=time.time())
         self.assertTrue(self.runtime['driving_log_store'].status(directory.name)['complete'])
         self.assertEqual(self.runtime['driving_log_store'].file(directory.name,'rlog').read_bytes(),rlog.read_bytes())
+
+    async def test_switch_off_rejects_inflight_chunks_commit_and_old_generation(self):
+        base=str(self.server.make_url('/api/carrot_ha/v1/driving_logs_upload/comma'))
+        policy=await set_enabled(self.hass,self.runtime,True)
+        headers={'Authorization':'Bearer '+upload_token('t'*64),'X-Transfer-Generation':policy['generation'],'X-Recording-Started':str(time.time())}
+        name='test--1'
+        async with self.client.post(base+'/begin',json={'segment':name,'recorded':time.time(),'files':{'rlog.zst':4,'qcamera.mp4':8}},headers=headers) as response:self.assertEqual(response.status,200)
+        await set_enabled(self.hass,self.runtime,False)
+        async with self.client.put(base+'/chunk/'+name+'/rlog.zst',data=b'log!',headers={**headers,'X-Upload-Offset':'0'}) as response:self.assertEqual(response.status,403)
+        async with self.client.post(base+'/commit',json={'segment':name,'hashes':{}},headers=headers) as response:self.assertEqual(response.status,403)
+        await set_enabled(self.hass,self.runtime,True)
+        async with self.client.put(base+'/chunk/'+name+'/rlog.zst',data=b'log!',headers={**headers,'X-Upload-Offset':'0'}) as response:self.assertEqual(response.status,403)
+        self.assertFalse(self.runtime['driving_log_store'].status(name)['complete'])
+
+    async def test_policy_cookie_scope_and_device_ack(self):
+        browse=str(self.server.make_url('/api/carrot_ha/v1/driving_logs/entry'))
+        async with self.client.get(browse+'/transfer/policy') as response:self.assertEqual(response.status,401)
+        async with self.client.post(browse+'/session',headers={'X-Test-Admin':'yes'}) as response:self.assertEqual(response.status,200)
+        async with self.client.get(browse+'/transfer/policy') as response:self.assertFalse((await response.json())['enabled'])
+        dispatcher=types.ModuleType('homeassistant.helpers.dispatcher');dispatcher.async_dispatcher_send=lambda *a:None
+        from unittest.mock import patch
+        with patch.dict(sys.modules,{'homeassistant.helpers.dispatcher':dispatcher}):
+            async with self.client.post(browse+'/transfer/policy',json={'enabled':'false'}) as response:self.assertEqual(response.status,400)
+            async with self.client.post(browse+'/transfer/policy',json={'enabled':True}) as response:
+                p=await response.json();self.assertFalse(p['applied'])
+        headers={'Authorization':'Bearer '+upload_token('t'*64)}
+        base=str(self.server.make_url('/api/carrot_ha/v1/driving_logs_upload/comma'))
+        async with self.client.get(base+'/state',params={'generation':p['generation']},headers=headers) as response:self.assertTrue((await response.json())['transfer']['enabled'])
+        async with self.client.get(browse+'/transfer/policy') as response:self.assertTrue((await response.json())['applied'])
 
     async def test_nas_only_replay_video_range_upload_summary_and_auth(self):
         root = Path(self.temp.name)

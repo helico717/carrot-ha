@@ -1,3 +1,11 @@
+## 2026-10-30 — 신규 생성 주행 로그 전송 토글 구현·검증
+
+- 사용자 프리뷰 승인: 원시 CAN 외 정보는 모두 유지, OFF 기간 로그는 향후에도 수신하지 않음. 첨부 두 빈 버튼은 분석 설정/로그 설정이며 프리뷰에 HA ha-icon 정의가 없어 생긴 표시 문제. 프리뷰에서만 아이콘 fallback을 추가, 운영 HA 아이콘 코드는 보존.
+- HA: 설정 창 토글 및 switch 엔터티, 기본 OFF 영속 정책, ON/OFF 세대 식별값과 기준시각, 관리자 발급 쿠키 세션의 정책 API, begin/chunk/commit 허가 검사·OFF 수신 거부, 차량 적용 확인 표시. browsing·NAS·기존 저장 로그·일반 상태 경로 유지.
+- Comma: 정책 미지원·기본 OFF는 전송 안 함. 새 활성 세대 확인 시 이미 존재하는 열린/완료 세그먼트를 기준선으로 제외, 이후 새 디렉터리만 허용하며 기기 Git 밖 영속 기록에 저장. OFF/ON 후 이전 대기·미완료 제외, 동일 ON 세대 재시작 시 허용 신기록 이어받기, 허가 오류 후 정책 재확인. 활성 확인 전에 시작된 현재 세그먼트도 보수적으로 제외한다.
+- 파일: custom_components/carrot_ha/driving_logs/{transfer_policy.py,http.py}, switch.py, frontend/carrot-logs-settings.js; openpilot/selfdrive/carrot/ha/{driving_logs.py,tests/test_log_activation.py}; tests/test_log_transfer_policy.py/test_driving_logs_transport.py, scripts/preview_log_transfer.py.
+- 검증: HA 정책2·실제 Comma 송신기→HA aiohttp 포함 transport6·runtime2·tiered9·store8·외부 upload7 통과(총34), Comma 활성 필터2+필수 polling4 통과. Comma 전체86 중81통과/환경 오류5(fcntl Linux 전용2, Windows symlink 권한1, bash/cp9492). 전체 성공으로 보고하지 않음. JS 구문 검사 통과, 실제 모듈 Chrome 토글ON/OFF 및 모바일390x844 경계 확인. 기기 실설치는 미확인.
+- 상태: 커밋·푸시·HA 백업/해시 직접 반영 준비 중. 새 버전·태그·Release 발행 없음. 사용자 HA/Comma 재시작은 실행하지 않음.
 ## 2026-10-30 — SOC % 정수 표시를 반올림에서 버림으로 변경
 
 - 요청/이유: 사용자가 SOC % 정수 표시에서 소수점을 반올림하지 말고 버리도록 요청했다. 표시 SOC 원본은 CAN 0x14A의 0.5% 단위라서, 기존에는 58.5가 59, 99.5가 100으로 올라가 보였다.
@@ -688,3 +696,4 @@
 - 관련 파일: addons/carrot_receiver/{receiver.py,config.yaml,DOCS.md}, custom_components/carrot_ha/{cloud.py,cloud_live.py,terminal_bootstrap.py,terminal_http.py,camera_http.py,__init__.py,config_flow.py}, driving_logs/http.py, docs/CLEAN_INSTALL_RECOVERY.md.
 - 검증/한계: 로컬 HEAD 3527e6b의 코드·설치 문서 대조. git pull은 FETCH_HEAD 권한 오류로 실패. 지정된 로컬 openpilot 경로가 없어 차량 실행 코드 대조 및 운영 HA/Comma 연결 상태 확인은 하지 못했다.
 - 배포 상태: 조사 기록만 추가. 실행 코드·운영 설정·문서 본문 변경, 배포·재시작·태그·릴리즈 없음. 기존 사용자 작업은 유지했다.
+- 원격 준비: Comma `5ec4868a12a9038547b373eb95be3a5fa86d30aa`를 carrot-wip-model_selector-ha에 푸시하고 ls-remote 일치 확인. HA CI companion pin을 이 커밋으로 갱신했다. HA 직접 반영 후 사용자 재시작 전까지는 새 Python 정책이 활성화되지 않는다.

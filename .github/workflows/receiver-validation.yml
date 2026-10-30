@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: helico717/openpilot
-          ref: d5879396da460d8fde85171f88d90cfde0d721d4
+          ref: 5ec4868a12a9038547b373eb95be3a5fa86d30aa
           path: companion-openpilot
           sparse-checkout: |
             openpilot/selfdrive/carrot/ha

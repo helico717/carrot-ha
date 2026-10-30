@@ -13,6 +13,7 @@ from homeassistant.components.http import HomeAssistantView
 from .store import CHUNK
 from .upload import UploadManager, request_segments
 from .runtime import store_for
+from .transfer_policy import policy_for, set_enabled, require_permission, public_status
 
 
 def upload_token(terminal_token):
@@ -85,8 +86,13 @@ class DeviceView(HomeAssistantView):
         if action != 'state':
             raise web.HTTPNotFound()
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
+            policy = await policy_for(self.hass, runtime)
+            if request.query.get('generation') == policy['generation'] and policy['generation']:
+                runtime['driving_log_transfer_ack'] = {'generation': policy['generation'], 'seen': time.monotonic()}
+            if not policy['enabled']:
+                return web.json_response({'transfer': policy, 'floor': 0, 'complete': {}}, headers={'Cache-Control': 'no-store'})
             store = await store_for(self.hass, runtime)
-            return web.json_response({'floor': store.state['floor'], 'complete': {
+            return web.json_response({'transfer': policy, 'floor': store.state['floor'], 'complete': {
                 name: item['recorded'] for name, item in store.state['segments'].items() if item['complete']
             }}, headers={'Cache-Control': 'no-store'})
 
@@ -99,6 +105,13 @@ class DeviceView(HomeAssistantView):
             raise web.HTTPBadRequest()
         lock = runtime.setdefault('driving_log_lock', asyncio.Lock())
         async with lock:
+            policy = await policy_for(self.hass, runtime)
+            try:
+                require_permission(policy, request.headers.get('X-Transfer-Generation'),
+                                   float(request.headers.get('X-Recording-Started', 'nan')))
+                runtime['driving_log_transfer_ack'] = {'generation': policy['generation'], 'seen': time.monotonic()}
+            except ValueError:
+                raise web.HTTPForbidden(text='Driving log transfer disabled or expired') from None
             store = await store_for(self.hass, runtime)
             try:
                 if action == 'begin':
@@ -116,6 +129,14 @@ class DeviceView(HomeAssistantView):
 
     async def put(self, request, device_id, action, segment=None, filename=None):
         runtime = self.runtime(request, device_id)
+        # Reject before consuming the upload body when transfer is disabled.
+        policy = await policy_for(self.hass, runtime)
+        try:
+            require_permission(policy, request.headers.get('X-Transfer-Generation'),
+                               float(request.headers.get('X-Recording-Started', 'nan')))
+            runtime['driving_log_transfer_ack'] = {'generation': policy['generation'], 'seen': time.monotonic()}
+        except ValueError:
+            raise web.HTTPForbidden(text='Driving log transfer disabled or expired') from None
         if action != 'chunk' or not segment or not filename:
             raise web.HTTPNotFound()
         if request.content_length is None or not 0 < request.content_length <= CHUNK:
@@ -126,6 +147,13 @@ class DeviceView(HomeAssistantView):
             raise web.HTTPBadRequest()
         data = await request.read()
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
+            policy = await policy_for(self.hass, runtime)
+            try:
+                require_permission(policy, request.headers.get('X-Transfer-Generation'),
+                                   float(request.headers.get('X-Recording-Started', 'nan')))
+                runtime['driving_log_transfer_ack'] = {'generation': policy['generation'], 'seen': time.monotonic()}
+            except ValueError:
+                raise web.HTTPForbidden(text='Driving log transfer disabled or expired') from None
             store = await store_for(self.hass, runtime)
             try:
                 value = await self.hass.async_add_executor_job(store.chunk, segment, filename, offset, data)
@@ -154,6 +182,9 @@ class BrowserView(HomeAssistantView):
 
     async def get(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'transfer' and action == 'policy' and segment is None:
+            policy = await policy_for(self.hass, runtime)
+            return web.json_response(public_status(runtime, policy), headers={'Cache-Control': 'no-store'})
         if area == 'local' and segment is None:
             return await self.local(request,runtime,action)
         if area == 'ai' and segment is None:
@@ -272,6 +303,18 @@ class BrowserView(HomeAssistantView):
 
     async def post(self, request, entry_id, area, action, segment=None, kind=None, index=None):
         runtime = self.runtime(request, entry_id)
+        if area == 'transfer' and action == 'policy' and segment is None:
+            if request.content_type != 'application/json':
+                raise web.HTTPUnsupportedMediaType()
+            if request.content_length is None or request.content_length > 1024:
+                raise web.HTTPBadRequest()
+            body = await request.json()
+            if not isinstance(body, dict) or type(body.get('enabled')) is not bool:
+                raise web.HTTPBadRequest()
+            policy = await set_enabled(self.hass, runtime, body['enabled'])
+            from homeassistant.helpers.dispatcher import async_dispatcher_send
+            async_dispatcher_send(self.hass, 'carrot_ha' + entry_id)
+            return web.json_response(public_status(runtime, policy), headers={'Cache-Control': 'no-store'})
         if area == 'local' and segment is None:
             return await self.local(request,runtime,action)
         if area == 'ai' and segment is None:

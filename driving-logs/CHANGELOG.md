@@ -1,3 +1,38 @@
+## 2026-10-30 — 신규 생성 주행 로그 전송 토글 구현·검증
+
+- 사용자 프리뷰 승인: 원시 CAN 외 정보는 모두 유지, OFF 기간 로그는 향후에도 수신하지 않음. 첨부 두 빈 버튼은 분석 설정/로그 설정이며 프리뷰에 HA ha-icon 정의가 없어 생긴 표시 문제. 프리뷰에서만 아이콘 fallback을 추가, 운영 HA 아이콘 코드는 보존.
+- HA: 설정 창 토글 및 switch 엔터티, 기본 OFF 영속 정책, ON/OFF 세대 식별값과 기준시각, 관리자 발급 쿠키 세션의 정책 API, begin/chunk/commit 허가 검사·OFF 수신 거부, 차량 적용 확인 표시. browsing·NAS·기존 저장 로그·일반 상태 경로 유지.
+- Comma: 정책 미지원·기본 OFF는 전송 안 함. 새 활성 세대 확인 시 이미 존재하는 열린/완료 세그먼트를 기준선으로 제외, 이후 새 디렉터리만 허용하며 기기 Git 밖 영속 기록에 저장. OFF/ON 후 이전 대기·미완료 제외, 동일 ON 세대 재시작 시 허용 신기록 이어받기, 허가 오류 후 정책 재확인. 활성 확인 전에 시작된 현재 세그먼트도 보수적으로 제외한다.
+- 파일: custom_components/carrot_ha/driving_logs/{transfer_policy.py,http.py}, switch.py, frontend/carrot-logs-settings.js; openpilot/selfdrive/carrot/ha/{driving_logs.py,tests/test_log_activation.py}; tests/test_log_transfer_policy.py/test_driving_logs_transport.py, scripts/preview_log_transfer.py.
+- 검증: HA 정책2·실제 Comma 송신기→HA aiohttp 포함 transport6·runtime2·tiered9·store8·외부 upload7 통과(총34), Comma 활성 필터2+필수 polling4 통과. Comma 전체86 중81통과/환경 오류5(fcntl Linux 전용2, Windows symlink 권한1, bash/cp9492). 전체 성공으로 보고하지 않음. JS 구문 검사 통과, 실제 모듈 Chrome 토글ON/OFF 및 모바일390x844 경계 확인. 기기 실설치는 미확인.
+- 상태: 커밋·푸시·HA 백업/해시 직접 반영 준비 중. 새 버전·태그·Release 발행 없음. 사용자 HA/Comma 재시작은 실행하지 않음.
+## 2026-10-30 — 신규 주행 로그만 전송하는 토글 프리뷰
+
+- 요청: OFF 기간 과거 기록은 나중에도 받지 않고 ON 이후 신규 생성 주행 영상/rlog만 수신. 기존 차량 상태·위치·충전·일반 주행 요약 유지. 기본 OFF, OFF 시 미완료/대기 전송 재개 금지.
+- 사전 UI 절차: 프로덕션 파일을 변경하지 않고 scripts/preview_log_transfer.py가 실제 carrot-logs-card.js/설정 모듈/전체 carrot_logs 정적 모듈을 제공한다. 설정 모듈 응답에만 토글을 삽입하고 합성 목록/보관량/ON/OFF/연결 상태를 사용. 원본 영상·rlog fixture와 AI 응답의 실제 기능 검증은 아직 포함하지 않아 전체 기능 100% 검증 완료로 주장하지 않는다.
+- 검증: Chrome 실제 Custom Element·iframe 목록/설정 렌더링, 토글 ON/OFF, OFF 기본 화면, 모바일390x844 경계/내부 스크롤, 다크·라이트, 오프라인 요청 대기 표시 확인. preview/log-transfer-{desktop,mobile}.png 저장. 127.0.0.1:8089 프리뷰 실행 중. 기존 sandbox 서버와 중복 바인딩으로 초기 연결 timeout 발생, 중복 프로세스 종료 후 정상화.
+- 설계 후속: HA 영속 정책/세대별 ON 기준점, begin/chunk/commit 서버 거부, 기기 생성시각 필터·세대 변경 시 기존 미완료 포기·OFF 상태에서는 inventory만 확인, fail-closed/재시작/전송 도중 OFF 회귀 테스트 필요. 부분 세그먼트가 OFF 시기에 걸치면 제외하는 보수적 경계 필요.
+- Comma 소스는 지정된 예전 Documents 경로 대신 C:/Users/limkw/OneDrive/바탕 화면/Developer/openpilot/openpilot/selfdrive/carrot/ha/driving_logs.py에서 발견. 읽기 가능하나 해당 Git 경로 status 권한 거부로 이후 승인 실행 필요. 기기 SSH/SCP 소스 수정 없음.
+- 상태: AGENTS의 프리뷰 사전 승인 대기. 프로덕션 파일/정책/원격 HA·Comma 변경 없음. 커밋·푸시·태그·Release·배포·재시작 없음. 기존 미커밋 driving-logs/CHANGELOG 조사 기록을 보존함.
+## 2026-10-30 — 10월 실제 수신 용량 조사 결과
+
+- HA 읽기 전용 실측: HA/NAS manifest를 세그먼트 키로 중복 제거한 10월 기록 3,109세그먼트/183,502.12초. rlog.zst 35,854,414,369B, qcamera.ts 7,088,603,732B, qcamera.mp4 5,946,854,684B, 합계 48,889,872,785B. 기록시각 범위 UTC 10/10 06:39:47~10/29 23:14:31(한국 10/30). 최대 단일 파일 rlog 12,699,948B. manifest 크기는 보관된 파일 기준이며 수신 월/망/재시도·삭제분을 포함한 wire bytes가 아니다.
+- 남아 있는 원시 CAN: 73,153 gzip, 9,998,838,720B, 전부 수신 mtime 10월. 최대 일별 잔존량 10/10 1,817,509,604B. 10GB 회전 보관으로 월 누적 전송량 판단 불가. 현재 capture.json continuous=false/until=0으로 중지. status.json의 enabled=true/continuous=true는 과거 수신 시점 상태로 현재 정책과 다름.
+- archive mode=ro/query_only + 설치 codec 복원: 10월 observed 상태 21,843건 원문 813,075,090B/저장본문 267,377,624B/최대 42,399B, trip 148건 4,816,791B/최대 134,825B, charge 24건 14,752B. DB 파일 크기를 전송량으로 간주하지 않음. 상태 원문에는 cloud_raw_state 406,191,330B와 charge_sessions 274,644,113B 등 HA 보존 중복이 포함돼 실제 차량 송신 바이트와 다름.
+- 결론: 확인 가능한 보관 데이터 최대는 rlog. TS/MP4 두 컨테이너 모두 manifest에 있어 동일 주행 영상 중복 전송 가능성을 검토하되 실제 내용/기기 생성 과정 미대조이므로 중복 확정하지 않음. 나머지 필수정보 유지, 무손실 압축/변경분 동기화/영상 한 형식 수신 후 서버 변환을 후보로 제시. 기능·정책 변경 없음.
+- 한계: 수신/프록시/라우터 월별 송수신 계량 미확보, 카메라 실시간 영상·파라미터·터미널·별도 서비스 트래픽 미계량. Docker 컨테이너 조회 실패. 보관 데이터만으로 공유 100GB 전체 원인 확정 불가. 원격 파일 변경·배포·재시작 없음.
+## 2026-10-30 — 10월 실제 수신 데이터 용량 읽기 전용 조사
+
+- 사용자 기준 정정: 원시 CAN 전체 기록만 비필수이며 나머지 정보는 모두 필수. 기능 제외 대신 전송량 근거와 무손실 절감 방향을 조사한다.
+- HA 기존 SSH 경로로 연결해 파일 메타데이터·HA/NAS manifest·archive mode=ro/query_only 집계를 실행했다. 운영 파일/설정/DB 변경·재시작 없음. HA/NAS 주행 파일은 세그먼트 키로 중복 제거. CAN은 남아 있는 압축 파일의 수신 mtime, 주행은 기록시각을 기준으로 하므로 월 실제 wire bytes와 구분한다.
+- 실행 중: CAN 73,153파일 존재 확인. 월별·유형별 결과는 후속 기록에 추가. GPS/토큰/장치 식별자를 출력하지 않음. 새 커밋·푸시·배포·태그 없음.
+## 2026-10-30 — 공유 데이터 100GB 소진 원인·절감 조사
+
+- 사용자 요청: 월 공유 데이터 100GB 소진에 대한 사용량 계산과 절감 방안. 실행 코드·설정 변경 없는 조사.
+- 근거: 현재 연결 구조, CAMERA_FEASIBILITY, 2026-10-28 저장 점검 기록. NAS 46,168,798,964바이트/2940세그먼트는 보관량이며 월 셀룰러 전송량으로 단정하지 않는다. 공식 openpilot logging 문서의 1분 세그먼트를 적용한 참고 평균은 약 15.70MB/분, 0.942GB/시간. 포크 실제 세그먼트 길이·중복·전송망·보관기간은 미확인.
+- 검증/한계: 통신사 계량·기기 인터페이스 통계·실제 파일 전송 기록 미조회. 지정된 Windows openpilot 경로 접근 실패. git pull은 FETCH_HEAD 쓰기 권한 오류로 실패하여 최신 원격 대조 미완료. 로컬 자료 기반 추정과 정책 제안만 제공.
+- 방안: 원본 영상/rlog를 신뢰한 집 Wi-Fi에서만 업로드, 셀룰러에서는 경량 상태 유지, 카메라 사용시간/비트레이트 제한, 파일별·망별 바이트 계량과 월 예산 도입. 기존 설정 제공 여부는 아직 미확인.
+- 상태: 조사 기록만 로컬 추가. 커밋·푸시·배포·릴리즈·HA/Comma 재시작 없음. 개인키·기기 ID·GPS·원본 로그 미기록.
 ## 2026-10-28 — Windows beta.2 준비 검증 상태 점검
 
 - 운영 HA 로그 코드와 main fb1ef34는 줄바꿈 제외 동일. 기존 격리 Python 환경의 전체 스위트 점검에서 AI/V2 각 cereal 실행 검사가 numpy 미설치로 실패했다. CI b258662의 Python 3.14 Alpine radar-ha-python은 성공했으나 regression은 실패해 전체 검증 완료로 해석하지 않는다.
@@ -891,3 +926,4 @@
 - 관련 파일: custom_components/carrot_ha/driving_logs/{http.py,upload.py}, docs/{CLEAN_INSTALL_RECOVERY.md,driving-logs-setup.md}.
 - 검증: 로컬 코드·문서 대조만 수행. 실제 차량 업로드·운영 프록시·NAS 상태 및 차량 실행 코드는 미확인(지정 로컬 openpilot 경로 없음).
 - 배포 상태: 조사 기록만 추가. 실행 코드·기기·HA 변경/배포·재시작·릴리즈 없음. 기존 미추적 분석 문서는 수정하지 않았다.
+- 원격 준비: Comma `5ec4868a12a9038547b373eb95be3a5fa86d30aa`를 carrot-wip-model_selector-ha에 푸시하고 ls-remote 일치 확인. HA CI companion pin을 이 커밋으로 갱신했다. HA 직접 반영 후 사용자 재시작 전까지는 새 Python 정책이 활성화되지 않는다.
