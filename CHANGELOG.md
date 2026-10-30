@@ -1,3 +1,10 @@
+## 2026-10-30 — 토글 비활성·실행 API 구버전 잔존 확인
+
+- 사용자 화면: 전송 설정 조회 실패, 회색 OFF 모양/disabled wait 커서. 운영 읽기 전용 확인: Carrot HA 엔트리loaded, switch.caryang_id_4_driving_log_transfer=off, 정책 파일0개(기본OFF).
+- 중요: 차량용 GET state 실응답에 transfer 키가 없고 complete3109개를 반환했다. 현재 실행 중인 DeviceView는 파일 반영 전 구버전이다. 따라서 스위치 상태OFF만으로 실제 업로드 차단이 작동한다고 보고하지 않는다. 새 UI 정책 조회 실패도 새 API 미로딩과 일치한다.
+- 원인: __init__.py async_setup에서 driving_logs HTTP view를 HA 프로세스 시작 시 등록한다. 08:42 시작실패 후09:11 통합reload는 엔트리/새 switch 모듈은 복구했으나 이미 import·등록된 기존 HTTP view를 교체하지 않았다. 앞선 reload 안내는 통합 복구에는 해당하지만 새 API 활성화에는 불충분했다.
+- 사용자 조치: HA Core 전체 재시작 후 브라우저Ctrl+F5. Comma 업데이트 전에도 새 서버는 기본OFF로 구버전 업로드를 거부하게 된다. 이후 실 state transfer.enabled=false 및 정책조회 성공을 재확인해야 한다. 현재 재시작/설정변경/차량업데이트는 실행하지 않았다.
+- 부수로그:09:11 can_capture.py upload KeyError can_capture 3건은 reload 중 런타임 초기화와 겹친 흔적, 현재 계속 발생하는지는 미확인. Docker보호설정 변경·DB조작·토큰출력 없음. 코드수정·배포·새릴리즈 없음.
 ## 2026-10-30 — HA 재시작 후 Carrot HA setup_error 읽기 전용 진단
 
 - 사용자 보고: HA 재시작 후 구성요소 로딩 실패, Comma 업데이트/재부팅 전. 현재 운영 로그·Core 엔트리 상태·DB 잠금을 읽기 전용으로 조사했다.
