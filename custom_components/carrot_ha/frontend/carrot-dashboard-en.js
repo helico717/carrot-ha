@@ -484,6 +484,7 @@ class CarrotDashboard extends HTMLElement {
       .mini-condition .aux-sib b::before,.mini-condition .aux-battery b::before{content:"";display:inline-block;height:8px;vertical-align:.05em}
       .mini-condition .aux-sib b::before{width:0;margin:0 0 0 6px}
       .mini-condition .aux-battery b::before{width:8px;border-radius:50%;margin:0 4px 0 6px;background:transparent}
+      .mini-condition .aux-battery b[data-aux="none"]::before{width:0;margin:0 0 0 6px}
       .mini-condition .aux-battery b[data-aux="ok"]::before{background:#22c55e}
       .mini-condition .aux-battery b[data-aux="caution"]{color:#fbbf24}.mini-condition .aux-battery b[data-aux="caution"]::before{background:#f59e0b}
       .mini-condition .aux-battery b[data-aux="warn"]{color:#f87171}.mini-condition .aux-battery b[data-aux="warn"]::before{background:#ef4444}

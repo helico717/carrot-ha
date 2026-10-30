@@ -1,3 +1,13 @@
+## 2026-10-30 — 주행·충전 중 12V 배터리 값 앞 빈칸 제거
+
+- 사용자 보고: 개요 탭의 외기/배터리 줄에서 주행 중에는 색 점이 사라지는데, "배터리"와 값(예: 13.8V) 사이에 빈칸이 크게 남았다.
+- 원인: 점(`b::before`)은 주행·충전 중(`data-aux="none"`)에 배경만 투명해지고, 너비 8px와 여백(왼쪽 6px, 오른쪽 4px)은 그대로 남아 약 18px의 빈칸이 생겼다.
+- 변경: `data-aux="none"`일 때 점의 너비를 0으로 하고 왼쪽 여백 6px만 남긴다. 옆의 "외기" 항목과 같은 간격이다. 주차 중 정상·주의·경고 점과 회색(판단 불가) 점은 그대로 둔다. 판단 로직과 HA 쪽 코드는 바꾸지 않았다.
+- 프리뷰: `preview/aux-voltage/index.html`에 비교안 상자(현재/A. 공간 제거/B. 회색 점 유지)와 주차↔주행 번갈아 보기를 추가했다. 사용자가 A안을 승인했다. Windows용 미리보기 서버 설정(`aux-voltage-preview-win`, python, 8767 포트)을 `.claude/launch.json`에 추가했다.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-dashboard-ko.js,carrot-dashboard-en.js}, tests/dashboard-aux-battery.test.mjs, preview/aux-voltage/index.html, .claude/launch.json.
+- 검증: dashboard-aux-battery·live-loading·lazy-runtime·view-state 16개 통과. 실제 운영 모듈을 쓰는 미리보기(한국어)에서 점 영역이 주행·충전 중 6px, 주차 중 18px로 측정됐고 콘솔 오류는 없었다. 영어 대시보드는 CSS 규칙을 테스트로만 확인했다. 확대 스크린샷은 브라우저 창이 그려지지 않아 남기지 못했다.
+- 배포 상태: 커밋·푸시와 HA 직접 반영을 진행한다. 새 버전·태그·릴리즈는 발행하지 않는다.
+
 ## 2026-10-30 — 토글 비활성·실행 API 구버전 잔존 확인
 
 - 사용자 화면: 전송 설정 조회 실패, 회색 OFF 모양/disabled wait 커서. 운영 읽기 전용 확인: Carrot HA 엔트리loaded, switch.caryang_id_4_driving_log_transfer=off, 정책 파일0개(기본OFF).

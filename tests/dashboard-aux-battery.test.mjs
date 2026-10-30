@@ -99,6 +99,8 @@ test('overview row uses the shared span, keeps outside temperature aligned and h
     for (const level of ['caution', 'warn']) {
       assert.match(source, new RegExp(`\\.mini-condition \\.aux-battery b\\[data-aux="${level}"\\]\\{color:`));
     }
+    // driving/charging: no dot, so no empty dot slot either (same 6px gap as the outside temperature)
+    assert.match(source, /\.mini-condition \.aux-battery b\[data-aux="none"\]::before\{width:0;margin:0 0 0 6px\}/);
   }
   const debug = readFileSync('custom_components/carrot_ha/frontend/carrot-dashboard-debug.js', 'utf8');
   assert.match(debug, /\$\{card\.auxBatterySpan\(v\)\}/);
