@@ -5,8 +5,8 @@
 - 변경: 카메라 기기 옵션·엔티티 상태 HTML·실효 카메라 모드·언어로 서명을 만들어, 바뀌었을 때만 DOM 갱신과 `dashCard.render()`를 실행한다. 디버그 카드 전체를 다시 그리면 서명을 초기화한다. 운영 대시보드와 HA 백엔드는 바꾸지 않았다.
 - 관련 파일: custom_components/carrot_ha/frontend/carrot-dashboard-debug.js.
 - 검증: 로컬 `preview.html`(실제 모듈)에서 관련 없는 엔티티를 바꾼 hass를 0.5초 간격으로 10번 넘겨도 대시보드 렌더링 0회, 미니 지도 객체·테마 select 요소가 그대로 유지됐다. Carrot 기기 엔티티를 새로 추가하면 렌더링이 실행됨을 확인했다. 콘솔 오류 없음. debug-3d·charge-soc·trip-history·view-state 테스트 통과. `debug-freshness.test.mjs`는 수정 전 HEAD에서도 같은 `import.meta` SyntaxError로 실패하는 기존 문제다.
-- 배포 상태: 커밋 `9244a4a` main 푸시 확인. HA 직접 반영·새 버전·릴리즈 없음.
-- 미확인: 실제 HA 화면에서의 깜빡임 해소.
+- 배포 상태: 커밋 `9244a4a` main 푸시 확인. 사용자 요청으로 HA SSH 직접 반영: 반영 전 설치 파일 SHA-256이 직전 커밋과 일치(369f5efe…). `/config/carrot_ha/deployment-backups/9244a4aabdddf7324947570dd583b8ab04c84c6e-debug-flicker/before`에 백업(before.sha256 포함) 후 임시 파일+mv로 교체. 반영 후 커밋과 일치(4522e977…), 권한 644 root:root, 임시 파일 없음. 새 버전·태그·릴리즈 없음.
+- 미확인: 사용자 브라우저 새로고침(Ctrl+F5) 후 실제 HA 화면에서 깜빡임·드롭다운 해소. 사용자는 수정 전 아무 조작 없이도 깜빡였다고 확인했다(HA 상태 갱신이 원인이라는 진단과 일치).
 
 ## 2026-10-30 — 주행·충전 중 12V 배터리 값 앞 빈칸 제거
 
