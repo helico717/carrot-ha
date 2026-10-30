@@ -927,3 +927,9 @@
 - 검증: 로컬 코드·문서 대조만 수행. 실제 차량 업로드·운영 프록시·NAS 상태 및 차량 실행 코드는 미확인(지정 로컬 openpilot 경로 없음).
 - 배포 상태: 조사 기록만 추가. 실행 코드·기기·HA 변경/배포·재시작·릴리즈 없음. 기존 미추적 분석 문서는 수정하지 않았다.
 - 원격 준비: Comma `5ec4868a12a9038547b373eb95be3a5fa86d30aa`를 carrot-wip-model_selector-ha에 푸시하고 ls-remote 일치 확인. HA CI companion pin을 이 커밋으로 갱신했다. HA 직접 반영 후 사용자 재시작 전까지는 새 Python 정책이 활성화되지 않는다.
+
+## 2026-10-30 — 전송 토글 직접 반영 완료·사용자 재시작 대기
+
+- HA 실행 커밋24d8d9001b90e7aff418afbddb75b5a465d2e0d8 main 푸시. Actions40976946905 전체 success 확인: https://github.com/helico717/carrot-ha/actions/runs/40976946905 . Comma 원격5ec4868a12a9038547b373eb95be3a5fa86d30aa 확인.
+- HA 실행4파일을 기존 경로로 직접 반영하고 SHA-256 전부 일치, Python3 compile() 메모리 검사 통과. 백업 /config/carrot_ha/deployment-backups/driving-logs-hud-24d8d9001b90/before 및 상위 DEPLOYMENT.json에 실제 이전 해시·대상 해시·커밋 기록. http.py preflight 차이는 CRLF445개뿐이며 정규화SHA0b921103…가 기준과 일치함을 확인. 배포 도구는 CRLF만 정규화한 기준 해시 일치도 허용하도록 보강했다. 다른 내용 변경은 계속 거부한다.
+- 정책 파일은 아직0개이며 새 코드 활성 시 기본OFF. HA Core 재시작·Comma Git Pull/재부팅·실차ON/OFF 검증은 사용자 단계로 남아 있다. 에이전트는 재시작하지 않았고 기존 원본 로그/보관 데이터/원시CAN 설정을 변경하지 않았다. 새 태그·버전·Release 없음.

@@ -29,7 +29,8 @@ for name in names:
     before = subprocess.run(['git', 'show', f'{args.base}:{name}'], cwd=root, capture_output=True)
     files[name] = data
     metadata[name] = {'sha': hashlib.sha256(data).hexdigest(),
-                      'before': hashlib.sha256(before.stdout).hexdigest() if before.returncode == 0 else None}
+                      'before': hashlib.sha256(before.stdout).hexdigest() if before.returncode == 0 else None,
+                      'before_lf': hashlib.sha256(before.stdout.replace(b'\r\n', b'\n')).hexdigest() if before.returncode == 0 else None}
 payload = io.BytesIO()
 with tarfile.open(fileobj=payload, mode='w:gz') as archive:
     entries = {'DEPLOYMENT.json': json.dumps({'commit': commit, 'apply': args.apply, 'files': metadata}).encode(), **files}
@@ -42,7 +43,7 @@ import hashlib,io,json,os,pathlib,shutil,sys,tarfile
 with tarfile.open(fileobj=io.BytesIO(sys.stdin.buffer.read()),mode='r:gz') as archive:
     metadata=json.load(archive.extractfile('DEPLOYMENT.json'))
     config=pathlib.Path('/config').resolve()
-    prepared=[]; conflicts=[]
+    prepared=[]; conflicts=[]; actual_before={}
     for name,item in metadata['files'].items():
         relative=pathlib.PurePosixPath(name)
         if relative.is_absolute() or '..' in relative.parts or not name.startswith('custom_components/carrot_ha/'):
@@ -54,13 +55,19 @@ with tarfile.open(fileobj=io.BytesIO(sys.stdin.buffer.read()),mode='r:gz') as ar
         sha=hashlib.sha256(data).hexdigest()
         if sha!=item['sha']: raise RuntimeError('Payload hash mismatch')
         current=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
-        if current not in (item['before'],sha): conflicts.append(name)
+        current_lf=hashlib.sha256(path.read_bytes().replace(b'\r\n',b'\n')).hexdigest() if path.is_file() else None
+        if current not in (item['before'],sha) and current_lf!=item['before_lf']: conflicts.append(name)
+        actual_before[name]=current
         prepared.append((path,name,data,current==sha))
     if conflicts:
         print(json.dumps({'conflicts':conflicts}));sys.exit(2)
     if not metadata['apply']:
         print(json.dumps({'preflight':'ok','files':len(prepared),'commit':metadata['commit']}));sys.exit(0)
     backup=config/'carrot_ha/deployment-backups'/('driving-logs-hud-'+metadata['commit'][:12])/'before'
+    backup.mkdir(parents=True,exist_ok=True)
+    receipt=backup.parent/'DEPLOYMENT.json'
+    if not receipt.exists():
+        receipt.write_text(json.dumps({'commit':metadata['commit'],'before_sha256':actual_before,'targets':metadata['files']},indent=2))
     prepared.sort(key=lambda row: (row[0].is_file(),row[1].endswith('ha_replay_loader.js')))
     for path,name,data,identical in prepared:
         if identical: continue
