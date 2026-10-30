@@ -6,7 +6,8 @@
 - 프리뷰: `preview/aux-voltage/index.html`에 비교안 상자(현재/A. 공간 제거/B. 회색 점 유지)와 주차↔주행 번갈아 보기를 추가했다. 사용자가 A안을 승인했다. Windows용 미리보기 서버 설정(`aux-voltage-preview-win`, python, 8767 포트)을 `.claude/launch.json`에 추가했다.
 - 관련 파일: custom_components/carrot_ha/frontend/{carrot-dashboard-ko.js,carrot-dashboard-en.js}, tests/dashboard-aux-battery.test.mjs, preview/aux-voltage/index.html, .claude/launch.json.
 - 검증: dashboard-aux-battery·live-loading·lazy-runtime·view-state 16개 통과. 실제 운영 모듈을 쓰는 미리보기(한국어)에서 점 영역이 주행·충전 중 6px, 주차 중 18px로 측정됐고 콘솔 오류는 없었다. 영어 대시보드는 CSS 규칙을 테스트로만 확인했다. 확대 스크린샷은 브라우저 창이 그려지지 않아 남기지 못했다.
-- 배포 상태: 커밋·푸시와 HA 직접 반영을 진행한다. 새 버전·태그·릴리즈는 발행하지 않는다.
+- 배포 상태: 커밋 `3e27b9b` main 푸시 확인. 반영 전 HA 설치 파일 2개의 SHA-256이 직전 커밋과 일치함을 확인했다(ko 20a62d6e…, en ddaa1754…). `/config/carrot_ha/deployment-backups/3e27b9b6ce0a943d5276b95e8c4a830852793d88-aux-dot-gap/before`에 백업하고(before.sha256 포함) HA SSH(`sudo`)로 임시 파일+mv 교체했다. 반영 후 커밋 해시와 일치(ko cc585900…, en 1204c3af…), 권한 644 root 유지, 임시 파일 없음. 새 버전·태그·릴리즈 없음.
+- 미확인: 사용자 브라우저 새로고침(Ctrl+F5) 후 실제 HA 화면.
 
 ## 2026-10-30 — 토글 비활성·실행 API 구버전 잔존 확인
 
