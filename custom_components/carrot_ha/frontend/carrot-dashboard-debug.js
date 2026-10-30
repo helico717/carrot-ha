@@ -901,6 +901,7 @@ export default class CarrotDebugDashboard extends HTMLElement {
   render() {
     if (!this.shadowRoot) return;
 
+    this._cameraUiSignature = null;
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -2023,24 +2024,33 @@ export default class CarrotDebugDashboard extends HTMLElement {
     const root = this.shadowRoot;
     if (!root) return;
 
+    // HA hands over a new hass object on every state change anywhere in the system.
+    // Only touch the DOM and re-render the dashboard when camera discovery actually changed;
+    // otherwise open dropdowns close and the overview mini maps are rebuilt every update.
+    const devices = this.getCarrotCameraDevices();
+    if (!this.state.selectedCameraDevice && devices.length > 0) {
+      this.state.selectedCameraDevice = devices[0].id;
+    }
+    const optionsHtml = this.renderDeviceSelectOptions();
+    const statusHtml = this.renderCameraEntitiesStatusHtml();
+    const isEn = this.state.lang === 'en';
+    const effectiveMode = this.getEffectiveCameraMode();
+    const signature = JSON.stringify([optionsHtml, statusHtml, effectiveMode, this.state.lang]);
+    if (signature === this._cameraUiSignature) return;
+    this._cameraUiSignature = signature;
+
     const camDeviceSelect = root.querySelector('#camDeviceSelect');
     if (camDeviceSelect) {
-      camDeviceSelect.innerHTML = this.renderDeviceSelectOptions();
-      const devices = this.getCarrotCameraDevices();
-      if (!this.state.selectedCameraDevice && devices.length > 0) {
-        this.state.selectedCameraDevice = devices[0].id;
-        camDeviceSelect.value = devices[0].id;
-      }
+      camDeviceSelect.innerHTML = optionsHtml;
+      if (this.state.selectedCameraDevice) camDeviceSelect.value = this.state.selectedCameraDevice;
     }
 
     const camEntitiesStatusBox = root.querySelector('#camEntitiesStatusBox');
     if (camEntitiesStatusBox) {
-      camEntitiesStatusBox.innerHTML = this.renderCameraEntitiesStatusHtml();
+      camEntitiesStatusBox.innerHTML = statusHtml;
     }
 
     const cameraModeVal = root.querySelector('#cameraModeVal');
-    const isEn = this.state.lang === 'en';
-    const effectiveMode = this.getEffectiveCameraMode();
     if (cameraModeVal) {
       cameraModeVal.textContent = effectiveMode === 'real'
         ? (isEn ? '🚗 Live Vehicle Mode' : '🚗 실기기 연결 모드')
