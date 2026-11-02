@@ -1,3 +1,12 @@
+## 2026-11-02 — 실제 클린 설치 후 HA 재연결 경로 조사
+
+- 사용자 요청: IQ.OS 업데이트 중 크롬의 기기 화면에서 읽기 전용 조사. app.konn3kt.com 자체 CLOUD WEBSSH 연결 성공. 같은 LAN SSH 외에도 최초 진단 경로가 있음을 실측.
+- 기기 읽기 결과: /VERSION=IQ.OS 4.9.9.4, release HEAD=11fcd74243ede4f1f5df24db1ed2d44e2ac22664, tracked status 비어 있음, IsOffroad=1/IsOnroad=0. launch_env AGNOS_VERSION=4.9.9.9.2. 웹에는 해당 버전 OS 업데이트 진행 표시. 현재 OS와 설치 목표를 구분하며 업데이트 완료 여부는 미확인.
+- /data/carrot_ha/direct-connection.json 및 /data/carrot_ha/camera/camera.json 없음 확인(비밀값 열람/출력 없음).
+- 공개 원본 release SHA가 기기와 동일하고, HA iq-ha는 9637e6c6e8287c96dbf12de7b79bb2cef3b585f5 그대로 확인. 기존 후보/진단 OS는 4.9.9.4 고정이며 refresh 도구는 OS 변경 시 NEEDS_REVIEW 중단. 기존 후보로 다운그레이드하지 않고 새 IQ 원본에 맞춘 연동 갱신·검증이 선행돼야 함.
+- 원본 신규 공개 소스를 Mac의 /private/tmp/iqpilot-recovery-current-20261102에 filtered/no-checkout 조사 클론. 주행 제어 코드는 변경하지 않음.
+- 기기에서는 cat/git status/rev-parse/branch/설정 존재 확인/rg만 실행. 설치·checkout·설정 복원·재부팅·OS 쓰기·HA 배포 없음. 기존 비공개 Mac 복구 키트는 보존. 실제 HA 연결 복원은 아직 수행하지 않음.
+
 ## 2026-11-02 — 플래싱 후 순정 IQpilot에서 HA 재연결 준비
 
 - 사용자 요청으로 플래싱·순정 설치 이후를 위한 docs/IQPILOT_HA_CLEAN_RECOVERY.md 준비. 같은 Wi-Fi + SSH 공개키 재등록, 주차 확인, 순정/후보 SHA 일치 확인 후 Git 전환, 선택적 HA 설정 복원, 사용자 재부팅·실차 확인 순서를 기록.
