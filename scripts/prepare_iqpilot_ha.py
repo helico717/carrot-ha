@@ -35,15 +35,16 @@ def port_source(text):
     return text
 
 
-def prepare(donor, iq, output):
+def prepare(donor, iq, output, iq_sha=IQ_SHA):
     if git(donor, 'rev-parse', 'HEAD').decode().strip() != CARROT_SHA:
         raise ValueError('Donor must match the actual vehicle commit')
-    if git(iq, 'rev-parse', 'HEAD').decode().strip() != IQ_SHA:
-        raise ValueError('IQpilot source commit changed; review again')
+    # The automatic refresh passes the new upstream commit; patches below still fail closed.
+    if git(iq, 'rev-parse', 'HEAD').decode().strip() != iq_sha:
+        raise ValueError('IQpilot source commit differs from the requested pin')
     output.mkdir(parents=True, exist_ok=False)
     files = git(donor, 'ls-tree', '-r', '--name-only', 'HEAD', '--', PREFIX).decode().splitlines()
     manifest = {'status': 'REVIEW_ONLY_NOT_INSTALLABLE', 'carrot_sha': CARROT_SHA,
-                'iqpilot_sha': IQ_SHA, 'files': {}, 'blockers': [
+                'iqpilot_sha': iq_sha, 'files': {}, 'blockers': [
                     'Replace the Carrot-only localhost:7000 PTY dependency.',
                     'Disable Carrot parameter writes; design an IQ catalog adapter separately.',
                     'Verify iqdbc optional message decoding against recorded CAN.',

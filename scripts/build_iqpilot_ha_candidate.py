@@ -40,7 +40,18 @@ mkdir -p /data/iqpilot-ha-runtime
 '''
 
 
-def build(donor, iq, output):
+def linked_directory(relative):
+    return any(relative == directory or relative.startswith(directory + '/') for directory in LINK_DIRS)
+
+
+def materialized(relative):
+    """Public upstream files copied into the superproject; everything else links into vendor."""
+    return Path(relative).name == '.gitignore' or relative.endswith(PUBLIC_SUFFIXES) or relative in (
+        'LICENSE', 'README.md', 'SECURITY.md', '.gitattributes', '.gitignore',
+        'pyproject.toml', 'uv.lock', 'prebuilt')
+
+
+def build(donor, iq, output, iq_sha=IQ_SHA):
     if output.exists():
         raise ValueError('Candidate destination must not exist')
     output.mkdir(parents=True)
@@ -64,14 +75,11 @@ def build(donor, iq, output):
         metadata, raw_path = record.split(b'\t', 1)
         mode, kind, oid = metadata.decode().split()
         relative = raw_path.decode()
-        if any(relative == directory or relative.startswith(directory + '/') for directory in LINK_DIRS):
+        if linked_directory(relative):
             continue
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        materialize = Path(relative).name == '.gitignore' or relative.endswith(PUBLIC_SUFFIXES) or relative in (
-            'LICENSE', 'README.md', 'SECURITY.md', '.gitattributes', '.gitignore',
-            'pyproject.toml', 'uv.lock', 'prebuilt')
-        if mode == '120000' or not materialize:
+        if mode == '120000' or not materialized(relative):
             link(relative)
         else:
             data = git(iq, 'cat-file', 'blob', oid)
@@ -80,11 +88,11 @@ def build(donor, iq, output):
             copied[relative] = hashlib.sha256(data).hexdigest()
     with tempfile.TemporaryDirectory(prefix='iq-ha-overlay-') as folder:
         overlay = Path(folder) / 'sources'
-        manifest = prepare(donor, iq, overlay)
+        manifest = prepare(donor, iq, overlay, iq_sha)
         shutil.copytree(overlay / 'iqpilot', output / 'iqpilot', dirs_exist_ok=True)
     bootstrap = output / 'bootstrap/ensure_vendor.sh'
     bootstrap.parent.mkdir()
-    bootstrap.write_text(BOOTSTRAP)
+    bootstrap.write_text(BOOTSTRAP.replace(IQ_SHA, iq_sha))
     bootstrap.chmod(0o755)
     source_root = Path(__file__).resolve().parents[1]
     switch = output / 'bootstrap/switch_to_carrot.sh'
@@ -244,7 +252,7 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
     (output / 'PORTABILITY.json').write_text(json.dumps(manifest, indent=2))
     subprocess.run(['git', '-C', str(output), 'add', '-f', '.'], check=True)
     subprocess.run(['git', '-C', str(output), 'update-index', '--add', '--cacheinfo',
-                    '160000,' + IQ_SHA + ',vendor/iqpilot'], check=True)
+                    '160000,' + iq_sha + ',vendor/iqpilot'], check=True)
     print('CANDIDATE_ASSEMBLED', output, 'public_files=', len(copied), 'links=', len(linked))
 
 
@@ -253,5 +261,6 @@ if __name__ == '__main__':
     parser.add_argument('--donor', type=Path, required=True)
     parser.add_argument('--iqpilot', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--iqpilot-sha', default=IQ_SHA, help='IQpilot commit to pin (default: the reviewed one)')
     args = parser.parse_args()
-    build(args.donor, args.iqpilot, args.output)
+    build(args.donor, args.iqpilot, args.output, args.iqpilot_sha)
