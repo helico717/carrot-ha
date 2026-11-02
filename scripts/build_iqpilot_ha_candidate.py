@@ -107,6 +107,9 @@ def build(donor, iq, output, iq_sha=IQ_SHA):
     installer = output / 'bootstrap/install_from_stock.py'
     installer.write_bytes((source_root / 'compat/iqpilot/install_from_stock.py').read_bytes())
     installer.chmod(0o755)
+    updater = output / 'bootstrap/update_iq_ha.py'
+    updater.write_bytes((source_root / 'compat/iqpilot/update_iq_ha.py').read_bytes())
+    updater.chmod(0o755)
     launch = output / 'launch_chffrplus.sh'
     original = launch.read_text()
     preamble = 'bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap/ensure_vendor.sh" || exit $?\n'
@@ -127,7 +130,7 @@ def build(donor, iq, output, iq_sha=IQ_SHA):
     (output / 'PORTABILITY.json').write_text(json.dumps(manifest, indent=2))
     tests = output / 'tests'
     tests.mkdir()
-    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py', 'test_iqpilot_return.py', 'test_iqpilot_can_contract.py', 'test_iqpilot_restore.py', 'test_iqpilot_install.py'):
+    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py', 'test_iqpilot_return.py', 'test_iqpilot_can_contract.py', 'test_iqpilot_restore.py', 'test_iqpilot_install.py', 'test_iqpilot_update.py'):
         text = (source_root / 'tests' / name).read_text()
         text = text.replace('compat/iqpilot/iq_camera.py', 'iqpilot/selfdrive/carrot/ha/iq_camera.py')
         text = text.replace('compat/iqpilot/iq_terminal.py', 'iqpilot/selfdrive/carrot/ha/iq_terminal.py')
@@ -135,6 +138,7 @@ def build(donor, iq, output, iq_sha=IQ_SHA):
         text = text.replace('compat/iqpilot/iq_preflight.py', 'iqpilot/selfdrive/carrot/ha/iq_preflight.py')
         text = text.replace('compat/iqpilot/switch_to_carrot.sh', 'bootstrap/switch_to_carrot.sh')
         text = text.replace('compat/iqpilot/install_from_stock.py', 'bootstrap/install_from_stock.py')
+        text = text.replace('compat/iqpilot/update_iq_ha.py', 'bootstrap/update_iq_ha.py')
         (tests / name).write_text(text)
     (tests / 'fetch_iqpilot_can_runtime.py').write_bytes((source_root / 'scripts/fetch_iqpilot_can_runtime.py').read_bytes())
     workflow = output / '.github/workflows/iq-ha-validation.yml'

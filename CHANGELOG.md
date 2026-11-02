@@ -1,3 +1,12 @@
+## 2026-11-02 — IQ.OS 기본 Git 관리 인터페이스 대응
+
+- 사용자가 설치 명령 실행. /usr/local/bin/git이 /data/iqpilot의 fetch/pull/checkout을 공식 iq-git-update로 전달하며 로컬 경로 fetch와 임의 옵션을 거절해 첫 fetch에서 중단. 순정 HEAD11fcd742/깨끗한 tracked 상태와 내부 .iqpilot 보존, 외부 runtime 미생성 확인. 기기 실행 소스·연결 설정·재부팅은 미변경.
+- 공식 래퍼 텍스트와 관리 인터페이스만 읽음. 컴파일된 helper는 조사/변형하지 않고 /usr/bin/git 직접 호출·SELinux/서명 우회 없음.
+- 설치기 restricted 경로는 정상 Git origin 설정과 fetch origin, branch 생성 및 checkout iq-ha를 사용. 미추적/ignored 충돌 사전 검사와 기존 runtime 보존 유지, 원본 fetch 실패 시 origin/fetch 설정 복구. 원격 후보와 준비 폴더 SHA 불일치도 거절.
+- 신규 bootstrap/update_iq_ha.py: 주차·HA origin·clean·fast-forward 가능 여부 확인, vendor 파일을 먼저 받아 네트워크 오류 시 소스는 유지. pull.ff=only 설정 및 공식 pull origin 사용 후 로컬 vendor 적용. reset/clean·강제 전환·OS 쓰기·재부팅 없음.
+- HA 터미널 버튼의 IQ 내부 명령만 Git 관리 updater 호출로 변경(화면 디자인/레이아웃 변경 없음). 기존 당근 명령/라벨 유지. JS5, restricted 설치 경로 포함 설치 시험5, updater 순서/실패/주차 시험3 통과. 실제 원격 helper 경로의 설치·버튼 검증은 아직 미완료.
+- HA 설치본 터미널 카드 SHA256이 직전 Git 원본과 같음을 SSH로 확인. 커밋 후 백업/해시 검증을 갖춘 기존 배포 도구로 한 파일 직접 반영 예정. pre-release/태그/HA 재시작 없음.
+
 ## 2026-11-02 — 최종 후보 706bc97 준비 완료·사용자 설치 대기
 
 - carrot-ha e0f20eb, iq-ha 706bc979c49b17710f584ef426aa3af59e63ce49 게시. Linux CI41445761367 success. 이전 후보45899f4 CI41444994340 및 기본 브랜치 e45592a 자동 갱신41444999717 success.

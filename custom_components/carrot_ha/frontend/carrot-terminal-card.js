@@ -6,7 +6,7 @@ const isIqBranch = branch => typeof branch === 'string' && (branch === 'iq-ha' |
 const PULL_COMMANDS = {
   carrot: 'cd /data/openpilot && git reset --hard && git pull --ff-only\r',
   // No reset: any local change stops the pull. The IQ original follows the version pinned by the pulled branch.
-  iq: 'cd /data/openpilot && git pull --ff-only && git submodule update --init --depth 1 -- vendor/iqpilot'
+  iq: 'cd /data/openpilot && python3 bootstrap/update_iq_ha.py'
     + ' && git -C vendor/iqpilot log -1 --format="IQ 원본 %h (%cs)"\r',
 };
 

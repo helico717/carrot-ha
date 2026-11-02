@@ -22,7 +22,7 @@ OS `4.9.9.9.2` 부팅, UpdaterState=idle, 실패 횟수 0, 주차 상태를 읽�
    이 기록은 소스 호환성 검토이며 실차 검증 성공 표시는 아니다.
 4. 조립 무결성·카메라 독점 및 주차 차단·PTY·복귀·기록 계약과 실제 IQ CAN/스키마 시험이
    통과해야 iq-ha에 fast-forward 게시한다. 테스트 실패/원본 삭제/OS 미검토 때는 기존 배포를 유지한다.
-5. 기기는 iq-ha를 유지하고 HA의 IQ.drive 업데이트 버튼으로 Git pull과 고정 vendor를 함께 받는다.
+5. 기기는 iq-ha를 유지하고 HA의 IQ.drive 업데이트 버튼으로 Git 관리 updater를 실행해 고정 vendor를 먼저 받고, 공식 origin pull로 소스를 함께 갱신한다.
    사용자 재부팅 후 IQ 원본 런처가 필요한 OS 업데이트를 처리한다. 원본 서버 인증·다운로드와
    전원 유지가 필요하며 OS 쓰기/재부팅은 별개 단계이다.
 6. IQ 순정 자동 소스 updater(updated)는 후보에서 비활성화한다. IQ 웹의 순정 브랜치 전환,
@@ -50,7 +50,7 @@ python3 bootstrap/install_from_stock.py
 
 /data/iq-ha-install이 이미 있으면 삭제/덮어쓰기하지 말고 상태를 먼저 확인한다.
 초기 clone과 vendor 준비는 현 실행 저장소를 바꾸지 않는다. 충분히 받은 뒤 설치기가
-주차·idle·정확한 순정 SHA/OS·깨끗한 소스·vendor 확인 후 Git으로만 전환한다.
+주차·idle·정확한 순정 SHA/OS·깨끗한 소스·vendor 확인 후 Git으로만 전환한다. IQ.OS 공식 Git 래퍼가 있는 경우 정상 origin 설정과 fetch origin/checkout iq-ha 인터페이스를 사용한다. /usr/bin/git 직접 호출이나 SELinux 우회는 하지 않는다.
 기존 .iqpilot 런타임 캐시는 Git 밖으로 보존한다. 무시된 파일도 강제로 덮지 않으며
 충돌 시 중단한다. 얕은 순정 Git도 지원하는 --no-local Git 복제로 vendor를 독립 보관한다.
 설치기가 실패하면 재부팅하지 말고 실패한 단계를 확인한다. reset/clean/수동 소스 복사는 하지 않는다.

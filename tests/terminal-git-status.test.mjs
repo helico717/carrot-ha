@@ -66,5 +66,5 @@ test('IQ.drive branch relabels pull and drops reset --hard',()=>{
   const iqCommand=source.match(/iq: '([^']+)'\n\s*\+ '([^']+)'/);
   assert.ok(iqCommand);
   assert.doesNotMatch(iqCommand[1]+iqCommand[2],/reset|clean|--force/);
-  assert.match(iqCommand[1],/git pull --ff-only && git submodule update --init --depth 1 -- vendor\/iqpilot/);
+  assert.match(iqCommand[1],/python3 bootstrap\/update_iq_ha\.py/);
 });
