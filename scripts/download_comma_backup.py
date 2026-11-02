@@ -16,6 +16,7 @@ import secrets
 import shlex
 import threading
 import urllib.parse
+from contextlib import suppress
 
 import aiohttp
 
@@ -80,6 +81,145 @@ def command(filename, marker):
     return 'python3 -c ' + shlex.quote(code) + '\n'
 
 
+BLOCK_BYTES = 12288
+
+
+def block_command(filename, marker, offset):
+    command(filename, marker)  # Validate the same fixed backup directory/name.
+    if not re.fullmatch(r'CB[0-9a-f]+', marker) or type(offset) is not int or offset < 0:
+        raise ValueError('Invalid block request')
+    code = ("import os,base64,hashlib;f=open('/data/carrot-backups/" + filename + "','rb');"
+            + f"f.seek({offset});b=f.read({BLOCK_BYTES});"
+            + f"print('\\n{marker} BLOCK',{offset},os.fstat(f.fileno()).st_size,"
+            + "base64.b64encode(b).decode(),hashlib.sha256(b).hexdigest(),flush=True)")
+    return 'python3 -c ' + shlex.quote(code) + '\n'
+
+
+class BlockReceiver:
+    def __init__(self, marker, offset):
+        self.marker, self.offset, self.buffer = marker, offset, ''
+
+    def feed(self, data):
+        self.buffer += data.decode('ascii', errors='replace')
+        if len(self.buffer) > 262144:
+            raise RuntimeError('Unexpected block output')
+        while '\n' in self.buffer:
+            line, self.buffer = self.buffer.split('\n', 1)
+            line = line.rstrip('\r')
+            if not line.startswith(self.marker + ' BLOCK '):
+                continue
+            fields = line.split(' ')
+            if len(fields) != 6 or int(fields[2]) != self.offset:
+                raise RuntimeError('Unexpected block offset')
+            total = int(fields[3])
+            chunk = base64.b64decode(fields[4], validate=True)
+            if not 0 < total <= 512 * 1024 * 1024 or len(chunk) != min(BLOCK_BYTES, total - self.offset):
+                raise RuntimeError('Unexpected block size')
+            if hashlib.sha256(chunk).hexdigest() != fields[5]:
+                raise RuntimeError('Block hash mismatch')
+            return total, chunk
+        return None
+
+
+async def transfer_blocks(session, access_token, args, partial):
+    """Retry only transient connection loss; retain verified bytes and OAuth login."""
+    total = None
+    digest = hashlib.sha256()
+    reconnects = 0
+    with partial.open('xb') as stream:
+        async with timeout(1800):
+            while total is None or stream.tell() < total:
+                acquired = acquiring = False
+                last_status = {}
+                receiver = None
+                pending = {}
+                serial = 0
+                try:
+                    async with session.ws_connect(args.url.replace('https://', 'wss://', 1) + '/api/websocket',
+                                                  heartbeat=20, max_msg_size=1048576) as ws:
+                        async def send(kind, **payload):
+                            nonlocal serial
+                            serial += 1
+                            pending[serial] = kind
+                            await ws.send_json({'id': serial, 'type': 'carrot_ha/terminal/' + kind,
+                                                'device_id': args.device, **payload})
+
+                        async def request_block():
+                            nonlocal receiver
+                            marker = 'CB' + secrets.token_hex(12)
+                            receiver = BlockReceiver(marker, stream.tell())
+                            await send('input', message={'type': 'raw', 'data': block_command(args.filename, marker, stream.tell())})
+
+                        await ws.receive_json(timeout=15)
+                        await ws.send_json({'type': 'auth', 'access_token': access_token})
+                        if (await ws.receive_json(timeout=15)).get('type') != 'auth_ok':
+                            raise RuntimeError('HA authentication failed')
+                        await send('subscribe')
+                        try:
+                            while total is None or stream.tell() < total:
+                                message = await ws.receive_json(timeout=90)
+                                if message.get('type') == 'result':
+                                    kind = pending.pop(message['id'], None)
+                                    if not message.get('success'):
+                                        if kind == 'acquire':
+                                            raise ConnectionError('Terminal temporarily unavailable')
+                                        raise RuntimeError('HA rejected backup request')
+                                    if kind == 'acquire':
+                                        acquired, acquiring = True, False
+                                        await send('input', message={'type': 'control', 'action': 'ctrl_c'})
+                                        await asyncio.sleep(0.3)
+                                        await request_block()
+                                elif message.get('type') == 'event':
+                                    event = message.get('event', {})
+                                    if event.get('type') == 'status':
+                                        last_status = {key: event.get(key) for key in ('connected', 'offroad', 'local_ready', 'ready')}
+                                        if event.get('ready') and not event.get('controller') and not acquired and not acquiring:
+                                            acquiring = True
+                                            await send('acquire')
+                                    elif event.get('type') == 'ended' and acquired:
+                                        acquired = False
+                                        raise ConnectionError('Terminal interrupted: ' + str(event.get('reason')) + '; ' + str(last_status))
+                                    elif event.get('type') == 'terminal' and receiver is not None:
+                                        payload = event.get('message', {})
+                                        if payload.get('type') != 'pty_output':
+                                            continue
+                                        block = receiver.feed(base64.b64decode(payload['b64'], validate=True))
+                                        if block is not None:
+                                            block_total, chunk = block
+                                            if total is not None and total != block_total:
+                                                raise RuntimeError('Source backup size changed')
+                                            total = block_total
+                                            stream.write(chunk)
+                                            digest.update(chunk)
+                                            print(f'PROGRESS {stream.tell()}/{total}', flush=True)
+                                            receiver = None
+                                            if stream.tell() < total:
+                                                await asyncio.sleep(0.15)
+                                                await request_block()
+                            stream.flush()
+                            os.fsync(stream.fileno())
+                        finally:
+                            if acquired and not ws.closed:
+                                with suppress(Exception):
+                                    if total is None or stream.tell() < total:
+                                        await send('input', message={'type': 'control', 'action': 'ctrl_c'})
+                                    await send('release')
+                                    async with timeout(10):
+                                        while pending:
+                                            message = await ws.receive_json()
+                                            if message.get('type') == 'result':
+                                                pending.pop(message.get('id'), None)
+                except (aiohttp.ClientError, ConnectionError, TimeoutError, TypeError) as error:
+                    reconnects += 1
+                    if reconnects > 8:
+                        raise RuntimeError('Connection retry limit reached') from error
+                    print(f'RETRY {reconnects}/8; verified bytes={stream.tell()}; {type(error).__name__}', flush=True)
+                    await asyncio.sleep(3)
+    if digest.hexdigest() != args.sha256:
+        raise RuntimeError('Final backup SHA256 mismatch')
+    return digest.hexdigest()
+
+
 async def download(args):
     state = secrets.token_urlsafe(24)
     result = {}
@@ -125,69 +265,12 @@ async def download(args):
                     response.raise_for_status()
                     token = await response.json()
                 refresh = token.get('refresh_token')
-                async with session.ws_connect(args.url.replace('https://', 'wss://', 1) + '/api/websocket',
-                                              heartbeat=20, max_msg_size=1048576) as ws:
-                    await ws.receive_json(timeout=15)
-                    await ws.send_json({'type': 'auth', 'access_token': token['access_token']})
-                    if (await ws.receive_json(timeout=15)).get('type') != 'auth_ok':
-                        raise RuntimeError('HA authentication failed')
-                    if not args.device:
-                        await ws.send_json({'id': 10, 'type': 'config/device_registry/list'})
-                        registry = await ws.receive_json(timeout=15)
-                        if registry.get('id') != 10 or not registry.get('success'):
-                            raise RuntimeError('Cannot discover configured vehicle')
-                        devices = {identity[1] for device in registry['result']
-                                   for identity in device.get('identifiers', [])
-                                   if len(identity) == 2 and identity[0] == 'carrot_ha'}
-                        if len(devices) != 1:
-                            raise RuntimeError('Multiple or missing vehicles; select with --device')
-                        args.device = devices.pop()
-                    marker = 'CB' + secrets.token_hex(12)
-                    await ws.send_json({'id': 1, 'type': 'carrot_ha/terminal/subscribe', 'device_id': args.device})
-                    with partial.open('xb') as stream:
-                        receiver = Receiver(stream, marker, args.sha256)
-                        acquired = False
-                        last_status = {}
-                        try:
-                            async with timeout(900):
-                                while not receiver.done:
-                                    message = await ws.receive_json(timeout=90)
-                                    if message.get('type') == 'result':
-                                        if not message.get('success'):
-                                            raise RuntimeError('HA rejected request; close the browser terminal controller and retry')
-                                        if message['id'] == 1:
-                                            await ws.send_json({'id': 2, 'type': 'carrot_ha/terminal/acquire', 'device_id': args.device})
-                                        elif message['id'] == 2:
-                                            acquired = True
-                                            await ws.send_json({'id': 3, 'type': 'carrot_ha/terminal/input',
-                                                'device_id': args.device, 'message': {'type': 'raw', 'data': command(args.filename, marker)}})
-                                    elif message.get('type') == 'event':
-                                        event = message.get('event', {})
-                                        if event.get('type') == 'status':
-                                            last_status = {key: event.get(key) for key in ('connected', 'offroad', 'local_ready', 'ready')}
-                                        if event.get('type') == 'ended' and acquired:
-                                            reason = str(event.get('reason', 'unknown'))[:80]
-                                            raise RuntimeError('Terminal session ended before completion: ' + reason
-                                                               + '; status=' + str(last_status))
-                                        payload = event.get('message', {})
-                                        if event.get('type') == 'terminal' and payload.get('type') == 'pty_output':
-                                            receiver.feed(base64.b64decode(payload['b64'], validate=True))
-                                stream.flush()
-                                os.fsync(stream.fileno())
-                        finally:
-                            if acquired and not ws.closed:
-                                if not receiver.done:
-                                    await ws.send_json({'id': 8, 'type': 'carrot_ha/terminal/input', 'device_id': args.device,
-                                                       'message': {'type': 'control', 'action': 'ctrl_c'}})
-                                await ws.send_json({'id': 9, 'type': 'carrot_ha/terminal/release', 'device_id': args.device})
-                                # Wait for release acknowledgement before closing the socket.
-                                async with timeout(10):
-                                    while True:
-                                        if (await ws.receive_json()).get('id') == 9:
-                                            break
-                    partial.rename(final)
-                    print('DOWNLOAD_OK', final, flush=True)
-                    print('SHA256', receiver.digest.hexdigest(), flush=True)
+                if not args.device:
+                    raise RuntimeError('Explicit verified vehicle ID is required')
+                actual = await transfer_blocks(session, token['access_token'], args, partial)
+                partial.rename(final)
+                print('DOWNLOAD_OK', final, flush=True)
+                print('SHA256', actual, flush=True)
             finally:
                 if refresh:
                     async with session.post(args.url + '/auth/token', data={'action': 'revoke', 'token': refresh},

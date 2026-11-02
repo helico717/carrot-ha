@@ -1,3 +1,10 @@
+## 2026-11-02 — 원격 백업 블록 이어받기 및 IQpilot 공개 소스 점검 계속
+
+- 세 번째 저속 전송도 종료: 마지막 서버 상태 connected/offroad/local_ready/ready 모두 true였고 최종 사유 device_disconnected. 실제 주행 때문이라고 단정하지 않는다. 미완성 파일 정리 및 OAuth 폐기 완료, Mac 최종 백업 없음.
+- scripts/download_comma_backup.py에 12KiB 블록 요청/offset·크기·블록 SHA256 검증 및 같은 메모리 인증을 사용한 최대 8회 연결 재시도 추가. 완전히 검증된 블록만 저장하고 마지막 완성 offset부터 재요청하며 최종 전체 SHA256 대조 후 이름 확정. offroad/관리자 lease 규칙은 우회하지 않는다.
+- 합성 검증 7개 통과: 실제 블록 생산 명령/분할 수신, 잘못된 해시/청크/경로 거부, 합성 HA WebSocket 강제 단절 후 같은 인증으로 다음 offset부터 재연결 및 원본 바이트 일치. 최초 localhost 바인드 권한 제한 후 승인된 로컬 테스트 환경에서 통과. 실기 반출은 재시도 대기.
+- IQpilot 안정판 공개 API branches/tree 조회는 HTTP403, 공개 launch_iqpilot.sh는 launch_chffrplus.sh 실행 확인. Git/공개 파일 조사 계속. IQ+HA 이식·설치·OS 변경은 아직 없음.
+
 ## 2026-11-02 — 주차 중 원격 반출 재시도와 진단 보완
 
 - 사용자가 실제 주차 상태이며 차량 이동 없음을 재확인. 두 번째 전송은 Mac partial 101376 bytes까지 수신했으나 terminal ended: device_not_offroad로 중단. 이 사유는 HA relay가 offroad/local_ready/status freshness 전체 ready 조건 실패에도 사용하므로 실제 주행 판정이라고 단정하지 않는다. UI는 이후 device_disconnected를 거쳐 주차·준비됨으로 복귀했다.
