@@ -29,27 +29,72 @@ IQ 사용 중에는 터미널 카드의 Git 버튼이 자동으로 **[📥 IQ.dr
 - [ ] **IQ.OS는 공개 다운로드가 아닙니다.** IQ의 OS 설치기는 IQ 서버(konn3kt)에 기기를 등록하고 인증된 경로로만
       이미지를 받습니다. 이때 기기 일련번호·IMEI·기기 공개키가 IQ 서버로 전송됩니다. 동의할 때만 진행합니다.
 
-## 2. 당근 → IQ 전환 (HA 원격 터미널, 한 줄씩)
+## 2. 당근 → IQ 전환
 
-| 단계 | 명령 | 기대 결과 |
-| --- | --- | --- |
-| 2-1 | `cd /data/openpilot && git status --short --untracked-files=no` | **아무 출력 없음** |
-| 2-2 | 아래 2-2 명령 | `IQ_HA_OK` |
-| 2-3 | `cd /data/openpilot && git checkout --no-recurse-submodules -B iq-ha refs/remotes/origin/iq-ha` | `Switched to a new branch 'iq-ha'` 류 메시지 |
-| 2-4 | 아래 2-4 명령 (수 분~수십 분) | 마지막 줄 `5c9291b9df6d90007d73ecd749b135bd5008e80d` |
-| 2-5 | `cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only` | `"passed": true` |
-| 2-6 | 터미널 카드 [🔄 기기 재부팅] — **2-5 직후 바로** | 연결 끊김 |
+**어디서:** HA 대시보드의 **Comma 원격 터미널** 카드에서 [연결]을 누른 뒤, 아래 회색 상자의 명령을
+**한 번에 하나씩** 통째로 복사해 터미널에 붙여 넣고 Enter를 누릅니다. 각 명령이 끝나면(다시 `$` 입력 줄이 보이면)
+결과가 "기대 결과"와 같은지 확인하고 다음 단계로 갑니다. 다르면 그 자리에서 멈추고 아래 "2절 문제 대응"을 봅니다.
+
+### 2-1. 기기에 손댄 흔적이 없는지 확인 (아무것도 바꾸지 않음)
+
+당근 프로그램 파일이 원래 상태 그대로인지 봅니다. 바뀐 파일이 있으면 전환하면 안 됩니다.
+
+```bash
+cd /data/openpilot && git status --short --untracked-files=no
+```
+
+**기대 결과:** 아무것도 출력되지 않고 바로 다음 `$` 줄이 나옴.
+
+### 2-2. IQ 설치 후보 내려받기 + 번호 확인 (아직 전환하지 않음)
+
+GitHub에서 `iq-ha`(IQ + HA 연동 후보)를 Comma 안으로 **받아 두기만** 합니다. 그리고 받은 것이 제가 시험한 바로 그
+버전(번호 `a35b564…`)인지 확인합니다. 맞으면 `IQ_HA_OK`를 출력합니다. 지금 실행 중인 당근은 그대로입니다.
 
 ```bash
 cd /data/openpilot && git fetch --no-tags origin +refs/heads/iq-ha:refs/remotes/origin/iq-ha && test "$(git rev-parse refs/remotes/origin/iq-ha)" = a35b564a53319c1b44cfb998388efb36b5f4c62c && echo IQ_HA_OK
 ```
 
+**기대 결과:** 마지막 줄에 `IQ_HA_OK`.
+
+### 2-3. 프로그램 파일을 IQ 후보로 바꾸기 (재부팅 전까지는 당근이 계속 실행됨)
+
+받아 둔 후보로 `/data/openpilot`의 파일을 바꿉니다. 덮어쓰면 안 되는 파일이 있으면 Git이 아무것도 바꾸지 않고 멈춥니다.
+
+```bash
+cd /data/openpilot && git checkout --no-recurse-submodules -B iq-ha refs/remotes/origin/iq-ha
+```
+
+**기대 결과:** `Switched to a new branch 'iq-ha'` 또는 `Switched to and reset branch 'iq-ha'`. (`warning: unable to rmdir ...` 같은
+경고 줄은 괜찮습니다.)
+
+### 2-4. IQ 원본 내려받기 (수 분~수십 분)
+
+IQ 개발자 저장소(konn3kt)에서 IQ 원본(약 1GB)을 받습니다. 끝나면 받은 원본 번호를 출력합니다.
+
 ```bash
 cd /data/openpilot && git submodule update --init --depth 1 -- vendor/iqpilot && git -C vendor/iqpilot rev-parse HEAD
 ```
 
-2-7. 첫 부팅에서 IQ 런처가 IQ.OS를 받아 다른 슬롯에 기록하고 다시 재부팅합니다. **화면이 로고에 오래 머물 수 있습니다.
-전원을 끊지 마세요.** 1시간까지 기다립니다. IQ 화면이 뜨면 3절로.
+**기대 결과:** 마지막 줄이 `5c9291b9df6d90007d73ecd749b135bd5008e80d`.
+
+### 2-5. 재부팅 전 마지막 점검 (읽기만 함)
+
+필요한 파일이 모두 제자리에 있는지 확인합니다.
+
+```bash
+cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only
+```
+
+**기대 결과:** 출력 안에 `"passed": true`.
+
+### 2-6. 재부팅 — 2-5 직후 바로
+
+터미널 카드의 **[🔄 기기 재부팅]**을 누릅니다. 터미널 연결이 끊기는 것이 정상입니다.
+
+### 2-7. 첫 부팅 기다리기 (최대 1시간)
+
+첫 부팅에서 IQ가 IQ.OS를 내려받아 설치한 뒤 한 번 더 재부팅합니다. **화면이 로고에 오래 머물 수 있습니다.
+전원을 끊지 마세요.** IQ 화면이 뜨면 3절로 갑니다.
 
 ### 2절 문제 대응
 
