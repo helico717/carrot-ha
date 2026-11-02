@@ -242,6 +242,11 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
 - Diagnostics require FastSleep off: deep standby would stop HA monitoring, terminal and camera while parked.
 - HA pauses the Carrot parameter queue and driving log transfer/screens while this branch runs;
   the device keeps following HA's log transfer policy, so no IQ recordings are uploaded.
+
+## 2026-11-02 — Return requires a confirmed parked state
+
+- switch_to_carrot.sh proceeds only with IsOffroad=1 and IsOnroad=0. Missing or unknown state refuses
+  unless the owner passes --confirm-parked in a guided recovery; an onroad report always refuses.
 ''')
     manifest['candidate_source_sha256'] = {
         str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()
