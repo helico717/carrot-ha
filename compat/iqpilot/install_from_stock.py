@@ -25,6 +25,7 @@ def parked(params):
 
 def preserve_python_caches(repo, paths, backup_parent):
     """Preserve only regenerable __pycache__/*.pyc collisions, never user data."""
+    repo = Path(repo).resolve()
     for relative in paths:
         path = repo / relative
         if ('__pycache__' not in Path(relative).parts or path.suffix != '.pyc'
