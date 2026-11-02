@@ -10,7 +10,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 설치 후보 | `helico717/openpilot` 브랜치 `iq-ha`, 커밋 `a35b564a53319c1b44cfb998388efb36b5f4c62c` |
+| 설치 후보 | `helico717/openpilot` 브랜치 `iq-ha`, 커밋 `9637e6c6e8287c96dbf12de7b79bb2cef3b585f5` |
 | IQ 원본(하위 저장소) | `5c9291b9df6d90007d73ecd749b135bd5008e80d`, 기대 OS `IQ.OS 4.9.9.4` |
 | 복귀 대상 | 브랜치 `ha-back` = `5ec4868a12a9038547b373eb95be3a5fa86d30aa` (자동 갱신 안 함) |
 | 백업 | Mac `~/Developer/carrot-backups/carrot-20261102T021704563634Z.tar.gz` (검증 완료) |
@@ -48,10 +48,10 @@ cd /data/openpilot && git status --short --untracked-files=no
 ### 2-2. IQ 설치 후보 내려받기 + 번호 확인 (아직 전환하지 않음)
 
 GitHub에서 `iq-ha`(IQ + HA 연동 후보)를 Comma 안으로 **받아 두기만** 합니다. 그리고 받은 것이 제가 시험한 바로 그
-버전(번호 `a35b564…`)인지 확인합니다. 맞으면 `IQ_HA_OK`를 출력합니다. 지금 실행 중인 당근은 그대로입니다.
+버전(번호 `9637e6c…`)인지 확인합니다. 맞으면 `IQ_HA_OK`를 출력합니다. 지금 실행 중인 당근은 그대로입니다.
 
 ```bash
-cd /data/openpilot && git fetch --no-tags origin +refs/heads/iq-ha:refs/remotes/origin/iq-ha && test "$(git rev-parse refs/remotes/origin/iq-ha)" = a35b564a53319c1b44cfb998388efb36b5f4c62c && echo IQ_HA_OK
+cd /data/openpilot && git fetch --no-tags origin +refs/heads/iq-ha:refs/remotes/origin/iq-ha && test "$(git rev-parse refs/remotes/origin/iq-ha)" = 9637e6c6e8287c96dbf12de7b79bb2cef3b585f5 && echo IQ_HA_OK
 ```
 
 **기대 결과:** 마지막 줄에 `IQ_HA_OK`.
@@ -106,17 +106,27 @@ cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha
 | 2-3이 `would be overwritten`·`error`로 실패 | **멈춤.** 기기는 당근 그대로(아무것도 안 바뀜). 재부팅해도 당근으로 정상 동작 | 출력 전체 |
 | 2-4가 실패·다른 SHA | 멈춤. **재부팅하지 말 것**(이미 iq-ha로 바뀐 상태라 재부팅 시 IQ 설치가 시작됨). 당근으로 되돌리려면 `cd /data/openpilot && bash bootstrap/switch_to_carrot.sh` 후 재부팅 | 출력 전체 |
 | 2-5가 `"passed": false` | 멈춤, 재부팅하지 않음. 되돌리기는 위와 같음 | JSON 전체 |
-| 2-7에서 1시간 넘게 로고 / 오류 화면 | 아직 당근 OS 상태(IQ.OS 기록 실패). 전원 유지한 채 화면 사진 | 화면 사진, 경과 시간 |
+| 2-7에서 1시간 넘게 로고 / 오류 화면 | **상태 미확인.** 화면만으로는 (가) 당근 OS에서 IQ.OS 설치가 멈춘 것인지, (나) IQ.OS로 부팅은 됐지만 IQ 실행이 실패한 것인지 구분할 수 없음. 전원 유지, 아무 명령도 실행하지 않음 | 화면 사진, 경과 시간 |
 
-2-7 실패 시에는 HA 터미널과 당근 복구 터미널(6999)이 실행되지 않습니다. 기존에 SSH 키를 등록해 둔 경우에만
-같은 네트워크에서 `ssh comma@<Comma IP>`(비상 복구 용도)로 접속해 `cd /data/openpilot && bash bootstrap/switch_to_carrot.sh`
-실행 후 재부팅하면 당근으로 돌아갑니다. 파일 편집·복사는 하지 않습니다. 확실하지 않으면 먼저 Mac으로 알려 주세요.
+2-7 실패 시에는 HA 터미널과 당근 복구 터미널(6999)이 실행되지 않습니다. 복구 방법은 실제 OS 상태에 따라 다르므로
+**먼저 Mac으로 알려 주세요.** 기존에 SSH 키를 등록해 둔 경우, 같은 네트워크에서 `ssh comma@<Comma IP>`(비상 복구 용도)로 접속해
+아래 **읽기 전용** 확인 결과를 함께 보내 주시면 상태를 구분할 수 있습니다. 파일 편집·복사·전환 명령은 실행하지 않습니다.
+
+```bash
+cat /VERSION; abctl --boot_slot; cd /data/openpilot && git rev-parse --abbrev-ref HEAD; cat /data/params/d/IsOffroad /data/params/d/IsOnroad
+```
+
+- `/VERSION`이 `19.8-carrot-bt1`이면 아직 당근 OS입니다. 이때 당근 복귀(`switch_to_carrot.sh`)는 OS 재설치 없이 끝납니다.
+- `IQ.OS 4.9.9.4`이면 IQ.OS로 부팅된 것입니다. 당근 복귀는 4절의 위험(당근 OS 재설치 권한)이 그대로 있으므로
+  에이전트가 확인하기 전에는 시도하지 않습니다.
+- 이 상태에서는 주행 상태값이 없거나 오래된 값일 수 있어 복귀 스크립트가 거부할 수 있습니다. 차량이 확실히 주차된 상태에서
+  **에이전트가 지시할 때만** `bash bootstrap/switch_to_carrot.sh --confirm-parked`로 확인을 직접 넘깁니다.
 
 ## 3. IQ.OS 부팅 후 확인 (주차 상태)
 
 3-1. **IQ 설정에서 FastSleep(깊은 절전)을 끕니다.** 켜져 있으면 주차 5분 후 HA 수집·터미널·카메라가 멈춥니다.
 
-3-2. HA 터미널 [연결] 후 확인합니다. 기대: `IQ.OS 4.9.9.4`, `a35b564a…`.
+3-2. HA 터미널 [연결] 후 확인합니다. 기대: `IQ.OS 4.9.9.4`, `9637e6c6…`.
 
 ```bash
 cat /VERSION; cd /data/openpilot && git rev-parse HEAD
@@ -160,7 +170,7 @@ IQ 설정은 기기 화면에서 바꿉니다. IQ 설정의 업데이트/브랜�
 
 | 단계 | 명령/행동 | 기대 결과 |
 | --- | --- | --- |
-| 4-1 | `cd /data/openpilot && bash bootstrap/switch_to_carrot.sh` | `CARROT_CHECKED_OUT 5ec4868a12a9038547b373eb95be3a5fa86d30aa` |
+| 4-1 | `cd /data/openpilot && bash bootstrap/switch_to_carrot.sh` | `CARROT_CHECKED_OUT 5ec4868a12a9038547b373eb95be3a5fa86d30aa`. 주차가 확인되지 않으면(`Parked state not confirmed`) 아무것도 바꾸지 않고 멈춤 |
 | 4-2 | [🔄 기기 재부팅] | 당근 런처가 당근 OS를 받아 기록 후 다시 재부팅(전원 유지) |
 | 4-3 | 당근 화면 후 `cat /VERSION; cd /data/openpilot && git rev-parse HEAD` | `19.8-carrot-bt1`, `5ec4868a…` |
 | 4-4 | `cd /data/openpilot && git checkout carrot-wip-model_selector-ha && git pull --ff-only` 후 재부팅 | 운영 브랜치 최신 |

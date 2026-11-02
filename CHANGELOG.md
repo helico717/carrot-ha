@@ -1,3 +1,9 @@
+## 2026-11-02 — Astra 검토 P1·P2 조치
+
+- P1: 복귀 스크립트가 IsOnroad 누락·읽기 실패 시 진행하던 문제 수정. IsOffroad=1·IsOnroad=0 확인 시에만 진행, 불명 상태는 사용자의 명시적 --confirm-parked(복구 안내 시)에서만 진행, 주행 중이면 항상 거부. 회귀 시험 3개 추가, 11개 통과. carrot-ha 6604665, iq-ha 9637e6c(CI 41399208645 success).
+- P2: 매뉴얼 2-7 실패를 "상태 미확인"으로 수정. 당근 OS/IQ.OS 구분용 읽기 전용 확인과 상태별 판단 기준 추가. 매뉴얼 후보 번호 9637e6c로 갱신, 바탕화면 사본 동기화. 검토 기록 docs/IQPILOT_HA_REVIEW_2026-11-02.md에 조치 추가.
+- 기기·HA 변경 없음. pre-release 미발행. 실차 미검증.
+
 ## 2026-11-02 — Claude IQpilot HA 후속 변경 검토
 
 - a7d1107 및 후보 a35b564 검토. 상세: docs/IQPILOT_HA_REVIEW_2026-11-02.md.

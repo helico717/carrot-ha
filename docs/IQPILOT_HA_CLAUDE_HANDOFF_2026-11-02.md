@@ -34,9 +34,9 @@ IQ.OS 실제 구동·카메라 영상·주행/충전 기록 연속성·당근 OS
 | IQ 원본 Git | https://git.konn3kt.com/IQ.Lvbs/IQPilot.git |
 | IQ 기대 OS | IQ.OS 4.9.9.4 |
 | 새 HA 포함 설치 후보 | helico717/openpilot:iq-ha |
-| 최신 후보 커밋 | a35b564a53319c1b44cfb998388efb36b5f4c62c (이전 25d213b, a9edceb, 1421eb45). 이후 IQ 원본 갱신 시 자동 작업이 커밋 |
+| 최신 후보 커밋 | 9637e6c6e8287c96dbf12de7b79bb2cef3b585f5 (이전 a35b564, 25d213b, a9edceb, 1421eb45). 이후 IQ 원본 갱신 시 자동 작업이 커밋 |
 | 짧은 후보 설치 주소 | installer.comma.ai/helico717/iq-ha |
-| 성공 CI | https://github.com/helico717/openpilot/actions/runs/41396971640 (a35b564), 이전 41392571135 |
+| 성공 CI | https://github.com/helico717/openpilot/actions/runs/41399208645 (9637e6c), 이전 41396971640 |
 | 첫 실패 CI | https://github.com/helico717/openpilot/actions/runs/41385112866 |
 
 설치 URL은 Comma에서 실제 첫 설치 시험을 한 주소가 아니다. Git 브랜치 존재와 코드·CI
