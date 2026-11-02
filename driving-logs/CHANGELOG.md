@@ -1,3 +1,11 @@
+## 2026-11-02 — 설치 준비 중 순정 shallow Git 차이 보완
+
+- 후보 45899f4 Linux CI41444994340 및 기본 브랜치 e45592a 자동 갱신 자체 검증41444999717 success 확인.
+- 사용자 기기 SSH 키 재등록 후 iq@192.168.0.237 직접 로그인 성공. 실제 런타임 .iqpilot은 저장소 내부 일반 디렉터리로 확인.
+- 실행 중인 순정은 그대로 두고 /data/iq-ha-install에 Git 후보를 clone. vendor 준비의 --reference가 순정 shallow 저장소를 거절해 중단됨(소스 전환/설정 복원/재부팅 없음).
+- install_from_stock.py에 --prepare-vendor 추가: Git --no-local --depth 1 복제와 absorbgitdirs로 얕은 순정도 독립 보관, 외부 IQ 원본 URL 유지. 활성화 시에도 얕은 준비 폴더를 reference로 삼지 않고 독립 Git 복제. 실제 임시 shallow 저장소 회귀 시험 추가.
+- 상태: 보완 로컬 시험 후 새 후보/CI 준비. 서버·차량 실행 소스·인증 설정은 아직 미전환. 비공개 키트는 Git에 포함하지 않음.
+
 ## 2026-11-02 — 최신 IQ.OS 4.9.9.9.2 HA 업데이트 경로 준비
 
 - 사용자가 순정 IQ/OS 자동 갱신과 HA 유지 업데이트 경로 구현 및 실제 연결 복구를 요청. 업데이트 중 기기 읽기 전용 관찰, 재시작 후 /VERSION=4.9.9.9.2, release 11fcd742, UpdaterState=idle/실패0/주차 확인. 전원·재부팅 명령 실행 없음.

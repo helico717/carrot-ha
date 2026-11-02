@@ -42,7 +42,7 @@ OS `4.9.9.9.2` 부팅, UpdaterState=idle, 실패 횟수 0, 주차 상태를 읽�
 ```sh
 git clone --branch iq-ha --single-branch https://github.com/helico717/openpilot.git /data/iq-ha-install
 cd /data/iq-ha-install
-git submodule update --init --reference /data/openpilot --dissociate -- vendor/iqpilot
+python3 bootstrap/install_from_stock.py --prepare-vendor
 python3 bootstrap/install_from_stock.py
 ```
 
@@ -50,7 +50,7 @@ python3 bootstrap/install_from_stock.py
 초기 clone과 vendor 준비는 현 실행 저장소를 바꾸지 않는다. 충분히 받은 뒤 설치기가
 주차·idle·정확한 순정 SHA/OS·깨끗한 소스·vendor 확인 후 Git으로만 전환한다.
 기존 .iqpilot 런타임 캐시는 Git 밖으로 보존한다. 무시된 파일도 강제로 덮지 않으며
-충돌 시 중단한다. stage에 계속 의존하지 않도록 vendor를 dissociate한다.
+충돌 시 중단한다. 얕은 순정 Git도 지원하는 --no-local Git 복제로 vendor를 독립 보관한다.
 설치기가 실패하면 재부팅하지 말고 실패한 단계를 확인한다. reset/clean/수동 소스 복사는 하지 않는다.
 
 그다음 **Mac 창**에서 비공개 연결 설정 두 개를 전용 Git 관리 CLI로 전달한다.
