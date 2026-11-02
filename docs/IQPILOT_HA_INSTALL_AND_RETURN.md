@@ -4,20 +4,20 @@
 
 > **아직 실기에서 한 번도 설치·복귀해 본 적 없는 후보입니다.** 코드·CI·로컬 시험만 통과했습니다.
 > IQ.OS 구동, 실제 CAN 값, 카메라 영상, 차계부 연속 기록, IQ.OS→당근 OS 복귀는 이 매뉴얼로
-> 처음 확인합니다. 기기 설치·재부팅은 사용자가 하고, 막히면 **멈춘 뒤 Mac으로 알려 주세요(7절).**
+> 처음 확인합니다. 기기 설치·재부팅은 사용자가 하고, 막히면 **멈춘 뒤 Mac으로 알려 주세요(8절).**
 
 ## 0. 고정 기준
 
 | 항목 | 값 |
 | --- | --- |
-| 설치 후보 | `helico717/openpilot` 브랜치 `iq-ha`, 커밋 `25d213b111581a24d34999eb9c496d3dd41f8486` |
+| 설치 후보 | `helico717/openpilot` 브랜치 `iq-ha`, 커밋 `a35b564a53319c1b44cfb998388efb36b5f4c62c` |
 | IQ 원본(하위 저장소) | `5c9291b9df6d90007d73ecd749b135bd5008e80d`, 기대 OS `IQ.OS 4.9.9.4` |
 | 복귀 대상 | 브랜치 `ha-back` = `5ec4868a12a9038547b373eb95be3a5fa86d30aa` (자동 갱신 안 함) |
 | 백업 | Mac `~/Developer/carrot-backups/carrot-20261102T021704563634Z.tar.gz` (검증 완료) |
 
 모든 전환은 Git으로만 합니다. `git reset --hard`, `git clean`, 강제 checkout, 공장 초기화,
 설정의 "제거(Uninstall)"는 쓰지 않습니다. "제거"는 `/data` 전체 초기화를 일으킬 수 있습니다.
-**IQ 사용 중에는 터미널 카드의 [📥 당근 Git Pull] 버튼을 누르지 마세요**(당근용 버튼, `reset --hard` 포함).
+IQ 사용 중에는 터미널 카드의 Git 버튼이 자동으로 **[📥 IQ.drive 업데이트]**로 바뀝니다(`reset --hard` 없음, 5절).
 
 ## 1. 시작 전 확인 — 하나라도 아니면 시작하지 않습니다
 
@@ -41,7 +41,7 @@
 | 2-6 | 터미널 카드 [🔄 기기 재부팅] — **2-5 직후 바로** | 연결 끊김 |
 
 ```bash
-cd /data/openpilot && git fetch --no-tags origin +refs/heads/iq-ha:refs/remotes/origin/iq-ha && test "$(git rev-parse refs/remotes/origin/iq-ha)" = 25d213b111581a24d34999eb9c496d3dd41f8486 && echo IQ_HA_OK
+cd /data/openpilot && git fetch --no-tags origin +refs/heads/iq-ha:refs/remotes/origin/iq-ha && test "$(git rev-parse refs/remotes/origin/iq-ha)" = a35b564a53319c1b44cfb998388efb36b5f4c62c && echo IQ_HA_OK
 ```
 
 ```bash
@@ -57,6 +57,7 @@ cd /data/openpilot && git submodule update --init --depth 1 -- vendor/iqpilot &&
 | --- | --- | --- |
 | 2-1에 출력이 있음 | **멈춤.** 아무것도 지우지 않음 | 출력 전체 |
 | 2-2에 `IQ_HA_OK`가 없음 / 네트워크 오류 | Wi-Fi 확인 후 2-2만 한 번 재시도, 그래도 실패면 멈춤 | 출력 전체 |
+| 2-2는 받았지만 번호가 달라 `IQ_HA_OK`가 없음 | IQ 원본 새 버전으로 자동 갱신됐을 수 있음. 멈추고 알려 주면 새 번호를 확인해 드림 | `git rev-parse refs/remotes/origin/iq-ha` 출력 |
 | 2-3이 `would be overwritten`·`error`로 실패 | **멈춤.** 기기는 당근 그대로(아무것도 안 바뀜). 재부팅해도 당근으로 정상 동작 | 출력 전체 |
 | 2-4가 실패·다른 SHA | 멈춤. **재부팅하지 말 것**(이미 iq-ha로 바뀐 상태라 재부팅 시 IQ 설치가 시작됨). 당근으로 되돌리려면 `cd /data/openpilot && bash bootstrap/switch_to_carrot.sh` 후 재부팅 | 출력 전체 |
 | 2-5가 `"passed": false` | 멈춤, 재부팅하지 않음. 되돌리기는 위와 같음 | JSON 전체 |
@@ -70,7 +71,7 @@ cd /data/openpilot && git submodule update --init --depth 1 -- vendor/iqpilot &&
 
 3-1. **IQ 설정에서 FastSleep(깊은 절전)을 끕니다.** 켜져 있으면 주차 5분 후 HA 수집·터미널·카메라가 멈춥니다.
 
-3-2. HA 터미널 [연결] 후 확인합니다. 기대: `IQ.OS 4.9.9.4`, `25d213b1…`.
+3-2. HA 터미널 [연결] 후 확인합니다. 기대: `IQ.OS 4.9.9.4`, `a35b564a…`.
 
 ```bash
 cat /VERSION; cd /data/openpilot && git rev-parse HEAD
@@ -138,18 +139,27 @@ cd /data/openpilot && git checkout --no-recurse-submodules -B iq-ha refs/remotes
 최후 수단(소프트웨어 복귀 불가 시): USB로 Comma 공식 OS 재설치 후 `installer.comma.ai/helico717/ha-back`.
 기기 데이터 초기화를 동반할 수 있고 이 기기에서 시험하지 않았으므로, 진행 전 반드시 함께 확인합니다.
 
-## 5. 일시중지되는 기능 (IQ 사용 중)
+## 5. IQ 사용 중 업데이트
+
+- 매일 04:17(한국 시간) GitHub 자동 작업이 IQ 원본 `release`를 확인합니다. 새 버전이면 `iq-ha`를 다시 조립하고
+  HA 연동 시험을 통과한 경우에만 올립니다. IQ.OS 변경이나 연동 수정이 깨지는 경우에는 올리지 않고 멈춥니다(에이전트가 확인).
+- 터미널 카드 커밋 줄에 `IQ.drive · … N개 커밋 뒤처짐`이 보이면, 주차 중에 **[📥 IQ.drive 업데이트]** → **[🔄 기기 재부팅]**.
+  이 버튼은 `git pull --ff-only`로만 받으며 기기 파일을 강제로 지우지 않습니다. 기기에 변경이 있으면 멈춥니다.
+- IQ 원본은 배포마다 이전 버전을 덮어쓰므로, 오래된 고정 번호는 원본 서버에서 사라질 수 있습니다.
+  이미 설치된 기기는 받은 파일로 계속 동작합니다. 새로 설치·재설치할 때는 최신 `iq-ha`를 사용합니다.
+
+## 6. 일시중지되는 기능 (IQ 사용 중)
 
 - **당근 파라미터 카드:** 블러+안내. 조회 요청을 멈추고, 변경 요청은 HA가 거부합니다(복귀 후 뒤늦게 적용되는 사고 방지).
 - **당근웹 로그 카드:** 블러+안내, 로그 화면 자체를 닫음. Comma의 로그·영상 업로드도 HA가 중지시킵니다.
 - 저장된 로그 전송 설정(켜짐/꺼짐)은 바뀌지 않으며, 당근으로 돌아오면 자동으로 재개됩니다.
 
-## 6. 유지되는 기능
+## 7. 유지되는 기능
 
 차량 대시보드·엔터티, 주행/주차/충전 상태, 주행·충전 기록과 통계, 차계부 자동 인계, 주차·실시간 위치,
 주차 카메라, 원격 터미널. 모두 코드상 연결돼 있으나 **실차 미검증**이며 3-4에서 처음 확인합니다.
 
-## 7. 문제가 생기면 Mac에서 이렇게 알려 주세요
+## 8. 문제가 생기면 Mac에서 이렇게 알려 주세요
 
 1. **그 자리에서 멈춥니다.** 같은 명령을 반복하거나 다른 방법을 시도하지 않습니다.
 2. 이 대화에 다음을 붙여 넣습니다: 몇 절 몇 단계인지, 실행한 명령, **출력 전체**(터미널 카드에서 복사),

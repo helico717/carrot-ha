@@ -1,3 +1,13 @@
+## 2026-11-02 — IQ.drive 업데이트 버튼과 IQ 원본 자동 갱신 작업
+
+- 사용자 승인(프리뷰 preview/iq-pull): 터미널 카드가 Comma 보고 브랜치가 iq- 이면 Git 버튼을 "📥 IQ.drive 업데이트"로 바꾸고 `git pull --ff-only && git submodule update --init --depth 1 -- vendor/iqpilot`를 실행한다(reset --hard 없음). 당근일 때는 기존과 같다. tests/terminal-git-status.test.mjs 5개 통과. 커밋 8561893을 HA에 SSH 직접 반영: 사전 충돌 검사 통과, 백업 /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-85618934d4c7/before, 설치 SHA256 일치. HA 재시작은 사용자 작업(미확인).
+- 자동 갱신: scripts/refresh_iq_ha.py 추가, 조립 스크립트가 IQ 원본 번호를 입력으로 받도록 변경. iq-ha를 (carrot-ha 조립 스크립트, 고정 당근 5ec4868a, IQ 원본 번호)의 조립 결과 그대로 만들고, 후보 시험 통과 시에만 커밋한다. IQ.OS 버전 변경·연동 수정 적용 실패는 NEEDS_REVIEW로 멈춘다. 필요한 공개 파일은 한 번에 받는다(IQ 942, 당근 48).
+- 조사: IQ 원본 release는 배포마다 커밋 1개로 강제 갱신되며 태그가 없다. 이전 고정 번호는 원본 서버에서 사라질 수 있으므로 커밋 메시지에는 IQ 자체 CHANGELOG 상단을 넣는다. 매뉴얼에 영향 기록.
+- helico717/openpilot 기본 브랜치 carrot-wip에 .github/workflows/iq_ha_upstream_refresh.yml 추가(77723f7→97a5ef3): 매일 04:17 KST, 수동 실행(force/dry_run), 워크플로 수정 시 강제 재조립·푸시 없는 자체 점검. 결과는 공개 주석으로 남는다. 이 푸시로 기존 tests/user docs 워크플로도 실행됐다(user docs 성공, tests는 기록 시점 진행 중, 이번 변경과 무관).
+- 검증: 로컬 강제 재조립 IDENTICAL, IQ beta 끝 커밋으로 가상 갱신 시 조립·시험·커밋 성공(푸시 안 함). GitHub 자체 점검 첫 결과 COMMITTED(HA_CANDIDATE.json, PORTABILITY.json): macOS/Linux 폴더 순서 차이. 조립 스크립트에서 목록 정렬(6878528), iq-ha a35b564에 정렬된 manifest 게시(내용 동일, CI41396971640 success), 재점검 41396994577 IDENTICAL.
+- 매뉴얼: 후보 a35b564로 갱신, 5절 "IQ 사용 중 업데이트" 추가, 자동 갱신으로 번호가 달라졌을 때의 대응 추가.
+- 미검증: 실제 IQ 신규 release에서의 자동 커밋·푸시, 기기에서 버튼 동작, 실차 전반. pre-release 미발행 — 다음 pre-release 포함 대상.
+
 ## 2026-11-02 — IQ.drive 사용 중 당근 전용 기능 일시중지, FastSleep 점검, 설치 매뉴얼 보강
 
 - 사용자 결정: IQ.drive 사용 시 당근 파라미터 대시보드와 당근웹 로그 대시보드는 지우지 않고 일시중지(전체 블러 + 중앙 "IQ.drive 사용 중" 안내). 로그는 업로드와 화면 모두 중지. FastSleep은 끄고 사용. pre-release는 발행하지 않고 HA SSH 직접 반영(사용자 VPN 연결).
