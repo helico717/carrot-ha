@@ -163,7 +163,8 @@ async def download(args):
                                     elif message.get('type') == 'event':
                                         event = message.get('event', {})
                                         if event.get('type') == 'ended' and acquired:
-                                            raise RuntimeError('Terminal session ended before completion')
+                                            reason = str(event.get('reason', 'unknown'))[:80]
+                                            raise RuntimeError('Terminal session ended before completion: ' + reason)
                                         payload = event.get('message', {})
                                         if event.get('type') == 'terminal' and payload.get('type') == 'pty_output':
                                             receiver.feed(base64.b64decode(payload['b64'], validate=True))
