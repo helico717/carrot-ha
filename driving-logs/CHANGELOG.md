@@ -1,3 +1,10 @@
+## 2026-11-02 — IQpilot 시험 전 당근 복귀 기준 및 비공개 백업 준비
+
+- 사용자 요청: 작은 Comma 화면의 입력 오류를 줄이는 복귀 주소와 왕복 전환 준비. helico717/openpilot의 ha-back 브랜치를 실제 설치 커밋 5ec4868a12a9038547b373eb95be3a5fa86d30aa에 생성했다. 해당 ref의 launch_env.sh 조회 성공, 기본 OS 19.8-carrot-bt1 확인. 복귀 주소 installer.comma.ai/helico717/ha-back. 브랜치를 자동 업데이트하지 않는다. 설치 URL의 기기 실설치·OS 복구는 미검증.
+- scripts/backup_comma.py 추가: Git checkout에서 실행하는 백업 전용 도구. 외부 상태 폴더·실제 Params·legacy ACK DB·설정 카탈로그를 비공개 tar.gz로 보관. SQLite online backup과 quick_check, 독립 DB 전환, SHA-256 및 압축 읽기 검증. 원본 변경·복원·재부팅 없음. 파일 복사 중 변경은 실패 처리, DB별 시점은 다를 수 있음. 중첩 symlink 제외를 manifest에 기록. 환경변수로 지정된 추가 경로·영상·모델·OS 이미지는 미포함.
+- 합성 검증: 열린 WAL DB의 커밋 데이터 보존, 독립 DB quick_check, Params symlink 해제, 중첩 symlink 제외 통과. 최초 검증에서 백업 목적지 WAL 잔존을 발견해 DELETE journal 전환 후 재검증 통과.
+- 실제 기기 백업·Mac 외부 보관·왕복 전환·IQpilot HA 이식은 미완료. 토큰·사용자 DB·원시 로그는 저장소에 포함하지 않았다. 기기 소스 SSH/SCP 수정·HA 반영·릴리즈·재부팅 없음.
+
 ## 2026-10-30 — v0.9.0 정식 발행 완료 확인
 
 - 태그 대상 ca6f6e12c27e22cfff260cdf315848110a3ce90b, 새 annotated tag v0.9.0 원격 일치. 준비 CI 40985016234 및 HACS Release 40985134385 모두 success.
