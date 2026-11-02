@@ -21,3 +21,6 @@ tools/vehicle3d/model/work/
 
 # Offline tool dependencies
 node_modules/
+
+# Private clean-install recovery credentials; never commit.
+.private-recovery/

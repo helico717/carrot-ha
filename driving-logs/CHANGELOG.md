@@ -1,3 +1,11 @@
+## 2026-11-02 — 플래싱 후 순정 IQpilot에서 HA 재연결 준비
+
+- 사용자 요청으로 플래싱·순정 설치 이후를 위한 docs/IQPILOT_HA_CLEAN_RECOVERY.md 준비. 같은 Wi-Fi + SSH 공개키 재등록, 주차 확인, 순정/후보 SHA 일치 확인 후 Git 전환, 선택적 HA 설정 복원, 사용자 재부팅·실차 확인 순서를 기록.
+- scripts/prepare_iq_ha_recovery.py: 원본 백업 SHA256 검사 후 허용된 수신기·카메라 JSON만 추출, ID 대조 및 비공개 권한 설정. Params/DB/큐/소스 미복원. .private-recovery/ Git 제외. 실제 Mac 키트 생성 성공(비밀값 출력 없음).
+- tools/receiver-recovery.py: --iqpilot 및 --config로 Git 관리 IQ 설정 CLI를 호출. 비밀키는 SSH stdin 전달. 차량 소스 SSH/SCP 수정 없음.
+- 검증: 수신기 SSH 전달 시험 3개, 합성 백업 추출 시험 1개 통과. 기존 설정 키트 생성 성공. 실차 SSH/checkout/카메라/수집/차계부 연속성 미검증.
+- 운영 상태: 차량·HA 변경, 플래싱·설치·재부팅·릴리즈 발행 없음. 로컬 복구 준비 및 문서/도구 Git 배포만 수행.
+
 ## 2026-11-02 — Astra 검토 P1·P2 조치
 
 - P1: 복귀 스크립트가 IsOnroad 누락·읽기 실패 시 진행하던 문제 수정. IsOffroad=1·IsOnroad=0 확인 시에만 진행, 불명 상태는 사용자의 명시적 --confirm-parked(복구 안내 시)에서만 진행, 주행 중이면 항상 거부. 회귀 시험 3개 추가, 11개 통과. carrot-ha 6604665, iq-ha 9637e6c(CI 41399208645 success).

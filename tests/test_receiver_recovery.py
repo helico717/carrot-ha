@@ -29,3 +29,10 @@ class RecoveryTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     recovery.configure(host, '~/key', url, 'existing', 'x' * 32)
             run.assert_not_called()
+
+    def test_iq_namespace_and_stdin(self):
+        with patch.object(recovery.subprocess, 'run') as run:
+            recovery.configure('192.168.1.10', '~/key', 'https://ha.example', 'existing', 'x'*32, True)
+        args, kwargs = run.call_args
+        self.assertIn('iqpilot.selfdrive.carrot.ha.direct_connection', args[0][-1])
+        self.assertNotIn('x'*32, str(args))
