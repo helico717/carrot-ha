@@ -1,3 +1,11 @@
+## 2026-11-02 — 사용자 예외 승인 및 Python 캐시 충돌 보존
+
+- 사용자 명시 지시: 이번에는 연동 성공까지 에이전트가 설치 재시도를 직접 진행. 반복 Enter 대기를 중단하되 Git 전용 소스 배포·보안 우회 금지 원칙은 유지.
+- 후보 a9018ea Linux CI41448488444 success. 사용자 재실행에서 공식 origin fetch는 성공, 안전 검사에서 untracked/ignored 충돌로 전환 전 중단. 순정 HEAD11fcd742 유지 확인. 충돌360개가 모두 __pycache__/*.pyc임을 파일명/형식으로 확인(다른 설정·기록0).
+- Git 설치 프로그램이 해당 Python 캐시만 Git 밖의 전용 디렉터리로 보존하도록 보완. 다른 파일·링크·경로 이탈은 여전히 거절하며 강제 삭제 없음. 혼합된 사용자 설정 충돌 시 캐시도 이동하지 않는 회귀 시험 추가.
+- HA 터미널 카드 1개는 커밋6f38582 원본으로 백업 후 직접 반영했고 SHA256 전체 일치. 백업 /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-6f385821da3b/before. HA runtime devices API에 pilot_software 필드가 실제 로드돼 있음 확인(장치정보·키 출력 없음). HA 재시작/릴리즈 없음.
+- 상태: 캐시 보존 보완 검증·후보 갱신 후 에이전트가 같은 설치를 이어 수행. 연결 설정 복원·재부팅 후 실제 HA 수신은 아직 미완료.
+
 ## 2026-11-02 — IQ.OS 기본 Git 관리 인터페이스 대응
 
 - 사용자가 설치 명령 실행. /usr/local/bin/git이 /data/iqpilot의 fetch/pull/checkout을 공식 iq-git-update로 전달하며 로컬 경로 fetch와 임의 옵션을 거절해 첫 fetch에서 중단. 순정 HEAD11fcd742/깨끗한 tracked 상태와 내부 .iqpilot 보존, 외부 runtime 미생성 확인. 기기 실행 소스·연결 설정·재부팅은 미변경.
