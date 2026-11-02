@@ -1,6 +1,14 @@
 const CARROT_TERMINAL_ASSET = '/carrot_ha_static/carrot_web/js/vendor/xterm.js';
 const CARROT_TERMINAL_FIT_ASSET = '/carrot_ha_static/carrot_web/js/vendor/xterm-addon-fit.js';
 const CARROT_TERMINAL_CSS = '/carrot_ha_static/carrot_web/css/vendor/xterm.css';
+// Same rule as driving_logs/pilot.py: the IQ.drive candidate runs from an iq- branch.
+const isIqBranch = branch => typeof branch === 'string' && (branch === 'iq-ha' || branch.startsWith('iq-'));
+const PULL_COMMANDS = {
+  carrot: 'cd /data/openpilot && git reset --hard && git pull --ff-only\r',
+  // No reset: any local change stops the pull. The IQ original follows the version pinned by the pulled branch.
+  iq: 'cd /data/openpilot && git pull --ff-only && git submodule update --init --depth 1 -- vendor/iqpilot'
+    + ' && git -C vendor/iqpilot log -1 --format="IQ 원본 %h (%cs)"\r',
+};
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -153,6 +161,13 @@ class CarrotTerminalCard extends HTMLElement {
     };
     details.title = `${git.branch || ''} · 기기 마지막 보고 ${format(git.installed_measured_at)} · GitHub 확인 ${format(git.checked_at)}${git.cached ? ' (저장된 결과)' : ''}`;
     status.textContent += ' · 마지막 기기 보고 기준';
+    const iq = isIqBranch(git.branch);
+    if (iq) status.textContent = `IQ.drive · ${status.textContent}`;
+    const pull = this.shadowRoot.getElementById('btn-pull');
+    if (pull) {
+      pull.textContent = iq ? '📥 IQ.drive 업데이트' : '📥 당근 Git Pull';
+      pull.title = iq ? 'HA 연동 iq-ha 브랜치와 고정된 IQ 원본 버전을 받습니다. 적용은 재부팅 후입니다.' : '';
+    }
   }
 
   _fit() {
@@ -643,7 +658,7 @@ class CarrotTerminalCard extends HTMLElement {
 
     this.shadowRoot.getElementById('btn-pull').onclick = () => {
       if (!this._active) return;
-      this._enqueue('cd /data/openpilot && git reset --hard && git pull --ff-only\r');
+      this._enqueue(PULL_COMMANDS[isIqBranch(this._gitStatus.branch) ? 'iq' : 'carrot']);
       this._terminal?.focus();
     };
 

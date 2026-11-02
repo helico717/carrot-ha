@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IQ.drive 업데이트 버튼 프리뷰</title>
+<style>
+  :root { color-scheme: dark; --primary-text-color:#e1e1e1; --secondary-text-color:#9aa0a6; --card-background-color:#1c1c1c;
+    --ha-card-background:#1c1c1c; --divider-color:rgba(255,255,255,.12); --primary-color:#03a9f4; --error-color:#ff5252;
+    --ha-card-border-radius:12px; --page-bg:#111; --accent:#ff7a29; --ok:#43a047; --new:#8e24aa; }
+  body { margin:0; background:var(--page-bg); color:var(--primary-text-color); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .bar { position:sticky; top:0; z-index:100; display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 16px; background:#263238; color:#fff; font-size:13px; }
+  .bar button { border:0; border-radius:999px; padding:7px 14px; cursor:pointer; background:#455a64; color:#fff; font-size:13px; }
+  .bar button[aria-pressed="true"] { background:var(--accent); }
+  main { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; padding:16px; max-width:1100px; margin:0 auto; }
+  main > * { min-width:0; }
+  carrot-terminal-card { display:block; }
+  h2 { margin:6px 0 0; font-size:16px; }
+  p.lead { margin:0; color:var(--secondary-text-color); font-size:13px; line-height:1.6; }
+  .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  @media (max-width:760px) { .flow { grid-template-columns:1fr; } }
+  .step { position:relative; padding:14px; border-radius:12px; background:var(--card-background-color); border:1px solid var(--divider-color); font-size:13px; line-height:1.55; }
+  .step b { display:block; font-size:14px; margin-bottom:6px; }
+  .tag { display:inline-block; margin-bottom:8px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; color:#fff; }
+  .tag.have { background:var(--ok); } .tag.new { background:var(--new); } .tag.you { background:var(--accent); }
+  .step small { color:var(--secondary-text-color); }
+  .compare { display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px; }
+  @media (max-width:760px) { .compare { grid-template-columns:1fr; } }
+  .compare div { padding:12px; border-radius:12px; background:var(--card-background-color); border:1px solid var(--divider-color); }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:12px; overflow-wrap:anywhere; }
+  .howto { padding:12px 14px; border-radius:12px; background:#1e2a33; font-size:13px; line-height:1.6; }
+  ha-card { display:block; background:var(--ha-card-background); border-radius:var(--ha-card-border-radius); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>Comma 소프트웨어</strong>
+  <button id="modeCarrot" aria-pressed="false">당근파일럿</button>
+  <button id="modeIq" aria-pressed="true">IQ.drive (iq-ha)</button>
+  <strong style="margin-left:12px">GitHub 상태</strong>
+  <button id="behind" aria-pressed="true">새 업데이트 2개 있음</button>
+  <button id="latest" aria-pressed="false">최신</button>
+</div>
+<main>
+  <h2>IQ.drive를 쓰는 동안 업데이트는 이렇게 흘러갑니다</h2>
+  <p class="lead">당근 때와 같은 구조입니다. 무거운 일(합치기·시험)은 GitHub가 하고, Comma는 시험을 통과한 결과만 받습니다.
+    보라색 단계는 아직 만들지 않은 부분입니다(이 프리뷰는 동작 설명용입니다).</p>
+  <div class="flow">
+    <div class="step"><span class="tag have">이미 있음</span><b>① IQ 원본에 새 버전</b>IQ 개발자가 konn3kt Git의 <code>release</code>에 새 커밋을 올립니다.<br><small>우리가 손대지 않는 원본</small></div>
+    <div class="step"><span class="tag new">새로 만들 것</span><b>② GitHub 자동 작업</b>하루 한 번 원본을 확인 → 새 버전이면 <code>iq-ha</code>의 "IQ 원본 버전 쪽지"를 새 번호로 바꿈 → HA 연동 시험(CI) → <b>통과할 때만</b> <code>iq-ha</code>에 올림.<br><small>실패하면 올리지 않고 알림만</small></div>
+    <div class="step"><span class="tag have">이미 있음</span><b>③ HA 터미널 카드가 알려줌</b>Comma가 보고한 설치 커밋과 GitHub <code>iq-ha</code> 최신 커밋을 비교해 "N개 커밋 뒤처짐"과 최신 내용을 표시합니다.</div>
+    <div class="step"><span class="tag you">사용자</span><b>④ 버튼 두 번</b><b style="display:inline">[📥 IQ.drive 업데이트]</b> → 받기만 함(기기 파일 강제 덮어쓰기 없음) → <b style="display:inline">[🔄 기기 재부팅]</b>으로 적용.</div>
+  </div>
+
+  <div class="compare">
+    <div><b>당근파일럿일 때 (지금과 같음)</b><br>버튼: 📥 당근 Git Pull<br><code>git reset --hard && git pull --ff-only</code></div>
+    <div><b>IQ.drive일 때 (바뀌는 점)</b><br>버튼 이름이 📥 IQ.drive 업데이트로 바뀝니다.<br>
+      <code>git pull --ff-only && git submodule update --init --depth 1 -- vendor/iqpilot</code><br>
+      <small><code>reset --hard</code> 없음. 기기에 변경이 있으면 지우지 않고 멈춥니다. IQ 원본도 쪽지에 적힌 버전으로 함께 받습니다.</small></div>
+  </div>
+
+  <div class="howto">아래는 <b>실제 터미널 카드 코드</b>입니다. Comma는 가상입니다(입력은 실제 기기로 가지 않음).
+    ① <b>[연결]</b> → ② <b>[🔍 업데이트 확인]</b> → ③ <b>[📥 IQ.drive 업데이트]</b> 순서로 눌러 보세요.
+    상단에서 <b>당근파일럿</b>으로 바꾸면 버튼 이름과 명령이 원래대로 돌아갑니다.</div>
+  <carrot-terminal-card id="terminal"></carrot-terminal-card>
+</main>
+<script>
+  if (!customElements.get('ha-card')) customElements.define('ha-card', class extends HTMLElement {});
+  if (!customElements.get('ha-icon')) customElements.define('ha-icon', class extends HTMLElement {});
+</script>
+<script src="/custom_components/carrot_ha/frontend/carrot-terminal-card.js"></script>
+<script>
+  const SHA = {iqOld: '25d213b111581a24d34999eb9c496d3dd41f8486', iqNew: '9f1c2aa0d4e5b6c7a8b9c0d1e2f3a4b5c6d7e8f9',
+    carrotOld: '5ec4868a12a9038547b373eb95be3a5fa86d30aa', carrotNew: 'a6a58ae924366238c6b4fc1ab953a68e74a76ca5'};
+  const state = {mode: 'iq', behind: true, pulled: false};
+  let listener = null, line = '';
+  const encode = text => btoa(String.fromCharCode(...new TextEncoder().encode(text.replace(/\n/g, '\r\n'))));
+  const out = text => listener?.({type: 'terminal', message: {type: 'pty_output', b64: encode(text)}});
+  const prompt = () => out('comma@tici:/data/openpilot$ ');
+  const branch = () => state.mode === 'iq' ? 'iq-ha' : 'carrot-wip-model_selector-ha';
+  const installed = () => state.mode === 'iq' ? (state.pulled ? SHA.iqNew : SHA.iqOld) : (state.pulled ? SHA.carrotNew : SHA.carrotOld);
+  const latest = () => state.mode === 'iq' ? (state.behind ? SHA.iqNew : SHA.iqOld) : (state.behind ? SHA.carrotNew : SHA.carrotOld);
+  // Example output only; commit messages and IQ versions below are illustrative.
+  function run(command) {
+    const behind = state.behind && !state.pulled;
+    if (command.includes('git fetch origin && git status -sb')) {
+      out(`## ${branch()}...origin/${branch()}${behind ? ' [behind 2]' : ''}\n`);
+      if (behind) out(state.mode === 'iq'
+        ? '9f1c2aa (예시) chore(iq-ha): IQ 원본 7a1b2c3 반영, HA 연동 시험 통과\n4d5e6f7 (예시) fix(iq-ha): HA 연동 수정\n'
+        : 'a6a58ae (예시) Merge upstream carrot-wip-model_selector\n3c2b1a0 (예시) fix(carrot-ha): HA 연동 수정\n');
+    } else if (command.includes('git pull --ff-only && git submodule update')) {
+      if (!behind) out('Already up to date.\nIQ 원본 5c9291b (2026-10-30)\n');
+      else { state.pulled = true;
+        out(`Updating 25d213b..9f1c2aa\nFast-forward\n vendor/iqpilot | 2 +-\n iqpilot/selfdrive/carrot/ha/collector.py | 4 ++--\n 2 files changed\n`
+          + "Submodule path 'vendor/iqpilot': checked out '7a1b2c3d4e5f60718293a4b5c6d7e8f901234567'\nIQ 원본 7a1b2c3 (2026-11-05)\n"
+          + '→ 받기 완료. [🔄 기기 재부팅]을 눌러야 적용됩니다.\n'); }
+    } else if (command.includes('git reset --hard && git pull --ff-only')) {
+      out(`HEAD is now at ${installed().slice(0, 7)} (현재 커밋)\n`);
+      if (!behind) out('Already up to date.\n');
+      else { state.pulled = true; out('Updating 5ec4868..a6a58ae\nFast-forward\n 12 files changed (예시)\n→ 받기 완료. [🔄 기기 재부팅]을 눌러야 적용됩니다.\n'); }
+    } else if (command.includes('reboot')) {
+      out('(프리뷰: 실제 기기에서는 여기서 재부팅되고 연결이 1~2분 끊깁니다)\n');
+    } else if (command.trim()) {
+      out(`(프리뷰: "${command.trim()}" 는 실행하지 않습니다)\n`);
+    }
+    prompt();
+    card._refreshGitStatus();
+  }
+  const hass = {
+    callWS: async message => message.type === 'carrot_ha/terminal/git_status' ? {
+      repository: 'helico717/openpilot', branch: branch(), installed_commit: installed(), latest_commit: latest(),
+      latest_message: state.mode === 'iq' ? '(예시) chore(iq-ha): IQ 원본 7a1b2c3 반영, HA 연동 시험 통과' : '(예시) Merge upstream carrot-wip-model_selector',
+      latest_url: '#', checked_at: new Date().toISOString(), installed_measured_at: new Date().toISOString(),
+      comparison: installed() === latest() ? 'identical' : 'behind', behind: installed() === latest() ? 0 : 2, ahead: 0, error: null, cached: false,
+    } : {},
+    connection: {
+      subscribeMessage: async callback => {
+        listener = callback;
+        setTimeout(() => callback({type: 'status', connected: true, ready: true, active: true, controller: false}), 50);
+        return () => { listener = null; };
+      },
+      sendMessagePromise: async message => {
+        if (message.type === 'carrot_ha/terminal/acquire') { setTimeout(() => { out('Carrot HA 터미널 (프리뷰 · 가상 Comma)\n'); prompt(); }, 100); return {ok: true}; }
+        if (message.type === 'carrot_ha/terminal/input') {
+          for (const character of message.message.data) {
+            if (character === '\r') { out('\n'); const command = line; line = ''; run(command); }
+            else if (character === '\x7f') { if (line) { line = line.slice(0, -1); out('\b \b'); } }
+            else { line += character; out(character); }
+          }
+        }
+        return {ok: true};
+      },
+    },
+  };
+  const card = document.getElementById('terminal');
+  card.setConfig({device_id: 'comma-preview'});
+  card.hass = hass;
+  const press = (on, off) => { document.getElementById(on).setAttribute('aria-pressed', 'true'); document.getElementById(off).setAttribute('aria-pressed', 'false'); };
+  const reset = () => { state.pulled = false; card._refreshGitStatus(); };
+  document.getElementById('modeIq').onclick = () => { state.mode = 'iq'; press('modeIq', 'modeCarrot'); reset(); };
+  document.getElementById('modeCarrot').onclick = () => { state.mode = 'carrot'; press('modeCarrot', 'modeIq'); reset(); };
+  document.getElementById('behind').onclick = () => { state.behind = true; press('behind', 'latest'); reset(); };
+  document.getElementById('latest').onclick = () => { state.behind = false; press('latest', 'behind'); reset(); };
+  window.previewState = state;
+</script>
+</body>
+</html>
