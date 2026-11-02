@@ -1,3 +1,12 @@
+## 2026-11-02 — IQpilot 개인 시험용 소스 준비와 독립 PTY 어댑터
+
+- scripts/prepare_iqpilot_ha.py 추가. 실제 당근 SHA5ec4868a 및 IQ 안정판 SHA5c9291b9를 고정해 공개 HA Python과 최소 manager 등록 검토 사본 생성. 47개 파일 AST 검사. opendbc.can CANParser를 iqdbc.can.parser에 연결, checkout 경로/data/openpilot와 영속 경로 보존. 기존 IQ 주행 프로세스·low_power 정책 유지. 설치 가능한 릴리즈가 아닌 REVIEW_ONLY_NOT_INSTALLABLE 표시.
+- compat/iqpilot/iq_terminal.py 추가. 당근웹7000 없는 IQ에서 기존 HA relay와 연결할 자체 PTY 어댑터, 외부 리스너 없음. 관리자 lease는 기존 HA에서 유지, 명시적 offroad 검사·최대4096-byte 입력·세션ID·자체 자식 그룹 종료·출력 replay 미전송 보존. tests/test_iqpilot_terminal.py에서 실제 Mac PTY 출력, onroad/unknown 시작 차단, offroad 해제 후 쓰기 차단과 종료 2개 통과. 합성 base relay이며 IQ 실기 검증 아님.
+- 당근 파라미터 동기화는 검토 사본에서 시작하지 않아 기존 큐를 소비/적용하지 않음. 배터리·충전·주행경계·outbox·로그 활성화 정책 기존 27개 테스트 통과. 최초 overlay 테스트의 PYTHONPATH 누락은 올바른 경로 지정 후 통과.
+- docs/IQPILOT_HA_PREPARATION_2026-11-02.md에 근거·완료/미완료 구분 기록. 당근 OS manifest boot/system URL HEAD200 확인, 해시·실설치·IQ.OS 역전환은 미검증. 두 manifest bootloader 차이를 확인했으며 무조건 branch switch 호환을 주장하지 않음.
+- 공개 IQpilot Cap’n Proto schema로 3개 livestream의 header/data/idx.timestampSof/idx.flags serialize/deserialize와 CarState canValid/vEgo/gearShifter 확인 통과. 실제 영상 디코딩·카메라 하드웨어 검증은 아님.
+- 백업 반출은 같은 인증으로 진행 중. 실제 Mac 최종 SHA256 성공은 후속 기록 대상. IQ/HA 운영 코드 반영·새 IQ 배포 branch·릴리즈·기기 설치·재부팅 없음.
+
 ## 2026-11-02 — 블록 전송 운영 진행 및 속도 조정
 
 - 사용자 로그인 후 12KiB 요청 방식으로 연속 전송이 진행됐다. 전체 백업 크기 50288578 bytes 확인, 최종 파일은 아직 미완료. 왕복 요청 비용을 줄이기 위해 96KiB 요청으로 조정하고 재연결 합성 테스트 포함 7개 재검증 통과.
