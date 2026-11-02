@@ -1,3 +1,9 @@
+## 2026-11-02 — 주차 중 원격 반출 재시도와 진단 보완
+
+- 사용자가 실제 주차 상태이며 차량 이동 없음을 재확인. 두 번째 전송은 Mac partial 101376 bytes까지 수신했으나 terminal ended: device_not_offroad로 중단. 이 사유는 HA relay가 offroad/local_ready/status freshness 전체 ready 조건 실패에도 사용하므로 실제 주행 판정이라고 단정하지 않는다. UI는 이후 device_disconnected를 거쳐 주차·준비됨으로 복귀했다.
+- Mac OAuth callback의 단일 HTTPServer가 브라우저 선행 연결 때문에 종료 대기할 수 있음을 확인. ThreadingHTTPServer로 변경하고 실패 시 마지막 비밀 없는 ready 상태를 오류에 포함. PTY 출력 부하를 줄이기 위해 3072-byte 단위 간격을 0.01s에서 0.10s로 제한. 이는 원인 확정이나 해결 완료가 아니다. 합성 테스트 4개 통과.
+- 기존 시도는 인증 폐기 확인 후 종료 대기를 SIGINT로 해제했다. 미완료 partial만 정리하고 동일 파일/해시로 재시도할 예정. 실제 최종 다운로드 미완료. 사용자 기기 파일/주차 인터록/HA 실행 코드 변경 없음.
+
 ## 2026-11-02 — 사용자 승인 백업 반출 시도, offroad 조건 해제로 중단
 
 - 사용자가 해당 차량 백업을 이 Mac으로 받도록 명시 승인. 지정 차량/파일/SHA256으로 다운로드 도구 실행, 사용자 HA 로그인 후 인증 성공.

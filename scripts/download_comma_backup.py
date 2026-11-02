@@ -8,7 +8,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import os
 from pathlib import Path
 import re
@@ -74,7 +74,7 @@ def command(filename, marker):
         "print('\\n" + marker + " BEGIN',os.fstat(f.fileno()).st_size,flush=True);"
         "exec(\"for i,b in enumerate(iter(lambda:f.read(3072),b'')):\\n"
         " print('" + marker + " DATA',i,base64.b64encode(b).decode(),flush=True)\\n"
-        " time.sleep(0.01)\");"
+        " time.sleep(0.10)\");"
         "print('" + marker + " END',flush=True)"
     )
     return 'python3 -c ' + shlex.quote(code) + '\n'
@@ -96,7 +96,7 @@ async def download(args):
             self.send_header('Content-Type', 'text/plain; charset=utf-8')
             self.end_headers()
             self.wfile.write('HA login received. Return to the backup downloader. 이 창은 닫아도 됩니다.'.encode())
-    server = HTTPServer(('127.0.0.1', 0), Callback)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Callback)
     client_id = f'http://127.0.0.1:{server.server_port}/'
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -147,6 +147,7 @@ async def download(args):
                     with partial.open('xb') as stream:
                         receiver = Receiver(stream, marker, args.sha256)
                         acquired = False
+                        last_status = {}
                         try:
                             async with timeout(900):
                                 while not receiver.done:
@@ -162,9 +163,12 @@ async def download(args):
                                                 'device_id': args.device, 'message': {'type': 'raw', 'data': command(args.filename, marker)}})
                                     elif message.get('type') == 'event':
                                         event = message.get('event', {})
+                                        if event.get('type') == 'status':
+                                            last_status = {key: event.get(key) for key in ('connected', 'offroad', 'local_ready', 'ready')}
                                         if event.get('type') == 'ended' and acquired:
                                             reason = str(event.get('reason', 'unknown'))[:80]
-                                            raise RuntimeError('Terminal session ended before completion: ' + reason)
+                                            raise RuntimeError('Terminal session ended before completion: ' + reason
+                                                               + '; status=' + str(last_status))
                                         payload = event.get('message', {})
                                         if event.get('type') == 'terminal' and payload.get('type') == 'pty_output':
                                             receiver.feed(base64.b64decode(payload['b64'], validate=True))
