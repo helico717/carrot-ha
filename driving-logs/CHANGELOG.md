@@ -1,3 +1,10 @@
+## 2026-11-02 — 실제 Git 전환 성공 및 연결 CLI 환경 보완
+
+- d955b931b13fed985c174f67a81497276d70951e Linux CI41449784671 success 후 사용자 예외 승인에 따라 에이전트 직접 설치 성공(IQ_HA_INSTALLED). 순정과 같은 IQ11fcd742/OS4.9.9.9.2를 유지하며 iq-ha 전환 및 vendor 독립 복제/추적 설정 완료.
+- Python 캐시360개 /data/iq-ha-python-cache-dcmw9u4t에 보존, 기존 .iqpilot runtime은 /data/iqpilot-ha-runtime으로 이동 후 Git 링크 유지. 강제 삭제·서명/SELinux 우회·재부팅 없음.
+- 최초 연결 설정 CLI는 bare SSH 환경에 iqdbc 모듈 경로가 없어 쓰기 전 거절됨. 읽기 전용 traceback으로 원인 확정. IQ 원본 launch_chffrplus.sh와 동일한 artifacts/package_runtime 경로를 Mac 전달 명령 PYTHONPATH에 지정하도록 보완. 진단 실패의 OS/소스 무결성·vendor 체크는 모두 통과했고 구성 저장은 아직 안 됨.
+- 이번 보완은 Mac 실행 명령의 런타임 환경만 변경하며 Comma 프로그램 파일 수동 수정 없음. 복원과 실제 런타임 진단을 이어 수행.
+
 ## 2026-11-02 — 캐시 보존 경로 정규화 시험 보완
 
 - 새 캐시 보존 단위 시험이 Mac /var→/private/var 경로 별칭 비교에서 실패해 후보 자동 검증이 게시를 막음(기기 후보는 a9018ea 그대로). 보존 함수 진입에서 repo.resolve()를 적용해 경로 이탈 검사 기준을 통일. 실제 실행 경로/사용자 데이터를 더 허용하는 우회가 아님.

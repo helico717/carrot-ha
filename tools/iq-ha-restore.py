@@ -6,7 +6,9 @@ from pathlib import Path
 import re
 import subprocess
 
-REMOTE = 'cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.iq_restore'
+REMOTE = ('cd /data/openpilot && '
+          'PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/data/openpilot/artifacts/package_runtime:/data/openpilot '
+          '/usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.iq_restore')
 
 
 def restore(host, identity, kit):
