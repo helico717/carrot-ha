@@ -1,3 +1,9 @@
+## 2026-11-02 — 원격 백업 반출 운영 점검 및 승인 심사 차단
+
+- Mac 도구 실제 HA OAuth 인증과 관리자 WebSocket 인증 성공 후 차량 자동 선택이 모호해 전송 전에 중단했다. 임시 refresh token 폐기 성공. 백업 바이트 전송/최종 파일 생성 없음.
+- 사용자에게 열려 있던 HA 터미널에서 load_config()['device'] 읽기 전용 조회로 현재 차량 식별자를 확인했다. 첫 조회는 잘못된 키 device_id로 KeyError, 올바른 device 키로 재조회 성공. 비밀키/설정 전체는 출력하지 않았다. 브라우저 터미널 제어권은 다운로드 준비를 위해 해제했다.
+- 정확한 차량·백업 파일·사전 SHA256을 지정한 재실행이 자동 승인 심사에서 거절됐다. 첫 이유: 식별자를 UI 예시값으로 판단. 기기 설정 조회 증거를 명시한 재검토도 거절: 민감한 백업 전송에는 사용자의 정확한 대상 확인이 필요하다고 판단. 우회 실행하지 않고 사용자 확인 대기. 실제 다운로드·Mac 해시 대조·OS 왕복 전환 미완료.
+
 ## 2026-11-02 — 같은 Wi-Fi 없이 Comma 백업 반출 준비
 
 - 사용자 요청으로 현재 터미널 소스와 운영 HA 화면을 확인: 다운로드 버튼/API는 없으며 관리자 전용 HA WebSocket terminal subscribe/acquire/input과 base64 PTY 출력이 존재한다. 소스: terminal_ws.py, terminal_relay.py, frontend/carrot-terminal-card.js, openpilot terminal.py. 일반 로그 업로드 API를 백업 전송에 재사용하지 않는다.
