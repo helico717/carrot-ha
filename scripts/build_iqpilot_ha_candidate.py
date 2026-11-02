@@ -228,6 +228,12 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
 - Added a Git-only return script to the pinned Carrot commit; it refuses onroad, local tracked
   changes, an unexpected ha-back commit and untracked collisions, and never reboots.
 - Not yet tried on a device; the IQ.OS -> Carrot OS flash remains unverified.
+
+## 2026-11-02 — FastSleep and Carrot-only pauses
+
+- Diagnostics require FastSleep off: deep standby would stop HA monitoring, terminal and camera while parked.
+- HA pauses the Carrot parameter queue and driving log transfer/screens while this branch runs;
+  the device keeps following HA's log transfer policy, so no IQ recordings are uploaded.
 ''')
     manifest['candidate_source_sha256'] = {
         str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()
