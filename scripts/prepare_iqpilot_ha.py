@@ -65,6 +65,14 @@ def prepare(donor, iq, output):
                 raise ValueError('Parameter sync entrypoint changed')
             converted = converted.replace(before,
                 "        print('IQpilot: Carrot parameter writes paused; queue not consumed', flush=True)")
+        if path.startswith(PREFIX + 'camera/'):
+            converted = converted.replace('from iqpilot.common.params import Params', 'from ..iq_camera import CameraParams as Params')
+        if path == PREFIX + 'camera/probe.py':
+            converted = converted.replace('    if params.get_bool("IsDriverViewEnabled"):',
+                '    if getattr(params, "iq_camera_busy", lambda: True)():\n        raise RuntimeError("IQ camera is busy or unavailable")\n    if params.get_bool("IsDriverViewEnabled"):')
+        if path == PREFIX + 'camera/agent.py':
+            converted = converted.replace("                and not params.get_bool('IsDriverViewEnabled')",
+                "                and not params.get_bool('IsDriverViewEnabled')\n                and not params.iq_camera_busy()")
         ast.parse(converted, filename=path)
         relative = 'iqpilot/selfdrive/carrot/ha/' + path[len(PREFIX):]
         target = output / relative
@@ -72,12 +80,13 @@ def prepare(donor, iq, output):
         target.write_text(converted)
         manifest['files'][relative] = {'source_sha256': hashlib.sha256(original.encode()).hexdigest(),
                                        'ported_sha256': hashlib.sha256(converted.encode()).hexdigest()}
-    adapter = Path(__file__).resolve().parents[1] / 'compat/iqpilot/iq_terminal.py'
-    target = output / 'iqpilot/selfdrive/carrot/ha/iq_terminal.py'
-    text = adapter.read_text()
-    ast.parse(text)
-    target.write_text(text)
-    manifest['files']['iqpilot/selfdrive/carrot/ha/iq_terminal.py'] = {'adapter_sha256': hashlib.sha256(text.encode()).hexdigest()}
+    for name in ('iq_terminal.py', 'iq_camera.py', 'iq_preflight.py'):
+        adapter = Path(__file__).resolve().parents[1] / 'compat/iqpilot' / name
+        target = output / 'iqpilot/selfdrive/carrot/ha' / name
+        text = adapter.read_text()
+        ast.parse(text)
+        target.write_text(text)
+        manifest['files']['iqpilot/selfdrive/carrot/ha/' + name] = {'adapter_sha256': hashlib.sha256(text.encode()).hexdigest()}
     manifest['blockers'][0] = 'Local PTY adapter prepared; test HA lease, reconnect, and offroad lifecycle on IQ.OS.'
     manager_path = 'iqpilot/system/manager/process_config.py'
     original = git(iq, 'show', 'HEAD:' + manager_path).decode()

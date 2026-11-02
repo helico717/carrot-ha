@@ -1,3 +1,10 @@
+## 2026-11-02 — IQpilot HA 설치 후보 조립 및 게시 준비
+
+- 사용자 요청으로 설치 가능한 개인 시험 후보 준비 계속. build_iqpilot_ha_candidate.py 추가: IQ 원본을 고정 Git 하위 저장소 vendor/iqpilot로 받고, 공개 Python·실행 스크립트와 HA 확장만 상위 Git에 공급. 대용량 바이너리는 원본에서 직접 받으며 서명·검증 경로를 끄거나 비공개 코드를 분석하지 않음. 처음 clone에서 vendor가 없어도 launch_openpilot 진입 후 Git 초기화를 할 수 있도록 실제 실행 파일을 제공한다.
+- iq_camera.py 추가: compiled IsTakingSnapshot 키 대신 Git 밖 소유권 marker/lock 사용. 다른 살아 있는 소유자 marker를 지우지 않고 IQ Sentry/Live View 또는 알 수 없는 상태에서 HA 카메라 차단. IQ 제어 Params 쓰기/삭제 거부. 전용 테스트4개 통과.
+- iq_preflight.py 추가: 읽기 전용 source/runtime 진단, 후보 소스 SHA256·submodule pin·실행 진입점·shell syntax 확인; 실제 기기에서는 ARM64/Python3.12/Params/DBC/카메라 schema/ffmpeg/OS/config 존재 확인. 카메라 시작/CAN송신/설정변경/재부팅 없음.
+- 실제 조립 후보에서 소스검사10개 및 계산·기록·로그·PTY·카메라 기능33개 통과. 공개 원본의 기존 공백 경고는 별도 확인했으며 불필요한 원본 본문 수정은 하지 않음. 기존 운용 브랜치와 별도 iq-ha 후보 브랜치 생성/게시 및 Linux CI 검증을 준비 중. HA 운영 반영·Release·Comma 설치·OS변경·실차 검증은 아직 없음.
+
 ## 2026-11-02 — Comma 복귀 백업 Mac 반출 및 검증 완료
 
 - 사용자 승인한 차량 백업을 같은 HA 인증 내 96KiB 블록으로 이어받아 완료. 최종 크기50288578 bytes, SHA256 ade4d0b3b447ad42ff9fdc559aa23e920744ef8f7c75b7f2f6beb22a2f24dad7로 기기 원본과 일치. 파일은 Git 밖 Mac 비공개 백업 폴더에 보관하며 사용자 파일/인증정보는 커밋하지 않는다.
