@@ -82,7 +82,7 @@ class TransferTests(unittest.TestCase):
 
 class ReconnectTests(unittest.IsolatedAsyncioTestCase):
     async def test_disconnect_preserves_blocks_and_reuses_login(self):
-        data = bytes(range(256)) * 80
+        data = bytes(range(256)) * (transfer.BLOCK_BYTES // 256 + 17)
         name = 'carrot-20261102T021704563634Z.tar.gz'
         connections, offsets = [], []
         with tempfile.TemporaryDirectory() as directory:

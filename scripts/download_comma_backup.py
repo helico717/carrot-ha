@@ -81,7 +81,7 @@ def command(filename, marker):
     return 'python3 -c ' + shlex.quote(code) + '\n'
 
 
-BLOCK_BYTES = 12288
+BLOCK_BYTES = 98304
 
 
 def block_command(filename, marker, offset):
@@ -127,6 +127,13 @@ async def transfer_blocks(session, access_token, args, partial):
     digest = hashlib.sha256()
     reconnects = 0
     with partial.open('xb') as stream:
+        resume = partial.with_suffix('.resume')
+        if resume.exists():
+            with resume.open('rb') as previous:
+                for chunk in iter(lambda: previous.read(1024 * 1024), b''):
+                    stream.write(chunk)
+                    digest.update(chunk)
+            print(f'RESUME_BYTES {stream.tell()}; final SHA256 still required', flush=True)
         async with timeout(1800):
             while total is None or stream.tell() < total:
                 acquired = acquiring = False

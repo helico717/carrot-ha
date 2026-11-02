@@ -1,3 +1,9 @@
+## 2026-11-02 — 블록 전송 운영 진행 및 속도 조정
+
+- 사용자 로그인 후 12KiB 요청 방식으로 연속 전송이 진행됐다. 전체 백업 크기 50288578 bytes 확인, 최종 파일은 아직 미완료. 왕복 요청 비용을 줄이기 위해 96KiB 요청으로 조정하고 재연결 합성 테스트 포함 7개 재검증 통과.
+- 기존 전송의 완료 블록 prefix를 비공개 .resume에 보존 후 기존 도구를 정상 인터럽트했다. 새 도구는 prefix를 재해시하여 이어받고 전체 SHA256이 원본과 같을 때만 최종 백업으로 확정한다. 기기 파일 변경 없음.
+- IQpilot release의 공개 Git 커밋 5c9291b9df6d90007d73ecd749b135bd5008e80d 확인, blob-filter/no-checkout 임시 Git 조사 저장소 생성. 공개 manager/process_config.py의 PythonProcess 등록·iqpilot namespace·iqdbc CAN parser·livestream 세 서비스 확인. 별도 터미널 backend와 camera 관리 조정이 필요하며 현재 Carrot daemon 그대로 설치 가능한 상태는 아니다. prebuilt/비공개 바이너리 내부는 분석하지 않았다. 실제 IQ+HA 이식/설치/OS 변경 없음.
+
 ## 2026-11-02 — 원격 백업 블록 이어받기 및 IQpilot 공개 소스 점검 계속
 
 - 세 번째 저속 전송도 종료: 마지막 서버 상태 connected/offroad/local_ready/ready 모두 true였고 최종 사유 device_disconnected. 실제 주행 때문이라고 단정하지 않는다. 미완성 파일 정리 및 OAuth 폐기 완료, Mac 최종 백업 없음.
