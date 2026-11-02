@@ -7,7 +7,8 @@
 - 검증: tests/test_pilot_pause.py 3개, 기존 driving_logs transport 6개(1 skip), params-card(스텁 하네스 갱신), dashboard lazy/live/view-state 통과. preview/iq-pause(실제 카드 코드 + mockHass, 실제 당근 설정 카탈로그)에서 IQ 전환 시 두 카드 블러·안내·inert·iframe 닫힘, 일시중지 35초 동안 devices 외 요청 없음, 당근 복귀 시 안내 제거·로그 세션 재생성 확인. 프리뷰의 당근 상태 파라미터 목록은 카탈로그 변환 차이로 일부만 표시됨.
 - 후보 iq-ha 25d213b: 실기 진단에 fast_sleep_off 추가. CI41392571135 success.
 - docs/IQPILOT_HA_INSTALL_AND_RETURN.md: 단계별 기대 결과·문제 대응표·Mac 보고 방법·FastSleep 끄기·일시중지 기능 설명으로 보강. 후보 SHA 25d213b로 갱신.
-- 배포 상태: HA 설치본(0.9.0)의 대상 파일이 저장소 HEAD와 동일함을 SSH로 확인. UI 승인 후 직접 반영 예정. HACS pre-release 미발행 — 다음 pre-release에 포함할 미발행 변경이다. 실기 미검증.
+- 배포 상태: HA 설치본(0.9.0)의 대상 파일이 저장소 HEAD와 동일함을 SSH로 확인한 뒤 UI 승인을 받았다. HACS pre-release 미발행 — 다음 pre-release에 포함할 미발행 변경이다. 실기 미검증.
+- HA 직접 반영(사용자 승인 후): 커밋 fdb0c5a의 7개 파일을 scripts/deploy_driving_logs_ha.py로 반영. 사전 충돌 검사 통과, 기존 5개 파일 백업 /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-fdb0c5a8730c/before, 설치 SHA256 7개 일치(별도 재확인 포함), Python 4개 AST 통과. HA 재시작은 사용자 작업이며 아직 미확인. 현재 Comma는 당근이므로 재시작 후에도 화면 변화 없음이 정상. pre-release 미발행.
 - 별도 발견(조치 안 함): 추적 파일 custom_components/carrot_ha/frontend/carrot-trip-days 2.js(커밋 5fc7cc6)는 iCloud 복사본 형식 이름이다. 사용자 확인 전 삭제하지 않는다.
 
 ## 2026-11-02 — IQ.OS→당근 복귀 위험 확인, 복귀 판정·Git 복귀 스크립트, 사용자 설치·복귀 절차
