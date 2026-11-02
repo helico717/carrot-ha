@@ -1,3 +1,13 @@
+## 2026-11-02 — 최신 IQ.OS 4.9.9.9.2 HA 업데이트 경로 준비
+
+- 사용자가 순정 IQ/OS 자동 갱신과 HA 유지 업데이트 경로 구현 및 실제 연결 복구를 요청. 업데이트 중 기기 읽기 전용 관찰, 재시작 후 /VERSION=4.9.9.9.2, release 11fcd742, UpdaterState=idle/실패0/주차 확인. 전원·재부팅 명령 실행 없음.
+- 진단: IQ 웹 LocalAPI no_verification_key_configured 및 Device Errors Unauthorized 관찰. 웹 offline을 실제 재부팅으로 단정하지 않음. 기기 직접 SSH 계정은 iq. 사용자 승인 후 Mac 기존 공개키를 Konn3kt 계정에 추가, 사용자 기기 메뉴에서 GitHub SSH 키 재등록 완료. 직접 연결 결과/실기 적용은 후속 기록.
+- 조립/진단 OS를 candidate manifest의 required_os와 정확히 비교. OS 변경은 reviewed_os_transitions.json의 정확한 원본 SHA만 검토 허용. 현재 전환은 소스/합성 계약 검토이며 실차 HA 검증을 뜻하지 않음.
+- 실제 IQ CAN Parser/DBC 검사에서 HA 전압 신호 정의 차이 확인. 고정 donor의 DBC를 HA 수집기 전용으로 보존하고 IQ 주행 DBC는 그대로 유지. 실 CAN parser/packer 합성 bus0/1→HA 값 및 현 camera capnp 스키마 시험 3개 통과. 바이너리/보안 검증 우회 없음.
+- Git 관리 설치기(업데이트 idle/주차/정확한 SHA·OS/무결성 확인, 런타임만 Git 밖 보존, 강제 checkout·reset·clean·재부팅 없음), 연결 전용 복원기 및 Mac stdin 전달 도구 준비. 임시 Git 설치 시험 3개, 후보 복원 시험 4개, 직접 전달 시험 2개 통과.
+- 관련 파일: compat/iqpilot/, scripts/{prepare_iqpilot_ha,build_iqpilot_ha_candidate,refresh_iq_ha,fetch_iqpilot_can_runtime}.py, tools/{receiver-recovery,iq-ha-restore}.py, tests/test_iqpilot_*.py, tests/test_iq_restore_transport.py, 최신 경로 문서. 기본 브랜치 자동 갱신 워크플로 시험 의존성도 별도 반영 예정.
+- 배포 상태: 개발/로컬 시험 진행 중. 후보 GitHub 게시·Linux CI·기기 전환·설정 복원·사용자 재부팅·HA 실제 수신/실차 검증은 아직 완료로 주장하지 않음. 릴리즈/태그/HA 서버 반영 없음.
+
 ## 2026-11-02 — 실제 클린 설치 후 HA 재연결 경로 조사
 
 - 사용자 요청: IQ.OS 업데이트 중 크롬의 기기 화면에서 읽기 전용 조사. app.konn3kt.com 자체 CLOUD WEBSSH 연결 성공. 같은 LAN SSH 외에도 최초 진단 경로가 있음을 실측.

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -52,6 +53,11 @@ def materialized(relative):
 
 
 def build(donor, iq, output, iq_sha=IQ_SHA):
+    launch_env = git(iq, 'show', 'HEAD:launch_env.sh').decode()
+    versions = set(re.findall(r'export AGNOS_VERSION="([^"]+)"', launch_env))
+    if len(versions) != 1:
+        raise ValueError('Expected one explicit IQ.OS version; review multi-device OS selection')
+    required_os = versions.pop().removeprefix('IQ.OS ')
     if output.exists():
         raise ValueError('Candidate destination must not exist')
     output.mkdir(parents=True)
@@ -98,6 +104,9 @@ def build(donor, iq, output, iq_sha=IQ_SHA):
     switch = output / 'bootstrap/switch_to_carrot.sh'
     switch.write_bytes((source_root / 'compat/iqpilot/switch_to_carrot.sh').read_bytes())
     switch.chmod(0o755)
+    installer = output / 'bootstrap/install_from_stock.py'
+    installer.write_bytes((source_root / 'compat/iqpilot/install_from_stock.py').read_bytes())
+    installer.chmod(0o755)
     launch = output / 'launch_chffrplus.sh'
     original = launch.read_text()
     preamble = 'bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap/ensure_vendor.sh" || exit $?\n'
@@ -111,20 +120,23 @@ def build(donor, iq, output, iq_sha=IQ_SHA):
     with (output / '.gitignore').open('a') as stream:
         stream.write('\n# HA companion runtime must never enter Git\niqpilot/selfdrive/carrot/ha/state/\n__pycache__/\n/.iqpilot-runtime-wheel-lock-sha256\n/.uv-tmp/\n')
     manifest.update({'status': 'INSTALL_CANDIDATE_PENDING_CI_AND_DEVICE', 'vendor_url': VENDOR_URL,
+                     'required_os': required_os,
                      'materialized_public_files': copied, 'vendor_links': linked,
                      'carrot_sha': CARROT_SHA})
     (output / 'HA_CANDIDATE.json').write_text(json.dumps(manifest, indent=2))
     (output / 'PORTABILITY.json').write_text(json.dumps(manifest, indent=2))
     tests = output / 'tests'
     tests.mkdir()
-    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py', 'test_iqpilot_return.py'):
+    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py', 'test_iqpilot_return.py', 'test_iqpilot_can_contract.py', 'test_iqpilot_restore.py', 'test_iqpilot_install.py'):
         text = (source_root / 'tests' / name).read_text()
         text = text.replace('compat/iqpilot/iq_camera.py', 'iqpilot/selfdrive/carrot/ha/iq_camera.py')
         text = text.replace('compat/iqpilot/iq_terminal.py', 'iqpilot/selfdrive/carrot/ha/iq_terminal.py')
         text = text.replace('compat/iqpilot/iq_video.py', 'iqpilot/selfdrive/carrot/ha/iq_video.py')
         text = text.replace('compat/iqpilot/iq_preflight.py', 'iqpilot/selfdrive/carrot/ha/iq_preflight.py')
         text = text.replace('compat/iqpilot/switch_to_carrot.sh', 'bootstrap/switch_to_carrot.sh')
+        text = text.replace('compat/iqpilot/install_from_stock.py', 'bootstrap/install_from_stock.py')
         (tests / name).write_text(text)
+    (tests / 'fetch_iqpilot_can_runtime.py').write_bytes((source_root / 'scripts/fetch_iqpilot_can_runtime.py').read_bytes())
     workflow = output / '.github/workflows/iq-ha-validation.yml'
     workflow.parent.mkdir(parents=True)
     workflow.write_text('''name: IQ HA candidate validation
@@ -143,7 +155,19 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python -m pip install aiohttp av
+      - run: python -m pip install aiohttp av pycapnp numpy requests
+      - name: Fetch pinned public CAN runtime (no vendor binaries)
+        run: |
+          pin=$(python -c 'import json; print(json.load(open("HA_CANDIDATE.json"))["iqpilot_sha"])')
+          git init /tmp/iq-can-source
+          git -C /tmp/iq-can-source remote add origin https://git.konn3kt.com/IQ.Lvbs/IQPilot.git
+          git -C /tmp/iq-can-source fetch --depth 1 --filter=blob:none origin "$pin"
+          git -C /tmp/iq-can-source update-ref HEAD FETCH_HEAD
+          python tests/fetch_iqpilot_can_runtime.py --repo /tmp/iq-can-source --output /tmp/iq-can-runtime
+      - name: Actual IQ CAN parser to HA values and current camera schema
+        env:
+          IQ_HA_CAN_PACKAGE_ROOT: /tmp/iq-can-runtime
+        run: python -m unittest discover -s tests -p test_iqpilot_can_contract.py
       - name: Source assembly and isolated PTY/camera guards
         run: |
           python -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only

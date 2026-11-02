@@ -26,7 +26,7 @@ def configure(host, identity, url, device, token, iqpilot=False):
         raise ValueError('Use a 32–256 character upload token without whitespace.')
     payload = {'transport': 'direct', 'url': url.rstrip('/'), 'device': device, 'token': token}
     subprocess.run(['ssh', '-i', str(Path(identity).expanduser()), '-o', 'ConnectTimeout=15',
-                    'comma@' + host, ("cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.direct_connection" if iqpilot else REMOTE)], input=json.dumps(payload), text=True, check=True)
+                    ('iq@' if iqpilot else 'comma@') + host, ("cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.direct_connection" if iqpilot else REMOTE)], input=json.dumps(payload), text=True, check=True)
 
 
 def main():

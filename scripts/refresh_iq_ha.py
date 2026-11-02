@@ -10,6 +10,7 @@ port patch no longer applies; those need a human review. Pushing is left to the 
 Exit codes: 0 committed or nothing to do (see the RESULT line), 1 error, 3 needs review.
 """
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -47,6 +48,22 @@ def agnos_version(launch_env):
     return match.group(1)
 
 
+def authorize_os_change(old_os, new_os, iq_sha, reviews=None):
+    """An exact source pin must be reviewed before crossing an OS boundary.
+
+    Subsequent source releases on the same OS keep the normal automated path.
+    This is source compatibility review, not a claim of a successful vehicle flash.
+    """
+    if old_os == new_os:
+        return
+    if reviews is None:
+        reviews = json.loads((Path(__file__).resolve().parents[1] /
+                              'compat/iqpilot/reviewed_os_transitions.json').read_text())
+    if not any(r['from'] == old_os and r['to'] == new_os and r['iqpilot_sha'] == iq_sha
+               for r in reviews):
+        raise NeedsReview(f'IQpilot now requires {new_os} instead of {old_os}; an OS reinstall needs review')
+
+
 def prefetch(repo, wanted_path):
     """One batched blob fetch; a filtered clone would otherwise fetch each file the builder reads separately."""
     wanted = []
@@ -73,7 +90,7 @@ def upstream_notes(iq, limit=25):
     return '\n'.join(lines[:limit])
 
 
-def run_tests(candidate):
+def run_tests(candidate, can_runtime=None):
     """Same checks as the iq-ha validation workflow; vendor binaries are not needed."""
     python = sys.executable
     steps = [[python, '-m', 'iqpilot.selfdrive.carrot.ha.iq_preflight', '--source-only'],
@@ -83,6 +100,9 @@ def run_tests(candidate):
         steps.append([python, '-m', 'unittest', 'discover', '-s', 'iqpilot/selfdrive/carrot/ha/tests', '-p', pattern])
     for step in steps:
         subprocess.run(step, cwd=candidate, check=True)
+    if can_runtime is not None:
+        subprocess.run([python, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_iqpilot_can_contract.py'],
+                       cwd=candidate, env={**os.environ, 'IQ_HA_CAN_PACKAGE_ROOT': str(can_runtime)}, check=True)
 
 
 def refresh(candidate, work, force=False, iqpilot_sha=None):
@@ -102,14 +122,14 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
     prefetch(iq, lambda relative: not linked_directory(relative) and materialized(relative))
     new_os = agnos_version(git('show', 'HEAD:launch_env.sh', cwd=iq))
     old_os = agnos_version((candidate / 'launch_env.sh').read_text())
-    if new_os != old_os:
-        raise NeedsReview(f'IQpilot now requires {new_os} instead of {old_os}; an OS reinstall needs review')
+    authorize_os_change(old_os, new_os, iqpilot_sha)
 
     donor = work / 'donor'
     git('clone', '-q', '--filter=blob:none', '--no-checkout', '-b', DONOR_BRANCH, DONOR_URL, str(donor))
     if git('rev-parse', 'HEAD', cwd=donor) != CARROT_SHA:
         raise NeedsReview(f'{DONOR_BRANCH} no longer points at the pinned Carrot commit {CARROT_SHA}')
-    prefetch(donor, lambda relative: relative.startswith('openpilot/selfdrive/carrot/ha/'))
+    prefetch(donor, lambda relative: relative.startswith('openpilot/selfdrive/carrot/ha/') or
+             relative == 'opendbc_repo/opendbc/dbc/vw_meb.dbc')
 
     output = work / 'candidate'
     try:
@@ -122,9 +142,12 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
     if git('rev-parse', 'FETCH_HEAD^{tree}', cwd=candidate) == git('rev-parse', 'HEAD^{tree}', cwd=candidate):
         return 'IDENTICAL', ''
     git('read-tree', '-u', '--reset', 'FETCH_HEAD', cwd=candidate)
-    run_tests(candidate)
+    from fetch_iqpilot_can_runtime import export
+    can_runtime = work / 'can-runtime'
+    export(iq, can_runtime)
+    run_tests(candidate, can_runtime)
     message = (f'chore(iq-ha): pin IQpilot {current[:8]} -> {iqpilot_sha[:8]}\n\n'
-               f'Automatic rebuild on {IQ_BRANCH}; IQ.OS stays {old_os}. HA companion tests passed on Linux.\n'
+               f'Rebuild on {IQ_BRANCH}; IQ.OS {old_os} -> {new_os}. Companion tests passed on {sys.platform}.\n'
                f'Not tried on a vehicle.\n\nUpstream: {git("log", "-1", "--format=%cs %s", cwd=iq)}\n'
                f'{upstream_notes(iq)}\n')
     subprocess.run(['git', *BOT, 'commit', '-q', '-F', '-'], cwd=candidate, input=message, text=True, check=True)

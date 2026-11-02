@@ -69,6 +69,14 @@ def prepare(donor, iq, output, iq_sha=IQ_SHA):
                 raise ValueError('Parameter sync entrypoint changed')
             converted = converted.replace(before,
                 "        print('IQpilot: Carrot parameter writes paused; queue not consumed', flush=True)")
+        if path == PREFIX + 'wayon_vehicle_telemetry.py':
+            # HA's measured MEB definitions differ from IQ's driving DBC. Keep a
+            # separate passive decoder; never replace the driving stack's DBC.
+            if converted.count('CANParser("vw_meb",') != 3:
+                raise ValueError('MEB telemetry parser entrypoints changed')
+            converted = converted.replace('CANParser("vw_meb",', 'CANParser(HA_MEB_DBC,')
+            converted = converted.replace('from pathlib import Path',
+                "from pathlib import Path\nHA_MEB_DBC = str(Path(__file__).with_name('dbc') / 'vw_meb.dbc')", 1)
         if path == PREFIX + 'driving_logs.py':
             before = "    raise OSError('ffmpeg is required to remux finalized qcamera for HA')"
             if converted.count(before) != 1:
@@ -89,7 +97,14 @@ def prepare(donor, iq, output, iq_sha=IQ_SHA):
         target.write_text(converted)
         manifest['files'][relative] = {'source_sha256': hashlib.sha256(original.encode()).hexdigest(),
                                        'ported_sha256': hashlib.sha256(converted.encode()).hexdigest()}
-    for name in ('iq_terminal.py', 'iq_camera.py', 'iq_preflight.py', 'iq_video.py'):
+    dbc_source = 'opendbc_repo/opendbc/dbc/vw_meb.dbc'
+    dbc_data = git(donor, 'show', 'HEAD:' + dbc_source)
+    dbc_target = output / 'iqpilot/selfdrive/carrot/ha/dbc/vw_meb.dbc'
+    dbc_target.parent.mkdir(parents=True, exist_ok=True)
+    dbc_target.write_bytes(dbc_data)
+    manifest['files']['iqpilot/selfdrive/carrot/ha/dbc/vw_meb.dbc'] = {
+        'source': dbc_source, 'source_sha256': hashlib.sha256(dbc_data).hexdigest()}
+    for name in ('iq_terminal.py', 'iq_camera.py', 'iq_preflight.py', 'iq_video.py', 'iq_restore.py'):
         adapter = Path(__file__).resolve().parents[1] / 'compat/iqpilot' / name
         target = output / 'iqpilot/selfdrive/carrot/ha' / name
         text = adapter.read_text()

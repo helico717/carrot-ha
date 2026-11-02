@@ -35,4 +35,5 @@ class RecoveryTests(unittest.TestCase):
             recovery.configure('192.168.1.10', '~/key', 'https://ha.example', 'existing', 'x'*32, True)
         args, kwargs = run.call_args
         self.assertIn('iqpilot.selfdrive.carrot.ha.direct_connection', args[0][-1])
+        self.assertIn('iq@192.168.1.10', args[0])
         self.assertNotIn('x'*32, str(args))

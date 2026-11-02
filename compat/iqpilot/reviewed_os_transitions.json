@@ -1,0 +1,9 @@
+[
+  {
+    "from": "4.9.9.4",
+    "to": "4.9.9.9.2",
+    "iqpilot_sha": "11fcd74243ede4f1f5df24db1ed2d44e2ac22664",
+    "review": "docs/IQPILOT_HA_UPDATE_PATH_2026-11-02.md",
+    "scope": "Public source, real IQ CAN/schema synthetic tests; vehicle HA field validation pending. Owner stock OS update observed complete."
+  }
+]

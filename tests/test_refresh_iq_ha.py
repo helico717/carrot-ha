@@ -18,6 +18,14 @@ class RefreshTests(unittest.TestCase):
         with self.assertRaises(refresh.NeedsReview):
             refresh.agnos_version('export OTHER=1\n')
 
+    def test_os_transition_requires_exact_reviewed_source(self):
+        review = [{'from': '4.9.9.4', 'to': '4.9.9.9.2', 'iqpilot_sha': 'a' * 40}]
+        refresh.authorize_os_change('4.9.9.4', '4.9.9.4', 'b' * 40, [])
+        refresh.authorize_os_change('4.9.9.4', '4.9.9.9.2', 'a' * 40, review)
+        for old, new, sha in [('4.9.9.4', '4.9.9.9.2', 'b'*40), ('4.9.9.4', '5.0', 'a'*40)]:
+            with self.assertRaises(refresh.NeedsReview):
+                refresh.authorize_os_change(old, new, sha, review)
+
     def test_selects_only_public_files_outside_linked_directories(self):
         self.assertTrue(refresh.materialized('iqpilot/selfdrive/ui/ui.py'))
         self.assertTrue(refresh.materialized('launch_env.sh'))
