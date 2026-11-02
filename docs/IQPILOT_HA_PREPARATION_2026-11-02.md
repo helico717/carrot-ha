@@ -1,6 +1,6 @@
 # IQpilot + Carrot HA 개인 시험 준비
 
-2026-11-02 KST. **검토용 소스 준비 단계이며 설치 가능한 배포본이 아니다.**
+2026-11-02 KST. **Git 설치 시험 후보를 iq-ha 브랜치에 게시했고 Linux CI가 통과했다. 실기·OS 왕복은 미검증이다.**
 현재 당근 설치·HA 실행 코드·차량 설정·OS는 변경하지 않았다.
 
 ## 고정한 기준
@@ -78,7 +78,7 @@ python3 scripts/prepare_iqpilot_ha.py \
 boot 압축 크기는 14,273,596 bytes, system은 1,010,655,092 bytes였다. 이미지 해시 검증,
 실제 설치·역방향 복귀·부트 체인 호환은 아직 하지 않았다.
 
-설치 가능한 후보를 만들기 전 다음을 마쳐야 한다.
+설치 후보의 실기 승인 전에 다음을 마쳐야 한다.
 
 1. **완료:** Mac 반출 백업의 전체 SHA256 및 SQLite 5개 무결성 확인.
 2. IQ.OS에서 compiled Params 키·CAN 디코딩·카메라 codec/소유권·자원 사용 검증 준비.
@@ -86,4 +86,31 @@ boot 압축 크기는 14,273,596 bytes, system은 1,010,655,092 bytes였다. 이
 4. IQ 로그와 기존 당근 로그를 구별해 디코딩하고 기존 HA 기록/식별자 연속성 확인.
 5. IQ 설치와 당근 OS 복귀를 함께 검증한 Git 전용 배포 경로 준비.
 
-새 IQ 배포 브랜치·HA 운영 반영·릴리즈·Comma 설치/재부팅은 아직 수행하지 않았다.
+## 설치 후보 게시 상태
+
+- 배포 브랜치: `helico717/openpilot:iq-ha`
+- 후보 커밋: `1421eb452e693283fc75451e188bf2a68eaf1ec1`
+- Linux CI: https://github.com/helico717/openpilot/actions/runs/41386251075 — success
+- 소스 조립검사 10개, 터미널/카메라/PyAV 및 기록 계약 35개 기능 검증 통과.
+- 설치 주소: `installer.comma.ai/helico717/iq-ha` (Comma에서의 첫 설치 시험은 아직 없음).
+
+원본 IQ는 `vendor/iqpilot`의 고정 Git 하위 저장소로 받는다. 상위 저장소에는 공개
+Python·실행 스크립트·HA 확장과 원본 파일 링크를 넣는다. 모델/실행 바이너리는 IQ 원본에서
+직접 받으며 서명 검증을 끄지 않는다. 첫 부팅 진입점은 하위 저장소가 없어도 실행되어
+Git 초기화를 완료한 뒤 원본 IQ 시작 절차로 넘어간다. `.iqpilot` 상태는 Git 밖
+`/data/iqpilot-ha-runtime`을 사용한다. 원본 stock updated 프로세스는 후보에서 비활성화하며
+업데이트는 이 전용 브랜치의 clean Git pull로만 한다.
+
+카메라 소유권은 compiled Params의 별도 키를 추가하지 않고 private marker/lock으로
+분리한다. IQ Sentry/Live View가 사용 중이거나 상태를 모르면 시작하지 않는다.
+ffmpeg CLI가 없으면 IQ의 기존 PyAV로 TS를 MP4로 stream-copy한다. 원본은 유지한다.
+후보 파일의 `HA_INSTALL.md` 및 `iq_preflight --source-only` / 기기 `iq_preflight`는
+시험 범위를 설명한다. 소스 점검과 실기 실행 점검은 구분한다.
+
+첫 시험은 차량이 주차되고 기기를 직접 확인할 수 있을 때 사용자만 진행한다.
+기존 당근에서 전환할 때는 강제 reset/파일 복사 대신 새 Git 브랜치로 전환한다.
+OS 설치가 시작되면 HA 연결이 중단될 수 있으므로 설치 중 원격 복귀를 보장하지 않는다.
+당근 복귀 ref와 Mac 백업은 확보됐지만, IQ.OS에서 당근 OS로 실제 돌아오는 과정은
+아직 통과하지 않았다. 기존 Params 전체를 IQ에 복원하지 않는다.
+
+운영 HA 반영·GitHub Release·Comma 실제 설치/재부팅은 수행하지 않았다.

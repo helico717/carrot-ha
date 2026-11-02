@@ -68,7 +68,7 @@ def build(donor, iq, output):
             continue
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        materialize = relative.endswith(PUBLIC_SUFFIXES) or relative in (
+        materialize = Path(relative).name == '.gitignore' or relative.endswith(PUBLIC_SUFFIXES) or relative in (
             'LICENSE', 'README.md', 'SECURITY.md', '.gitattributes', '.gitignore',
             'pyproject.toml', 'uv.lock', 'prebuilt')
         if mode == '120000' or not materialize:
@@ -106,10 +106,11 @@ def build(donor, iq, output):
     tests = output / 'tests'
     tests.mkdir()
     source_root = Path(__file__).resolve().parents[1]
-    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py'):
+    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py'):
         text = (source_root / 'tests' / name).read_text()
         text = text.replace('compat/iqpilot/iq_camera.py', 'iqpilot/selfdrive/carrot/ha/iq_camera.py')
         text = text.replace('compat/iqpilot/iq_terminal.py', 'iqpilot/selfdrive/carrot/ha/iq_terminal.py')
+        text = text.replace('compat/iqpilot/iq_video.py', 'iqpilot/selfdrive/carrot/ha/iq_video.py')
         (tests / name).write_text(text)
     workflow = output / '.github/workflows/iq-ha-validation.yml'
     workflow.parent.mkdir(parents=True)
@@ -122,14 +123,14 @@ permissions:
   contents: read
 jobs:
   companion:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python -m pip install aiohttp
+      - run: python -m pip install aiohttp av
       - name: Source assembly and isolated PTY/camera guards
         run: |
           python -m iqpilot.selfdrive.carrot.ha.iq_preflight --source-only
@@ -198,8 +199,12 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
 - Added separate parked-camera ownership and fail-closed IQ Sentry/Live View exclusion.
 - Added source/runtime diagnostics; no CAN actuation, camera startup or reboot in diagnostics.
 - Vendor binaries remain in the original pinned repository; public Python sources retain the upstream license.
-- Local validation: 10 source assembly checks and 33 functional checks pass. Linux CI/device/OS rollback status
+- Local validation: 10 source assembly checks and 35 functional checks pass. Linux CI/device/OS rollback status
   is tracked in the companion helico717/carrot-ha preparation report. No vehicle installation performed.
+- Initial Linux CI exposed a test expectation for Bash bracketed-paste ANSI output; normalize terminal
+  controls before checking the actual standalone output line. Git ignore files are regular tracked files.
+- Stock automatic source updating is disabled; companion updates use this Git branch only.
+- Finalized camera TS remux can use IQpilot's PyAV when the ffmpeg command is unavailable.
 ''')
     manifest['candidate_source_sha256'] = {
         str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()

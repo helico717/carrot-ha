@@ -1,3 +1,17 @@
+## 2026-11-02 — IQ HA 설치 후보 CI·원본 의존성 검증 및 Claude 인계
+
+- 수정 후보1421eb452e693283fc75451e188bf2a68eaf1ec1을 iq-ha에 정상 게시. 새 Linux CI41386251075 success 확인: 소스검사10개, 기능35개. 최초43a58f1/CI41385112866 실패는 별도로 보존하며 성공으로 바꿔 보고하지 않음.
+- Mac 별도 후보에서 실제 고정 Git 하위 저장소를 받아 5c9291b9 checkout/clean 확인. vendor 연결115개 전부 존재, camerad/encoderd 실행파일·params_pyx.so·env_sync.sh 존재 확인. vendor542MB/Git객체465MB 관측. 바이너리 실행·역공학·기기 설치는 하지 않았다. 실제 fetch 시험에는 --filter=blob:none을 사용했고 게시 bootstrap에는 아직 필터 최적화를 적용하지 않았다.
+- docs/IQPILOT_HA_CLAUDE_HANDOFF_2026-11-02.md에 사용자 목표·정확한 SHA/CI·완료한 비공개 백업·구현/시험 폴더·남은 CAN/카메라/IQ.OS 왕복·설치 및 Git/사용자 재부팅 제약을 기록. docs/IQPILOT_HA_PREPARATION_2026-11-02.md의 후보 게시 상태도 갱신했다.
+- 추가 CAN 파싱 시험용 Mac Python3.12.16 설치만 완료. 해당 환경에서 실제 iqdbc 합성/기록 CAN 비교는 미수행이며 인계 항목이다. 활성 인증/백업 전송 대기 프로세스 없음. 실기검증 전 정식 완성판으로 보고하지 않는다. 사용자 요청에 따라 후속 기능 개발을 멈추고 인계 문서·미커밋 작업을 정리한다.
+
+## 2026-11-02 — IQ HA 후보 첫 CI 실패 원인 확인 및 보완
+
+- IQ 후보43a58f1을 새 iq-ha 브랜치에 정상 게시, 원격 SHA 일치 확인. 실제 Linux 실행41385112866은 소스검사10개 통과 후 PTY 테스트1개 실패. GitHub 로그에서 Bash5 bracketed-paste ANSI sequence가 삽입되어 엄격한 CRLF 문자열 비교만 실패한 것을 확인했다. 실제 출력은 존재했다. 테스트가 ANSI/CR을 정규화한 뒤 독립 출력 행을 확인하도록 수정했다. 실제 오류 확인 전 주행/하드웨어 실패로 해석하지 않는다.
+- 배포 시 Git이 경고한 nested .gitignore symlink는 정규 tracked 파일로 materialize. stock updated 프로세스만 비활성화해 고정 companion 브랜치가 일반 IQ 업데이트로 교체되는 것을 예방한다. 조향·롱컨 프로세스 정의는 변경하지 않음.
+- iq_video.py 추가: ffmpeg CLI가 없으면 IQ의 기존 PyAV로 낮은 우선순위 subprocess에서 TS→MP4 stream-copy. 원본 유지·기존 출력 덮어쓰기 금지·실패 임시 파일 정리. 합성H264 TS4프레임의 MP4 디코딩/codec과 원본SHA 유지, 기존파일보존 2개 통과. 진단은 ffmpeg 또는 PyAV 존재 확인. IQ 설치 CI에는 PyAV를 설치해 테스트를 실행하고 일반 HA 환경에는 강제 의존성을 추가하지 않는다.
+- 공식 Actions 문서 확인 후 새 후보 workflow에 Node24 기반 checkout/setup-python v6 및 ubuntu24.04 지정. 수정 후보 전체검증35개와 새 실제 CI는 진행 중. 기존 당근/HA/Comma 설치·OS·재부팅은 변경하지 않았다.
+
 ## 2026-11-02 — IQpilot HA 설치 후보 조립 및 게시 준비
 
 - 사용자 요청으로 설치 가능한 개인 시험 후보 준비 계속. build_iqpilot_ha_candidate.py 추가: IQ 원본을 고정 Git 하위 저장소 vendor/iqpilot로 받고, 공개 Python·실행 스크립트와 HA 확장만 상위 Git에 공급. 대용량 바이너리는 원본에서 직접 받으며 서명·검증 경로를 끄거나 비공개 코드를 분석하지 않음. 처음 clone에서 vendor가 없어도 launch_openpilot 진입 후 Git 초기화를 할 수 있도록 실제 실행 파일을 제공한다.

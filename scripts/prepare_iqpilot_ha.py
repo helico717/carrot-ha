@@ -29,6 +29,9 @@ def port_source(text):
     text = text.replace('from opendbc.can import CANParser', 'from iqdbc.can.parser import CANParser')
     text = text.replace('openpilot/system/', 'iqpilot/system/')
     text = text.replace("ROOT / 'openpilot' /", "ROOT / 'iqpilot' /")
+    text = text.replace("sys.path[:0] = [str(ROOT), str(ROOT / 'pydeps')]", 'sys.path.insert(0, str(ROOT))')
+    text = text.replace('sys.path[:0] = [str(root), str(root / "pydeps")]', 'sys.path.insert(0, str(root))')
+    text = text.replace("    sys.path.insert(0, str(Path(__file__).resolve().parents[5] / 'pydeps'))", '    # Use the IQ runtime; never shadow it with legacy Carrot pydeps.')
     return text
 
 
@@ -65,6 +68,11 @@ def prepare(donor, iq, output):
                 raise ValueError('Parameter sync entrypoint changed')
             converted = converted.replace(before,
                 "        print('IQpilot: Carrot parameter writes paused; queue not consumed', flush=True)")
+        if path == PREFIX + 'driving_logs.py':
+            before = "    raise OSError('ffmpeg is required to remux finalized qcamera for HA')"
+            if converted.count(before) != 1:
+                raise ValueError('Video remux entrypoint changed')
+            converted = converted.replace(before, '    from .iq_video import prepare_video as av_prepare_video\n    return await av_prepare_video(video, working)')
         if path.startswith(PREFIX + 'camera/'):
             converted = converted.replace('from iqpilot.common.params import Params', 'from ..iq_camera import CameraParams as Params')
         if path == PREFIX + 'camera/probe.py':
@@ -80,7 +88,7 @@ def prepare(donor, iq, output):
         target.write_text(converted)
         manifest['files'][relative] = {'source_sha256': hashlib.sha256(original.encode()).hexdigest(),
                                        'ported_sha256': hashlib.sha256(converted.encode()).hexdigest()}
-    for name in ('iq_terminal.py', 'iq_camera.py', 'iq_preflight.py'):
+    for name in ('iq_terminal.py', 'iq_camera.py', 'iq_preflight.py', 'iq_video.py'):
         adapter = Path(__file__).resolve().parents[1] / 'compat/iqpilot' / name
         target = output / 'iqpilot/selfdrive/carrot/ha' / name
         text = adapter.read_text()
@@ -94,6 +102,11 @@ def prepare(donor, iq, output):
     if original.count(boundary) != 1 or '"carrot_ha"' in original:
         raise ValueError('IQ manager registry changed')
     registration = '''# Personal Carrot HA companion: preserve IQ driving process definitions.
+# The stock updater does not understand the pinned companion superproject.
+for companion_process in procs:
+  if companion_process.name == 'updated':
+    companion_process.enabled = False
+
 def carrot_ha_configured(started, params, CP):
   return not_low_power(started, params, CP) and any(os.path.isfile(path) for path in (
     '/data/id4-collector/connection.json', '/data/carrot_ha/connection.json',
