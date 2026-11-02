@@ -1,3 +1,10 @@
+## 2026-11-02 — 최종 후보 706bc97 준비 완료·사용자 설치 대기
+
+- carrot-ha e0f20eb, iq-ha 706bc979c49b17710f584ef426aa3af59e63ce49 게시. Linux CI41445761367 success. 이전 후보45899f4 CI41444994340 및 기본 브랜치 e45592a 자동 갱신41444999717 success.
+- 실제 자동 갱신 도구 --force로 새 후보 조립·시험·커밋 재현. 58개 고유 시험(기본/기록/실 IQ CAN 계약) 통과, CAN 별도 실행 전 중복 발견의 3개 skip은 별도 실제 입력 실행으로 통과. shallow 보완 시험 포함.
+- 기기 /data/iq-ha-install은 706bc97, vendor=11fcd742 준비 완료. --no-local Git 복제로 shallow 원본 재사용 성공. 기기에서 source-only 11개 체크 및 installer validate 통과(INSTALL_READY_NO_SOURCE_SWITCH).
+- 저장소 사용자 설치·재시작 원칙에 따라 크롬 IQ 터미널에 활성화 명령만 입력하고 Enter 실행은 사용자에게 넘김. 현재 실행 저장소 순정 및 연결 설정은 아직 변경하지 않음. 사용자 실행 결과·복원·재부팅·HA 수신을 이어 확인할 예정.
+
 ## 2026-11-02 — 설치 준비 중 순정 shallow Git 차이 보완
 
 - 후보 45899f4 Linux CI41444994340 및 기본 브랜치 e45592a 자동 갱신 자체 검증41444999717 success 확인.

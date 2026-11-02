@@ -1,5 +1,7 @@
 # IQpilot + HA 유지 업데이트 경로 — 2026-11-02
 
+배포 준비 후보: `706bc979c49b17710f584ef426aa3af59e63ce49` (iq-ha), Linux CI41445761367 success.
+
 ## 현재 실제 상태
 
 기기 순정 IQ release `11fcd74243ede4f1f5df24db1ed2d44e2ac22664`와
