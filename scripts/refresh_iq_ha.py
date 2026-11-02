@@ -92,7 +92,7 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
         iqpilot_sha = git('ls-remote', IQ_URL, 'refs/heads/' + IQ_BRANCH).split()[0]
     print(f'IQpilot pinned {current}, requested {iqpilot_sha}', flush=True)
     if iqpilot_sha == current and not force:
-        return 'UP_TO_DATE'
+        return 'UP_TO_DATE', ''
 
     iq = work / 'iqpilot'
     git('clone', '-q', '--filter=blob:none', '--no-checkout', '-b', IQ_BRANCH, IQ_URL, str(iq))
@@ -120,7 +120,7 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
     git(*BOT, 'commit', '-q', '-m', 'assembled', cwd=output)
     git('fetch', '-q', str(output), 'HEAD', cwd=candidate)
     if git('rev-parse', 'FETCH_HEAD^{tree}', cwd=candidate) == git('rev-parse', 'HEAD^{tree}', cwd=candidate):
-        return 'IDENTICAL'
+        return 'IDENTICAL', ''
     git('read-tree', '-u', '--reset', 'FETCH_HEAD', cwd=candidate)
     run_tests(candidate)
     message = (f'chore(iq-ha): pin IQpilot {current[:8]} -> {iqpilot_sha[:8]}\n\n'
@@ -128,7 +128,8 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
                f'Not tried on a vehicle.\n\nUpstream: {git("log", "-1", "--format=%cs %s", cwd=iq)}\n'
                f'{upstream_notes(iq)}\n')
     subprocess.run(['git', *BOT, 'commit', '-q', '-F', '-'], cwd=candidate, input=message, text=True, check=True)
-    return 'COMMITTED'
+    changed = git('diff', '--name-only', 'HEAD~1', 'HEAD', cwd=candidate).splitlines()
+    return 'COMMITTED', f'{len(changed)} files: ' + ', '.join(changed[:8])
 
 
 def report(result, detail=''):
@@ -149,13 +150,13 @@ def main():
     args = parser.parse_args()
     folder = tempfile.mkdtemp(prefix='iq-ha-refresh-')
     try:
-        result = refresh(args.candidate, Path(folder), args.force, args.iqpilot_sha)
+        result, detail = refresh(args.candidate, Path(folder), args.force, args.iqpilot_sha)
     except NeedsReview as error:
         report('NEEDS_REVIEW', str(error))
         return 3
     finally:
         shutil.rmtree(folder, ignore_errors=True)
-    report(result)
+    report(result, detail)
     return 0
 
 
