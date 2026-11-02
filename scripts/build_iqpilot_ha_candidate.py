@@ -245,7 +245,8 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
 ''')
     manifest['candidate_source_sha256'] = {
         str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in output.rglob('*')
+        # Sorted: directory order differs between macOS and Linux, and the manifest must be reproducible.
+        for path in sorted(output.rglob('*'))
         if path.relative_to(output).parts[0] != '.git' and not path.is_symlink()
         and path.is_file() and path.name not in ('HA_CANDIDATE.json', 'PORTABILITY.json')}
     (output / 'HA_CANDIDATE.json').write_text(json.dumps(manifest, indent=2))
