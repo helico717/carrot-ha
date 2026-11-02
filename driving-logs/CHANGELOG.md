@@ -1,3 +1,10 @@
+## 2026-11-02 — 같은 Wi-Fi 없이 Comma 백업 반출 준비
+
+- 사용자 요청으로 현재 터미널 소스와 운영 HA 화면을 확인: 다운로드 버튼/API는 없으며 관리자 전용 HA WebSocket terminal subscribe/acquire/input과 base64 PTY 출력이 존재한다. 소스: terminal_ws.py, terminal_relay.py, frontend/carrot-terminal-card.js, openpilot terminal.py. 일반 로그 업로드 API를 백업 전송에 재사용하지 않는다.
+- scripts/download_comma_backup.py 및 tests/test_backup_transfer.py 추가. Mac에서 HA HTTPS OAuth 로그인 후 기존 관리자 터미널로 지정 백업만 읽고 로컬 0600 파일에 저장한다. Comma 파일 쓰기·HA 배포·기기 Git 변경·외부 포트 개방 없음. OAuth 토큰은 메모리 보관, 정상/예외 종료 시 refresh token 폐기 시도. 강제 종료·네트워크 장애에는 폐기가 실패할 수 있다.
+- 청크 순서·크기·기존 SHA-256 확인 후에만 최종 파일로 전환. 실패 시 partial 삭제, 제어권 보유 시 Ctrl+C와 세션 해제. 기존 브라우저 터미널 제어권은 먼저 해제해야 한다. 자동 차량 선택은 등록된 carrot_ha 기기가 하나일 때만 허용한다.
+- 합성 테스트 4개 통과: 실제 생산 명령의 분할/CRLF 스트림 왕복, 해시 불일치, 청크 누락, 경로/명령 주입 거부. macOS Python3.9 timeout 호환 적용. 실제 HA OAuth 승인·차량 데이터 전송·외부 백업 완료는 아직 미검증. 사용자 승인 없는 로그인 자격증명 추출은 하지 않았다. 임시 환경 aiohttp 설치, 사용자 기기 재시작/업데이트 없음.
+
 ## 2026-11-02 — IQpilot 시험 전 당근 복귀 기준 및 비공개 백업 준비
 
 - 사용자 요청: 작은 Comma 화면의 입력 오류를 줄이는 복귀 주소와 왕복 전환 준비. helico717/openpilot의 ha-back 브랜치를 실제 설치 커밋 5ec4868a12a9038547b373eb95be3a5fa86d30aa에 생성했다. 해당 ref의 launch_env.sh 조회 성공, 기본 OS 19.8-carrot-bt1 확인. 복귀 주소 installer.comma.ai/helico717/ha-back. 브랜치를 자동 업데이트하지 않는다. 설치 URL의 기기 실설치·OS 복구는 미검증.
