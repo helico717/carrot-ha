@@ -131,6 +131,16 @@ def refresh(candidate, work, force=False, iqpilot_sha=None):
     return 'COMMITTED'
 
 
+def report(result, detail=''):
+    print(f'RESULT={result} {detail}'.rstrip(), flush=True)
+    if os.environ.get('GITHUB_ACTIONS'):
+        # Annotations stay readable on the public run page without signing in.
+        print(f'::notice title=iq-ha refresh::{result} {detail}'.rstrip(), flush=True)
+    if os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+            stream.write(f'result={result}\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--candidate', required=True, help='checkout of the iq-ha branch')
@@ -141,17 +151,11 @@ def main():
     try:
         result = refresh(args.candidate, Path(folder), args.force, args.iqpilot_sha)
     except NeedsReview as error:
-        print(f'RESULT=NEEDS_REVIEW {error}', flush=True)
-        if os.environ.get('GITHUB_OUTPUT'):
-            with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-                stream.write('result=NEEDS_REVIEW\n')
+        report('NEEDS_REVIEW', str(error))
         return 3
     finally:
         shutil.rmtree(folder, ignore_errors=True)
-    print(f'RESULT={result}', flush=True)
-    if os.environ.get('GITHUB_OUTPUT'):
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-            stream.write(f'result={result}\n')
+    report(result)
     return 0
 
 
