@@ -86,6 +86,10 @@ def build(donor, iq, output):
     bootstrap.parent.mkdir()
     bootstrap.write_text(BOOTSTRAP)
     bootstrap.chmod(0o755)
+    source_root = Path(__file__).resolve().parents[1]
+    switch = output / 'bootstrap/switch_to_carrot.sh'
+    switch.write_bytes((source_root / 'compat/iqpilot/switch_to_carrot.sh').read_bytes())
+    switch.chmod(0o755)
     launch = output / 'launch_chffrplus.sh'
     original = launch.read_text()
     preamble = 'bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap/ensure_vendor.sh" || exit $?\n'
@@ -105,12 +109,13 @@ def build(donor, iq, output):
     (output / 'PORTABILITY.json').write_text(json.dumps(manifest, indent=2))
     tests = output / 'tests'
     tests.mkdir()
-    source_root = Path(__file__).resolve().parents[1]
-    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py'):
+    for name in ('test_iqpilot_camera.py', 'test_iqpilot_terminal.py', 'test_iqpilot_video.py', 'test_iqpilot_return.py'):
         text = (source_root / 'tests' / name).read_text()
         text = text.replace('compat/iqpilot/iq_camera.py', 'iqpilot/selfdrive/carrot/ha/iq_camera.py')
         text = text.replace('compat/iqpilot/iq_terminal.py', 'iqpilot/selfdrive/carrot/ha/iq_terminal.py')
         text = text.replace('compat/iqpilot/iq_video.py', 'iqpilot/selfdrive/carrot/ha/iq_video.py')
+        text = text.replace('compat/iqpilot/iq_preflight.py', 'iqpilot/selfdrive/carrot/ha/iq_preflight.py')
+        text = text.replace('compat/iqpilot/switch_to_carrot.sh', 'bootstrap/switch_to_carrot.sh')
         (tests / name).write_text(text)
     workflow = output / '.github/workflows/iq-ha-validation.yml'
     workflow.parent.mkdir(parents=True)
@@ -166,6 +171,16 @@ IQ settings remain on the device; there is no claimed IQ parameter editor in HA 
 and video reuse the existing upload API; Carrot-specific log analysis is not claimed compatible.
 IQ Sentry/Live View take precedence over the HA parked camera. No vehicle runtime tests have passed yet.
 Do not use an updater/branch selector to replace this companion branch with stock IQ inadvertently.
+
+The runtime diagnostics also print `carrot_return`. It checks, read-only, whether the inactive-slot
+partitions are writable by the Carrot OS flasher (IQ.OS removes owner root). Only
+`SOFTWARE_RETURN_POSSIBLE_UNVERIFIED` allows the software return; otherwise plan a recovery first.
+Return to the pinned Carrot commit with Git only (no force/reset/clean, stops on any conflict):
+
+    cd /data/openpilot
+    bash bootstrap/switch_to_carrot.sh
+
+Then reboot. Full owner procedure: carrot-ha docs/IQPILOT_HA_INSTALL_AND_RETURN.md.
 ''')
     (output / 'README.md').write_text('''# IQpilot + Carrot HA 개인 시험 후보
 
@@ -205,6 +220,14 @@ HA/Comma 실제 설치·주행 검증 없이 로컬/CI 통과만으로 안정성
   controls before checking the actual standalone output line. Git ignore files are regular tracked files.
 - Stock automatic source updating is disabled; companion updates use this Git branch only.
 - Finalized camera TS remux can use IQpilot's PyAV when the ffmpeg command is unavailable.
+
+## 2026-11-02 — Carrot return readiness
+
+- Diagnostics report read-only inactive-slot write access for the Carrot OS flasher, the /AGNOS
+  marker the Carrot launcher requires for its OS reinstall, and sudo availability.
+- Added a Git-only return script to the pinned Carrot commit; it refuses onroad, local tracked
+  changes, an unexpected ha-back commit and untracked collisions, and never reboots.
+- Not yet tried on a device; the IQ.OS -> Carrot OS flash remains unverified.
 ''')
     manifest['candidate_source_sha256'] = {
         str(path.relative_to(output)): hashlib.sha256(path.read_bytes()).hexdigest()

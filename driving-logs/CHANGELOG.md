@@ -1,3 +1,14 @@
+## 2026-11-02 — IQ.OS→당근 복귀 위험 확인, 복귀 판정·Git 복귀 스크립트, 사용자 설치·복귀 절차
+
+- 인계 후 원격 상태 재확인: iq-ha 1421eb45, ha-back 5ec4868a 고정, CI41386251075 success. 운영 carrot-wip-model_selector-ha는 a6a58ae9로 진행했고 5ec4868a는 그 조상임을 확인. 백업·로그인은 반복하지 않았다.
+- 복귀 경로 소스 조사(공개 소스만, 비공개 바이너리 분석 없음): IQ 원본 utils.py에 IQ.OS 4.9.9.2부터 기기 owner root 제거가 명시돼 있다. 당근 agnos.py는 sudo 없이 비활성 슬롯 파티션에 직접 쓰고 abctl을 호출하므로 IQ.OS 위 당근 OS 재설치 가능 여부는 미확인 위험이다. 당근 런처는 /AGNOS 표식이 있을 때만 OS 재설치를 실행하고, 실패 시 포트6999 복구 터미널을 먼저 띄운다. IQ.OS 이미지는 공개 주소가 404이며 IQ 서버 기기 등록(일련번호·IMEI·공개키 전송) 인증 경로로만 받는다.
+- 당근 기본 업데이터의 브랜치 선택으로 iq-ha 전환은 openpilot/system/hardware/tici/agnos.json 경로가 없어 OS 단계에서 실패하므로 사용하지 않는다. 빈 manifest 등으로 우회하지 않고, 강제 옵션 없는 Git checkout 절차를 사용한다.
+- compat/iqpilot/iq_preflight.py: 실기 진단에 carrot_return 별도 보고 추가(passed와 분리). 읽기 전용으로 현재 슬롯, 비활성 슬롯 xbl/xbl_config/abl/aop/devcfg/boot/system 쓰기 권한(열지 않고 access만), /AGNOS 표식, sudo -n 가능 여부를 보고하고 SOFTWARE_RETURN_POSSIBLE_UNVERIFIED/BLOCKED를 판정. abctl 슬롯 변경 권한은 여전히 미검증.
+- compat/iqpilot/switch_to_carrot.sh(후보 bootstrap/switch_to_carrot.sh): 고정 ha-back 5ec4868a로의 Git 전용 복귀. 주행 중·origin 불일치·추적 파일 변경·예상 외 커밋에서 거부, --force/reset/clean 없음, 미추적 파일 충돌 시 HEAD 유지, 재부팅 안 함. tests/test_iqpilot_return.py 8개(합성 파티션·로컬 Git 저장소) 통과. 빌더가 새 파일·테스트·안내를 조립하도록 갱신했고 재조립 결과가 게시 후보와 의도한 변경 외 동일함을 확인.
+- iq-ha 후속 커밋 7118c2f, a9edcebe183fde1654ad84f7c9f7948fd4a0aff2 정상 push(force 없음). Linux CI41388595172, 41388791014 success. Mac 후보 source-only passed, test_iqpilot_* 15개 통과(PyAV 2개 skip, CI에서 실행).
+- docs/IQPILOT_HA_INSTALL_AND_RETURN.md 추가: 사용자 실행용 시작 조건, 당근→IQ Git 전환 7단계, IQ.OS 진단·실기 확인표, IQ→당근 복귀와 OS 기록 실패 시 6999 복구 터미널에서 IQ로 되돌리는 경로, 운영 브랜치 ff-only 복귀, 소프트웨어 복귀 차단 시 대응.
+- 미검증: 실제 Comma 설치·IQ.OS 기록/부팅, IQ.OS 위 실제 carrot_return 결과, 실제 CAN·카메라·차계부·로그 업로드, 당근 OS 재설치 복귀, USB 복구. iqdbc 합성 CAN 비교는 미수행. HA 운영 코드·Release·기기 변경 없음.
+
 ## 2026-11-02 — IQ HA 설치 후보 CI·원본 의존성 검증 및 Claude 인계
 
 - 수정 후보1421eb452e693283fc75451e188bf2a68eaf1ec1을 iq-ha에 정상 게시. 새 Linux CI41386251075 success 확인: 소스검사10개, 기능35개. 최초43a58f1/CI41385112866 실패는 별도로 보존하며 성공으로 바꿔 보고하지 않음.

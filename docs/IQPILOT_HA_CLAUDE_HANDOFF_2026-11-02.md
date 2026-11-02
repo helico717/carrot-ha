@@ -34,14 +34,25 @@ IQ.OS 실제 구동·카메라 영상·주행/충전 기록 연속성·당근 OS
 | IQ 원본 Git | https://git.konn3kt.com/IQ.Lvbs/IQPilot.git |
 | IQ 기대 OS | IQ.OS 4.9.9.4 |
 | 새 HA 포함 설치 후보 | helico717/openpilot:iq-ha |
-| 최신 후보 커밋 | 1421eb452e693283fc75451e188bf2a68eaf1ec1 |
+| 최신 후보 커밋 | a9edcebe183fde1654ad84f7c9f7948fd4a0aff2 (이전 1421eb45) |
 | 짧은 후보 설치 주소 | installer.comma.ai/helico717/iq-ha |
-| 성공 CI | https://github.com/helico717/openpilot/actions/runs/41386251075 |
+| 성공 CI | https://github.com/helico717/openpilot/actions/runs/41388791014 (a9edceb), 이전 41386251075 |
 | 첫 실패 CI | https://github.com/helico717/openpilot/actions/runs/41385112866 |
 
 설치 URL은 Comma에서 실제 첫 설치 시험을 한 주소가 아니다. Git 브랜치 존재와 코드·CI
 성공은 확인했다. 현재 사용자 기기는 여전히 당근이며 에이전트가 기기 소스를 수정하거나
 설치·재부팅한 적 없다. HA 운영 코드 반영/HACS 업데이트/GitHub Release도 하지 않았다.
+
+### 2026-11-02 Claude 후속 상태
+
+- 사용자 실행 절차: [docs/IQPILOT_HA_INSTALL_AND_RETURN.md](IQPILOT_HA_INSTALL_AND_RETURN.md). 전환은 강제 옵션 없는
+  Git checkout, 복귀는 후보의 `bootstrap/switch_to_carrot.sh`. 당근 업데이터 브랜치 선택은 쓰지 않는다
+  (iq-ha에 당근 OS manifest 경로가 없어 OS 단계에서 실패).
+- 가장 큰 미확인 위험: IQ.OS 4.9.9.2+는 owner root를 제거하고, 당근 OS 설치기는 sudo 없이 파티션에 직접 쓴다.
+  IQ.OS 진단의 `carrot_return.verdict`(읽기 전용)를 받은 뒤에만 복귀를 안내한다. 당근 런처는 `/AGNOS`가
+  있어야 OS를 재설치하며, 실패 시 6999 복구 터미널에서 iq-ha로 Git 되돌리기가 가능하다.
+- IQ.OS 이미지는 공개 다운로드가 아니며 IQ 서버 기기 등록 인증이 필요하다(사용자에게 고지함).
+- 다음 할 일: 사용자의 실제 설치 결과와 IQ.OS 진단 JSON을 받아 판단. iqdbc 합성 CAN 비교는 여전히 선택 항목.
 
 ## 3. 반드시 지킬 규칙
 
