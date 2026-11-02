@@ -1,3 +1,9 @@
+## 2026-11-02 — Comma 복귀 백업 Mac 반출 및 검증 완료
+
+- 사용자 승인한 차량 백업을 같은 HA 인증 내 96KiB 블록으로 이어받아 완료. 최종 크기50288578 bytes, SHA256 ade4d0b3b447ad42ff9fdc559aa23e920744ef8f7c75b7f2f6beb22a2f24dad7로 기기 원본과 일치. 파일은 Git 밖 Mac 비공개 백업 폴더에 보관하며 사용자 파일/인증정보는 커밋하지 않는다.
+- 독립 재검증: 전체 SHA256, private0600 권한, manifest의 원래 커밋5ec4868a 및 OS19.8-carrot-bt1, Params 포함 확인. archive 내 SQLite5개 각각 read-only quick_check 통과. 원본 Comma 백업 유지, 검증 완료 후 Mac 도구의 중간 .resume만 정리. 해시 sidecar 저장. 임시 HA refresh token 폐기 성공.
+- 복귀 ref·기기 외부 설정/DB 백업 확보 단계 완료. IQpilot 설치본은 아직 아님. 공개 IQ MEB DBC의 필수8개 메시지 및 에너지/전압/용량/거리/외기온6개 신호 존재 확인. 실제 CAN/카메라/IQ.OS 왕복/실차 검증 대기 상태 유지. 운영 HA/Comma 프로그램·OS·설정·재부팅 변경 없음.
+
 ## 2026-11-02 — IQpilot 개인 시험용 소스 준비와 독립 PTY 어댑터
 
 - scripts/prepare_iqpilot_ha.py 추가. 실제 당근 SHA5ec4868a 및 IQ 안정판 SHA5c9291b9를 고정해 공개 HA Python과 최소 manager 등록 검토 사본 생성. 47개 파일 AST 검사. opendbc.can CANParser를 iqdbc.can.parser에 연결, checkout 경로/data/openpilot와 영속 경로 보존. 기존 IQ 주행 프로세스·low_power 정책 유지. 설치 가능한 릴리즈가 아닌 REVIEW_ONLY_NOT_INSTALLABLE 표시.

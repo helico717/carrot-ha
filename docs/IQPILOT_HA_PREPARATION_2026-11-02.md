@@ -31,7 +31,7 @@
 장시간 PTY 출력 전송은 연결 단절로 실패했다. 마지막 관측 상태는 offroad/local_ready가
 모두 true였으므로 실제 주행 때문이라고 해석하지 않는다. 현재 96KiB 요청·블록 SHA256·
 완료 offset 이어받기·같은 로그인 내 재연결을 사용한다. 최종 전체 SHA256까지 일치해야
-외부 백업 완료로 판정한다. 현재 실제 반출 결과는 companion CHANGELOG에 후속 기록한다.
+외부 백업 완료로 판정한다. 실제 Mac 반출이 완료됐고 원본 SHA256 일치, SQLite 5개 read-only quick_check, Params와 원래 커밋·OS·비공개 권한을 확인했다. 임시 인증 폐기도 완료됐다.
 백업에는 인증정보가 포함되므로 Git/공개 저장소에 넣지 않는다. OS 이미지·모델·주행 영상은
 이 백업의 범위가 아니다. Params 전체를 IQpilot에 무조건 복원하지 않는다.
 
@@ -41,7 +41,7 @@
 - 공개 manager에 PythonProcess를 추가할 수 있다. 기존 주행 프로세스 정의는 유지하고
   HA/카메라 companion 등록만 별도로 준비했다. IQ FastSleep low_power 정책도 유지한다.
 - MEB DBC `vw_meb`와 CANParser의 `(dbc_name, messages, bus)` / `update(frames)` 경로가 있다.
-  실제 IQ DBC를 사용한 recorded-CAN 결과 비교는 아직 필요하다.
+  공개 IQ DBC에서 필수 8개 메시지와 에너지·전압·용량·거리·외기온 6개 신호 존재를 확인했다. 실제 IQ DBC를 사용한 recorded-CAN 결과 비교는 아직 필요하다.
 - 차량/위치/주변장치 메시지와 wide/road/driver livestream encode 서비스는 존재한다.
 - 현재 당근 terminal은 localhost:7000 당근웹 PTY에 의존한다. `compat/iqpilot/iq_terminal.py`는
   별도 리스너 없이 PTY를 소유하는 어댑터다. HA 관리자 lease와 명시적 offroad 검사는 유지한다.
@@ -80,7 +80,7 @@ boot 압축 크기는 14,273,596 bytes, system은 1,010,655,092 bytes였다. 이
 
 설치 가능한 후보를 만들기 전 다음을 마쳐야 한다.
 
-1. Mac 반출 백업의 전체 SHA256 및 DB 무결성 확인.
+1. **완료:** Mac 반출 백업의 전체 SHA256 및 SQLite 5개 무결성 확인.
 2. IQ.OS에서 compiled Params 키·CAN 디코딩·카메라 codec/소유권·자원 사용 검증 준비.
 3. IQ Sentry/Live View와 카메라 자원 충돌 시 실패 처리 및 주행전환 종료 확인.
 4. IQ 로그와 기존 당근 로그를 구별해 디코딩하고 기존 HA 기록/식별자 연속성 확인.
