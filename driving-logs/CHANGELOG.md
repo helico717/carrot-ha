@@ -1,3 +1,10 @@
+## 2026-11-02 — Claude IQpilot HA 후속 변경 검토
+
+- a7d1107 및 후보 a35b564 검토. 상세: docs/IQPILOT_HA_REVIEW_2026-11-02.md.
+- 복귀 스크립트의 Params 누락 시 전환 허용(P1)을 로컬 Git fixture로 재현. 설치 안내의 로고 화면 기반 OS 상태 단정(P2) 확인.
+- 복귀 8, 갱신 helper 2, 일시중지 3, Node 6 시험 통과. 공개 후보 CI41396971640 success 확인. 실차·OS 복귀·신규 IQ 자동 갱신 미검증.
+- 실행 코드 수정·차량/HA 반영·재부팅·릴리즈 없음. 검토 문서와 조사 기록만 추가. P1 수정 후 재검토 필요.
+
 ## 2026-11-02 — IQ.drive 업데이트 버튼과 IQ 원본 자동 갱신 작업
 
 - 사용자 승인(프리뷰 preview/iq-pull): 터미널 카드가 Comma 보고 브랜치가 iq- 이면 Git 버튼을 "📥 IQ.drive 업데이트"로 바꾸고 `git pull --ff-only && git submodule update --init --depth 1 -- vendor/iqpilot`를 실행한다(reset --hard 없음). 당근일 때는 기존과 같다. tests/terminal-git-status.test.mjs 5개 통과. 커밋 8561893을 HA에 SSH 직접 반영: 사전 충돌 검사 통과, 백업 /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-85618934d4c7/before, 설치 SHA256 일치. HA 재시작은 사용자 작업(미확인).
