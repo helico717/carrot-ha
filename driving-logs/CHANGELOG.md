@@ -1,3 +1,15 @@
+## 2026-11-02 — IQ.drive 사용 중 당근 전용 기능 일시중지, FastSleep 점검, 설치 매뉴얼 보강
+
+- 사용자 결정: IQ.drive 사용 시 당근 파라미터 대시보드와 당근웹 로그 대시보드는 지우지 않고 일시중지(전체 블러 + 중앙 "IQ.drive 사용 중" 안내). 로그는 업로드와 화면 모두 중지. FastSleep은 끄고 사용. pre-release는 발행하지 않고 HA SSH 직접 반영(사용자 VPN 연결).
+- 판정: Comma가 이미 보내는 comma_git_branch가 iq-ha(또는 iq- 접두)이면 IQ 사용 중. 수신 앱 변경 없음. 당근 브랜치를 다시 보고하면 자동 해제.
+- HA 통합(custom_components/carrot_ha): driving_logs/pilot.py 추가. devices API에 pilot_software 추가. IQ 사용 중 param_set은 409 paused_iqpilot로 거부(복귀 후 뒤늦은 적용 방지). 로그 화면 세션 409 거부. Comma가 보는 로그 전송 정책만 enabled=false(paused)로 바꾸고 저장된 사용자 선택은 유지. 기기 ActivationTracker 특성상 일시중지 중 녹화분은 당근 복귀 후에도 업로드되지 않는다.
+- 프론트엔드: carrot-pilot-pause.js 공통 모듈(카드 둥근 모서리 안 blur 오버레이, 중앙 안내, 아래 내용 inert). 파라미터 카드는 일시중지 중 settings/param_status 조회 중단, 기기 목록은 30초마다 HA 내부 API로만 재확인. 로그 카드는 iframe을 about:blank로 닫고 세션을 만들지 않으며 복귀 시 다시 연다. 차량 수신기 조회 증가 없음.
+- 검증: tests/test_pilot_pause.py 3개, 기존 driving_logs transport 6개(1 skip), params-card(스텁 하네스 갱신), dashboard lazy/live/view-state 통과. preview/iq-pause(실제 카드 코드 + mockHass, 실제 당근 설정 카탈로그)에서 IQ 전환 시 두 카드 블러·안내·inert·iframe 닫힘, 일시중지 35초 동안 devices 외 요청 없음, 당근 복귀 시 안내 제거·로그 세션 재생성 확인. 프리뷰의 당근 상태 파라미터 목록은 카탈로그 변환 차이로 일부만 표시됨.
+- 후보 iq-ha 25d213b: 실기 진단에 fast_sleep_off 추가. CI41392571135 success.
+- docs/IQPILOT_HA_INSTALL_AND_RETURN.md: 단계별 기대 결과·문제 대응표·Mac 보고 방법·FastSleep 끄기·일시중지 기능 설명으로 보강. 후보 SHA 25d213b로 갱신.
+- 배포 상태: HA 설치본(0.9.0)의 대상 파일이 저장소 HEAD와 동일함을 SSH로 확인. UI 승인 후 직접 반영 예정. HACS pre-release 미발행 — 다음 pre-release에 포함할 미발행 변경이다. 실기 미검증.
+- 별도 발견(조치 안 함): 추적 파일 custom_components/carrot_ha/frontend/carrot-trip-days 2.js(커밋 5fc7cc6)는 iCloud 복사본 형식 이름이다. 사용자 확인 전 삭제하지 않는다.
+
 ## 2026-11-02 — IQ.OS→당근 복귀 위험 확인, 복귀 판정·Git 복귀 스크립트, 사용자 설치·복귀 절차
 
 - 인계 후 원격 상태 재확인: iq-ha 1421eb45, ha-back 5ec4868a 고정, CI41386251075 success. 운영 carrot-wip-model_selector-ha는 a6a58ae9로 진행했고 5ec4868a는 그 조상임을 확인. 백업·로그인은 반복하지 않았다.

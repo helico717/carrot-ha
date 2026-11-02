@@ -4,26 +4,49 @@
     {
       "name": "preview",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", ".preview"],
+      "runtimeArgs": [
+        "serve",
+        ".preview"
+      ],
       "port": 3000
     },
     {
       "name": "journal-review",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765"
+      ],
       "port": 8765
     },
     {
       "name": "aux-voltage-preview",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8766"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766"
+      ],
       "port": 8766
     },
     {
       "name": "aux-voltage-preview-win",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8767"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8767"
+      ],
       "port": 8767
+    },
+    {
+      "name": "iq-pause-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "preview/iq-pause/server.mjs"
+      ],
+      "port": 8768
     }
   ]
 }
