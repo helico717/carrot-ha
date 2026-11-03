@@ -1,3 +1,7 @@
+## 2026-11-03 — 대시보드 차량 색상 피커 HA 직접 반영
+
+- 335fdbf의 carrot-dashboard-ko.js·carrot-dashboard-en.js·carrot-vehicle-3d.js를 반영 전 해시가 직전 커밋과 같음을 확인하고 백업(`/config/carrot_ha/deployment-backups/335fdbf/frontend/`)한 뒤 반영했다. 파일·HTTP 응답 SHA-256이 커밋과 일치하고 권한(root:root 644)도 기존과 같다. 브라우저 새로고침으로 적용되며 HA 재시작은 필요 없다. 실제 HA 화면 확인은 사용자 대기. 릴리즈 발행 없음.
+
 ## 2026-11-03 — 대시보드 차량 색상 피커(기기별 localStorage 저장)
 
 - 한국어·영어 대시보드의 화면 테마 왼쪽에 "차량 색상"(Vehicle colour) 피커를 추가했다. 8가지 기본 색, 직접 선택, 기본값 복귀를 제공하고 고르는 즉시 3D 차량 색이 바뀐다. 이유: 사용자 요청. 선택값은 이 브라우저의 localStorage `carrot-vehicle-color-<device_id>`에만 저장해 다른 기기에는 적용되지 않는다. 우선순위는 기기 선택 > 카드 설정 `vehicle_3d_color` > 기본색 `#333234`. `vehicle_3d: false` 카드에서는 숨긴다. 색 이름은 ID.4 색을 참고한 근삿값이다.
