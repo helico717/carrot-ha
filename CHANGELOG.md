@@ -1,3 +1,7 @@
+## 2026-11-03 — 차계부 수동 충전 기록 저장 수정 HA 직접 반영
+
+- 10754b6의 carrot-vehicle-journal.js·vehicle_journal/api.py를 백업(`/config/carrot_ha/deployment-backups/10754b6/`) 후 HA에 반영했고 파일·HTTP 응답 SHA-256이 커밋과 일치했다. 브라우저 적용·HA 재시작은 사용자 확인 대기. 상세는 vehicle-journal/CHANGELOG.md.
+
 ## 2026-11-03 — 차계부 수동 충전 기록 저장 실패 수정·단가 회색 미리 표시·충전량 라벨
 
 - 장소 검색 결과의 `phone`·`category_name`이 기록 위치에 섞여 저장이 거부되던 문제를 수정했고, 연결 차량 저장 오류가 금액 오류로 잘못 표시되던 문구를 실제 검증 사유로 바꿨다. 충전 기록에 금액 ÷ 충전량 단가를 회색으로 미리 보여 주고 "청구 충전량" 라벨을 "충전량"으로 바꿨다.

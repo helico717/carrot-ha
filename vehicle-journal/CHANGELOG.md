@@ -1,3 +1,10 @@
+## 2026-11-03 — 수동 충전 기록 저장 수정 HA 직접 반영
+
+- 대상 커밋 10754b6 `vehicle-journal: fix manual charge save rejected by searched place fields`. 사용자 승인 후 반영했다.
+- 반영 전 HA의 carrot-vehicle-journal.js(64b35de0…)·vehicle_journal/api.py(f2b90043…)가 직전 커밋 6dba9c1의 파일과 SHA-256 일치함을 확인했다. 기존 파일은 `/config/carrot_ha/deployment-backups/10754b6/`에 백업했다(백업 해시 동일).
+- 반영 후 HA 파일 SHA-256: carrot-vehicle-journal.js b192d81f…, api.py 8d844e92… — 커밋 파일과 일치. 내부 HTTP `/carrot_ha_static/carrot-vehicle-journal.js` 응답 200, 같은 해시로 새 라벨·`recordLocation` 포함 확인. DB·사진·설정은 건드리지 않았다.
+- 미확인: 사용자 접속 주소의 실제 브라우저 화면·저장 결과는 확인하지 못했다. 화면(위치 정리·단가 미리 표시·라벨)은 브라우저 새로고침으로, API 오류 문구 변경은 사용자 HA 재시작 후 적용된다. HA 재시작·릴리즈 발행은 하지 않았다.
+
 ## 2026-11-03 — 수동 충전 기록 저장 실패 수정, 단가 회색 미리 표시, 충전량 라벨 변경
 
 - 사용자 보고: 누락된 자동 충전 1건을 차계부 충전 기록으로 직접 입력하고 저장하자 "입력한 충전 금액을 확인해 주세요." 오류가 나고 저장되지 않았다.
