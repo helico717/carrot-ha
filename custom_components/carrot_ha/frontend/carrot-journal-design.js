@@ -2142,13 +2142,18 @@ export const journalDesign = `:host {
   #recordDialog #locEdit,#recordDialog #removeLocation{align-self:flex-start}
   #recordDialog .loc-head-actions{display:flex;gap:6px;flex-shrink:0}
   #recordDialog:not(.loc-sheet-open) #locationEditor{display:none!important}
-  #recordDialog.loc-sheet-open #locationEditor{display:flex!important;position:absolute;inset:0;z-index:50;flex-direction:column;gap:0;padding:0;border:0;border-radius:0;background:#0d1318}
+  /* iOS WebKit clips absolute children to the scrolling body, leaving the dialog header on top: use a fixed sheet and stop the body clipping while it is open. */
+  #recordDialog.loc-sheet-open .modal-scroll-body{overflow:visible!important;-webkit-overflow-scrolling:auto}
+  #recordDialog.loc-sheet-open .modal-header-row{visibility:hidden}
+  #recordDialog.loc-sheet-open #locationEditor{display:flex!important;position:fixed;inset:0;width:100vw;height:100dvh;z-index:2100;flex-direction:column;gap:0;padding:0;border:0;border-radius:0;background:#0d1318}
   #recordDialog .loc-sheet-bar{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;background:#141c23;border-bottom:1px solid var(--j-border)}
   #recordDialog .loc-sheet-bar b{flex:1;font-size:16px}
   #recordDialog .loc-sheet-bar button{min-height:36px;padding:6px 12px;border-radius:10px}
   #recordDialog #locSheetBack{background:transparent;border:0;color:var(--j-ink);font-size:22px;padding:4px 8px}
   #recordDialog #locSheetDone{background:var(--j-accent);color:#0b1014;border:0;font-weight:700}
-  #recordDialog .loc-search-step{position:absolute;top:calc(57px + env(safe-area-inset-top,0px));left:10px;right:10px;z-index:5;gap:0}
+  #recordDialog .loc-search-step{position:relative;flex:0 0 auto;padding:8px 10px;background:#141c23;border-bottom:1px solid var(--j-border);z-index:5;gap:0}
+  #recordDialog .loc-search-step #placeResults{position:absolute;top:calc(100% + 4px);left:10px;right:10px;margin:0}
+  #recordDialog .loc-search-step .loc-search-row{box-shadow:none}
   #recordDialog #placeResults{max-height:46dvh}
   #recordDialog .loc-map-container{flex:1;min-height:0}
   #recordDialog #locationMap{height:100%!important}

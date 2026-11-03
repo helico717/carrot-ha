@@ -1,3 +1,12 @@
+## 2026-11-03 — 모바일 위치 시트 겹침 수정, 지도 기본 중심을 현재 기기 위치로
+
+- 사용자 보고(실제 iPhone 화면): 모바일 위치 지도 시트를 열면 기록창 머리글(충전 기록·저장·닫기)이 시트 위에 남아 시트의 뒤로·완료 막대를 가리고, 검색창이 머리글 바로 아래에 겹쳐 보였다. 요청: 기록 입력 시 지도의 기본 위치를 입력하는 기기의 현재 위치로 표시.
+- 원인: 시트(`#locationEditor`)를 스크롤 본문(`.modal-scroll-body`) 안의 absolute 요소로 띄웠다. iOS WebKit은 스크롤 레이어가 이런 자식을 잘라내 머리글이 위에 남는다. 데스크톱 Chrome·WebKit에서는 재현되지 않아 이전 검증에서 놓쳤다.
+- 변경: 시트가 열린 동안 본문 잘라내기를 끄고(`overflow:visible`), 시트를 화면 고정(`position:fixed`, 100vw×100dvh, z-index 2100)으로 띄우며 기록창 머리글을 숨긴다. 검색창은 시트 상단 막대 바로 아래 흐름에 두고 결과 목록만 지도 위에 띄워 안전 영역 높이와 무관하게 겹치지 않게 했다. 시트를 닫으면 본문 스크롤 위치를 되돌린다.
+- 현재 위치: 지도에 아직 핀이 없으면 기기 위치(`navigator.geolocation`, 저정밀, 5분 캐시, 8초 제한)를 받아 지도 중심만 옮긴다. 기록의 위치(핀)로 자동 저장하지 않는다. 당일 기록의 근처 충전소·주유소 자동 선택이 받은 위치도 재사용한다. 권한 거부·실패 시 기존 기본 중심(서울시청)을 유지한다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-vehicle-journal.js, custom_components/carrot_ha/frontend/carrot-journal-design.js.
+- 검증(합성 지도·합성 위치 36.9, 127.15): Chrome 390×844·1366×820과 Playwright WebKit iPhone 13 에뮬레이션에서 지도 중심이 기기 위치로 이동, 핀 없음 유지, 시트 열림 중 완료 버튼·검색창이 최상단 요소, 기록창 머리글 숨김 확인. `record-edit-layout.cjs` 320~1280px 통과, 충전·주유·정비 기록 넘침 0. 실제 iOS 기기(HA 앱)의 겹침 해소와 위치 권한 표시는 아직 확인하지 못했다(데스크톱 WebKit은 이전 코드도 겹침이 재현되지 않음).
+
 ## 2026-11-03 — 기록 입력창 개편 HA 직접 반영
 
 - 대상 커밋 3e9b6ea `vehicle-journal: redesign record entry dialog for desktop and mobile`. 사용자 승인("적용해 줘") 후 반영했다.

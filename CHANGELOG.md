@@ -1,3 +1,7 @@
+## 2026-11-03 — 차계부 모바일 위치 시트 겹침 수정·지도 기본 중심을 현재 기기 위치로
+
+- 실제 iPhone에서 위치 지도 시트가 기록창 머리글에 가려지던 문제를 화면 고정 시트·본문 잘라내기 해제·머리글 숨김으로 수정했다. 핀이 없을 때 지도 중심을 기기 현재 위치로 옮긴다(핀 자동 저장 없음). 관련 파일: carrot-vehicle-journal.js, carrot-journal-design.js. 상세는 vehicle-journal/CHANGELOG.md.
+
 ## 2026-11-03 — 차계부 기록 입력창 개편 HA 직접 반영
 
 - 3e9b6ea의 carrot-vehicle-journal.js·carrot-journal-design.js를 백업(`/config/carrot_ha/deployment-backups/3e9b6ea/`) 후 HA에 반영했고 파일·HTTP 응답 SHA-256이 커밋과 일치했다. 브라우저 새로고침으로 적용되며 실제 화면 확인은 사용자 대기. 상세는 vehicle-journal/CHANGELOG.md.
