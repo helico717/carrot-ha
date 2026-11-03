@@ -1,3 +1,7 @@
+## 2026-11-03 — 차계부 기록 입력창 개편 HA 직접 반영
+
+- 3e9b6ea의 carrot-vehicle-journal.js·carrot-journal-design.js를 백업(`/config/carrot_ha/deployment-backups/3e9b6ea/`) 후 HA에 반영했고 파일·HTTP 응답 SHA-256이 커밋과 일치했다. 브라우저 새로고침으로 적용되며 실제 화면 확인은 사용자 대기. 상세는 vehicle-journal/CHANGELOG.md.
+
 ## 2026-11-03 — 차계부 기록 입력창 개편(데스크톱 2단·모바일 위치 지도 시트·주유 방식 스위처)
 
 - 데스크톱은 입력|지도 2단(창 크기 비례, 최대 1330×840), 모바일은 전체 화면 입력창과 전체 화면 위치 지도 시트로 바꿨다. "기록된 위치"→"위치 기록", 가득/부분 주유 세그먼트 스위처, 6칸 숫자 배열, 빈 이관 원본 정보 표시 버그 수정. 관련 파일: carrot-vehicle-journal.js, carrot-journal-design.js, vehicle-journal/tests/record-edit-layout.cjs, vehicle-journal/review-record-entry.html. 상세는 vehicle-journal/CHANGELOG.md.

@@ -1,3 +1,10 @@
+## 2026-11-03 — 기록 입력창 개편 HA 직접 반영
+
+- 대상 커밋 3e9b6ea `vehicle-journal: redesign record entry dialog for desktop and mobile`. 사용자 승인("적용해 줘") 후 반영했다.
+- 반영 전 HA의 carrot-vehicle-journal.js(b192d81f…)·carrot-journal-design.js(46a77813…)가 직전 커밋 파일과 SHA-256 일치함을 확인하고 `/config/carrot_ha/deployment-backups/3e9b6ea/frontend/`에 백업했다(백업 해시 동일).
+- 반영 후 HA 파일과 내부 HTTP `/carrot_ha_static/` 응답 SHA-256: carrot-vehicle-journal.js 1bea9ccd…, carrot-journal-design.js caefe333… — 커밋과 일치. Python 변경 없음, HA 재시작 불필요. DB·사진·설정은 건드리지 않았다.
+- 미확인: 사용자 접속 주소의 실제 브라우저 화면과 실제 카카오 지도 동작은 사용자 새로고침 후 확인이 필요하다. 릴리즈 발행 없음.
+
 ## 2026-11-03 — 기록 입력창 개편: 데스크톱 입력|지도 2단, 모바일 위치 지도 시트, 주유 방식 스위처
 
 - 사용자 요청: 기록 입력창의 세로 스크롤이 너무 많고, 위치 기록이 일반 지도 서비스와 다른 배열이라 어색하다. 데스크톱·모바일 모두 개편하고 "기록된 위치"를 "위치 기록"으로 바꾼다. 가득/부분 주유는 절약 탭 거리 선택과 같은 스위처로, 숫자 입력 배열은 적절히 다시 정한다. 인터랙티브 프리뷰(`vehicle-journal/review-record-entry.html`)로 데스크톱·모바일 안을 검토했고, 데스크톱 최대 크기는 사용자 요청으로 1600×1000에서 중간값 1330×840으로 조정한 뒤 적용을 승인받았다.
