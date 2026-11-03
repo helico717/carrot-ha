@@ -399,7 +399,7 @@ class CarrotTerminalCard extends HTMLElement {
     if (connect) connect.disabled = this._active || !this._status.ready || (this._status.controller && !this._active);
     if (disconnect) disconnect.disabled = !this._active;
     if (badge) {
-      badge.textContent = this._active ? '터미널 연결됨' : this._status.controller ? '다른 관리자 사용 중' : this._status.ready ? '주차 · 준비됨' :
+      badge.textContent = this._active ? '터미널 연결됨' : this._status.controller ? '다른 관리자 사용 중' : this._status.ready ? (this._status.onroad_override ? '임시 허용 · 준비됨' : '주차 · 준비됨') :
         this._status.connected ? '사용 불가' : 'Comma 오프라인';
       badge.className = this._active || this._status.ready ? 'ready' : '';
     }

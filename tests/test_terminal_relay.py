@@ -101,6 +101,26 @@ class TerminalRelayTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.relay.controller)
         await ws.close()
 
+    async def test_explicit_onroad_override_and_revocation(self):
+        ws = await self.device()
+        await ws.send_json({'type': 'status', 'protocol': 1, 'offroad': False,
+                            'onroad_override': True, 'local_ready': True})
+        for _ in range(100):
+            if self.relay.onroad_override:
+                break
+            await asyncio.sleep(.01)
+        self.assertFalse(self.relay.offroad)
+        self.assertTrue(self.relay.ready)
+        await self.relay.acquire('admin')
+        self.assertEqual((await ws.receive_json(timeout=2))['type'], 'start')
+        await self.relay.input('admin', {'type': 'raw', 'data': 'uptime\r'})
+        self.assertEqual((await ws.receive_json(timeout=2))['type'], 'input')
+        await ws.send_json({'type': 'status', 'protocol': 1, 'offroad': False,
+                            'onroad_override': False, 'local_ready': True})
+        self.assertEqual((await ws.receive_json(timeout=2))['type'], 'stop')
+        self.assertFalse(self.relay.ready)
+        await ws.close()
+
     async def test_input_is_bounded_and_allowlisted(self):
         ws = await self.device()
         await self.relay.acquire('admin')

@@ -23,6 +23,7 @@ class TerminalRelay:
         self.ws = None
         self.generation = None
         self.offroad = False
+        self.onroad_override = False
         self.local_ready = False
         self.last_status = 0.0
         self.session_id = None
@@ -38,13 +39,14 @@ class TerminalRelay:
 
     @property
     def ready(self):
-        return self.connected and self.offroad and self.local_ready and self.clock() - self.last_status < 10
+        return self.connected and (self.offroad or self.onroad_override) and self.local_ready and self.clock() - self.last_status < 10
 
     def snapshot(self):
         return {
             'type': 'status',
             'connected': self.connected,
             'offroad': self.offroad,
+            'onroad_override': self.onroad_override,
             'local_ready': self.local_ready,
             'ready': self.ready,
             'active': self.session_id is not None,
@@ -96,7 +98,7 @@ class TerminalRelay:
 
     async def acquire(self, key):
         if not self.ready:
-            raise RuntimeError('Comma terminal is not ready or the vehicle is onroad')
+            raise RuntimeError('Comma terminal is not ready')
         if self.controller not in (None, key):
             raise RuntimeError('Another administrator controls this terminal')
         self.controller = key
@@ -188,9 +190,10 @@ class TerminalRelay:
                 kind = data.get('type')
                 if kind == 'status' and data.get('protocol') == PROTOCOL:
                     self.offroad = data.get('offroad') is True
+                    self.onroad_override = data.get('onroad_override') is True
                     self.local_ready = data.get('local_ready') is True
                     self.last_status = self.clock()
-                    if not self.offroad and self.session_id is not None:
+                    if not (self.offroad or self.onroad_override) and self.session_id is not None:
                         await self._end_session('device_not_offroad')
                     self._notify(self.snapshot())
                 elif kind == 'terminal':
@@ -214,6 +217,7 @@ class TerminalRelay:
                 self.ws = None
                 self.generation = None
                 self.offroad = False
+                self.onroad_override = False
                 self.local_ready = False
                 self.last_status = 0
                 await self._end_session('device_disconnected')
