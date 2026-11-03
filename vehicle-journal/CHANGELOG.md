@@ -1,3 +1,9 @@
+## 2026-11-03 — 모바일 위치 시트·현재 위치 수정 HA 직접 반영
+
+- 대상 커밋 507379b `vehicle-journal: fix iOS location sheet overlap and center map on device`. 반영 전 HA 파일(1bea9ccd…, caefe333…)이 직전 배포 3e9b6ea와 일치함을 확인하고 `/config/carrot_ha/deployment-backups/507379b/frontend/`에 백업했다.
+- 반영 후 HA 파일·내부 HTTP 응답 SHA-256: carrot-vehicle-journal.js f87742e6…, carrot-journal-design.js bccf2294… — 커밋과 일치. HA 재시작 불필요, 브라우저/앱 새로고침으로 적용.
+- 미확인: 실제 iPhone HA 앱에서 시트 겹침 해소와 위치 권한 요청·현재 위치 중심 표시는 사용자 확인 대기. 릴리즈 발행 없음.
+
 ## 2026-11-03 — 모바일 위치 시트 겹침 수정, 지도 기본 중심을 현재 기기 위치로
 
 - 사용자 보고(실제 iPhone 화면): 모바일 위치 지도 시트를 열면 기록창 머리글(충전 기록·저장·닫기)이 시트 위에 남아 시트의 뒤로·완료 막대를 가리고, 검색창이 머리글 바로 아래에 겹쳐 보였다. 요청: 기록 입력 시 지도의 기본 위치를 입력하는 기기의 현재 위치로 표시.
