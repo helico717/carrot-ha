@@ -12,6 +12,8 @@ const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEne
 const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// 3D 차체 색 선택지(차량 색상 피커). 고른 값은 이 브라우저의 localStorage에만 저장한다.
+const VEHICLE_COLORS=[['#333234','그래파이트 그레이'],['#18191b','미스틱 블랙'],['#e8e9ea','글레이셔 화이트'],['#9a9ea1','문스톤 그레이'],['#4d5155','망간 그레이'],['#8e1b22','킹스 레드'],['#2c3b57','더스크 블루'],['#2f6290','오로라 블루']];
 const AUX_STALE_S=600; // 12V 측정이 이보다 오래되면 색을 입히지 않는다
 const n = (v, digits=1) => typeof v==='number' && Number.isFinite(v) ? v.toLocaleString('ko-KR',{maximumFractionDigits:digits}) : '—';
 const time = (v, tz) => v && !Number.isNaN(new Date(v).getTime()) ? new Date(v).toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:tz||undefined}) : '기록 없음';
@@ -111,7 +113,7 @@ class CarrotDashboard extends HTMLElement {
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,saved_at:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
-  setConfig(config){this.config=config;if(config.vehicle_3d!==false)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.warmVehicle3d(config)).catch(()=>{});this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
+  setConfig(config){this.config=config;if(config.vehicle_3d!==false)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.warmVehicle3d(config)).catch(()=>{});this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.vehicleColor=null;try{this.vehicleColor=localStorage.getItem('carrot-vehicle-color-'+(config.device_id||'default'))||null;}catch{}if(this._colorControl)this.paintColorControl();this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
@@ -128,7 +130,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.initialized)this._onVisible();
     this.setupTabsObserver();
   }
-  disconnectedCallback(){if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  disconnectedCallback(){this._closeColorControl?.();if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;
@@ -453,7 +455,7 @@ class CarrotDashboard extends HTMLElement {
     this.setupTabsObserver();
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
-      .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
+      .theme-control{display:flex;align-items:center;gap:8px;margin-top:14px;color:var(--muted);font-size:12px}.display-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px 20px;margin-top:14px}.display-controls .theme-control{margin-top:0}.vehicle-color-control{position:relative;display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.vc-trigger{display:inline-flex;align-items:center;gap:8px;font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:6px 10px 6px 8px;min-height:34px;box-sizing:border-box;cursor:pointer}.vc-trigger:focus-visible,.vc-swatch:focus-visible,.vc-swatch:focus-within,.vc-reset:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}.vc-dot{width:18px;height:18px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 0 0 1px rgba(0,0,0,.25);flex:none}.vc-pop{position:absolute;right:0;bottom:calc(100% + 8px);z-index:1100;width:228px;box-sizing:border-box;padding:12px;border-radius:12px;background:#202528;border:1px solid var(--line);box-shadow:0 12px 32px rgba(0,0,0,.35)}.vc-pop[hidden]{display:none}.vc-swatches{display:grid;grid-template-columns:repeat(5,32px);justify-content:space-between;gap:10px 0}.vc-swatch{position:relative;display:block;width:32px;height:32px;padding:0;border-radius:50%;border:0;background:var(--c);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 0 1px rgba(0,0,0,.3);cursor:pointer;overflow:hidden}.vc-swatch[aria-pressed="true"]{box-shadow:0 0 0 2px #202528,0 0 0 4px #3b82f6}.vc-custom{background:conic-gradient(#ef4444,#f59e0b,#eab308,#22c55e,#06b6d4,#3b82f6,#a855f7,#ef4444)}.vc-custom[style*="--c"]{background:var(--c)}.vc-custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}.vc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.vc-foot small{color:var(--muted);font-size:11px}.vc-reset{font:inherit;font-size:12px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer}:host([data-theme="light"]) .vc-trigger,:host([data-theme="light"]) .vc-pop{background:#fff}:host([data-theme="light"]) .vc-swatch[aria-pressed="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px #2563eb}:host([data-theme="light"]) .vc-pop{box-shadow:0 12px 32px rgba(15,23,42,.16)}.theme-control select{font:inherit;color:var(--ink);background:#202528;border:1px solid var(--line);border-radius:8px;padding:7px;min-height:34px}
       :host([data-theme="dark"]){color-scheme:dark}
       :host([data-theme="light"]){color-scheme:light;--ink:#1b292f;--muted:#5b686e;--line:#d6dfe2;--green:#187845;--orange:#b85a00}
       :host([data-theme="light"]) ha-card{background:#f6f8f9;border-color:var(--line)}
@@ -806,7 +808,7 @@ class CarrotDashboard extends HTMLElement {
     themeControl.innerHTML='화면 테마 <select aria-label="화면 테마"><option value="auto">자동 · HA 테마</option><option value="light">라이트</option><option value="dark">다크</option></select>';
     const select=themeControl.querySelector('select');select.value=this.themeMode||'auto';
     select.onchange=()=>{this.themeMode=select.value;try{localStorage.setItem('carrot-theme-'+(this.config?.device_id||'default'),this.themeMode);}catch{}this.applyTheme();};
-    this.shadowRoot.querySelector('main').append(themeControl);
+    const displayControls=document.createElement('div');displayControls.className='display-controls';if(this.config?.vehicle_3d!==false)displayControls.append(this.vehicleColorControl());displayControls.append(themeControl);this.shadowRoot.querySelector('main').append(displayControls);
     this.shadowRoot.querySelector('.refresh').onclick=()=>this.load();
     this.shadowRoot.querySelectorAll('[data-trip-day]').forEach(b=>b.onclick=(e)=>{if(e){e.preventDefault();e.stopPropagation();}this.tripDay=b.dataset.tripDay;this.selected=null;this._tripPage=1;this.render();});
     const mergeBtn=this.shadowRoot.querySelector('#btnToggleTripMerge');
@@ -1451,6 +1453,42 @@ class CarrotDashboard extends HTMLElement {
     if(v.charge_mode_evidence?.delayed) etaCardSubText += ` · 갱신 지연 (${Math.round(v.charge_mode_evidence.measurement_age_s ?? 0)}s)`;
     if(v.charging_eta_source==='held_last_valid') etaCardSubText += ` · 마지막 추정 유지 (${v.charging_eta_hold_age_s ?? 0}s)`;
     return `<div class="cockpit desktop-balanced-cockpit"><div class="overview-col-visual"><section class="hero"><div class="hero-copy"><h2>${esc(status).replace('\n','<br>')}</h2></div>${this.vehicleImage()}</section><div class="mini-condition"><span class="aux-sib">외기 <b>${n(v.outside_temp_c)}°C</b></span>${this.auxBatterySpan(v)}${cameraConditionSlotHtml}</div></div><div class="overview-col-telemetry"><section class="energy ${charging?'is-charging':''} ${isDriving?'is-driving':''} ${socState}" style="--soc:${soc??0}%">${sweepHtml}${markersHtml}${energyHeadHtml}</section><div class="quick-metrics">${quickMetrics}</div><div class="overview-links"><button class="shortcut" data-tab="parking"><span><b>주차 위치</b><small>${v.parking_latitude==null?'위치 수신 대기':time(v.parking_at, tz)}</small>${v.parking_estimated?'<small>주차 위치 추정 · 마지막 GPS 기준</small>':''}</span><em>지도 →</em><div class="mini-map parking-mini"></div></button><button class="shortcut" data-tab="trips"><span><b>최근 주행</b><small>${latest?n(latest.distance_m==null?null:latest.distance_m/1000,2)+' km':'기록 없음'}</small><small>${latest?shortDuration(latest.duration_s):'새 주행 기록을 기다립니다'}</small></span><em>보기 →</em><div class="mini-map trip-mini"></div></button></div></div></div>`;
+  }
+  // 차량 색상 피커: 렌더마다 같은 노드를 다시 붙여 열린 팝오버와 포커스가 갱신에 닫히지 않게 한다.
+  vehicleColorControl(){
+    if(this._colorControl)return this._colorControl;
+    const wrap=document.createElement('div');wrap.className='vehicle-color-control';
+    wrap.innerHTML=`<span>차량 색상</span><button type="button" class="vc-trigger" aria-haspopup="dialog" aria-expanded="false"><i class="vc-dot"></i><span class="vc-name"></span></button><div class="vc-pop" role="dialog" aria-label="차량 색상" hidden><div class="vc-swatches">${VEHICLE_COLORS.map(([hex,name])=>`<button type="button" class="vc-swatch" data-color="${hex}" title="${name}" aria-label="${name}" aria-pressed="false" style="--c:${hex}"></button>`).join('')}<label class="vc-swatch vc-custom" title="직접 선택"><input type="color" aria-label="직접 선택"></label></div><div class="vc-foot"><small>이 기기에만 저장</small><button type="button" class="vc-reset">기본값</button></div></div>`;
+    const trigger=wrap.querySelector('.vc-trigger'),pop=wrap.querySelector('.vc-pop'),picker=wrap.querySelector('input[type=color]');
+    const outside=e=>{if(!e.composedPath().includes(wrap))toggle(false);};
+    const toggle=open=>{pop.hidden=!open;trigger.setAttribute('aria-expanded',String(open));if(open)document.addEventListener('pointerdown',outside,true);else document.removeEventListener('pointerdown',outside,true);};
+    trigger.onclick=()=>toggle(pop.hidden);
+    wrap.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.hidden){e.stopPropagation();toggle(false);trigger.focus();}});
+    wrap.querySelectorAll('[data-color]').forEach(b=>b.onclick=()=>this.setVehicleColor(b.dataset.color));
+    picker.oninput=()=>this.setVehicleColor(picker.value);
+    wrap.querySelector('.vc-reset').onclick=()=>this.setVehicleColor(null);
+    this._colorControl=wrap;this._closeColorControl=()=>toggle(false);this.paintColorControl();
+    return wrap;
+  }
+  vehicleColorValue(){return (this.vehicleColor||this.config?.vehicle_3d_color||'#333234').toLowerCase();}
+  paintColorControl(){
+    const wrap=this._colorControl;if(!wrap)return;
+    const color=this.vehicleColorValue(),preset=VEHICLE_COLORS.find(([hex])=>hex===color);
+    wrap.querySelector('.vc-trigger').style.setProperty('--c',color);
+    wrap.querySelector('.vc-name').textContent=preset?preset[1]:color.toUpperCase();
+    wrap.querySelectorAll('[data-color]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===color)));
+    const custom=wrap.querySelector('.vc-custom');custom.setAttribute('aria-pressed',String(!preset));if(preset)custom.style.removeProperty('--c');else custom.style.setProperty('--c',color);
+    wrap.querySelector('input[type=color]').value=/^#[0-9a-f]{6}$/.test(color)?color:'#333234';
+  }
+  // null이면 이 기기의 선택을 지우고 카드 설정(vehicle_3d_color) 또는 기본색으로 돌아간다.
+  setVehicleColor(color){
+    const key='carrot-vehicle-color-'+(this.config?.device_id||'default');
+    this.vehicleColor=color?String(color).toLowerCase():null;
+    try{if(this.vehicleColor)localStorage.setItem(key,this.vehicleColor);else localStorage.removeItem(key);}catch{}
+    this.paintColorControl();
+    const bodyColor=this.vehicleColorValue(),viewer=this._v3d?.viewer;
+    if(this._v3d)this._v3d.pending={...this._v3d.pending,bodyColor};
+    if(viewer){viewer.setState({bodyColor});viewer.refreshFrame?.();}
   }
   vehicleImage(){
     const src=this.config?.vehicle_image||assetBase+'carrot.png';

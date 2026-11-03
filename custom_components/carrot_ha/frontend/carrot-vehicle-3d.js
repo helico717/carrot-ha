@@ -87,6 +87,13 @@ export function loadModel(url) {
 
 const loadViewerModule = () => (viewerModule ||= import(versioned('./carrot-assets/vehicle-3d.js')));
 
+// Paint: this browser's own pick (the card's colour picker, kept in localStorage) wins over the
+// card option, so each device can show its own colour without changing the shared dashboard config.
+export const DEFAULT_BODY_COLOR = '#333234';
+export function bodyColorOf(card) {
+  return card?.vehicleColor || card?.config?.vehicle_3d_color || DEFAULT_BODY_COLOR;
+}
+
 function modelUrlOf(config) {
   return config?.vehicle_3d_model || DEFAULT_MODEL_URL;
 }
@@ -158,7 +165,7 @@ export async function syncVehicle3d(card, {v, status, dark}) {
     if (holder) disposeVehicle3d(card);
     return;
   }
-  const next = vehicleViewState(v, status, dark, openpilotEngaged(v, card._hass, card.config));
+  const next = {...vehicleViewState(v, status, dark, openpilotEngaged(v, card._hass, card.config)), bodyColor: bodyColorOf(card)};
   if (holder && holder.box === box) {
     holder.pending = next;
     if (holder.viewer) {
@@ -184,7 +191,7 @@ export async function syncVehicle3d(card, {v, status, dark}) {
     const viewer = await module.createVehicleViewer(stage, {
       modelUrl: url,
       modelBuffer: model.buffer.slice(0),
-      bodyColor: card.config?.vehicle_3d_color,
+      bodyColor: bodyColorOf(card),
       label: card.config?.vehicle_name || 'Carrot HA',
       // The stage spans the whole hero, heading included: frame the car in the space below it.
       frameTop: () => headingBottom(box, stage),

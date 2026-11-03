@@ -1,3 +1,10 @@
+## 2026-11-03 — 대시보드 차량 색상 피커(기기별 localStorage 저장)
+
+- 한국어·영어 대시보드의 화면 테마 왼쪽에 "차량 색상"(Vehicle colour) 피커를 추가했다. 8가지 기본 색, 직접 선택, 기본값 복귀를 제공하고 고르는 즉시 3D 차량 색이 바뀐다. 이유: 사용자 요청. 선택값은 이 브라우저의 localStorage `carrot-vehicle-color-<device_id>`에만 저장해 다른 기기에는 적용되지 않는다. 우선순위는 기기 선택 > 카드 설정 `vehicle_3d_color` > 기본색 `#333234`. `vehicle_3d: false` 카드에서는 숨긴다. 색 이름은 ID.4 색을 참고한 근삿값이다.
+- 프리뷰에서 색상판이 Leaflet 지도 미리보기(z-index 400) 아래로 가려지던 문제를 z-index 1100으로 수정했다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-vehicle-3d.js, preview/vehicle-color/index.html(실제 모듈 프리뷰).
+- 검증: 프리뷰에서 데스크톱 라이트·모바일(375px) 다크 테마로 즉시 색 변경, 새로고침 후 유지, 갱신 중 열린 색상판 유지, 바깥 클릭 닫기, 기본값 복귀, 지도 위 표시를 확인했다. vehicle-3d-integration(25)·debug-3d(7)·dashboard-live-loading(6)·dashboard-view-state(3)·dashboard-lazy-runtime 테스트 통과. 실제 HA 화면 확인은 사용자 대기.
+
 ## 2026-11-03 — 차계부 모바일 위치 시트·현재 위치 수정 HA 직접 반영
 
 - 507379b의 carrot-vehicle-journal.js·carrot-journal-design.js를 백업(`/config/carrot_ha/deployment-backups/507379b/`) 후 반영했고 파일·HTTP 응답 SHA-256이 커밋과 일치했다. 실제 iPhone 확인은 사용자 대기. 상세는 vehicle-journal/CHANGELOG.md.

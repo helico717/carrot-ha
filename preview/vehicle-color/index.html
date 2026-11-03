@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>차량 색상 피커 프리뷰</title>
+  <link rel="stylesheet" href="../../custom_components/carrot_ha/frontend/carrot-assets/leaflet.css">
+  <style>
+    body{margin:0;background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Segoe UI",Roboto,sans-serif}
+    header{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 20px;background:#161b22;border-bottom:1px solid #30363d;font-size:12px;color:#8b949e}
+    header h1{margin:0;font-size:14px;color:#e6edf3}
+    header b{color:#e6edf3}
+    header button{font:inherit;color:#e6edf3;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:6px 10px;cursor:pointer}
+    main{padding:16px 20px 60px}
+  </style>
+</head>
+<body>
+<header>
+  <h1>🥕 차량 색상 피커 프리뷰</h1>
+  <span>실제 대시보드 코드입니다. 개요 탭 아래 <b>차량 색상</b>(화면 테마 왼쪽)을 눌러 보세요. 선택값은 이 브라우저의 localStorage에만 저장됩니다.</span>
+  <button id="clearPick">저장된 색 지우기</button>
+  <span id="stored"></span>
+</header>
+<main><carrot-dashboard-debug-card id="debugCard"></carrot-dashboard-debug-card></main>
+
+<script type="module">
+// 프리뷰 전용 ha-icon 대체(모양만)
+class HaIcon extends HTMLElement{connectedCallback(){this.innerHTML='<svg viewBox="0 0 24 24" style="width:var(--mdc-icon-size,20px);height:var(--mdc-icon-size,20px);display:block;margin:auto;fill:currentColor"><circle cx="12" cy="12" r="6"/></svg>';}}
+if(!customElements.get('ha-icon'))customElements.define('ha-icon',HaIcon);
+const [{default:KoreanDashboard},{default:EnglishDashboard},{default:DebugDashboard}]=await Promise.all([
+  import('../../custom_components/carrot_ha/frontend/carrot-dashboard-ko.js'),
+  import('../../custom_components/carrot_ha/frontend/carrot-dashboard-en.js'),
+  import('../../custom_components/carrot_ha/frontend/carrot-dashboard-debug.js'),
+]);
+if(!customElements.get('carrot-dashboard-ko'))customElements.define('carrot-dashboard-ko',KoreanDashboard);
+if(!customElements.get('carrot-dashboard-en'))customElements.define('carrot-dashboard-en',EnglishDashboard);
+if(!customElements.get('carrot-dashboard-debug-card'))customElements.define('carrot-dashboard-debug-card',DebugDashboard);
+const show=()=>{const items=Object.keys(localStorage).filter(k=>k.startsWith('carrot-vehicle-color-')).map(k=>`${k} = ${localStorage.getItem(k)}`);document.getElementById('stored').textContent=items.length?'저장됨: '+items.join(', '):'저장된 색 없음 (기본색)';};
+setInterval(show,500);show();
+document.getElementById('clearPick').onclick=()=>{const card=document.getElementById('debugCard').dashCard;card?.setVehicleColor?card.setVehicleColor(null):Object.keys(localStorage).filter(k=>k.startsWith('carrot-vehicle-color-')).forEach(k=>localStorage.removeItem(k));show();};
+</script>
+</body>
+</html>
