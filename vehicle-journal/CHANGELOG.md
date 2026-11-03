@@ -1,3 +1,18 @@
+## 2026-11-03 — 수동 충전 기록 저장 실패 수정, 단가 회색 미리 표시, 충전량 라벨 변경
+
+- 사용자 보고: 누락된 자동 충전 1건을 차계부 충전 기록으로 직접 입력하고 저장하자 "입력한 충전 금액을 확인해 주세요." 오류가 나고 저장되지 않았다.
+- 원인: 장소 검색(`location/search`) 결과에는 영수증 매칭용 `phone`·`category_name`이 들어 있다(e7a4f00 주유 영수증 OCR 개선 때 추가). 화면이 검색 결과 전체를 기록 위치로 저장 요청에 넣었고, `validate_location`이 허용하지 않은 항목이라 "위치 항목을 확인해 주세요."로 거부했다. Comma 연결 차량의 저장 API는 모든 ValueError를 금액 오류 문구 하나로 바꿔 보여 줘서 실제 원인이 가려졌다. 영수증으로 찾은 주유소도 `station_id: null`·`selection_source: 'receipt'`로 같은 거부 대상이었다.
+- 근거: HA 설치 코드(HEAD와 SHA-256 일치)로 운영 차계부·archive DB의 임시 복사본에서 sync→충전 지출 저장→sync를 실행해 위치 없이는 정상 저장됨을 확인했다. 운영 DB는 읽기 전용 백업 API로만 복사했고 복사본은 삭제했다.
+- 변경:
+  - 화면: 저장할 때 위치를 저장 가능한 항목(name·address·latitude·longitude·provider·station_id·station_type·selection_source)만 보내고, 빈 값은 빼며 허용되지 않은 출처는 `manual`로 바꾼다(`recordLocation`).
+  - API: 저장/공통 처리의 입력 오류는 store의 한국어 검증 문구를 그대로 보여 준다. UUID·날짜 파서 등 내부 영문 오류만 일반 문구로 대체한다(`input_error`). 연결 차량 저장 경로도 KeyError·TypeError·OverflowError를 입력 오류로 처리한다.
+  - 충전 기록: 충전금액과 충전량을 입력하면 단가 칸에 금액 ÷ 충전량(원 단위 반올림, 천 단위 쉼표)을 회색 placeholder로 미리 보여 준다. 원장 단가 계산(`station_stats.unit_price`)과 같은 값이라 따로 저장하지 않으며, 직접 입력한 단가만 저장한다.
+  - 라벨 "청구 충전량 · kWh" → "충전량 · kWh".
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-vehicle-journal.js, custom_components/carrot_ha/vehicle_journal/api.py, vehicle-journal/tests/record-edit-layout.cjs, vehicle-journal/tests/test_api_authorization.py.
+- 테스트: `record-edit-layout.cjs`가 아이콘 정의 이전 위치부터 모듈을 잘라 읽어 기존부터 실행 불가(`jIcon is not defined`)였다. 전체 모듈을 inline하고 동적 import를 도우미 소스로 대체하도록 고쳤고, 새 충전 기록에서 검색 장소(phone·category_name 포함)를 고른 뒤 라벨·회색 단가 341(12,000원 ÷ 35.2kWh)·저장 위치 항목을 검증하는 회귀를 추가했다. `input_error` 단위 테스트 추가.
+- 검증: Windows Chrome에서 새 회귀 통과. 단, 같은 파일의 모바일 날짜 한 줄/누적거리·금액 배치 검사는 변경 전 코드에서도 실패하는 기존 문제라 해당 검사만 건너뛰고 확인했다(미수정). 차계부 Python 테스트 105개 중 검증 실패 없음, Windows 전용 오류 22건(임시 폴더 잠금·NAS 백업 디렉터리 fsync). 사용자 승인 후 커밋.
+- 배포: HA 직접 반영 결과는 다음 기록에 남긴다. 화면 수정은 브라우저 새로고침, API 문구 수정은 사용자 HA 재시작 후 적용된다. 릴리즈 발행 없음.
+
 ## 2026-10-30 — v0.9.0 정식 발행 완료 확인
 
 - 태그 대상 ca6f6e12c27e22cfff260cdf315848110a3ce90b, 새 annotated tag v0.9.0 원격 일치. 준비 CI 40985016234 및 HACS Release 40985134385 모두 success.

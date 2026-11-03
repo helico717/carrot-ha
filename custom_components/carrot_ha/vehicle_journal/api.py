@@ -33,14 +33,20 @@ def runtime(hass, connection, msg):
     return result
 
 
+def input_error(error,fallback):
+    """Show the store's Korean validation message; parser internals keep the generic text."""
+    text=str(error)
+    return text if any('가'<=c<='힣' for c in text) else fallback
+
+
 async def execute(hass,connection,msg,method,*args):
     try:
         result=await hass.async_add_executor_job(method,*args)
         connection.send_result(msg['id'],result)
     except Conflict as error:
         connection.send_error(msg['id'],'conflict',str(error))
-    except (ValueError,KeyError,TypeError,OverflowError):
-        connection.send_error(msg['id'],'invalid_input','입력한 날짜·금액·측정값을 확인해 주세요.')
+    except (ValueError,KeyError,TypeError,OverflowError) as error:
+        connection.send_error(msg['id'],'invalid_input',input_error(error,'입력한 날짜·금액·측정값을 확인해 주세요.'))
     except Exception:
         import logging
         logging.getLogger(__name__).exception('Journal operation failed')
@@ -139,8 +145,8 @@ async def save(hass,connection,msg):
         connection.send_result(msg['id'],result)
     except (Conflict,PaymentConflict) as error:
         connection.send_error(msg['id'],'conflict',str(error))
-    except ValueError:
-        connection.send_error(msg['id'],'invalid_input','입력한 충전 금액을 확인해 주세요.')
+    except (ValueError,KeyError,TypeError,OverflowError) as error:
+        connection.send_error(msg['id'],'invalid_input',input_error(error,'입력한 날짜·금액·측정값을 확인해 주세요.'))
     except Exception:
         connection.send_error(msg['id'],'storage_failed','동기화를 완료하지 못했어요. 저장된 변경은 재시도돼요.')
 

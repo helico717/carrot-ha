@@ -21,6 +21,14 @@ class AuthorizationTests(unittest.TestCase):
             self.assertIsNone(self.namespace['runtime'](self.hass,self.connection,{'id':1,'entry_id':'entry'}))
             self.assertEqual(self.errors[-1][1],'unauthorized')
 
+    def test_input_error_shows_validation_reason_not_parser_internals(self):
+        tree=ast.parse(Path('custom_components/carrot_ha/vehicle_journal/api.py').read_text(encoding='utf-8'))
+        tree.body=[node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='input_error']
+        namespace={};exec(compile(tree,'api.py','exec'),namespace)
+        # A rejected location must not be reported as an amount problem.
+        self.assertEqual(namespace['input_error'](ValueError('위치 항목을 확인해 주세요.'),'fallback'),'위치 항목을 확인해 주세요.')
+        self.assertEqual(namespace['input_error'](ValueError('badly formed hexadecimal UUID string'),'fallback'),'fallback')
+
     def test_missing_entry_blocked_admin_entry_allowed(self):
         self.connection.user=SimpleNamespace(is_admin=True)
         self.assertIsNone(self.namespace['runtime'](self.hass,self.connection,{'id':1,'entry_id':'other'}))

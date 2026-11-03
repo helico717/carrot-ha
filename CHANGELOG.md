@@ -1,3 +1,8 @@
+## 2026-11-03 — 차계부 수동 충전 기록 저장 실패 수정·단가 회색 미리 표시·충전량 라벨
+
+- 장소 검색 결과의 `phone`·`category_name`이 기록 위치에 섞여 저장이 거부되던 문제를 수정했고, 연결 차량 저장 오류가 금액 오류로 잘못 표시되던 문구를 실제 검증 사유로 바꿨다. 충전 기록에 금액 ÷ 충전량 단가를 회색으로 미리 보여 주고 "청구 충전량" 라벨을 "충전량"으로 바꿨다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-vehicle-journal.js, custom_components/carrot_ha/vehicle_journal/api.py, vehicle-journal/tests/record-edit-layout.cjs, vehicle-journal/tests/test_api_authorization.py. 원인·검증·배포 상태 전체는 vehicle-journal/CHANGELOG.md 같은 날짜 항목에 있다.
+
 ## 2026-11-02 — 실제 Git 전환 성공 및 연결 CLI 환경 보완
 
 - d955b931b13fed985c174f67a81497276d70951e Linux CI41449784671 success 후 사용자 예외 승인에 따라 에이전트 직접 설치 성공(IQ_HA_INSTALLED). 순정과 같은 IQ11fcd742/OS4.9.9.9.2를 유지하며 iq-ha 전환 및 vendor 독립 복제/추적 설정 완료.

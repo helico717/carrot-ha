@@ -5,8 +5,10 @@ const fs=require('fs');
  const page=await browser.newPage({viewport:{width:1280,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.setContent('<main id="mount"></main>');
  const raw=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-vehicle-journal.js','utf8');
- const module='const assetBase="http://localhost/carrot-assets/";\n'+raw.slice(raw.indexOf('// HA-local EV journal.')).replace('export class VehicleJournal','class VehicleJournal').replace(/export default VehicleJournal;/,'');
- await page.addScriptTag({content:fs.readFileSync('custom_components/carrot_ha/frontend/carrot-journal-design.js','utf8').replace('export const','const')+'\n'+fs.readFileSync('custom_components/carrot_ha/frontend/carrot-view-state.js','utf8').replace(/export function/g,'function')+'\n'+module});
+ // Inline the whole card (icons/helpers precede the class) with its dynamic imports replaced by the helper sources.
+ const module='const assetBase="http://localhost/carrot-assets/";\n'+raw.split('\n').filter(line=>!/^const (journalVersion|journalModuleURL|assetBase)=|=await import\(/.test(line)).join('\n').replace('export class VehicleJournal','class VehicleJournal').replace(/export default VehicleJournal;/,'');
+ const helper=name=>fs.readFileSync('custom_components/carrot_ha/frontend/'+name,'utf8').replace(/^export (const|function|async function)/gm,'$1');
+ await page.addScriptTag({content:helper('carrot-journal-design.js')+'\n'+helper('carrot-view-state.js')+'\n'+helper('carrot-receipt-ocr.js')+'\n'+module});
  await page.evaluate(()=>{
   window.calls=[];window.vehicles=[];
   const card=document.createElement('carrot-vehicle-journal');document.getElementById('mount').append(card);card.setConfig({});
@@ -38,6 +40,16 @@ const fs=require('fs');
   const saved=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
   if(saved.category!=='charging'||saved.actual_krw!==5432||saved.location.name!=='Chosen Station')throw Error('edit not saved '+width);
  }
+ // New charging entry: a searched place (phone/category_name) must save with only stored location keys.
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.openRecord(null,'charging');c.setLocation({name:'Synthetic Charger',address:'Synthetic road 1',latitude:37.1,longitude:127.1,provider:'kakao',station_id:'123',phone:'02-000-0000',category_name:'EV charger',selection_source:'manual'},null);});
+ if((await root.locator('#billedField').textContent()).includes('청구')||!(await root.locator('#billedField').textContent()).startsWith('충전량 · kWh'))throw Error('billed label not renamed');
+ await root.locator('#actualKrw').fill('12,000');await root.locator('[name=billed_charge_kwh]').fill('35.2');
+ const hint=await root.locator('[name=unit_price_krw]').evaluate(el=>({value:el.value,placeholder:el.placeholder}));
+ if(hint.value!==''||hint.placeholder!=='341')throw Error('unit price hint '+JSON.stringify(hint));
+ await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+ const charged=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
+ const keys=Object.keys(charged.location).sort().join(',');
+ if(keys!=='address,latitude,longitude,name,provider,selection_source,station_id'||charged.actual_krw!==12000||charged.billed_charge_kwh!==35.2||'unit_price_krw' in charged)throw Error('charging payload '+JSON.stringify(charged));
  await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.data={totals:{categories:{}},daily:[],records:[{id:'deleted-test',version:2,status:'deleted',kind:'expense',origin:'manual',category:'tuning',accounting_date:'2026-01-01',actual_krw:100}],recent_records:[],record_count:1,has_more:false,status:{phase:'complete'}};c.renderData();c.selectTab(3);});
  const purge=root.locator('[data-action=purge]');if(!await purge.isVisible())throw Error('permanent delete missing from deleted record');
  page.once('dialog',dialog=>dialog.dismiss());await purge.click();if(await page.evaluate(()=>window.calls.some(c=>c.type.endsWith('/record/purge'))))throw Error('cancelled permanent delete sent request');
