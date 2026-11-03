@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>기록 입력창 검토</title>
+<!--
+  검토용 하네스: 실제 carrot-vehicle-journal.js 모듈을 그대로 불러오고, '개편안'에서는
+  기록 입력창에 제안 CSS와 최소한의 DOM 이동만 덧입힌다(프로덕션 파일은 수정하지 않음).
+  저장소 루트에서 python -m http.server 8765 실행 후
+    http://localhost:8765/vehicle-journal/review-record-entry.html
+  카카오 지도/검색은 합성 응답으로 대체한다(실제 호출 없음). 저장은 합성 응답으로 끝난다.
+-->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  html,body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic",sans-serif}
+  .bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)}
+  .seg{display:inline-flex;border:1px solid var(--j-border);border-radius:10px;overflow:hidden}
+  .seg button{background:var(--j-raised);color:var(--j-sub);border:0;padding:7px 12px;font-size:12.5px;cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--j-accent);color:#0b1014;font-weight:700}
+  .bar small{color:var(--j-sub)}
+  .bar button.reopen{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:10px;padding:7px 12px;font-size:12.5px;cursor:pointer}
+  /* 카드는 iframe 안에서 열려 모달이 떠 있어도 위 막대는 항상 누를 수 있다. */
+  .stage{display:flex;justify-content:center;align-items:flex-start;height:calc(100dvh - 54px);overflow:auto}
+  .stage iframe{border:0;display:block;background:var(--j-bg);width:100%;height:100%}
+  .stage.mobile{padding:20px 12px;box-sizing:border-box}
+  .stage.mobile iframe{width:390px;height:844px;box-sizing:content-box;flex:0 0 auto;border-radius:40px;border:10px solid #1d262e;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  body.embed{overflow:hidden}
+  body.embed .bar,body.embed .stage{display:none}
+  .reopen-float{display:none}
+  body.embed .reopen-float{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10;display:block;background:var(--j-accent);color:#0b1014;border:0;border-radius:12px;padding:12px 18px;font-weight:700;font-size:14px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+  <b>기록 입력창 검토</b>
+  <span class="seg" id="deviceSeg"><button data-device="desktop">데스크톱</button><button data-device="mobile">모바일 390×844</button></span>
+  <span class="seg" id="modeSeg"><button data-mode="charging">충전 기록</button><button data-mode="refueling">주유 기록</button><button data-mode="maintenance">정비/기타</button></span>
+  <button class="reopen" id="reopenTop">기록창 다시 열기</button>
+  <small>합성 지도·검색: "충전소" 또는 "주유소"로 검색하거나 지도를 눌러 핀을 꽂아 보세요.</small>
+</div>
+<div class="stage" id="stage"><iframe id="frame" title="기록 입력창 미리보기"></iframe></div>
+<main id="mount"></main>
+<button type="button" class="reopen-float" id="reopenFloat">기록창 다시 열기</button>
+
+<script type="module">
+const params=new URLSearchParams(location.search);
+const embed=params.has('embed');
+if(embed)document.body.classList.add('embed');
+const state={variant:params.get('variant')||'v2',device:params.get('device')||'desktop',mode:params.get('mode')||'charging'};
+
+// 바깥 페이지: 조작 막대와 iframe만 둔다.
+const press=()=>{for(const [seg,key] of [['deviceSeg','device'],['modeSeg','mode']])for(const b of document.getElementById(seg).children)b.setAttribute('aria-pressed',String(b.dataset[key]===state[key]));};
+const render=()=>{press();const stage=document.getElementById('stage');stage.classList.toggle('mobile',state.device==='mobile');
+  document.getElementById('frame').src=`?embed=1&variant=${state.variant}&mode=${state.mode}&t=${Date.now()}`;};
+if(!embed){
+  for(const [seg,key] of [['deviceSeg','device'],['modeSeg','mode']])document.getElementById(seg).onclick=e=>{const b=e.target.closest('button');if(!b)return;state[key]=b.dataset[key];render();};
+  document.getElementById('reopenTop').onclick=()=>{const w=document.getElementById('frame').contentWindow;w?.reviewOpen?w.reviewOpen():render();};
+  render();
+}else{
+// 합성 카카오 지도: 핀 표시와 클릭 이벤트만 흉내 낸다.
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+class LatLng{constructor(a,b){this.a=a;this.b=b}getLat(){return this.a}getLng(){return this.b}}
+class FakeMap{
+  constructor(el,o){this.el=el;this.listeners=[];this.center=o?.center||new LatLng(37.5665,126.978);
+    el.replaceChildren();const root=document.createElement('div');root.style.cssText='position:relative;width:100%;height:100%;cursor:crosshair;overflow:hidden;background-color:#dfe7e2;background-image:linear-gradient(rgba(0,0,0,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.07) 1px,transparent 1px),linear-gradient(115deg,transparent 46%,#f6f1dc 46%,#f6f1dc 50%,transparent 50%),linear-gradient(25deg,transparent 60%,#fff 60%,#fff 62%,transparent 62%);background-size:36px 36px,36px 36px,100% 100%,100% 100%';el.append(root);this.root=root;
+    root.addEventListener('click',e=>{const r=root.getBoundingClientRect();const lat=this.center.getLat()+(0.5-(e.clientY-r.top)/r.height)*0.01;const lng=this.center.getLng()+((e.clientX-r.left)/r.width-0.5)*0.016;this.listeners.forEach(f=>f({latLng:new LatLng(lat,lng)}));});}
+  setCenter(p){this.center=p;this.marker?.draw()}
+  relayout(){}
+}
+class Marker{
+  constructor(o){this.pos=o.position;this.map=null}
+  setPosition(p){this.pos=p;this.draw()}
+  setMap(m){this.map=m;if(m)m.marker=this;this.draw()}
+  draw(){if(!this.map)return;const root=this.map.root;let pin=root.querySelector('.pin');if(!pin){pin=document.createElement('div');pin.className='pin';pin.style.cssText='position:absolute;width:24px;height:24px;margin:-24px 0 0 -12px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#e5484d;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)';root.append(pin)}
+    const c=this.map.center;pin.style.left=clamp(50+(this.pos.getLng()-c.getLng())/0.016*100,3,97)+'%';pin.style.top=clamp(50-(this.pos.getLat()-c.getLat())/0.01*100,8,98)+'%';}
+}
+const maps={Map:FakeMap,LatLng,Marker,event:{addListener:(m,ev,fn)=>{if(ev==='click')m.listeners.push(fn)}}};
+window.__journalKakaoKey='demo';window.__journalKakao=Promise.resolve(maps);
+
+const charging=[
+  {name:'합성 공영주차장 전기차충전소',address:'서울 중구 합성대로 12',latitude:37.5668,longitude:126.9786,provider:'kakao',station_id:'c1',phone:'02-000-0001',category_name:'전기차 충전소',selection_source:'manual'},
+  {name:'합성 마트 급속충전소',address:'서울 중구 합성로 48',latitude:37.5652,longitude:126.9801,provider:'kakao',station_id:'c2',phone:'02-000-0002',category_name:'전기차 충전소',selection_source:'manual'},
+  {name:'합성 휴게소 충전소',address:'경기 합성시 합성고속도로 100',latitude:37.5677,longitude:126.9762,provider:'kakao',station_id:'c3',phone:'',category_name:'전기차 충전소',selection_source:'manual'}];
+const refueling=[
+  {name:'합성제일주유소',address:'서울 중구 합성대로 30',latitude:37.5661,longitude:126.9795,provider:'kakao',station_id:'r1',phone:'02-000-0003',category_name:'주유소',selection_source:'manual'},
+  {name:'합성셀프주유소',address:'서울 중구 합성로 7',latitude:37.5672,longitude:126.9773,provider:'kakao',station_id:'r2',phone:'',category_name:'주유소',selection_source:'manual'}];
+window.saved=[];
+const hass={states:{},callWS:async msg=>{
+  const t=msg.type;
+  if(t.endsWith('/entries'))return [{entry_id:'demo',title:'합성 전기차',fuel:'electric',linked:true}];
+  if(t.endsWith('/query'))return {totals:{categories:{}},daily:[],records:[],recent_records:[],record_count:0,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{},record_filters_supported:true};
+  if(t.endsWith('/map/config'))return {key:'demo',rest_configured:true};
+  if(t.endsWith('/settings'))return {map_key:'demo',automatic_locations:false};
+  if(t.endsWith('/location/search')){await new Promise(r=>setTimeout(r,200));const q=(msg.query||'').trim();
+    if(q.includes('충전'))return charging;if(q.includes('주유'))return refueling;return [];}
+  if(t.endsWith('/record/save')){window.saved.push(msg.payload);return {id:msg.record_id,version:1};}
+  return {};
+},fetchWithAuth:async()=>({ok:true,json:async()=>({}),blob:async()=>new Blob([])})};
+
+await import('../custom_components/carrot_ha/frontend/carrot-vehicle-journal.js');
+const card=document.createElement('carrot-vehicle-journal');
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;
+await new Promise(r=>{const t=setInterval(()=>{if(card.shadowRoot?.getElementById('recordDialog')){clearInterval(t);r();}},50)});
+card.automaticLocations=false;card.load=async()=>{};
+const root=card.shadowRoot,$=id=>root.getElementById(id),dialog=$('recordDialog');
+
+// 개편안은 2026-11-03 프로덕션(carrot-vehicle-journal.js·carrot-journal-design.js)에 반영됐다. 이 하네스는 실제 모듈을 그대로 보여 준다.
+const openRecord=()=>{if(dialog.open)dialog.close();card.openRecord(null,state.mode);
+  const f=$('recordForm').elements;f.date.value='2026-11-02';
+  if(state.mode==='charging'){f.actual_krw.value='12,000';f.billed_charge_kwh.value='35.2';card.estimateChargeUnitPrice();}
+  if(state.mode==='refueling'){f.fuel_type.value='gasoline';f.actual_krw.value='60,000';f.unit_price_krw.value='1,689';card.estimateFuelLiters();}
+  card.setDraftDirty(false);};
+window.reviewOpen=openRecord;
+
+// 닫으면 그대로 닫아 두고, 다시 열기 버튼으로만 연다.
+document.getElementById('reopenFloat').onclick=openRecord;
+openRecord();
+}
+</script>
+</body>
+</html>

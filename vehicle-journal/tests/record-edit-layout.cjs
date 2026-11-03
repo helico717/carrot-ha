@@ -33,10 +33,16 @@ const fs=require('fs');
   if(await root.locator('#recordDialog').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('dialog overflow '+width);
   const overlap=await root.locator('#recordForm').evaluate(form=>{const a=form.elements.date.getBoundingClientRect(),b=form.elements.odometer_km.getBoundingClientRect();return a.right>b.left+1&&a.bottom>b.top+1&&a.top<b.bottom-1&&a.left<b.right-1;});
   if(overlap)throw Error('date overlaps odometer '+width);
-  if(width<=440){const compact=await root.locator('#recordForm').evaluate(form=>{const fields=form.querySelector('.fields'),date=form.querySelector('#dateField').getBoundingClientRect(),odo=form.querySelector('#odometerField').getBoundingClientRect(),amount=form.querySelector('#amountField').getBoundingClientRect();return {dateFull:Math.abs(date.width-fields.clientWidth)<2,paired:Math.abs(odo.y-amount.y)<1&&odo.right<=amount.left+1,inputsAligned:Math.abs(form.elements.odometer_km.getBoundingClientRect().y-form.elements.actual_krw.getBoundingClientRect().y)<1};});if(!compact.dateFull||!compact.paired||!compact.inputsAligned)throw Error('mobile date full row / paired values '+width);}
+  // Date|odometer share the first row; the charging amount opens the amount/quantity/unit-price row.
+  {const layout=await root.locator('#recordForm').evaluate(form=>{const r=id=>form.querySelector('#'+id).getBoundingClientRect(),date=r('dateField'),odo=r('odometerField'),amount=r('amountField');return {paired:Math.abs(date.y-odo.y)<1&&date.right<=odo.left+1,below:amount.y>=date.bottom};});if(!layout.paired||!layout.below)throw Error('date/odometer row '+width+' '+JSON.stringify(layout));}
   await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.$('placeResults').innerHTML=Array.from({length:5},(_,i)=>'<button type="button" class="place-result-item"><strong class="place-result-name">Synthetic station with long multiline name '+i+'</strong><span class="place-result-address">Synthetic long address that must stay within each result</span></button>').join('');});
   const shrunk=await root.locator('#placeResults').evaluate(el=>[...el.children].some(row=>row.scrollHeight>row.clientHeight+2));if(shrunk)throw Error('place results shrink '+width);
-  await root.locator('#actualKrw').fill('5432');await root.locator('#locationName').fill('Chosen Station');await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+  await root.locator('#actualKrw').fill('5432');
+  // Phone widths edit the place in the full-screen map sheet opened from the summary card.
+  if(width<=760){await root.locator('#locEdit').click();if(!await root.locator('#recordDialog').evaluate(d=>d.classList.contains('loc-sheet-open')))throw Error('location sheet not opened '+width);}
+  await root.locator('#locationName').fill('Chosen Station');if(width<=760)await root.locator('#locSheetDone').click();
+  if(!(await root.locator('#locationSummary').textContent()).startsWith('Chosen Station'))throw Error('summary not updated '+width);
+  await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
   const saved=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
   if(saved.category!=='charging'||saved.actual_krw!==5432||saved.location.name!=='Chosen Station')throw Error('edit not saved '+width);
  }
@@ -56,5 +62,5 @@ const fs=require('fs');
  page.once('dialog',dialog=>{if(!dialog.message().includes('복원할 수 없습니다'))throw Error('permanent delete warning missing');dialog.accept();});await purge.click();
  const deletion=await page.evaluate(()=>window.calls.find(c=>c.type.endsWith('/record/purge')));if(deletion?.confirm!==true||deletion?.entry_id!=='manual'||deletion?.expected_version!==2)throw Error('permanent delete payload');
  if(errors.length)throw Error(errors.join('\n'));
- await browser.close();console.log('PASS charging edit payload, date layout, place results and permanent deletion confirmation at 320/360/390/430/1280px');
+ await browser.close();console.log('PASS charging edit payload, date|odometer row, place results and permanent deletion confirmation at 320/360/390/430/1280px');
 })().catch(e=>{console.error(e);process.exit(1);});

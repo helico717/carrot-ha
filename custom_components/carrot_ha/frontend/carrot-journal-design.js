@@ -2058,5 +2058,102 @@ export const journalDesign = `:host {
  #page2 .manual-distance input{min-width:0;flex:1;width:100%;text-align:right}
  @media(max-width:760px){#page2 #comparisonContext{font-size:18px}#page2 .savings-hero{min-height:400px}}
 
+
+/* 2026-11-03 기록 입력창 개편: 데스크톱 입력|지도 2단, 모바일 전체 화면·위치 지도 시트, 6칸 숫자 배열, 주유 방식 스위처. */
+#recordDialog .loc-header-title-wrap h3{font-size:15px}
+#recordDialog .loc-step-head,#recordDialog .loc-step-hint,#recordDialog #locationPin,#recordDialog .selected-loc-name-title em{display:none!important}
+#recordDialog .fields textarea[name=memo]{height:64px!important;min-height:64px;resize:vertical}
+/* 숫자 입력 배열: 6칸 격자. 날짜|누적거리, 분류|세부, 유종|주유 방식은 반반, 금액·수량·단가는 한 줄 3칸. */
+#recordDialog .fields{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:12px 10px!important}
+#recordDialog .fields>*{grid-column:span 3}
+#recordDialog .fields #dateField{order:1;grid-column:span 3!important}
+#recordDialog #odometerField{order:2}
+#recordDialog #categoryField{order:3}#recordDialog #subcategoryField{order:4}
+#recordDialog #fuelTypeField{order:5}
+#recordDialog .fields #tankModeField{order:6;grid-column:span 3!important;display:flex;flex-direction:column;gap:4px}
+#recordDialog #amountField{order:7}#recordDialog #billedField{order:8}#recordDialog #unitPriceField{order:9}
+#recordDialog[data-mode=refueling] #unitPriceField{order:8}#recordDialog #fuelLitersField{order:9}
+#recordDialog #washCostField{order:10}#recordDialog #driveModeField{order:11}#recordDialog #distanceField{order:12}
+#recordDialog #memoField{order:20}#recordDialog #recordPhotoField{order:21}#recordDialog #importSourceDetails{order:22}#recordDialog .fields>#recordLocationField{order:23}
+#recordDialog[data-mode=charging] #amountField,#recordDialog[data-mode=charging] #billedField,#recordDialog[data-mode=charging] #unitPriceField,
+#recordDialog[data-mode=refueling] #amountField,#recordDialog[data-mode=refueling] #unitPriceField,#recordDialog[data-mode=refueling] #fuelLitersField{grid-column:span 2}
+#recordDialog #fuelLitersField small,#recordDialog #tankModeField small{display:none}
+#recordDialog .fields .input-unit-suffix{font-size:11.5px}
+/* 가득/부분 주유: 절약 탭 거리 선택(.distance-choices)과 같은 세그먼트 스위처. */
+#recordDialog .tank-title{font-size:12.5px;font-weight:600;color:var(--j-sub)}
+#recordDialog .tank-switch{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;min-height:38px;box-sizing:border-box;background:var(--j-bg);border:1px solid var(--j-border);border-radius:12px}
+#recordDialog .fields .tank-switch label{position:relative;flex-direction:row;justify-content:center;align-items:center;gap:0;min-height:30px;border-radius:9px;color:var(--j-sub);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s ease,color .15s ease}
+#recordDialog .tank-switch label:hover{color:var(--j-ink)}
+#recordDialog .fields .tank-switch input{position:absolute;opacity:0;width:1px;height:1px;min-height:0;margin:0;pointer-events:none}
+#recordDialog .fields .tank-switch label:has(input:checked){background:var(--j-raised);color:var(--j-ink);box-shadow:0 2px 8px rgba(0,0,0,.3);font-weight:750}
+#recordDialog .tank-switch label:has(input:focus-visible){outline:2px solid var(--j-accent);outline-offset:-2px}
+#recordDialog .loc-search-row{background:#141c23;border:1px solid var(--j-border);border-radius:12px;padding:4px 4px 4px 12px;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#recordDialog .loc-search-row::before{content:'';width:16px;height:16px;flex:0 0 16px;opacity:.7;background:no-repeat center/16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a8bdca' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E")}
+#recordDialog .loc-search-row #placeQuery{border:0!important;background:transparent!important;box-shadow:none!important;padding:8px 0!important;min-height:36px}
+#recordDialog .btn-loc-search{min-height:36px!important;padding:6px 14px!important;border-radius:9px!important}
+#recordDialog #placeResults{background:#141c23;border:1px solid var(--j-border);border-radius:12px;padding:4px;gap:0;margin:6px 0 0;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+#recordDialog .place-result-item{border:0!important;border-radius:8px!important;background:transparent!important;min-height:0!important;padding:9px 10px!important}
+#recordDialog .place-result-item+.place-result-item{border-top:1px solid rgba(255,255,255,.06)!important;border-radius:0!important}
+#recordDialog .place-result-item:hover{background:var(--j-raised)!important}
+#recordDialog .loc-map-container{position:relative;gap:0}
+#recordDialog #locationMap{display:block!important;border-radius:0!important}
+#recordDialog #locationHint{position:absolute;left:12px;bottom:10px;z-index:4;margin:0;padding:4px 10px;border-radius:999px;background:rgba(13,19,24,.82);color:var(--j-ink);font-size:11.5px;pointer-events:none;max-width:calc(100% - 24px)}
+#recordDialog .selected-loc-section{border-radius:0;border:0;border-top:1px solid var(--j-border);background:#141c23;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px;align-items:end}
+#recordDialog .selected-loc-badge{grid-column:1;grid-row:1}
+#recordDialog .selected-loc-addr-text{grid-column:1;grid-row:2;font-size:13px}
+#recordDialog .selected-loc-name-field{grid-column:2;grid-row:1 / span 2;margin:0;gap:4px}
+#recordDialog .selected-loc-name-title{font-size:11.5px;color:var(--j-sub)}
+#recordDialog .selected-loc-name-field #locationName{padding:8px 10px;min-height:36px}
+#recordDialog .loc-name-state-row{display:none}
+#recordDialog .loc-sheet-bar,#recordDialog #locEdit{display:none}
+#recordDialog .btn-loc-edit{background:transparent;color:var(--j-ink);border:1px solid var(--j-border);font-size:12px;padding:4px 10px;min-height:28px;height:auto;border-radius:8px;cursor:pointer}
+#recordDialog .loc-search-row #placeQuery:focus,#recordDialog .loc-search-row #placeQuery:focus-visible{outline:none!important;box-shadow:none!important;border:0!important}
+#recordDialog .loc-search-row:focus-within{border-color:var(--j-accent);box-shadow:0 0 0 2px rgba(129,230,197,.18),0 8px 24px rgba(0,0,0,.45)}
+#recordDialog>form>.modal-scroll-body>.note{margin:10px 0 0;font-size:12px;color:var(--j-sub)}
+
+@media (min-width:761px){
+  /* 창 크기에 비례: 폭 76vw(최대 1330px), 높이 82dvh(최대 840px). 작은 창은 여백 24px만 남긴다. */
+  dialog#recordDialog{width:min(max(76vw,1060px),1330px,calc(100vw - 48px));height:min(max(82dvh,680px),840px,calc(100dvh - 48px))}
+  #recordDialog .modal-scroll-body{display:flex;flex-direction:column;overflow:hidden;padding:16px 20px}
+  #recordDialog .entry-split{flex:1;min-height:0;display:grid;grid-template-columns:clamp(360px,36%,470px) minmax(0,1fr);gap:clamp(20px,1.6vw,32px)}
+  #recordDialog .entry-split>.fields{margin:0;overflow-y:auto;align-content:start;padding:2px 6px 2px 2px}
+  #recordDialog .entry-split>#recordLocationField{grid-column:2!important;grid-row:1;margin:0;min-height:0;display:flex;flex-direction:column;gap:10px}
+  #recordDialog #addLocation{display:none!important}
+  #recordDialog #locationEditor{flex:1;min-height:0;position:relative;padding:0;gap:0;overflow:hidden;background:#0d1318;border-radius:14px}
+  #recordDialog .loc-search-step{position:absolute;top:12px;left:12px;width:min(max(380px,45%),450px,calc(100% - 24px));z-index:5;gap:0}
+  #recordDialog #placeResults{max-height:min(420px,50%)}
+  #recordDialog .loc-map-container{flex:1;min-height:0}
+  #recordDialog #locationMap{height:100%!important}
+}
+
+@media (max-width:760px){
+  dialog#recordDialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;border:0}
+  #recordDialog .modal-header-row{padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px}
+  #recordDialog .modal-header-row h2{font-size:18px}
+  #recordDialog .modal-scroll-body{padding:14px 14px calc(20px + env(safe-area-inset-bottom,0px))}
+  #recordDialog .fields{gap:10px 8px!important;margin-bottom:10px}
+  #recordDialog .photo-pick-tile{width:56px;height:56px;min-height:56px}
+  #recordDialog #recordPhotoField small{font-size:11px}
+  #recordDialog #recordLocationField{margin:0;padding:12px;border:1px solid var(--j-border);border-radius:14px;background:#101820;gap:10px}
+  #recordDialog .loc-header-title-wrap{flex-direction:column;align-items:flex-start;gap:6px}
+  #recordDialog .loc-summary-pill{max-width:100%;white-space:normal;font-size:13px;padding:6px 10px}
+  #recordDialog .btn-loc-add{padding:10px;border-style:solid;background:#141c23}
+  #recordDialog #locEdit:not([hidden]){display:inline-flex}
+  #recordDialog #locEdit,#recordDialog #removeLocation{align-self:flex-start}
+  #recordDialog .loc-head-actions{display:flex;gap:6px;flex-shrink:0}
+  #recordDialog:not(.loc-sheet-open) #locationEditor{display:none!important}
+  #recordDialog.loc-sheet-open #locationEditor{display:flex!important;position:absolute;inset:0;z-index:50;flex-direction:column;gap:0;padding:0;border:0;border-radius:0;background:#0d1318}
+  #recordDialog .loc-sheet-bar{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;background:#141c23;border-bottom:1px solid var(--j-border)}
+  #recordDialog .loc-sheet-bar b{flex:1;font-size:16px}
+  #recordDialog .loc-sheet-bar button{min-height:36px;padding:6px 12px;border-radius:10px}
+  #recordDialog #locSheetBack{background:transparent;border:0;color:var(--j-ink);font-size:22px;padding:4px 8px}
+  #recordDialog #locSheetDone{background:var(--j-accent);color:#0b1014;border:0;font-weight:700}
+  #recordDialog .loc-search-step{position:absolute;top:calc(57px + env(safe-area-inset-top,0px));left:10px;right:10px;z-index:5;gap:0}
+  #recordDialog #placeResults{max-height:46dvh}
+  #recordDialog .loc-map-container{flex:1;min-height:0}
+  #recordDialog #locationMap{height:100%!important}
+  #recordDialog .selected-loc-section{grid-template-columns:1fr;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px))}
+  #recordDialog .selected-loc-name-field{grid-column:1;grid-row:3}
+}
 `;
 
