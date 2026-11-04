@@ -52,6 +52,13 @@ class ChargePaymentsTest(unittest.TestCase):
         self.assertEqual(self.data()['effective_cost_krw'], 2800)
         self.assertEqual(self.archive.history('car', 'charge')[0], event)
 
+    def test_can_charge_summary_preserves_partial_reason(self):
+        self.charge(source='can_actual', can_mode=4, partial=True,
+                    partial_reasons=['charging_signal_gap'])
+        data = self.data()
+        self.assertTrue(data['partial'])
+        self.assertEqual(data['partial_reasons'], ['charging_signal_gap'])
+
     def test_group_payment_scope_does_not_absorb_later_charges_even_after_delete(self):
         self.charge('a')
         self.charge('b', start='2026-01-01T01:10:00Z')

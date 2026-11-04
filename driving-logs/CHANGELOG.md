@@ -1,3 +1,19 @@
+## 2026-11-04 — 충전 기록기 Carrot 원격 게시
+
+- Carrot27e02e26baa3c905f6de484fa501912ab2404639 게시및원격carrot-wip-model_selector-ha일치확인. CI결과확인중. 사용자집VPN불안정으로HA직접반영시도보류,로컬시계열재생은계속가능. 차량pull/재부팅·HA사유보존반영은미완료. IQ게시/설치없음.
+
+## 2026-11-04 — Carrot 충전 기록 개선·실기록 재생 결과
+
+- 현재차량은IQpilot아님을사용자가정정하고carrot-wip-model_selector-ha를확인. IQ전용작업철회,게시/설치없음. Carrot charge_recorder.py와test_charge_quality.py만차량배포대상.
+- 백업통합상세29건중종료관측26건재생,구형partial5건정상종료패턴재현,26건충전량동일. archive공백9건은실제차량누락단정불가·완전세션확증에서제외,종료미관측3건보류. 원본DB불변. docs/charging-history-analysis-2026-11-04.md 및scripts/replay_charge_completeness.py에방법/한계기록.
+- Carrot충전20·기존CAN9·polling4,HA결제/사유보존12통과. 전체121중기존카메라2·sync1실패는수정전HEAD사본에서도재현. 게시/CI/실차설치는미완료이며아래후속기록으로갱신. Comma소스SSH수정·재부팅없음.
+
+## 2026-11-04 — 충전 기록 완전성·과거 기록 재생 검증 착수
+
+- 사용자 요청: 정상 충전 종료 직후 출발을partial로 오판하지 않고, 실제 수집 공백·데이터 이상에만 사유를 남기도록 개선. 과거 충전 기록을 재생해 오판 여부도 검증.
+- 구형 collector/engine.py는 주행 전환 시 _sample_energy 초기화에서partial을 붙인 후세션종료. 현재 openpilot CAN기록기는 정상출발오판이이미없으나 수집기중단중호출없음에따른암묵적공백누락과재구성공백partial표시미흡을확인. openpilot charge_recorder.py 및 carrot-ha compat/iqpilot/charge_recorder.py에 사유·공백탐지보완, 정상출발/출발전공백/복구/에너지무변화검증추가. 빌더가IQ후보에동일수정을보존하도록어댑터포함.
+- 검증: 합성품질8개·openpilot충전패턴20개통과. 전체데몬·원본기록재생·CI·Git게시·실차반영은진행중. 운영DB원본수정·기기소스SSH수정·재시작없음.
+
 ## 2026-11-02 — 실제 Git 전환 성공 및 연결 CLI 환경 보완
 
 - d955b931b13fed985c174f67a81497276d70951e Linux CI41449784671 success 후 사용자 예외 승인에 따라 에이전트 직접 설치 성공(IQ_HA_INSTALLED). 순정과 같은 IQ11fcd742/OS4.9.9.9.2를 유지하며 iq-ha 전환 및 vendor 독립 복제/추적 설정 완료.

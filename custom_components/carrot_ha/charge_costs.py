@@ -108,7 +108,7 @@ class ChargeCosts:
             cost = energy * unit
         summary = {key: data[key] for key in (
             'duration_s', 'energy_kwh', 'start_soc_percent', 'end_soc_percent',
-            'soc_charged_percent', 'soc_retroactive_estimated', 'partial', 'source', 'can_mode',
+            'soc_charged_percent', 'soc_retroactive_estimated', 'partial', 'partial_reasons', 'source', 'can_mode',
             'confirmed_duration_s', 'unknown_duration_s', 'gap_corrected', 'gap_count', 'corrected_energy_kwh', 'signal_gaps') if key in data}
         summary.update(started_at=start.isoformat(), ended_at=end.isoformat(),
                        cost_krw=round(cost), unit_price_krw=unit, accounting_timezone=self.charge_timezone)
