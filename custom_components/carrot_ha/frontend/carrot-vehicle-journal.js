@@ -2,6 +2,7 @@ const journalVersion=new URL(import.meta.url).searchParams.get('v')||'journal-20
 const journalModuleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',journalVersion);return url.href;};
 const {journalDesign}=await import(journalModuleURL('./carrot-journal-design.js'));
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
+const {attachCarrotUiTheme,detachCarrotUiTheme}=await import(journalModuleURL('./carrot-ui-theme.js'));
 const {parseFuelReceipt,runReceiptOcr,matchStationFromReceipt}=await import(journalModuleURL('./carrot-receipt-ocr.js'));
 const assetBase=new URL('./carrot-assets/',import.meta.url).href;
 const JOURNAL_ICONS={
@@ -268,12 +269,12 @@ const styles=`
 export class VehicleJournal extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.recordCategories=new Set();this.recordSort='time';this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
   setConfig(config){this.config=config||{};if(!this.ready)this.build();if(this.$('cardSettingsTop'))this.$('cardSettingsTop').hidden=!!this.config.panel;if(this.config.entry_id&&this.entry!==this.config.entry_id){this.entry=this.config.entry_id;this.data=null;this.offset=0;}this.load();}
-  set hass(hass){this._hass=hass;if(!this.ready)this.build();this.load();}
+  set hass(hass){this._hass=hass;if(!this.ready)this.build();this._carrotUi?.sync();this.load();}
   getCardSize(){return 12;}
   getGridOptions(){return {columns:36,rows:'auto',min_columns:6};}
   static getStubConfig(){return {entry_id:''};}
-  connectedCallback(){if(!this.ready)this.build();this.setupTabsObserver();this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
-  disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
+  connectedCallback(){if(!this.ready)this.build();attachCarrotUiTheme(this,{kind:'journal',lang:'ko'});this.setupTabsObserver();this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
+  disconnectedCallback(){detachCarrotUiTheme(this);this._tabsObserver?.disconnect();this._tabsObserver=null;for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;

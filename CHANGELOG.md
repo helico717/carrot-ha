@@ -1,3 +1,11 @@
+## 2026-11-05 — 화면 설정(모드 3선택·포인트 색·통일 팝업) 구현 — HA 직접 반영 준비
+
+- 사용자 요청: 프리뷰(preview/theme-style)로 승인한 설계를 HA에 반영하고, 중대한 문제 시 롤백할 수 있게 준비. 기본값=Home Assistant 테마 따라가기, 라이트/다크=기존 모드 재사용, 포인트 색은 모드와 무관, 카드 곡률 유지, 모든 팝업 같은 스킨.
+- 변경: 공용 모듈 carrot-ui-theme.js 추가(포인트 색 엔진·설정창·팝업 스킨·비상 끄기). 대시보드 ko/en, 차계부, 충전 금액 팝업에 연결(각 몇 줄). 프리셋 3색(주황·보라·민트), HA 아이콘 견본, 차계부 기존 설정창에 "화면" 항목 추가. 라이트 모드 선택 안 된 날짜 라벨(#d1d5db) 대비 결함 수정.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-ui-theme,carrot-dashboard-ko,carrot-dashboard-en,carrot-vehicle-journal,carrot-charge-payment}.js, tests/{ui-theme,dashboard-dependency-version}.test.mjs, docs/dashboard-theme-settings.md, preview/theme-style/.
+- 검증(로컬): 신규 ui-theme 7개 통과, 의존성 테스트는 신규 모듈 포함으로 갱신해 통과, 기존 node 테스트는 변경 전과 동일(camera-360·charging-curve·debug-freshness·motion-status·range-c3 5건은 변경 전에도 실패). 브라우저에서 운영 코드 하네스로 HA 테마 따라가기·라이트/다크 고정·포인트 색·설정창·충전 금액 팝업·차계부 화면 항목 확인. 프리뷰의 가독성 전수 검사(40,400건)에서 포인트 색 때문에 악화된 곳 0건.
+- 배포 상태: 커밋 후 HA 직접 반영 예정(릴리즈 없음). 롤백은 docs/dashboard-theme-settings.md. 미확인: 실제 HA 테마·실기기 화면, 차계부 기본값+HA 라이트의 일부 글자 대비 부족(알려진 한계).
+
 ## 2026-11-04 — 충전 기록 개선 CI 성공·운영 반영 대기
 
 - Carrot 코드27e02e26baa3c905f6de484fa501912ab2404639의 충전전용 Linux CI41765211369 success, 결과기록 cc0872fff까지carrot-wip-model_selector-ha게시/원격확인. https://github.com/helico717/openpilot/actions/runs/41765211369

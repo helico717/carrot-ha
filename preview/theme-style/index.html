@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>대시보드 설정 메뉴 프리뷰</title>
+<link rel="stylesheet" href="../../custom_components/carrot_ha/frontend/carrot-assets/leaflet.css">
+<style>
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Segoe UI",sans-serif}
+  .sim{position:sticky;top:0;z-index:100;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:9px 16px;background:#16181b;color:#e8eaed;border-bottom:1px solid #333;font-size:12px}
+  .sim h1{margin:0;font-size:14px}
+  .sim fieldset{border:0;margin:0;padding:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .sim legend{float:left;margin-right:6px;color:#9aa0a6;padding:0}
+  .sim label.seg{display:inline-flex}
+  .sim input[type=radio]{position:absolute;opacity:0;pointer-events:none}
+  .sim label.seg span{padding:5px 10px;border:1px solid #3a3d42;border-radius:8px;cursor:pointer;background:#0f1113}
+  .sim input:checked+span{background:#e8eaed;color:#111;border-color:#e8eaed}
+  .sim input:focus-visible+span{outline:2px solid #6ea8fe}
+  .sim button{font:inherit;padding:5px 10px;border:1px solid #3a3d42;border-radius:8px;background:#0f1113;color:#e8eaed;cursor:pointer}
+  #hint{width:100%;color:#9aa0a6;line-height:1.5}
+  #audit{width:100%;color:#cfd3d7;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:11px;max-height:200px;overflow:auto;display:none;margin:0}
+  #stage{min-height:calc(100vh - 100px);padding:24px 16px 60px;background:var(--stage-bg);transition:background .3s}
+  #host,#jhost{max-width:1100px;margin:auto}
+  #jhost{display:none}
+</style>
+</head>
+<body>
+<div class="sim">
+  <h1>🥕 설정 메뉴 프리뷰</h1>
+  <fieldset><legend>화면</legend>
+    <label class="seg"><input type="radio" name="view" value="dash" checked><span>차량 대시보드</span></label>
+    <label class="seg"><input type="radio" name="view" value="journal"><span>차계부</span></label>
+  </fieldset>
+  <fieldset><legend>HA 쪽 상태(시뮬)</legend>
+    <label class="seg"><input type="radio" name="ha" value="default" checked><span>HA 기본 테마</span></label>
+    <label class="seg"><input type="radio" name="ha" value="vision"><span>visionOS 예시</span></label>
+    <label class="seg"><input type="radio" name="ha" value="blue"><span>파란 예시</span></label>
+    <label class="seg"><input type="radio" name="ha" value="green"><span>초록 예시</span></label>
+  </fieldset>
+  <fieldset>
+    <label class="seg"><input type="radio" name="hamode" value="dark" checked><span>HA 다크</span></label>
+    <label class="seg"><input type="radio" name="hamode" value="light"><span>HA 라이트</span></label>
+  </fieldset>
+  <button id="runAudit">가독성 전수 검사</button>
+  <div id="hint">카드 오른쪽 위 <b>⚙</b> 버튼으로 설정을 엽니다. 위 컨트롤은 “HA에서 사용자가 고른 테마”를 흉내 내는 시뮬레이터이며 실제 기능이 아닙니다. 모든 데이터는 더미입니다.</div>
+  <pre id="audit"></pre>
+</div>
+<div id="stage"><div id="host"></div><div id="jhost"></div></div>
+
+<script type="module">
+class HaIcon extends HTMLElement{connectedCallback(){this.innerHTML='<svg viewBox="0 0 24 24" style="width:var(--mdc-icon-size,20px);height:var(--mdc-icon-size,20px);display:block;margin:auto;fill:currentColor"><circle cx="12" cy="12" r="6"/></svg>';}}
+if(!customElements.get('ha-icon'))customElements.define('ha-icon',HaIcon);
+const F='../../custom_components/carrot_ha/frontend/';
+const {default:Card}=await import(F+'carrot-dashboard-ko.js');
+customElements.define('carrot-dashboard-ko',Card);
+await import(F+'carrot-vehicle-journal.js');
+
+/* ================= 더미 데이터 ================= */
+const TZ='Asia/Seoul';
+const kstParts=d=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d).filter(p=>p.type!=='literal').map(p=>[p.type,+p.value]));
+const kst=(daysAgo,h,m=0)=>{const n=kstParts(new Date());return new Date(Date.UTC(n.year,n.month-1,n.day-daysAgo,h-9,m));};
+const iso=d=>d.toISOString();
+function route(seed,km){
+  const pts=[],n=44,la0=37.5665+((seed*7)%10)*.004,lo0=126.978+((seed*5)%9)*.005,dir=seed%2?1:-1;
+  for(let i=0;i<n;i++){const t=i/(n-1);const sp=Math.sin(Math.PI*Math.min(1,t*1.1))*(8+((seed*3)%12))+3;
+    pts.push({latitude:+(la0+t*km*.0075*dir+Math.sin(t*6+seed)*.006).toFixed(6),longitude:+(lo0+t*km*.0095+Math.cos(t*4+seed)*.005).toFixed(6),speedMps:+sp.toFixed(2)});}
+  return pts;
+}
+// [daysAgo, hh, mm, km, min, startSoc]
+const TRIPS=[[0,7,20,12.4,28,70],[0,9,5,6.1,17,66],[1,8,10,23.8,41,82],[1,18,40,25.2,46,74],[2,8,5,11.9,26,90],[2,12,30,4.8,12,86],[2,19,10,13.4,30,80],
+  [3,7,55,31.5,52,64],[3,18,20,29.9,50,52],[4,9,15,8.2,21,88],[5,10,0,47.6,63,92],[5,17,45,44.1,66,70],[6,8,30,15.0,33,95],[6,18,0,17.3,36,90]];
+const trips=TRIPS.map(([da,h,m,km,min,soc],i)=>{const s=kst(da,h,m),e=new Date(+s+min*60000),eff=5.2+((i*7)%11)/10;
+  const wh=Math.round(km/eff*1000),used=wh/77000*100;
+  return {event_id:'t'+i,kind:'trip',observed_at:iso(e),data:{started_at:iso(s),ended_at:iso(e),duration_s:min*60,distance_m:Math.round(km*1000),energy_wh:wh,energy_complete:true,
+    start_soc_percent:soc,end_soc_percent:+(soc-used).toFixed(1),start_soc_source:'can',route:route(i+1,km)}};});
+const CHARGES=[[1,22,30,390,26.4,34,88,1],[2,13,10,36,31.8,15,62,6],[4,23,0,300,21.0,40,81,1],[6,12,0,28,24.0,12,52,6]];
+const charges=CHARGES.map(([da,h,m,min,kwh,s0,s1,mode],i)=>{const s=kst(da,h,m),e=new Date(+s+min*60000);
+  return {event_id:'c'+i,kind:'charge',observed_at:iso(e),data:{started_at:iso(s),ended_at:iso(e),duration_s:min*60,energy_kwh:kwh,start_soc_percent:s0,end_soc_percent:s1,can_mode:mode,
+    payment_id:'p'+i,payment_version:1,source_event_ids:['c'+i],estimated_cost_krw:Math.round(kwh*290),actual_cost_krw:i===0?7680:null,effective_cost_krw:i===0?7680:Math.round(kwh*290),cost_source:i===0?'actual':'estimated'}};});
+const ymd=d=>{const k=kstParts(d);return `${k.year}-${String(k.month).padStart(2,'0')}-${String(k.day).padStart(2,'0')}`;};
+const days=Array.from({length:7},(_,i)=>{const d=kst(6-i,12);
+  const hrs=Array.from({length:24},(_,h)=>({soc:Math.max(12,92-(i*3)-h*1.1+(h>14?8:0))}));
+  return {date:ymd(d),used:[9,14,22,11,7,16,12][i],hours:hrs,drive_s:3600+i*540,charge_s:[0,23400,0,2160,0,0,0][i],charge_hours:[]};});
+const values={soc_percent:68,range_km:312,estimated_range_km:312,odometer_km:18420,outside_temp_c:14,aux_voltage:12.6,hv_voltage:398.4,dcdc_temperature_c:41,
+  onroad:false,charging:false,doors_locked:true,battery_kwh:77,soc_capacity_kwh:77,gear:'P',ac_on:false,speed_kph:0,
+  month_distance_km:742,month_trip_count:31,month_charge_kwh:96.4,month_charge_cost:21800,month_slow_kwh:47.4,month_fast_kwh:49,
+  parking_latitude:37.5665,parking_longitude:126.978,parking_at:iso(kst(0,9,40)),recorded_distance_km:742,
+  measured_at:new Date().toISOString(),live_checked_at:new Date().toISOString(),live_status:'ok',cloud_status:'ok',
+  battery_history:days,charge_cost_totals:{}};
+const callApi=async(m,path)=>{
+  if(path.endsWith('devices'))return {devices:[{entry_id:'fixture',device_id:'fixture'}]};
+  if(path.includes('/dashboard/'))return {values};
+  if(path.includes('kind=trip'))return {events:trips};
+  if(path.includes('kind=charge'))return {events:charges};
+  return {events:[]};
+};
+
+/* ---- 차계부 더미 ---- */
+const L=n=>({name:n,address:n});
+const rec=(id,da,cat,krw,x={})=>({id,kind:'expense',origin:'automatic',status:'active',version:1,accounting_date:ymd(kst(da,12)),category:cat,actual_krw:krw,estimated_krw:null,attachments:[],location:null,...x});
+const jrecords=[
+  rec('r1',1,'charging',8728,{location:L('꽃지해안공원 주차장 전기차충전소'),unit_price:{krw:200,unit:'kWh',approximate:true}}),
+  rec('r2',2,'charging',10974,{location:L('티스테이션 의왕시청점 전기차충전소'),unit_price:{krw:313,unit:'kWh',approximate:false}}),
+  rec('r3',4,'washing',9000,{origin:'manual',memo:'손세차'}),
+  rec('r4',5,'charging',9420,{location:L('한국전력 본사 주차장 전기차충전소'),unit_price:{krw:292,unit:'kWh',approximate:false}}),
+  rec('r5',7,'parking',6000,{origin:'manual',location:L('코엑스 주차장')}),
+  rec('r6',9,'maintenance',450000,{origin:'manual',subcategory:'휠 타이어 구매',memo:'235 60 R18'}),
+  rec('r7',11,'charging',18240,{location:L('테슬라 슈퍼차저 판교'),unit_price:{krw:341,unit:'kWh',approximate:false}}),
+  rec('r8',13,'toll',2800,{origin:'manual',memo:'경부고속도로'}),
+  rec('r9',16,'insurance',68400,{origin:'manual',memo:'자동차보험 분할'}),
+  rec('r10',20,'charging',7650,{location:L('구리시청 전기차충전소'),unit_price:{krw:215,unit:'kWh',approximate:true}}),
+];
+const jdaily=n=>Array.from({length:n},(_,i)=>{const d=kst(n-1-i,12);const dist=[18,42,0,31,12,55,24,0,38,16][i%10]+((i*3)%7);
+  const ch=i%5===1?+(12+(i%4)*3).toFixed(1):0;return {day:ymd(d),date:ymd(d),distance_km:dist,battery_charge_kwh:ch,billed_charge_kwh:ch,drive_soc_used_pp:+(dist/5.4).toFixed(1),drive_energy_kwh:+(dist/5.6).toFixed(1),energy_distance_km:dist,
+    cost_categories:ch?{charging:{effective_krw:Math.round(ch*270)}}:{}};});
+const sum=(a,k)=>a.reduce((s,r)=>s+(r[k]||0),0);
+const mkTotals=daily=>({distance_km:sum(daily,'distance_km'),battery_charge_kwh:+sum(daily,'battery_charge_kwh').toFixed(1),billed_charge_kwh:+sum(daily,'billed_charge_kwh').toFixed(1),
+  charge_effective_krw:Math.round(sum(daily,'battery_charge_kwh')*270),total_cost_krw:Math.round(sum(daily,'battery_charge_kwh')*270)+467400,drive_soc_used_pp:+sum(daily,'drive_soc_used_pp').toFixed(1),
+  drive_energy_kwh:+sum(daily,'drive_energy_kwh').toFixed(1),energy_distance_km:sum(daily,'energy_distance_km'),efficiency_km_kwh:5.6,fast_count:2,slow_count:5,unknown_count:0,
+  categories:{charging:{effective_krw:Math.round(sum(daily,'battery_charge_kwh')*270)},washing:{effective_krw:9000},maintenance:{effective_krw:450000},parking:{effective_krw:6000},toll:{effective_krw:2800}}});
+const jhass=dark=>({language:'ko',themes:{darkMode:dark},user:{id:'u',is_admin:true},states:{},config:{time_zone:TZ},
+  async callWS(msg){const t=msg.type;
+    if(t.endsWith('/entries'))return [{entry_id:'demo',title:'ID.4',linked:true,fuel:'electric',is_default:true}];
+    if(t.endsWith('/query')){const daily=jdaily(Math.max(8,kstParts(new Date()).day));
+      return {totals:mkTotals(daily),daily,records:jrecords,recent_records:jrecords,record_count:jrecords.length,timezone:TZ,has_more:false,status:{phase:'complete'},
+        latest:{soc_percent:68,range_km:312,odometer_km:18420,doors_locked:true,measured_at:new Date().toISOString()},
+        station_stats:{places:[],unlocated_records:0,basis:''},expense_category_groups_supported:true,manual_trip_records_supported:true,fuel_facts:null,odometer_facts:null};}
+    if(t.endsWith('/map/config'))return {key:'',rest_configured:false};
+    if(t.endsWith('/settings'))return {map_key:'',kakao_rest_key:''};
+    return {};},
+  async fetchWithAuth(){return new Response('{}',{status:404});}});
+
+/* ================= 카드 ================= */
+const card=document.createElement('carrot-dashboard-ko');
+document.getElementById('host').append(card);
+card.setConfig({language:'ko',device_id:'fixture'});
+const jcard=document.createElement('carrot-vehicle-journal');
+document.getElementById('jhost').append(jcard);
+jcard.setConfig({});
+const stageEl=document.getElementById('stage');
+
+/* ================= 상태 ================= */
+const ha={theme:'default',dark:true};
+const KEY='carrot-style-preview-v2';
+const user={accent:'ha'};
+try{Object.assign(user,JSON.parse(localStorage.getItem(KEY)||'{}'));}catch{}
+const saveUser=()=>{try{localStorage.setItem(KEY,JSON.stringify(user));}catch{}};
+const HA={
+  default:{dark:{'--primary-color':'#03a9f4','--primary-text-color':'#e1e1e1','--secondary-text-color':'#9b9b9b','--ha-card-background':'#1c1c1c','--divider-color':'rgba(225,225,225,.12)','--stage':'#111111'},
+           light:{'--primary-color':'#03a9f4','--primary-text-color':'#212121','--secondary-text-color':'#727272','--ha-card-background':'#ffffff','--divider-color':'rgba(0,0,0,.12)','--stage':'#fafafa'}},
+  vision:{dark:{'--primary-color':'#ff9f43','--primary-text-color':'#f5f2ee','--secondary-text-color':'rgba(245,242,238,.62)','--ha-card-background':'rgba(255,255,255,.10)','--divider-color':'rgba(255,255,255,.14)','--ha-card-backdrop-filter':'blur(24px) saturate(1.4)','--stage':'linear-gradient(135deg,#5b5651,#3f3b37 55%,#4a423b)'},
+          light:{'--primary-color':'#ff7a00','--primary-text-color':'#2b2723','--secondary-text-color':'rgba(43,39,35,.62)','--ha-card-background':'rgba(255,255,255,.55)','--divider-color':'rgba(0,0,0,.10)','--ha-card-backdrop-filter':'blur(24px) saturate(1.4)','--stage':'linear-gradient(135deg,#f3e6d6,#e4d2bd 55%,#f0dcc6)'}},
+  blue:{dark:{'--primary-color':'#4c8dff','--primary-text-color':'#e8eefc','--secondary-text-color':'#9db0d6','--ha-card-background':'#141b2b','--divider-color':'rgba(157,176,214,.18)','--stage':'#0b1020'},
+        light:{'--primary-color':'#1f6feb','--primary-text-color':'#14213d','--secondary-text-color':'#5b6b8c','--ha-card-background':'#ffffff','--divider-color':'rgba(20,33,61,.12)','--stage':'#eef3fb'}},
+  green:{dark:{'--primary-color':'#4ade80','--primary-text-color':'#e6f2ea','--secondary-text-color':'#9bb5a4','--ha-card-background':'#16201a','--divider-color':'rgba(155,181,164,.18)','--stage':'#0d130f'},
+         light:{'--primary-color':'#16a34a','--primary-text-color':'#10261a','--secondary-text-color':'#52695a','--ha-card-background':'#ffffff','--divider-color':'rgba(16,38,26,.12)','--stage':'#eef6f0'}}
+};
+// 대화상자 면: 실제 HA에서는 테마의 --ha-dialog-surface-background(없으면 카드 배경)를 그대로 쓴다.
+const DLG={default:{dark:'#1c1c1c',light:'#ffffff'},vision:{dark:'rgba(52,48,44,.78)',light:'rgba(255,252,247,.78)'},blue:{dark:'#141b2b',light:'#ffffff'},green:{dark:'#16201a',light:'#ffffff'}};
+for(const t of Object.keys(HA))for(const m of ['dark','light'])HA[t][m]['--ha-dialog-surface-background']=DLG[t][m];
+const ALL_HA_VARS=['--primary-color','--primary-text-color','--secondary-text-color','--ha-card-background','--divider-color','--ha-card-backdrop-filter','--ha-dialog-surface-background'];
+const PRESETS=[['#ff9f43','주황'],['#a78bfa','보라'],['#38d9a9','민트']];
+// 모드 선택: 기본값(=HA가 지금 쓰는 모드) / 라이트 / 다크. 라이트·다크로 고정해도 '선택한 HA 테마의 해당 모드 변형'을 그대로 쓴다.
+// (실제 HA: hass.themes.themes[선택한 테마].modes.light / .dark)
+const effMode=()=>card.themeMode==='light'||card.themeMode==='dark'?card.themeMode:(ha.dark?'dark':'light');
+const effDark=()=>effMode()==='dark';
+// 모드는 3가지 하나로 합침: 기본값(=Home Assistant 테마를 그대로 따름) / 라이트 / 다크(= 기존 Carrot 라이트·다크 그대로)
+const styleHA=()=>card.themeMode!=='light'&&card.themeMode!=='dark';
+const haVarsCSS=()=>Object.entries(HA[ha.theme][effMode()]).filter(([k])=>k!=='--stage').map(([k,v])=>`${k}:${v}`).join(';');
+
+/* ================= 포인트 색 엔진 (OKLCH: 색상·선명도만 교체, 밝기·투명도 유지) ================= */
+const lin=c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4, unlin=c=>c<=.0031308?12.92*c:1.055*c**(1/2.4)-.055;
+function toOk([r,g,b]){r=lin(r/255);g=lin(g/255);b=lin(b/255);
+  const l=Math.cbrt(.4122214708*r+.5363325363*g+.0514459929*b),m=Math.cbrt(.2119034982*r+.6806995451*g+.1073969566*b),s=Math.cbrt(.0883024619*r+.2817188376*g+.6299787005*b);
+  const A=1.9779984951*l-2.428592205*m+.4505937099*s,B=.0259040371*l+.7827717662*m-.808675766*s;
+  return {L:.2104542553*l+.793617785*m-.0040720468*s,C:Math.hypot(A,B),h:Math.atan2(B,A)};}
+function fromOk(L,C,h){
+  const rgb=(C)=>{const A=C*Math.cos(h),B=C*Math.sin(h);
+    const l=(L+.3963377774*A+.2158037573*B)**3,m=(L-.1055613458*A-.0638541728*B)**3,s=(L-.0894841775*A-1.291485548*B)**3;
+    return [4.0767416621*l-3.3077115913*m+.2309699292*s,-1.2684380046*l+2.6097574011*m-.3413193965*s,-.0041960863*l-.7034186147*m+1.707614701*s];};
+  let lo=0,hi=C,v=rgb(C);const ok=v=>v.every(x=>x>=-.0005&&x<=1.0005);
+  if(!ok(v)){for(let i=0;i<24;i++){const mid=(lo+hi)/2;ok(rgb(mid))?lo=mid:hi=mid;}v=rgb(lo);}
+  return v.map(x=>Math.round(Math.min(1,Math.max(0,unlin(Math.min(1,Math.max(0,x)))))*255));}
+const REF=toOk([0x12,0x60,0xe8]);
+// 밝기는 WCAG 상대휘도(Y)를 그대로 맞춘다 → 색상을 바꿔도 글자·배경 대비가 원래와 같다.
+function lumOf([r,g,b]){const f=c=>{c/=255;return c<=.03928?c/12.92:((c+.055)/1.055)**2.4};return .2126*f(r)+.7152*f(g)+.0722*f(b);}
+function fromY(Y0,C,h){let lo=0,hi=1,best=[0,0,0];for(let i=0;i<22;i++){const L=(lo+hi)/2;const rgb=fromOk(L,C,h);best=rgb;if(lumOf(rgb)<Y0)lo=L;else hi=L;}return best;}
+const remapCache=new Map();
+function isBlue([r,g,b],mint=false){const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/510;if(mx===mn)return false;
+  const d=(mx-mn)/255,sat=l>.5?d/(2-(mx+mn)/255):d/((mx+mn)/255);let h;
+  if(mx===b)h=60*((r-g)/(mx-mn)+4);else if(mx===g)h=60*((b-r)/(mx-mn)+2);else h=60*(((g-b)/(mx-mn))%6);if(h<0)h+=360;
+  return (h>=195&&h<=260||(mint&&h>=155&&h<195))&&sat>.25;}
+function parseColor(c){c=c.trim();let m;
+  if(m=c.match(/^#([0-9a-f]{3,8})$/i)){let x=m[1];if(x.length<=4)x=[...x].map(q=>q+q).join('');return {rgb:[0,2,4].map(i=>parseInt(x.slice(i,i+2),16)),a:x.length===8?parseInt(x.slice(6,8),16)/255:null,hex:true};}
+  if(m=c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i))return {rgb:[+m[1],+m[2],+m[3]],a:m[4]==null?null:+m[4]};
+  return null;}
+let ACC=null;
+function remapColor(str,mint=false,dim=false){const p=parseColor(str);if(!p||!ACC||!isBlue(p.rgb,mint))return str;
+  const key=str+'|'+ACC.h.toFixed(4)+'|'+ACC.k.toFixed(3)+(mint?'m':'')+(dim?'d':'');let hit=remapCache.get(key);
+  if(!hit){const o=toOk(p.rgb);hit=fromY(lumOf(p.rgb)*(dim?.2:1),o.C*ACC.k,ACC.h);remapCache.set(key,hit);}
+  const [r,g,b]=hit;
+  if(p.a==null)return p.hex?'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join(''):`rgb(${r},${g},${b})`;
+  return `rgba(${r},${g},${b},${+p.a.toFixed(3)})`;}
+const COLOR_RE=/#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*[\d.]+\s*)?\)/g;
+const remapText=(t,mint=false,dim=false)=>t.replace(COLOR_RE,c=>remapColor(c,mint,dim));
+function accentHex(){
+  if(user.accent==='default')return null;
+  if(user.accent==='ha')return HA[ha.theme][effMode()]['--primary-color']||'#03a9f4';
+  return user.accent;}
+function accentParams(){const hex=accentHex();if(!hex)return null;const p=parseColor(hex);if(!p)return null;const o=toOk(p.rgb);
+  return {h:o.h,k:Math.min(1.15,Math.max(.35,o.C/REF.C)),C:o.C};}
+const origStyle=new WeakMap();
+// 카테고리·지표를 구분하는 색(기록 유형 아이콘, 추세 카드 등)은 포인트 색으로 바꾸지 않고 원래 값을 유지한다.
+const EXEMPT=/type-icon-box|tint-|trend-card|receipt-source/;
+// lightText: 라이트 모드에서 글자색(color)으로 쓰인 밝은 강조색은 흰 배경에서 읽히도록 어둡게(휘도 ×0.2) 바꾼다. 배경·테두리 색은 그대로.
+function remapRule(r,mint,lightText){
+  // CSSOM 재직렬화는 var()가 든 단축 속성을 잃어버리므로 cssText 문자열을 그대로 쓴다.
+  let t=r.cssText;const held=[];
+  if(lightText)t=t.replace(/(^|[{;\s])((?:-webkit-text-fill-)?color)\s*:\s*([^;}]*)/g,(m,pre,prop,val)=>{held.push(remapText(val,mint,true));return `${pre}${prop}:@@${held.length-1}@@`;});
+  t=remapText(t,mint);
+  return t.replace(/@@(\d+)@@/g,(m,i)=>held[+i]);}
+function remapCss(text,mint,lightText=false){
+  let sh;try{sh=new CSSStyleSheet();sh.replaceSync(text);}catch{return remapText(text,mint);}
+  const walk=rules=>{let out='';for(const r of rules){
+    if(r.type===1)out+=EXEMPT.test(r.selectorText)?r.cssText:remapRule(r,mint,lightText);
+    else if(r.type===4)out+=`@media ${r.conditionText}{${walk(r.cssRules)}}`;
+    else out+=remapText(r.cssText,mint);}return out;};
+  return walk(sh.cssRules);}
+function remapShadow(root,mint=false,lightText=false){
+  root.querySelectorAll('*').forEach(el=>{
+    if(el.closest('[data-sim="1"]'))return;
+    if(el.tagName==='STYLE'){
+      if(!origStyle.has(el))origStyle.set(el,el.textContent);
+      const t=ACC?remapCss(origStyle.get(el),mint,lightText):origStyle.get(el);if(el.textContent!==t)el.textContent=t;
+    }
+    for(const att of ['style','fill','stroke','stop-color']){
+      if(!el.hasAttribute(att))continue;
+      const key='data-orig-'+att;if(!el.hasAttribute(key))el.setAttribute(key,el.getAttribute(att));
+      const t=ACC?remapText(el.getAttribute(key),mint):el.getAttribute(key);if(el.getAttribute(att)!==t)el.setAttribute(att,t);
+    }
+  });
+}
+const tones=()=>['#1260e8','#60a5fa','#dbeafe'].map(remapColor);
+
+/* ================= 스타일 레이어(Home Assistant 테마 따라가기) — 모서리 곡률은 원래 값 유지 ================= */
+const ov=p=>`color-mix(in srgb,var(--primary-text-color) ${p}%,transparent)`;
+// 기존 결함 수정: 라이트 모드에서 선택되지 않은 날짜 라벨(.trip-day b)이 연회색(#d1d5db)이라 흰 배경에서 안 보임(대비 1.08)
+const DASH_FIX_CSS=`.trip-day:not([aria-pressed="true"]) b,.charge-day:not([aria-pressed="true"]) b{color:var(--ink)!important}`;
+const DASH_CSS=()=>!styleHA()?'':`
+  :host{${haVarsCSS()};--ink:var(--primary-text-color);--muted:var(--secondary-text-color);--line:var(--divider-color)}
+  ha-card{background:var(--ha-card-background)!important;border:1px solid var(--divider-color)!important;-webkit-backdrop-filter:var(--ha-card-backdrop-filter,none);backdrop-filter:var(--ha-card-backdrop-filter,none);color:var(--primary-text-color)}
+  .nav{background:${ov(6)}!important}
+  .nav button.active{background:${ov(14)}!important;color:var(--primary-text-color)!important}
+  .hero{background:${ov(8)}!important;color:var(--primary-text-color)!important}
+  .hero h2,.hero small{color:var(--primary-text-color)!important}
+  .metric,.panel,.status-group,.raw-data-card,.trip-history,.charge-history,.trip-grid-container,.day-timeline-wrap,.sleek-trip-card,.charge-info-stack,.mini-condition,.battery-history,.parking-heading{background:${ov(7)}!important;border:1px solid var(--divider-color)!important}
+  .refresh,.badge,.trip-day:not([aria-pressed="true"]),.charge-day:not([aria-pressed="true"]){background:${ov(9)}!important;color:var(--primary-text-color)!important;border-color:var(--divider-color)!important}
+  .display-controls{display:none!important}`;
+const DARK_TOK='--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca';
+const LIGHT_TOK='--j-bg:#f4f6f8;--j-surface:#ffffff;--j-raised:#f1f4f7;--j-border:rgba(0,0,0,.14);--j-ink:#1d2125;--j-sub:#5d656d';
+// 모든 대화상자의 색 토큰: HA 테마 스타일이면 HA 변수를, 기본 스타일이면 Carrot 팔레트를 쓴다.
+const dialogTok=(kind='dash')=>styleHA()
+  ?`${haVarsCSS()};--j-bg:${ov(6)};--j-surface:var(--ha-dialog-surface-background,var(--ha-card-background));--j-raised:${ov(10)};--j-border:var(--divider-color);--j-ink:var(--primary-text-color);--j-sub:var(--secondary-text-color)`
+  :(kind==='journal'?DARK_TOK:(effDark()?DARK_TOK:LIGHT_TOK));   // 차계부는 기존에 다크만 있음
+const dialogBlur=()=>styleHA()?'var(--ha-card-backdrop-filter,none)':'none';
+// 모든 대화상자(설정·기록 입력·충전 금액 입력 등)가 같은 면·테두리·모서리·배경막·버튼 모양을 쓰도록 하는 공통 스킨
+const dialogSkin=sel=>`
+${sel}{border-radius:18px!important;background:var(--j-surface)!important;border:1px solid var(--j-border)!important;color:var(--j-ink)!important;box-shadow:0 24px 70px rgba(0,0,0,.45);-webkit-backdrop-filter:${dialogBlur()};backdrop-filter:${dialogBlur()}}
+${sel}::backdrop{background:rgba(5,8,11,.75)!important;backdrop-filter:blur(8px)!important}
+${sel} h2{font-weight:750;letter-spacing:-.3px}
+${sel} button:not(.cs-sw):not(.type-icon-box):not(.receipt-source-card){border-radius:12px}
+${sel} input,${sel} select,${sel} textarea{border-radius:10px}
+`;
+const JOURNAL_CSS=()=>{let css='';
+  if(styleHA())css+=`
+  :host{${haVarsCSS()};--j-bg:var(--ha-card-background);--j-surface:${ov(6)};--j-raised:${ov(11)};--j-border:var(--divider-color);--j-ink:var(--primary-text-color);--j-sub:var(--secondary-text-color)}
+  .shell{-webkit-backdrop-filter:var(--ha-card-backdrop-filter,none);backdrop-filter:var(--ha-card-backdrop-filter,none)}
+  .trend-card,.trends-map-wrapper,.savings-hero{background:${ov(7)}!important;border:1px solid var(--divider-color)!important}`;
+  css+=`dialog{${dialogTok('journal')}}`;
+  css+=`@media (max-width:600px){.settings-nav{grid-template-columns:repeat(5,1fr)!important}}`;
+  css+=dialogSkin('dialog');
+  return css;};
+
+/* ================= 설정 메뉴 — 차계부의 기존 설정 대화상자(#vehicleManageDialog)와 같은 구조·스타일 =================
+   차계부: 기존 대화상자에 '화면' 항목만 추가(설정창을 새로 만들지 않음).
+   대시보드: 같은 CSS·구조의 대화상자를 사용. */
+const MENU_CSS=`
+.cs-gear{width:40px;height:40px;min-width:40px;min-height:40px;border-radius:50%;border:1px solid var(--line,var(--j-border,rgba(255,255,255,.14)));background:transparent;color:var(--muted,var(--j-sub,#aaa));display:inline-grid;place-items:center;cursor:pointer;margin-left:10px;padding:0}
+.cs-gear:hover{color:var(--ink,var(--j-ink,#fff));background:rgba(127,127,127,.15)}
+.top .badge{margin-left:auto}
+.cs-hrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cs-hrow h4{margin:0!important}
+.cs-seg{display:flex;gap:8px}
+.cs-seg button{flex:1 1 0;text-align:center;min-width:0}
+.cs-seg button.active{color:var(--cs-a);background:var(--cs-a12);border-color:var(--cs-a35)}
+.cs-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:10px 6px;justify-items:center;align-items:center}
+.cs-swatches .cs-sw{box-sizing:border-box!important;width:34px!important;height:34px!important;min-height:34px!important;padding:0!important;border:0!important;border-radius:50%!important;clip-path:circle(50%);cursor:pointer;position:relative;background:var(--c)!important;display:inline-grid;place-items:center;overflow:hidden;flex:none;--ring:var(--j-border)}
+/* 테두리는 pseudo 요소의 안쪽 링으로 그려서 배경(그라데이션)과 섞이거나 모서리가 각져 보이지 않게 한다 */
+.cs-swatches .cs-sw::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 2px var(--ring)}
+.cs-swatches .cs-sw[aria-pressed=true]{--ring:var(--j-ink)}
+.cs-swatches .cs-sw[aria-pressed=true]::after{box-shadow:inset 0 0 0 2px var(--j-ink),inset 0 0 0 4px var(--j-surface)}
+.cs-swatches .cs-sw.follow{background:#18bcf2!important}
+.cs-swatches .cs-sw.follow svg{width:20px;height:20px;fill:#fff;position:relative;z-index:1}
+.cs-swatches .cs-sw.def{background:#1260e8!important}
+.cs-swatches .cs-sw.custom{background:conic-gradient(from 90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)!important}
+.cs-swatches .cs-sw.custom[aria-pressed=true]{background:var(--c)!important}
+.cs-swatches .cs-sw.custom input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;cursor:pointer;border:0;padding:0;margin:0;-webkit-appearance:none;appearance:none;z-index:2}
+.cs-cap{font-size:12.5px;color:var(--j-sub)}
+.cs-prev{display:flex;gap:8px;margin-top:14px}
+.cs-tile{flex:1;border-radius:14px;padding:10px 13px;color:#fff;font-weight:650;display:flex;flex-direction:column;justify-content:center;min-height:52px}
+.cs-tile small{font-weight:500;opacity:.92;font-size:12px}
+.cs-seg button:focus-visible,.cs-swatches .cs-sw:focus-visible,.cs-gear:focus-visible{outline:3px solid var(--cs-a);outline-offset:2px}
+`;
+const VEHICLE_COLORS=[['#333234','그래파이트 그레이'],['#18191b','미스틱 블랙'],['#e8e9ea','글레이셔 화이트'],['#9a9ea1','문스톤 그레이'],['#4d5155','망간 그레이'],['#8e1b22','킹스 레드'],['#2c3b57','더스크 블루'],['#2f6290','오로라 블루']];
+const hosts=[];
+const MINT=toOk([0x81,0xe6,0xc5]);
+
+// 차계부의 설정 대화상자 CSS를 그대로 가져와 대시보드 대화상자에 적용한다(스타일 연속성).
+function journalDialogCSS(){
+  const src=[...jcard.shadowRoot.querySelectorAll('style')].filter(st=>st.dataset.sim!=='1').map(st=>origStyle.get(st)??st.textContent).join('\n');
+  const sh=new CSSStyleSheet();try{sh.replaceSync(src);}catch{return '';}
+  const want=r=>/#vehicleManageDialog|\.settings-/.test(r.selectorText||'');
+  const fix=t=>t.replace(/#vehicleManageDialog/g,'dialog.cs-dialog');
+  let out='';
+  for(const r of sh.cssRules){
+    if(r.type===1&&want(r))out+=fix(r.cssText)+'\n';
+    else if(r.type===4){const inner=[...r.cssRules].filter(x=>x.type===1&&want(x)).map(x=>fix(x.cssText)).join('\n');if(inner)out+=`@media ${r.conditionText}{${inner}}\n`;}
+  }
+  return out;
+}
+function dashDialogCSS(){
+  const tok=dialogTok();
+  const base=`
+dialog.cs-dialog{${tok};color:var(--j-ink);background:var(--j-surface);-webkit-backdrop-filter:${dialogBlur()};backdrop-filter:${dialogBlur()};font:15px/1.65 system-ui,-apple-system,sans-serif}
+dialog.cs-dialog *{box-sizing:border-box}
+dialog.cs-dialog::backdrop{background:rgba(5,8,11,.75);backdrop-filter:blur(8px)}
+dialog.cs-dialog:not([open]){display:none!important}
+dialog.cs-dialog button{font:inherit;color:var(--j-ink);background:var(--j-raised);border:1px solid var(--j-border);cursor:pointer}
+dialog.cs-dialog h2,dialog.cs-dialog h3,dialog.cs-dialog h4,dialog.cs-dialog p{margin:0}
+`;
+  const compact=`
+dialog.cs-dialog{width:min(560px,calc(100vw - 24px))!important;height:fit-content!important;max-height:calc(100dvh - 48px)!important;margin:auto!important}
+dialog.cs-dialog[open]{display:flex!important;flex-direction:column}
+dialog.cs-dialog .cs-body{display:grid;gap:12px;padding:18px 22px;overflow:auto;min-height:0}
+dialog.cs-dialog .cs-body>div{display:contents}
+dialog.cs-dialog .cs-body .settings-section{margin:0!important}
+dialog.cs-dialog .cs-foot{display:flex;justify-content:space-between;gap:8px;padding:14px 22px;border-top:1px solid var(--j-border)}
+dialog.cs-dialog .cs-foot .primary{color:var(--cs-a);background:var(--cs-a12);border-color:var(--cs-a35)}
+@media (max-width:600px){dialog.cs-dialog .cs-body{padding:14px 14px}dialog.cs-dialog .cs-foot{padding:12px 14px}}
+`;
+  // 차계부 대화상자의 민트 강조는 대시보드에서는 현재 포인트 색(기본: 파랑)의 같은 밝기 색조로 대체
+  const keep=ACC;ACC=ACC||{h:REF.h,k:1,C:REF.C};
+  const css=remapCss(journalDialogCSS(),true,!effDark());ACC=keep;
+  return tok&&base+css+compact;
+}
+const accentTone=h=>{const dk=(h.kind==='journal'&&!styleHA())||effDark();const a=h.kind==='journal'?(ACC||null):(ACC||{h:REF.h,C:REF.C});if(!a)return dk?[129,230,197]:fromY(.12,MINT.C,MINT.h);return fromY(dk?lumOf([0x81,0xe6,0xc5]):.12,Math.min(MINT.C,a.C),a.h);};
+
+function colorSwatch(parent,hex,name,cls){const b=document.createElement('button');b.type='button';b.className='cs-sw '+(cls||'');b.title=name;b.setAttribute('aria-label',name);b.dataset.v=hex;if(hex[0]==='#')b.style.setProperty('--c',hex);parent.append(b);return b;}
+function customSwatch(parent,onInput,initial){const l=document.createElement('label');l.className='cs-sw custom';l.title='직접 고르기';l.dataset.v='custom';
+  l.innerHTML=`<input type="color" value="${initial}" aria-label="직접 고르기">`;parent.append(l);l.querySelector('input').oninput=e=>onInput(e.target.value);return l;}
+const sec=(title,inner,cap)=>`<section class="settings-section"><div class="cs-hrow"><h4>${title}</h4>${cap?`<span class="cs-cap" data-k="${cap}"></span>`:''}</div>${inner}</section>`;
+
+// '화면' 설정 내용(차계부·대시보드 공통)
+function appearanceNode(h,withReset){
+  const wrap=document.createElement('div');wrap.dataset.sim='1';wrap.className='cs-appearance';
+  wrap.innerHTML=
+    sec('모드','<div class="cs-seg" data-k="mode"><button type="button" data-v="auto">기본값</button><button type="button" data-v="light">라이트</button><button type="button" data-v="dark">다크</button></div>')+
+    sec('포인트 색','<div class="cs-swatches" data-k="accent"></div><div class="cs-prev"><div class="cs-tile" data-k="t1">배터리 잔량<small>68%</small></div><div class="cs-tile" data-k="t2">주차 위치<small>지도 →</small></div></div>','accCap')+
+    (withReset?`<div class="settings-actions"><button type="button" data-k="reset">초기화</button></div>`:'');
+  const q=k=>wrap.querySelector(`[data-k=${k}]`);
+  const acc=q('accent');
+  colorSwatch(acc,'default','기본 파랑','def');
+  const haSw=colorSwatch(acc,'ha','Home Assistant 색','follow');
+  haSw.insertAdjacentHTML('afterbegin','<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.8 13H20v8h-7v-3.33l2.79-2.79.71.12a2.1 2.1 0 1 0-2.1-2.1l.1.71L13 15.13V9.65a2.1 2.1 0 1 0-2 0v5.48l-1.5-1.52.1-.71a2.1 2.1 0 1 0-2.1 2.1l.71-.12L11 17.67V21H4v-8H2.25c-.42 0-.83 0-.83-.21 0-.22.43-.64.86-1.07L11 3c.33-.33.66-.5 1-.5s.67.17 1 .5l3 3V5h3v4l2.8 2.72c.43.43.86.84.87 1.07 0 .21-.4.21-.87.21z"/></svg>');
+  PRESETS.forEach(([c,t])=>colorSwatch(acc,c,t));
+  customSwatch(acc,v=>{user.accent=v;saveUser();refresh();},'#ff9f43');
+  acc.addEventListener('click',e=>{const b=e.target.closest('button.cs-sw');if(!b)return;user.accent=b.dataset.v;saveUser();refresh();});
+  q('mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;card.themeMode=b.dataset.v;try{localStorage.setItem('carrot-theme-fixture',card.themeMode);}catch{}card.applyTheme();refresh();});
+  if(withReset)q('reset').onclick=()=>resetAll();
+  return wrap;
+}
+function resetAll(){user.accent='ha';saveUser();card.themeMode='auto';try{localStorage.removeItem('carrot-theme-fixture');}catch{}card.setVehicleColor(null);card.applyTheme();refresh();}
+function carNode(){
+  const wrap=document.createElement('div');wrap.dataset.sim='1';
+  wrap.innerHTML=sec('내 차 색상','<div class="cs-swatches" data-k="car"></div>','carCap');
+  const car=wrap.querySelector('[data-k=car]');VEHICLE_COLORS.forEach(([hex,name])=>colorSwatch(car,hex,name));
+  customSwatch(car,v=>{card.setVehicleColor(v);paintAll();},'#333234');
+  car.addEventListener('click',e=>{const b=e.target.closest('button.cs-sw');if(!b)return;card.setVehicleColor(b.dataset.v);paintAll();});
+  return wrap;
+}
+function buildMenu(h){
+  h.menuStyle=document.createElement('style');h.menuStyle.dataset.sim='1';h.menuStyle.textContent=MENU_CSS;
+  if(h.kind==='dash'){
+    const d=h.dialog=document.createElement('dialog');d.className='cs-dialog';d.dataset.sim='1';d.setAttribute('aria-labelledby','csTitle');
+    d.innerHTML=`<header class="settings-dialog-header"><div><h2 id="csTitle">설정</h2></div><button type="button" data-k="close" aria-label="설정 닫기">닫기</button></header>
+      <div class="cs-body"></div>
+      <footer class="cs-foot"><button type="button" data-k="reset">초기화</button><button type="button" data-k="done" class="primary">완료</button></footer>`;
+    const body=d.querySelector('.cs-body');body.append(appearanceNode(h,false),carNode());
+    h.scope=d;
+    d.querySelector('[data-k=reset]').onclick=()=>resetAll();d.querySelector('[data-k=done]').onclick=()=>d.close();
+    d.querySelector('[data-k=close]').onclick=()=>d.close();
+    d.addEventListener('click',e=>{if(e.target===d)d.close();});
+    d.addEventListener('close',()=>h.gear?.focus());
+    h.gear=document.createElement('button');h.gear.type='button';h.gear.className='cs-gear';h.gear.dataset.sim='1';h.gear.setAttribute('aria-label','설정');h.gear.title='설정';
+    h.gear.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+    h.gear.onclick=()=>{paintMenu(h);d.showModal();};
+  }else{
+    // 차계부: 이미 있는 설정 대화상자의 목록에 '화면'을 추가한다.
+    h.scope=null;
+  }
+}
+// 차계부 기존 대화상자에 '화면' 항목 주입(없을 때만)
+function injectJournal(h){
+  const root=h.el.shadowRoot,nav=root.querySelector('#settingsNav'),main=root.querySelector('.settings-content');
+  if(!nav||!main||nav.querySelector('[data-settings-nav=appearance]'))return;
+  const b=document.createElement('button');b.type='button';b.dataset.settingsNav='appearance';b.dataset.sim='1';b.textContent='화면';nav.append(b);
+  const pane=document.createElement('section');pane.dataset.settingsPane='appearance';pane.dataset.sim='1';pane.hidden=true;pane.innerHTML='<h3>화면</h3>';pane.append(appearanceNode(h,true));main.append(pane);
+  h.scope=pane;
+}
+function paintMenu(h){
+  const sc=h.scope;if(!sc)return;const q=k=>sc.querySelector(`[data-k=${k}]`);
+  const [r,g,b]=accentTone(h);sc.style.setProperty('--cs-a',`rgb(${r},${g},${b})`);sc.style.setProperty('--cs-a12',`rgba(${r},${g},${b},.12)`);sc.style.setProperty('--cs-a35',`rgba(${r},${g},${b},.35)`);
+  const t=tones();if(h.gear)h.gear.style.setProperty('--cs-a',`rgb(${r},${g},${b})`);
+  q('t1').style.background=t[0];q('t2').style.background=`linear-gradient(135deg,${t[0]},${remapColor('#0c43ad')})`;
+  sc.querySelectorAll('[data-k=mode] button').forEach(x=>x.classList.toggle('active',x.dataset.v===(card.themeMode||'auto')));
+  const known=['default','ha',...PRESETS.map(p=>p[0])];const isPreset=known.includes(user.accent);
+  sc.querySelectorAll('[data-k=accent] .cs-sw').forEach(x=>{const on=x.dataset.v===user.accent||(x.dataset.v==='custom'&&!isPreset);x.setAttribute('aria-pressed',String(on));if(x.dataset.v==='custom'&&!isPreset)x.style.setProperty('--c',user.accent);});
+  q('accCap').textContent=user.accent==='default'?'기본 파랑':user.accent==='ha'?'Home Assistant 색':(PRESETS.find(p=>p[0]===user.accent)?.[1]||user.accent);
+  if(h.kind==='dash'){
+    const cv=card.vehicleColorValue(),preset=VEHICLE_COLORS.find(([x])=>x===cv);
+    sc.querySelectorAll('[data-k=car] button.cs-sw').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===cv)));
+    const cc=sc.querySelector('[data-k=car] .custom');cc.setAttribute('aria-pressed',String(!preset));if(!preset)cc.style.setProperty('--c',cv);
+    q('carCap').textContent=preset?preset[1]:cv.toUpperCase();
+  }
+}
+const paintAll=()=>hosts.forEach(paintMenu);
+
+/* ================= document.body 에 붙는 대화상자(충전 금액 직접 입력·삭제 확인 등) ================= */
+const bodySkin=document.createElement('style');bodySkin.dataset.sim='1';document.head.append(bodySkin);
+function applyBodySkin(){
+  const tok=dialogTok();const [r,g,b]=accentTone({kind:'dash'});
+  bodySkin.textContent=`
+body>dialog{${tok};--cs-a:rgb(${r},${g},${b});--cs-a12:rgba(${r},${g},${b},.12);--cs-a35:rgba(${r},${g},${b},.35);box-sizing:border-box!important;padding:24px 26px!important;font:15px/1.65 system-ui,-apple-system,sans-serif!important}
+body>dialog{border-radius:18px!important;background:var(--j-surface)!important;border:1px solid var(--j-border)!important;color:var(--j-ink)!important;box-shadow:0 24px 70px rgba(0,0,0,.45);-webkit-backdrop-filter:${dialogBlur()};backdrop-filter:${dialogBlur()}}
+body>dialog::backdrop{background:rgba(5,8,11,.75)!important;backdrop-filter:blur(8px)!important}
+body>dialog h2{font-size:20px!important;font-weight:750;letter-spacing:-.3px}
+body>dialog input{background:var(--j-bg)!important;border:1px solid var(--j-border)!important;border-radius:10px!important;color:var(--j-ink)!important}
+body>dialog button{border-radius:12px!important;border:1px solid var(--j-border)!important;background:var(--j-raised)!important;color:var(--j-ink)!important;min-height:40px;padding:8px 16px!important;font-weight:600}
+body>dialog button.save,body>dialog button.confirm{color:var(--cs-a)!important;background:var(--cs-a12)!important;border-color:var(--cs-a35)!important}
+body>dialog button.delete{color:#ff8585!important}`;
+}
+
+/* ================= 적용 ================= */
+function applyHA(){
+  const vars=HA[ha.theme][ha.dark?'dark':'light'];
+  ALL_HA_VARS.forEach(k=>document.documentElement.style.removeProperty(k));
+  for(const [k,v] of Object.entries(vars)){ if(k==='--stage')stageEl.style.setProperty('--stage-bg',v); else document.documentElement.style.setProperty(k,v); }
+  document.documentElement.style.setProperty('color-scheme',ha.dark?'dark':'light');
+  card.hass={locale:{language:'ko'},themes:{darkMode:ha.dark},states:{},config:{time_zone:TZ},callApi};
+  jcard.hass=jhass(ha.dark);
+}
+function applyHost(h){
+  const root=h.el.shadowRoot;if(!root)return;
+  if(!h.styleEl){h.styleEl=document.createElement('style');h.styleEl.dataset.sim='1';}
+  if(!h.menuStyle)buildMenu(h);
+  h.styleEl.textContent=h.kind==='dash'?DASH_CSS()+DASH_FIX_CSS+dashDialogCSS():JOURNAL_CSS();
+  const nodes=[h.styleEl,h.menuStyle];if(h.dialog)nodes.push(h.dialog);
+  for(const n of nodes)if(n.parentNode!==root)root.append(n);
+  if(h.kind==='dash'){const top=root.querySelector('.top');if(top&&h.gear.parentNode!==top)top.append(h.gear);}
+  else injectJournal(h);
+  remapShadow(root,h.kind==='journal',h.kind==='journal'&&styleHA()&&!effDark());
+}
+function applyAll(){ACC=accentParams();hosts.forEach(applyHost);applyBodySkin();}
+function refresh(){applyHA();applyAll();paintAll();}
+hosts.push({el:card,kind:'dash'},{el:jcard,kind:'journal'});
+hosts.forEach(h=>{let pending=false;new MutationObserver(()=>{if(pending)return;pending=true;setTimeout(()=>{pending=false;try{ACC=accentParams();applyHost(h);paintMenu(h);}catch(e){window.__simErr=String(e.stack||e);console.error('sim',e);}},0);}).observe(h.el.shadowRoot,{childList:true,subtree:true});});
+document.querySelectorAll('input[name=ha]').forEach(r=>r.addEventListener('change',()=>{ha.theme=r.value;refresh();}));
+document.querySelectorAll('input[name=hamode]').forEach(r=>r.addEventListener('change',()=>{ha.dark=r.value==='dark';refresh();}));
+document.querySelectorAll('input[name=view]').forEach(r=>r.addEventListener('change',()=>{document.getElementById('host').style.display=r.value==='dash'?'':'none';document.getElementById('jhost').style.display=r.value==='journal'?'block':'none';}));
+refresh();
+
+/* ================= 가독성 전수 검사 ================= */
+const parseCss=s=>{let m;if(m=s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/)){const a=m[4]==null?1:(m[4].endsWith('%')?parseFloat(m[4])/100:+m[4]);return [+m[1],+m[2],+m[3],a];}
+  if(m=s.match(/color\(srgb\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/)){const a=m[4]==null?1:(m[4].endsWith('%')?parseFloat(m[4])/100:+m[4]);return [m[1]*255,m[2]*255,m[3]*255,a];}return null;};
+const colorsIn=s=>(s.match(/rgba?\([^)]*\)|color\(srgb[^)]*\)/g)||[]).map(parseCss).filter(Boolean);
+const over=(top,bot)=>{const a=top[3]+bot[3]*(1-top[3]);if(a===0)return [0,0,0,0];return [0,1,2].map(i=>(top[i]*top[3]+bot[i]*bot[3]*(1-top[3]))/a).concat(a);};
+const relLum=([r,g,b])=>{const f=c=>{c/=255;return c<=.03928?c/12.92:((c+.055)/1.055)**2.4};return .2126*f(r)+.7152*f(g)+.0722*f(b);};
+const ratio=(a,b)=>{const x=relLum(a),y=relLum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+function stageBase(){const cs=getComputedStyle(stageEl);const c=colorsIn(cs.backgroundImage);const bc=parseCss(cs.backgroundColor);return c.length?[c[0],c[c.length-1]]:[bc];}
+function auditRoot(root,tag){
+  const res=[],seen={};const bases=stageBase();
+  root.querySelectorAll('*').forEach(el=>{
+    if(el.closest('[data-sim="1"]')||el.closest('.leaflet-container')||el.closest('.carrot-floating-bubble'))return;
+    if(!['SPAN','DIV','BUTTON','B','STRONG','SMALL','H1','H2','H3','LABEL','A','P','I','LI','TD','TH','SELECT','OPTION'].includes(el.tagName))return;
+    let own='';el.childNodes.forEach(n=>{if(n.nodeType===3)own+=n.textContent;});own=own.trim();if(!own)return;
+    if(!el.getClientRects().length)return;const cs=getComputedStyle(el);if(cs.visibility==='hidden'||+cs.opacity===0)return;
+    let cur=el,opaque=false;const layers=[];
+    while(cur&&!opaque){const c=getComputedStyle(cur);
+      const gi=colorsIn(c.backgroundImage||'');const bc=parseCss(c.backgroundColor||'');
+      if(gi.length&&/gradient/.test(c.backgroundImage)){layers.push(gi.length>1?[gi[0],gi[gi.length-1]]:[gi[0]]);if(gi.every(x=>x[3]>=.99))opaque=true;}
+      if(bc&&bc[3]>0){layers.push([bc]);if(bc[3]>=.99)opaque=true;}
+      cur=cur.parentNode&&cur.parentNode.nodeType===11?cur.parentNode.host:cur.parentElement;
+      if(cur&&(cur.tagName==='CARROT-DASHBOARD-KO'||cur.tagName==='CARROT-VEHICLE-JOURNAL'))cur=null;
+    }
+    let stack=bases.map(b=>[b]);for(let i=layers.length-1;i>=0;i--){const next=[];for(const lay of layers[i])for(const s of stack)next.push(over(lay,s[0]));stack=next.map(x=>[x]);}
+    const finals=stack.map(s=>s[0]).filter(Boolean);if(!finals.length)return;
+    const fg=parseCss(cs.color);if(!fg)return;
+    let worst=99;for(const bg of finals){const f=over(fg,[bg[0],bg[1],bg[2],1]);worst=Math.min(worst,ratio(f,bg));}
+    const fs=parseFloat(cs.fontSize),bold=+cs.fontWeight>=700;const large=fs>=24||(fs>=18.66&&bold);const need=large?3:4.5;
+    const sig0=tag+' '+el.tagName.toLowerCase()+'.'+String(el.className).trim().split(/\s+/).slice(0,3).join('.')+' ['+own.slice(0,14)+']';
+    const n=(seen[sig0]=(seen[sig0]||0)+1);   // 같은 모양의 요소를 구분해 기준선과 1:1로 비교한다
+    res.push({sig:n>1?sig0+' #'+n:sig0,ratio:worst,need,fail:worst<need});
+  });
+  return res;
+}
+const TABS=['overview','trips','parking','charge','status'];
+function noTrAgain(){hosts.forEach(h=>{const r=h.el.shadowRoot;if(!r.querySelector('style[data-notr]')){const st=document.createElement('style');st.dataset.sim='1';st.dataset.notr='1';st.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';r.append(st);}});void card.offsetHeight;}
+function auditAll(){
+  const out=[];
+  for(const tab of TABS){card.tab=tab;card.render();applyAll();noTrAgain();out.push(...auditRoot(card.shadowRoot,'대시보드/'+tab));}
+  card.tab='overview';card.render();applyAll();noTrAgain();
+  out.push(...auditRoot(jcard.shadowRoot,'차계부'));
+  return out;
+}
+async function runAudit(){
+  const out=document.getElementById('audit');out.style.display='block';out.textContent='검사 중…';
+  await new Promise(r=>setTimeout(r,50));
+  const noTr=document.createElement('style');noTr.dataset.sim='1';noTr.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';
+  hosts.forEach(h=>h.el.shadowRoot.append(noTr.cloneNode(true)));
+  const jv=document.getElementById('jhost').style.display,dv=document.getElementById('host').style.display;document.getElementById('jhost').style.display='block';document.getElementById('host').style.display='block';
+  const saved={ha:{...ha},user:{...user},mode:card.themeMode};
+  const accents=['default','ha',...PRESETS.map(p=>p[0])];
+  const lines=[],worstAll=[];let total=0,newFail=0;
+  const combos=[];for(const theme of Object.keys(HA))for(const dark of [true,false])combos.push({mode:'auto',theme,dark});
+  for(const m of ['light','dark'])combos.push({mode:m,theme:'default',dark:true});
+  for(const c of combos){
+    ha.theme=c.theme;ha.dark=c.dark;card.themeMode=c.mode;
+    const label=c.mode==='auto'?`기본값/${c.theme}/HA${c.dark?'다크':'라이트'}`:`${c.mode==='light'?'라이트':'다크'}고정`;
+    const base={};
+    for(const acc of accents){user.accent=acc;applyHA();card.applyTheme();ACC=accentParams();
+      const r=auditAll();
+      if(acc==='default')r.forEach(x=>base[x.sig]=x.ratio);
+      const bad=r.filter(x=>x.fail&&(acc==='default'||base[x.sig]==null||x.ratio<base[x.sig]-.5));
+      const regress=acc==='default'?[]:bad;total+=r.length;newFail+=regress.length;
+      regress.forEach(x=>worstAll.push(`${label}/${acc}  ${x.ratio.toFixed(2)}<${x.need}  ${x.sig}  (기준 ${base[x.sig]==null?'-':base[x.sig].toFixed(2)})`));
+      if(acc==='default'&&bad.length)lines.push(`[기준선] ${label} 기본 파랑에서 AA 미달 ${bad.length}건: `+bad.slice(0,4).map(x=>x.sig+' '+x.ratio.toFixed(2)).join(' | '));
+    }
+  }
+  hosts.forEach(h=>h.el.shadowRoot.querySelectorAll('style[data-notr]').forEach(s=>s.remove()));
+  document.getElementById('jhost').style.display=jv;document.getElementById('host').style.display=dv;
+  Object.assign(ha,saved.ha);Object.assign(user,saved.user);card.themeMode=saved.mode;refresh();
+  lines.unshift(`검사한 텍스트 요소×조합 ${total}건 · 기본 파랑 대비 새로 악화된 AA 미달: ${newFail}건`);
+  const uniq=[...new Set(worstAll)];
+  out.textContent=lines.join('\n')+'\n'+(uniq.length?uniq.slice(0,40).join('\n'):'새로 악화된 항목 없음');
+  window.__sim.lastAudit={total,newFail,uniq,lines};
+}
+// 스타일이 안 입혀진 어두운 불투명 영역 찾기(HA 테마 따라가기 상태에서)
+function findOpaqueDark(root){const found=new Map();
+  root.querySelectorAll('*').forEach(el=>{if(el.closest('[data-sim="1"]')||el.closest('.leaflet-container')||!el.getClientRects().length)return;
+    const cs=getComputedStyle(el);const bc=parseCss(cs.backgroundColor);const gi=colorsIn(cs.backgroundImage);
+    const cands=[];if(bc&&bc[3]>=.9)cands.push(bc);if(/gradient/.test(cs.backgroundImage)&&gi.length&&gi.every(g=>g[3]>=.9))cands.push(gi[0]);
+    for(const c of cands){const o=toOk(c);if(o.C<.05&&o.L<.35){const r=el.getBoundingClientRect();if(r.width>80&&r.height>40){const k=el.tagName.toLowerCase()+'.'+String(el.className).trim().split(/\s+/).join('.');found.set(k,(found.get(k)||0)+1);}}}});
+  return [...found.entries()];}
+document.getElementById('runAudit').onclick=runAudit;
+window.__sim={ha,user,card,jcard,refresh,runAudit,auditAll,findOpaqueDark,origStyle,engine:{remapColor,toOk,accentParams,parseColor,isBlue}};
+</script>
+</body>
+</html>

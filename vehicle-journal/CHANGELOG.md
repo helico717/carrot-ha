@@ -1,3 +1,10 @@
+## 2026-11-05 — 차계부 화면 설정("화면" 항목) 추가
+
+- 사용자 요청: 대시보드와 같은 화면 설정을 차계부에도 두되 설정을 두 개 만들지 말 것. 기존 설정 대화상자(#vehicleManageDialog)의 왼쪽 목록에 "화면"(모드·포인트 색) 항목을 추가했다. 모드 기본값은 Home Assistant 테마를 따르며, 라이트/다크 고정에서는 기존처럼 다크를 유지한다.
+- 모든 팝업(설정·기록 유형·기록 입력·사진 보기 등) 면·모서리·배경막·버튼 모양을 통일했고, 차계부 카테고리 팔레트(--cat-*)와 기록 유형 아이콘 색은 포인트 색에서 제외했다.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-ui-theme,carrot-vehicle-journal}.js(차계부는 연결 4줄), docs/dashboard-theme-settings.md. 저장·집계·수신기 요청 변경 없음.
+- 검증: 합성 데이터 운영 코드 하네스에서 설정 대화상자에 "화면" 항목 표시·동작, 카테고리 변수 보존 확인. 배포 상태: 커밋 후 HA 직접 반영 예정. 미확인: 기본값+HA 라이트에서 일부 글자 대비 부족(차계부 라이트 팔레트 없음), 실제 HA 화면.
+
 ## 2026-11-03 — 모바일 위치 시트·현재 위치 수정 HA 직접 반영
 
 - 대상 커밋 507379b `vehicle-journal: fix iOS location sheet overlap and center map on device`. 반영 전 HA 파일(1bea9ccd…, caefe333…)이 직전 배포 3e9b6ea와 일치함을 확인하고 `/config/carrot_ha/deployment-backups/507379b/frontend/`에 백업했다.
