@@ -128,5 +128,5 @@ CAN 표시 SOC와 에너지 목표 기준의 정합성은 별도 과제다. 현�
 
 합성 품질8개, 기존 CAN기록기9개, 충전패턴20개, 파라미터polling4개 통과.
 HA충전결제·사유보존12개 통과. Carrot전체데몬121개는118통과이며 본 수정과 무관한 카메라2건·동기화테스트1건 실패가 남았다.
-수정 전 HEAD 사본에서도 동일3건이 재현됐다. 현재 전체 성공으로 보고하지 않는다. Carrot 수정은27e02e26baa3c905f6de484fa501912ab2404639로원격carrot-wip-model_selector-ha에게시했다. CI확인중. 사용자VPN불안정으로HA사유보존직접반영은미완료. IQ 관련 변경은 현재 사용하지 않는다는 사용자 정정에 따라 제거했고 게시·설치하지 않았다.
+수정 전 HEAD 사본에서도 동일3건이 재현됐다. 현재 전체 성공으로 보고하지 않는다. Carrot 수정은27e02e26baa3c905f6de484fa501912ab2404639로원격carrot-wip-model_selector-ha에게시했다. 충전전용[CI41765211369](https://github.com/helico717/openpilot/actions/runs/41765211369)가success이며, HA06cbfc5의전체[CI41766513568](https://github.com/helico717/carrot-ha/actions/runs/41766513568)도success다. 사용자VPN불안정으로HA사유보존직접반영은미완료. IQ 관련 변경은 현재 사용하지 않는다는 사용자 정정에 따라 제거했고 게시·설치하지 않았다.
 차량 설치/재부팅과 실차 충전 관측은 사용자 적용 후 확인해야 한다.

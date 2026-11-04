@@ -1,3 +1,10 @@
+## 2026-11-04 — 충전 기록 개선 CI 성공·운영 반영 대기
+
+- Carrot 코드27e02e26baa3c905f6de484fa501912ab2404639의 충전전용 Linux CI41765211369 success, 결과기록 cc0872fff까지carrot-wip-model_selector-ha게시/원격확인. https://github.com/helico717/openpilot/actions/runs/41765211369
+- HA코드/분석06cbfc5e733e2085ea34fb65917ff0f12e53d1ac의 Direct receiver validation41766513568 success(radar-ha-python/regression). https://github.com/helico717/carrot-ha/actions/runs/41766513568
+- 확보한원본시계열로재생26건/충전량보존/구형partial정상출발패턴5건검증. 분석보고서는 docs/charging-history-analysis-2026-11-04.md. 상세29후보를모두완전세션이나완충으로간주하지않음.
+- HA직접반영,차량설치/pull/재부팅,실차충전확인은미완료. 사용자VPN불안정으로내부HA SSH추가시도중단. 외부HTTPS API/기존웹터미널은가능경로지만현재인증·접속가능성미검증. 버전/태그/릴리즈없음. 별도사용자작업 .claude/launch.json·preview/theme-style/은본커밋에서제외.
+
 ## 2026-11-04 — Carrot 충전 기록기 Git 게시·VPN 미사용 상태
 
 - 27e02e26baa3c905f6de484fa501912ab2404639를 helico717/openpilot의 carrot-wip-model_selector-ha에 게시하고원격SHA일치확인. 정상출발보존·실제관측공백사유·회귀시험·전용CI포함. IQ게시없음.
