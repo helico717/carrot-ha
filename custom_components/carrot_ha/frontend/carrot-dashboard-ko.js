@@ -8,7 +8,6 @@ const dependencyURL = name => {
 };
 const {bindChargePayments, chargeCostLabel} = await import(dependencyURL('./carrot-charge-payment.js'));
 const {preserveView,updateView} = await import(dependencyURL('./carrot-view-state.js'));
-const {attachCarrotUiTheme,detachCarrotUiTheme} = await import(dependencyURL('./carrot-ui-theme.js'));
 const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, tripDateKey, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} = await import(dependencyURL('./carrot-trip-days.js'));
 const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
@@ -120,11 +119,9 @@ class CarrotDashboard extends HTMLElement {
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
     this.setAttribute('data-theme',dark?'dark':'light');
     if(this.cameraModal)this.cameraModal.setTheme(dark?'dark':'light');
-    this._carrotUi?.sync();
   }
   set hass(hass){const oldCharging=this._hass?.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state;const previous=this._hass?.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state;this._hass=hass;this.applyTheme();if(!this.initialized){this.initialized=true;if(!this.v||!Object.keys(this.v).length)this.loadCache();this.load();}else if(oldCharging!==hass.states?.[this.config?.charging_entity||this.v?.entity_ids?.charging]?.state||previous!==hass.states?.[this.config?.online_entity||this.v?.entity_ids?.comma_online]?.state){this.render();}}
   connectedCallback(){
-    attachCarrotUiTheme(this,{kind:'dash',lang:'ko',vehicleColors:VEHICLE_COLORS,showCar:()=>this.config?.vehicle_3d!==false});
     clearInterval(this.timer);clearInterval(this.liveTimer);
     this.timer=setInterval(()=>{if(this._hass&&!document.hidden&&this.getClientRects?.().length!==0)this.load(true);},60000);
     this.liveTimer=setInterval(()=>{if(this._hass&&!document.hidden&&this.getClientRects?.().length!==0)this.loadLive();},15000);
@@ -133,7 +130,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.initialized)this._onVisible();
     this.setupTabsObserver();
   }
-  disconnectedCallback(){detachCarrotUiTheme(this);this._closeColorControl?.();if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  disconnectedCallback(){this._closeColorControl?.();if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;
@@ -231,7 +228,7 @@ class CarrotDashboard extends HTMLElement {
     const maps=this.miniMaps||[];this.miniMaps=[];
     for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
   }
-  render(){if(this._carrotUi?.dialogOpen()){this._carrotUi.deferRender();return;}return preserveView(this,()=>this.renderContent());}
+  render(){return preserveView(this,()=>this.renderContent());}
   renderContent(){
     this._renderId=(this._renderId||0)+1;
     const mapContext=JSON.stringify([this.tab,this.tripDay,this.selected===null?null:this.trips[this.selected]?.data?.started_at]);

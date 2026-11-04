@@ -38,7 +38,7 @@ export async function refreshChargeCosts(card, refreshGraph=false) {
 export function openChargePayment(card, charge, en=false) {
   if(card._chargePaymentEditor)return;
   const data=charge.data, entryId=card.device.entry_id;
-  const dialog=document.createElement('dialog');card._chargePaymentEditor=dialog;dialog.className='carrot-ui-dialog';
+  const dialog=document.createElement('dialog');card._chargePaymentEditor=dialog;
   const number=value=>Number(value).toLocaleString(en?'en-US':'ko-KR');
   dialog.style.cssText='box-sizing:border-box;width:min(420px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--divider-color,#808080);border-radius:18px;padding:24px;background:var(--card-background-color,#202528);color:var(--primary-text-color,#eee);font:14px system-ui;box-shadow:0 16px 64px #0008';
   // Only static markup is inserted. All record values use textContent.
@@ -104,7 +104,7 @@ function bindChargeDeletion(card,en) {
 }
 export function confirmChargeDeletion(card,charge,en=false) {
   if(card._chargeDeleteDialog||!charge?.data?.payment_id)return;
-  const data=charge.data,dialog=document.createElement('dialog');card._chargeDeleteDialog=dialog;dialog.className='carrot-ui-dialog';
+  const data=charge.data,dialog=document.createElement('dialog');card._chargeDeleteDialog=dialog;
   dialog.style.cssText='box-sizing:border-box;width:min(420px,calc(100vw - 32px));border:1px solid #888;border-radius:18px;padding:24px;background:var(--card-background-color,#202528);color:var(--primary-text-color,#eee);font:14px system-ui';
   dialog.innerHTML='<h2></h2><p class="summary"></p><p class="warning"></p><p class="error" role="alert"></p><button class="cancel" type="button"></button> <button class="confirm" type="button"></button>';
   dialog.querySelector('h2').textContent=en?'Permanently delete this charge?':'이 충전 기록을 영구적으로 삭제할까요?';

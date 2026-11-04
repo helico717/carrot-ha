@@ -1,3 +1,11 @@
+## 2026-11-05 — HA 테마 연동·포인트 색상 설정 전체 되돌림(아카이브 보존)
+
+- 사용자 요청으로 통합 화면 설정(HA 테마 따르기/라이트/다크 3단 모드, 포인트 색상, 공용 팝업 스킨, 차계부 라이트 팔레트)을 모두 되돌렸다. 대상 커밋: e0fd23a, 696ff48, 0d308ee, c76a571, b7cdd57, 6306496.
+- 방법: 기능 파일을 직전 커밋 e84a87b 상태로 복원했다. carrot-dashboard-ko/en.js, carrot-vehicle-journal.js, carrot-journal-panel-runtime.js, carrot-charge-payment.js, tests/dashboard-dependency-version.test.mjs 복원. carrot-ui-theme.js, docs/dashboard-theme-settings.md, preview/theme-style/, scripts/ui-theme-rollback*.sh, tests/ui-theme.test.mjs 삭제. 변경 기록은 이력 보존을 위해 되돌리지 않았다. 11-03 차량 색상 피커(335fdbf)는 범위 밖이라 유지했다.
+- 아카이브: 원격 브랜치 `archive/ui-theme-2026-11-04`(6306496)에 전체 작업을 보존했다. 재사용 시 `git cherry-pick e0fd23a 0d308ee b7cdd57` 또는 해당 브랜치에서 파일을 가져온다.
+- 검증: e84a87b와 기능 파일 diff 없음(변경 기록만 차이). 대시보드 회귀 테스트 4개 파일 13건 통과.
+- 배포 상태: Git 커밋·푸시만 수행했다. HA에는 아직 테마 코드(b7cdd57판)가 직접 반영된 상태이며 HA 직접 반영·릴리즈는 하지 않았다.
+
 ## 2026-11-05 — 실제 HA 테마 23종 점검에서 찾은 버그 4건 수정
 - 배포 상태: 커밋 b7cdd57을 HA에 SSH 직접 반영(2026-11-05). 반영 전 ko·en·ui-theme(0d308ee판)이 HA 파일과 일치함을 확인하고 /homeassistant/carrot_ha/deployment-backups/ui-theme-fix2-b7cdd57/before 에 백업(rollback.sh 포함, 이 수정만 되돌림). 반영 후 HA 파일·HTTP 응답 SHA-256 앞 12자리가 커밋과 일치: carrot-ui-theme.js 5fff5a9e8cb1, carrot-dashboard-ko.js 6f4cd5fd1b8b, carrot-dashboard-en.js a7241e85c942, 프런트 버전 0.9.0-d08f92110a03. 재시작 불필요. 릴리즈 없음.
 - 실제 HA 재측정: 버그1 설정 창이 라이브 갱신 약 22초 동안 모달·고정 위치(y=50) 유지, 강제 render()도 미뤘다가 닫을 때 반영. 버그2 visionOS·Liquid Glass 라이트·Graphite·E-ink Dark가 모두 글자색 극성(dark)으로 판정, 글자 변수가 테마 값. 버그3·4 차계부 HA 기본 라이트 글자 대비 미달 178→0, 기록 유형 팝업 10→0, 상단 버튼 어두운 글자+10% 오버레이, Frosted Glass Light 0, 다크 변동 없음(46). 남은 항목(수정 대상 아님): 차계부 설정 창 2~16건, 배경 사진 테마·Graphite 다크의 보조 글자 3~4대 대비, 대시보드 라이트 팔레트의 기존 문제.
