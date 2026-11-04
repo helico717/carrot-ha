@@ -4,7 +4,8 @@
 - 변경: 공용 모듈 carrot-ui-theme.js 추가(포인트 색 엔진·설정창·팝업 스킨·비상 끄기). 대시보드 ko/en, 차계부, 충전 금액 팝업에 연결(각 몇 줄). 프리셋 3색(주황·보라·민트), HA 아이콘 견본, 차계부 기존 설정창에 "화면" 항목 추가. 라이트 모드 선택 안 된 날짜 라벨(#d1d5db) 대비 결함 수정.
 - 관련 파일: custom_components/carrot_ha/frontend/{carrot-ui-theme,carrot-dashboard-ko,carrot-dashboard-en,carrot-vehicle-journal,carrot-charge-payment}.js, tests/{ui-theme,dashboard-dependency-version}.test.mjs, docs/dashboard-theme-settings.md, preview/theme-style/.
 - 검증(로컬): 신규 ui-theme 7개 통과, 의존성 테스트는 신규 모듈 포함으로 갱신해 통과, 기존 node 테스트는 변경 전과 동일(camera-360·charging-curve·debug-freshness·motion-status·range-c3 5건은 변경 전에도 실패). 브라우저에서 운영 코드 하네스로 HA 테마 따라가기·라이트/다크 고정·포인트 색·설정창·충전 금액 팝업·차계부 화면 항목 확인. 프리뷰의 가독성 전수 검사(40,400건)에서 포인트 색 때문에 악화된 곳 0건.
-- 배포 상태: 커밋 후 HA 직접 반영 예정(릴리즈 없음). 롤백은 docs/dashboard-theme-settings.md. 미확인: 실제 HA 테마·실기기 화면, 차계부 기본값+HA 라이트의 일부 글자 대비 부족(알려진 한계).
+- 배포 상태: 커밋 e0fd23a(main 푸시 완료)를 2026-11-05(HA 시계 11/04 16:49~) HA에 SSH 직접 반영했다. 반영 전 4개 파일(ko·en·차계부·충전 팝업)이 직전 커밋 e84a87b과 일치함(CRLF 제외)을 확인하고 /homeassistant/carrot_ha/deployment-backups/ui-theme-e0fd23a/before 에 백업(SHA256SUMS.before)했다. 반영 후 HA 파일·내부 HTTP 응답 SHA-256 앞 12자리가 커밋과 일치: carrot-ui-theme.js fa3051b143d2, carrot-dashboard-ko.js 9e616d9c75db, carrot-dashboard-en.js 46d2a17cd161, carrot-vehicle-journal.js 4c7bfa757a03, carrot-charge-payment.js 5528a76f50e7. 프런트 버전 해시가 0.9.0-f52224b3a520 으로 바뀌었다(재시작 불필요, 브라우저 새로고침으로 적용). 릴리즈 발행 없음.
+- 롤백: `sudo sh /homeassistant/carrot_ha/deployment-backups/ui-theme-e0fd23a/rollback.sh`(백업 검증 후 복원, 새 파일 제거, 반영 후 해시 검사). 재배포 없이 끄기: 주소 끝 ?carrot_ui=off. 스크립트 사본: scripts/ui-theme-rollback.sh. 미확인: 실제 HA 화면(사용자 테마·실기기)에서의 동작은 사용자 새로고침 후 확인 대기.
 
 ## 2026-11-04 — 충전 기록 개선 CI 성공·운영 반영 대기
 
