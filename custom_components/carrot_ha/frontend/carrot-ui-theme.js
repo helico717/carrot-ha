@@ -134,6 +134,7 @@ const HELPER_VARS = `--cui-card:var(--ha-card-background,var(--card-background-c
 const ov = p => `color-mix(in srgb,var(--cui-ink) ${p}%,transparent)`;
 const DARK_TOK = '--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca';
 const LIGHT_TOK = '--j-bg:#f4f6f8;--j-surface:#ffffff;--j-raised:#f1f4f7;--j-border:rgba(0,0,0,.14);--j-ink:#1d2125;--j-sub:#5d656d';
+const LIGHT_VARS = ':host{--cui-card:#ffffff;--cui-ink:#1d2125;--cui-sub:#5d656d;--cui-line:rgba(0,0,0,.14);--cui-blur:none;--cui-dialog:#ffffff;--cui-base:#ffffff}';
 const FOLLOW_DIALOG_TOK = `--j-bg:${ov(6)};--j-surface:var(--cui-dialog);--j-raised:${ov(10)};--j-border:var(--cui-line);--j-ink:var(--cui-ink);--j-sub:var(--cui-sub)`;
 // 기존 결함 수정: 라이트 모드에서 선택되지 않은 날짜 라벨(.trip-day b)이 연회색(#d1d5db)이라 흰 배경에서 안 보임
 const DASH_FIX_CSS = `.trip-day:not([aria-pressed="true"]) b,.charge-day:not([aria-pressed="true"]) b{color:var(--ink)!important}.display-controls{display:none!important}`;
@@ -146,6 +147,12 @@ const dashFollowCss = () => `
   .hero h2,.hero small{color:var(--cui-ink)!important}
   .metric,.panel,.status-group,.raw-data-card,.trip-history,.charge-history,.trip-grid-container,.day-timeline-wrap,.sleek-trip-card,.charge-info-stack,.mini-condition,.battery-history,.parking-heading{background:${ov(7)}!important;border:1px solid var(--cui-line)!important}
   .refresh,.badge,.trip-day:not([aria-pressed="true"]),.charge-day:not([aria-pressed="true"]){background:${ov(9)}!important;color:var(--cui-ink)!important;border-color:var(--cui-line)!important}`;
+// 라이트에서도 히어로 카드는 어두운 포인트 색 면 + 밝은 글자로 유지(기존 디자인 의도). 면 색은 포인트 색 계열의 어두운 톤.
+const journalHeroLight = () => {
+  const a = ACC || {h: MINT.h, C: MINT.C * .5};
+  const c1 = fromY(.045, Math.min(.09, a.C), a.h), c2 = fromY(.02, Math.min(.06, a.C), a.h);
+  return `.hero,.savings-hero{--j-ink:#f1f6fa;--j-sub:#c9d6de;color:#f1f6fa;background:linear-gradient(130deg,rgb(${c1}),rgb(${c2}))!important;border:1px solid rgba(255,255,255,.12)!important}`;
+};
 const journalFollowCss = () => `
   :host{--j-bg:var(--cui-card);--j-surface:${ov(6)};--j-raised:${ov(11)};--j-border:var(--cui-line);--j-ink:var(--cui-ink);--j-sub:var(--cui-sub)}
   .shell{-webkit-backdrop-filter:var(--cui-blur);backdrop-filter:var(--cui-blur)}
@@ -244,7 +251,9 @@ class Controller {
   styleHA() { return this.getMode() === 'auto'; }
   isDark() {
     if (this.kind === 'dash') return this.card.getAttribute('data-theme') !== 'light';
-    if (!this.styleHA()) return true;                     // 차계부는 기존에 다크만 있음
+    const m = this.getMode();
+    if (m === 'dark') return true;
+    if (m === 'light') return false;                      // 차계부 라이트 고정(Carrot 라이트 팔레트)
     const d = this.card._hass?.themes?.darkMode;
     return d == null ? matchMedia('(prefers-color-scheme: dark)').matches : !!d;
   }
@@ -286,13 +295,27 @@ class Controller {
     if (this.kind === 'dash') {
       css += (follow ? dashFollowCss() : '') + DASH_FIX_CSS + this.dashDialogCss(follow, dark);
     } else {
-      css += (follow ? journalFollowCss() : '') + `dialog{${follow ? FOLLOW_DIALOG_TOK : DARK_TOK}}` + `@media (max-width:600px){.settings-nav{grid-template-columns:repeat(5,1fr)!important}}` + dialogSkin('dialog', follow);
+      const lightFixed = !follow && !dark;                  // 라이트 고정: Carrot 라이트 팔레트로 같은 오버레이 스타일을 쓴다
+      css += (follow ? journalFollowCss() : lightFixed ? LIGHT_VARS + journalFollowCss() : '') + (!dark ? journalHeroLight() : '') + `dialog{${follow ? FOLLOW_DIALOG_TOK : (dark ? DARK_TOK : LIGHT_TOK)}}` + `@media (max-width:600px){.settings-nav{grid-template-columns:repeat(5,1fr)!important}}` + dialogSkin('dialog', follow);
+      this.applyPanelVars(follow, dark);
     }
     if (this.styleEl.textContent !== css) this.styleEl.textContent = css;
     this.ensure();
     this.remapTree(root, true);
     this.paint();
     applyBodySkin();
+  }
+  // HA 사이드바 패널(차계부 화면)의 바깥 틀(배경·머리글)도 같은 모드를 따른다. 변수가 없으면 기존 다크 값.
+  applyPanelVars(follow, dark) {
+    const host = this.card.getRootNode?.()?.host;
+    if (!host || host.tagName !== 'CARROT-JOURNAL-PANEL') return;
+    const set = (k, v) => v == null ? host.style.removeProperty(k) : host.style.setProperty(k, v);
+    if (follow) {
+      set('--cui-panel-bg', 'var(--primary-background-color,#111)'); set('--cui-panel-fg', 'var(--primary-text-color,#e1e1e1)');
+      set('--cui-panel-line', 'var(--divider-color,rgba(127,127,127,.25))'); set('--cui-panel-raised', ov(10)); set('--cui-panel-surface', 'var(--card-background-color,#1c1c1c)');
+    } else if (!dark) {
+      set('--cui-panel-bg', '#f4f6f8'); set('--cui-panel-fg', '#1d2125'); set('--cui-panel-line', 'rgba(0,0,0,.14)'); set('--cui-panel-raised', '#f1f4f7'); set('--cui-panel-surface', '#ffffff');
+    } else for (const k of ['bg', 'fg', 'line', 'raised', 'surface']) set('--cui-panel-' + k, null);
   }
   dashDialogCss(follow, dark) {
     const tok = follow ? FOLLOW_DIALOG_TOK : (dark ? DARK_TOK : LIGHT_TOK);
@@ -388,7 +411,7 @@ ${dialogSkin('dialog.cui-dialog', follow)}`;
   paint() {
     const sc = this.scope; if (!sc) return;
     const q = k => sc.querySelector(`[data-k=${k}]`), dark = this.isDark();
-    const [r, g, b] = accentTone(this.kind === 'journal' && !this.styleHA() ? true : dark);
+    const [r, g, b] = accentTone(dark);
     sc.style.setProperty('--cui-a', `rgb(${r},${g},${b})`); sc.style.setProperty('--cui-a12', `rgba(${r},${g},${b},.12)`); sc.style.setProperty('--cui-a35', `rgba(${r},${g},${b},.35)`);
     this.gear?.style.setProperty('--cui-a', `rgb(${r},${g},${b})`);
     const tn = tones(); q('t1').style.background = tn[0]; q('t2').style.background = `linear-gradient(135deg,${tn[0]},${remapColor('#0c43ad')})`;
@@ -406,7 +429,7 @@ ${dialogSkin('dialog.cui-dialog', follow)}`;
   }
   /* --- 포인트 색 적용: <style>/인라인 색을 변환(원본은 보존) --- */
   remapTree(rootNode, full = false) {
-    const mint = this.kind === 'journal', lightText = this.kind === 'journal' && this.styleHA() && !this.isDark();
+    const mint = this.kind === 'journal', lightText = this.kind === 'journal' && !this.isDark();
     const els = rootNode.nodeType === 1 ? [rootNode, ...rootNode.querySelectorAll('*')] : [...rootNode.querySelectorAll('*')];
     for (const el of els) {
       if (el.closest?.('[data-cui="1"]')) continue;
