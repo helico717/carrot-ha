@@ -231,7 +231,7 @@ class CarrotDashboard extends HTMLElement {
     const maps=this.miniMaps||[];this.miniMaps=[];
     for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
   }
-  render(){return preserveView(this,()=>this.renderContent());}
+  render(){if(this._carrotUi?.dialogOpen()){this._carrotUi.deferRender();return;}return preserveView(this,()=>this.renderContent());}
   renderContent(){
     this._renderId=(this._renderId||0)+1;
     const mapContext=JSON.stringify([this.tab,this.tripDay,this.selected===null?null:this.trips[this.selected]?.data?.started_at]);

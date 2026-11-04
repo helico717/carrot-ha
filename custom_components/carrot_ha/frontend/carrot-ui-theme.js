@@ -76,6 +76,42 @@ function normalizeColor(value) {
     return parseColor(resolved.replace(/\s+/g, ' ').replace(/rgba?\((\d+) (\d+) (\d+)(?: \/ ([\d.]+))?\)/, (m0, r, g, b, a) => a == null ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${a})`));
   } catch { return null; }
 }
+// 테마의 글자색이 밝으면 '다크 극성'으로 본다. HA가 라이트라고 알려줘도 글자가 흰색인 테마(visionOS 라이트, Liquid Glass 라이트,
+// 단일 모드 다크 테마)가 있어, 글자색 극성이 실제 색 구성을 더 정확히 말해 준다.
+function themePolarityDark() {
+  const p = normalizeColor(getComputedStyle(document.documentElement).getPropertyValue('--primary-text-color').trim());
+  return p ? lumOf(p.rgb) > .5 : null;
+}
+function dimColor(str) {                       // 색상·선명도는 유지하고 휘도만 낮춘다(밝은 카테고리 색을 흰 배경 글자로 쓸 때)
+  const p = parseColor(str); if (!p) return str;
+  const o = toOk(p.rgb), [r, g, b] = fromY(lumOf(p.rgb) * .3, o.C, o.h);
+  return p.a == null ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${p.a})`;
+}
+function neutralToVar(val) {                   // 라이트에서 글자색으로 박혀 있는 밝은 무채색은 토큰(--j-ink/--j-sub)으로 바꾼다
+  return val.replace(COLOR_RE, c => {
+    const p = parseColor(c); if (!p) return c;
+    const [r, g, b] = p.rgb; if (Math.max(r, g, b) - Math.min(r, g, b) > 40) return c;
+    const y = lumOf(p.rgb); if (y < .45) return c;
+    return y > .7 ? 'var(--j-ink)' : 'var(--j-sub)';
+  });
+}
+// 라이트에서 글자색으로 쓰이는 값 전체 처리: 밝은 무채색→토큰, 포인트 색 변수→어두운 포인트 글자색, 그 밖의 밝은 유채색→같은 색상의 어두운 톤.
+function lightTextColor(val, mint, pre = false) {
+  val = neutralToVar(val).replace(/var\(--j-(?:accent|mint)(?:\s*,[^)]*)?\)/g, 'var(--cui-accent-text)');
+  return val.replace(COLOR_RE, c => {
+    const p = parseColor(c); if (!p) return c;
+    if (!pre && ACC && isAccentRgb(p.rgb, mint)) return remapColor(c, mint, true);
+    return lumOf(p.rgb) > .2 ? dimColor(c) : c;
+  });
+}
+// 인라인 style에서 글자색(color, --*color, --c)만 라이트용으로 바꾼다. 배경·테두리 등은 그대로.
+function lightInline(style, mint) {
+  return style.split(';').map(d => {
+    const i = d.indexOf(':'); if (i < 0) return d;
+    const n = d.slice(0, i).trim().toLowerCase();
+    return n === 'color' || n === '--c' || /^--.*(color|accent)$/.test(n) ? d.slice(0, i + 1) + lightTextColor(d.slice(i + 1), mint, true) : d;
+  }).join(';');
+}
 let ACC = null;   // {h,k,C} 또는 null(기본 파랑 그대로)
 const remapCache = new Map();
 function remapColor(str, mint = false, dim = false) {
@@ -92,12 +128,12 @@ const COLOR_RE = /#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|rgba?\(\
 const remapText = (t, mint = false, dim = false) => t.replace(COLOR_RE, c => remapColor(c, mint, dim));
 // 카테고리·지표를 구분하는 색(기록 유형 아이콘, 추세 카드, --cat-* 팔레트)은 원래 값을 유지한다.
 const EXEMPT = /type-icon-box|tint-|trend-card|receipt-source/;
-function remapRule(r, mint, lightText) {
+function remapRule(r, mint, lightText, exempt = false) {
   // CSSOM 재직렬화는 var()가 든 단축 속성을 잃어버리므로 cssText 문자열을 그대로 쓴다.
   let t = r.cssText; const held = [];
-  t = t.replace(/(--cat-[\w-]+)\s*:\s*([^;}]*)/g, (m0, prop, val) => { held.push(val); return `${prop}:@@${held.length - 1}@@`; });
-  if (lightText) t = t.replace(/(^|[{;\s])((?:-webkit-text-fill-)?color)\s*:\s*([^;}]*)/g, (m0, pre, prop, val) => { held.push(remapText(val, mint, true)); return `${pre}${prop}:@@${held.length - 1}@@`; });
-  t = remapText(t, mint);
+  t = t.replace(/(--cat-[\w-]+)\s*:\s*([^;}]*)/g, (m0, prop, val) => { held.push(lightText ? val.replace(COLOR_RE, dimColor) : val); return `${prop}:@@${held.length - 1}@@`; });
+  if (lightText) t = t.replace(/(^|[{;\s])((?:-webkit-text-fill-)?color)\s*:\s*([^;}]*)/g, (m0, pre, prop, val) => { held.push(lightTextColor(val, mint)); return `${pre}${prop}:@@${held.length - 1}@@`; });
+  if (!exempt) t = remapText(t, mint);   // 제외 규칙(카테고리·지표 색)은 포인트 색으로 바꾸지 않지만, 라이트의 밝은 글자색 처리는 받는다
   return t.replace(/@@(\d+)@@/g, (m0, i) => held[+i]);
 }
 function remapCss(text, mint, lightText = false) {
@@ -106,7 +142,7 @@ function remapCss(text, mint, lightText = false) {
   const walk = rules => {
     let out = '';
     for (const r of rules) {
-      if (r.type === 1) out += EXEMPT.test(r.selectorText) ? r.cssText : remapRule(r, mint, lightText);
+      if (r.type === 1) out += remapRule(r, mint, lightText, EXEMPT.test(r.selectorText));
       else if (r.type === 4) out += `@media ${r.conditionText}{${walk(r.cssRules)}}`;
       else out += remapText(r.cssText, mint);
     }
@@ -139,7 +175,7 @@ const FOLLOW_DIALOG_TOK = `--j-bg:${ov(6)};--j-surface:var(--cui-dialog);--j-rai
 // 기존 결함 수정: 라이트 모드에서 선택되지 않은 날짜 라벨(.trip-day b)이 연회색(#d1d5db)이라 흰 배경에서 안 보임
 const DASH_FIX_CSS = `.trip-day:not([aria-pressed="true"]) b,.charge-day:not([aria-pressed="true"]) b{color:var(--ink)!important}.display-controls{display:none!important}`;
 const dashFollowCss = () => `
-  :host{--ink:var(--cui-ink);--muted:var(--cui-sub);--line:var(--cui-line)}
+  :host([data-theme]){--ink:var(--cui-ink);--muted:var(--cui-sub);--line:var(--cui-line)}
   ha-card{background:var(--cui-card)!important;border:1px solid var(--cui-line)!important;-webkit-backdrop-filter:var(--cui-blur);backdrop-filter:var(--cui-blur);color:var(--cui-ink)}
   .nav{background:${ov(6)}!important}
   .nav button.active{background:${ov(14)}!important;color:var(--cui-ink)!important}
@@ -217,6 +253,60 @@ function loadJournalDialogCss() {
 }
 let journalDialogCss = '';
 
+/* ---------------- 글자 대비 보호막(차계부 라이트) ----------------
+   차계부의 많은 글자색·배경색이 다크 디자인 기준으로 박혀 있다. 규칙을 하나씩 고치는 대신, 라이트에서 실제 렌더된 글자와 배경의
+   대비를 재서 기준에 못 미치는 글자만 어두운/밝은 글자색(data-cui-gc)으로 바꾼다. 스타일 속성은 건드리지 않는다. */
+const cssRgba = s => {
+  let m;
+  if ((m = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)/))) return [+m[1], +m[2], +m[3], m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4])];
+  if ((m = s.match(/color\(srgb\s+([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/))) return [m[1] * 255, m[2] * 255, m[3] * 255, m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4])];
+  if ((m = s.match(/oklab\(\s*([\d.e-]+)\s+([\d.e-]+)\s+([\d.e-]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/))) {
+    const L = +m[1], A = +m[2], B = +m[3], l = (L + .3963377774 * A + .2158037573 * B) ** 3, mm = (L - .1055613458 * A - .0638541728 * B) ** 3, ss = (L - .0894841775 * A - 1.291485548 * B) ** 3;
+    const f = c => 255 * Math.min(1, Math.max(0, c <= .0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - .055));
+    return [f(4.0767416621 * l - 3.3077115913 * mm + .2309699292 * ss), f(-1.2684380046 * l + 2.6097574011 * mm - .3413193965 * ss), f(-.0041960863 * l - .7034186147 * mm + 1.707614701 * ss), m[4] == null ? 1 : (m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4])];
+  }
+  return null;
+};
+const cssColors = s => (s.match(/rgba?\([^)]*\)|color\(srgb[^)]*\)|oklab\([^)]*\)/g) || []).map(cssRgba).filter(Boolean);
+const overColor = (t, b) => { const a = t[3] + b[3] * (1 - t[3]); return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map(i => (t[i] * t[3] + b[i] * b[3] * (1 - t[3])) / a).concat(a); };
+const contrastOf = (a, b) => { const x = lumOf(a), y = lumOf(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+const GUARD_TAGS = new Set(['SPAN', 'DIV', 'BUTTON', 'B', 'STRONG', 'SMALL', 'H1', 'H2', 'H3', 'H4', 'LABEL', 'A', 'P', 'I', 'LI', 'TD', 'TH', 'SELECT', 'OPTION']);
+function pageBases() {
+  const p = document.createElement('div'); p.style.cssText = 'position:fixed;left:-9px;width:1px;height:1px;background:var(--lovelace-background,var(--primary-background-color,#fff))';
+  document.body.append(p); const cs = getComputedStyle(p), g = cssColors(cs.backgroundImage), bc = cssRgba(cs.backgroundColor); p.remove();
+  return g.length ? [g[0], g[g.length - 1]] : [bc || [255, 255, 255, 1]];
+}
+function guardText(rootNode) {
+  const bases = pageBases(), els = rootNode.nodeType === 1 ? [rootNode, ...rootNode.querySelectorAll('*')] : [...rootNode.querySelectorAll('*')];
+  for (const el of els) {
+    if (!GUARD_TAGS.has(el.tagName) || el.closest?.('[data-cui="1"]') || el.closest?.('.leaflet-container')) continue;
+    let own = ''; el.childNodes.forEach(n => { if (n.nodeType === 3) own += n.textContent; });
+    if (!own.trim() || !el.getClientRects().length) continue;
+    const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || +cs.opacity === 0) continue;
+    const fg = cssRgba(cs.color); if (!fg) continue;
+    const layers = []; let cur = el, opaque = false;
+    while (cur && !opaque) {
+      const c = getComputedStyle(cur), gi = cssColors(c.backgroundImage || ''), bc = cssRgba(c.backgroundColor || '');
+      if (gi.length && /gradient/.test(c.backgroundImage)) { layers.push(gi.length > 1 ? [gi[0], gi[gi.length - 1]] : [gi[0]]); if (gi.every(x => x[3] >= .99)) opaque = true; }
+      if (bc && bc[3] > 0) { layers.push([bc]); if (bc[3] >= .99) opaque = true; }
+      cur = cur.parentNode && cur.parentNode.nodeType === 11 ? cur.parentNode.host : cur.parentElement;
+      if (cur && cur.tagName === 'HOME-ASSISTANT') cur = null;
+    }
+    let stack = bases.map(b => [b]);
+    for (let i = layers.length - 1; i >= 0; i--) { const next = []; for (const lay of layers[i]) for (const st of stack) next.push(overColor(lay, st[0])); stack = next.map(x => [x]); }
+    const finals = stack.map(x => x[0]); let worst = 99;
+    for (const bg of finals) worst = Math.min(worst, contrastOf(overColor(fg, [bg[0], bg[1], bg[2], 1]), bg));
+    const fs = parseFloat(cs.fontSize), need = (fs >= 24 || (fs >= 18.66 && +cs.fontWeight >= 700)) ? 3 : 4.5;
+    if (worst >= need) { if (el.dataset.cuiGc && worst >= need) { /* 이미 읽히면 유지 */ } continue; }
+    // 배경들에 대해 어두운 글자/밝은 글자 중 더 잘 읽히는 쪽을 고른다
+    const dark = [29, 33, 37], light = [241, 246, 250];
+    const score = c => Math.min(...finals.map(bg => contrastOf(c, bg)));
+    el.dataset.cuiGc = score(dark) >= score(light) ? 'd' : 'l';
+  }
+}
+function clearGuard(rootNode) { rootNode.querySelectorAll('[data-cui-gc]').forEach(e => e.removeAttribute('data-cui-gc')); }
+const GUARD_CSS = '[data-cui-gc="d"]{color:#1d2125!important}[data-cui-gc="l"]{color:#f1f6fa!important}';
+
 /* ---------------- 컨트롤러 ---------------- */
 const controllers = new Set();
 const sec = (title, inner, cap) => `<section class="settings-section"><div class="cui-hrow"><h4>${title}</h4>${cap ? `<span class="cui-cap" data-k="${cap}"></span>` : ''}</div>${inner}</section>`;
@@ -236,6 +326,10 @@ class Controller {
     else if (!this.wantCar() && this.carEl) { this.carEl.remove(); this.carEl = null; }
   }
   /* --- 모드 --- */
+  dialogOpen() { return !!this.dialog?.open; }
+  closeDialog() { if (this.dialog?.open) this.dialog.close(); this.afterClose(); }
+  afterClose() { this.gear?.focus(); if (this.renderDeferred && !this.dialogOpen()) { this.renderDeferred = false; this.card.render?.(); } }   // 닫는 동안 밀린 화면 갱신을 지금 반영
+  deferRender() { this.renderDeferred = true; }
   getMode() {
     if (this.kind === 'dash') { const m = this.card.themeMode; return m === 'light' || m === 'dark' ? m : 'auto'; }
     return settings.mode === 'light' || settings.mode === 'dark' ? settings.mode : 'auto';
@@ -250,10 +344,12 @@ class Controller {
   }
   styleHA() { return this.getMode() === 'auto'; }
   isDark() {
-    if (this.kind === 'dash') return this.card.getAttribute('data-theme') !== 'light';
+    if (this.kind === 'dash') return this.card.getAttribute('data-theme') !== 'light';   // 기본값에서는 sync()가 글자색 극성으로 맞춰 둔다
     const m = this.getMode();
     if (m === 'dark') return true;
     if (m === 'light') return false;                      // 차계부 라이트 고정(Carrot 라이트 팔레트)
+    const pol = themePolarityDark();
+    if (pol != null) return pol;
     const d = this.card._hass?.themes?.darkMode;
     return d == null ? matchMedia('(prefers-color-scheme: dark)').matches : !!d;
   }
@@ -261,7 +357,7 @@ class Controller {
     if (this.running) return;
     this.running = true; controllers.add(this);
     this.observer = new MutationObserver(muts => this.onMutations(muts));
-    this.observer.observe(this.root, {childList: true, subtree: true});
+    this.observer.observe(this.root, {childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class']});   // 탭 전환(hidden/class)도 대비 검사 대상
     this.sync(true);
   }
   stop() { this.running = false; controllers.delete(this); this.observer?.disconnect(); clearTimeout(this.pending); this.pending = null; }
@@ -269,18 +365,24 @@ class Controller {
     const added = [];
     for (const m of muts) {
       if (m.target.nodeType === 1 && m.target.closest?.('[data-cui]')) continue;
+      if (m.type === 'attributes') { added.push(m.target); continue; }
       for (const n of m.addedNodes) if (n.nodeType === 1 && !n.dataset?.cui) added.push(n);
     }
     this.queue = (this.queue || []).concat(added);
     if (this.pending) return;
     this.pending = setTimeout(() => {
       this.pending = null; const nodes = this.queue || []; this.queue = [];
-      try { this.ensure(); if (ACC) for (const n of nodes) this.remapTree(n); } catch (e) { console.warn('Carrot UI theme:', e); }
+      try { this.ensure(); if (this.needsTransform()) for (const n of nodes) this.remapTree(n); if (this.kind === 'journal' && !this.isDark()) for (const n of nodes) guardText(n); } catch (e) { console.warn('Carrot UI theme:', e); }
     }, 0);
   }
+  needsTransform() { return !!ACC || (this.kind === 'journal' && !this.isDark()); }
   /* --- 동기화(설정·HA 테마 변경 시) --- */
   sync(force = false) {
     if (!this.running || !this.root) return;
+    if (this.kind === 'dash' && this.styleHA()) {          // 카드의 applyTheme()가 HA의 darkMode로 덮어쓴 값을 테마 글자색 극성으로 바로잡는다
+      const pol = themePolarityDark();
+      if (pol != null) { const want = pol ? 'dark' : 'light'; if (this.card.getAttribute('data-theme') !== want) this.card.setAttribute('data-theme', want); }
+    }
     const hvar = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
     const sig = [this.getMode(), settings.accent, this.isDark(), settings.accent === 'ha' ? hvar : '', this.card._hass?.themes?.theme || ''].join('|');
     if (!force && sig === this.signature) return;
@@ -297,11 +399,13 @@ class Controller {
     } else {
       const lightFixed = !follow && !dark;                  // 라이트 고정: Carrot 라이트 팔레트로 같은 오버레이 스타일을 쓴다
       css += (follow ? journalFollowCss() : lightFixed ? LIGHT_VARS + journalFollowCss() : '') + (!dark ? journalHeroLight() : '') + `dialog{${follow ? FOLLOW_DIALOG_TOK : (dark ? DARK_TOK : LIGHT_TOK)}}` + `@media (max-width:600px){.settings-nav{grid-template-columns:repeat(5,1fr)!important}}` + dialogSkin('dialog', follow);
+      if (!dark) { css += GUARD_CSS; const [ar, ag, ab] = accentTone(false); css += `:host{--cui-accent-text:rgb(${ar},${ag},${ab})}`; }
       this.applyPanelVars(follow, dark);
     }
     if (this.styleEl.textContent !== css) this.styleEl.textContent = css;
     this.ensure();
     this.remapTree(root, true);
+    if (this.kind === 'journal') { clearGuard(root); if (!dark) guardText(root); }
     this.paint();
     applyBodySkin();
   }
@@ -312,7 +416,7 @@ class Controller {
     const set = (k, v) => v == null ? host.style.removeProperty(k) : host.style.setProperty(k, v);
     if (follow) {
       set('--cui-panel-bg', 'var(--primary-background-color,#111)'); set('--cui-panel-fg', 'var(--primary-text-color,#e1e1e1)');
-      set('--cui-panel-line', 'var(--divider-color,rgba(127,127,127,.25))'); set('--cui-panel-raised', ov(10)); set('--cui-panel-surface', 'var(--card-background-color,#1c1c1c)');
+      set('--cui-panel-line', 'var(--divider-color,rgba(127,127,127,.25))'); set('--cui-panel-raised', 'color-mix(in srgb,var(--primary-text-color,#e1e1e1) 10%,transparent)'); set('--cui-panel-surface', 'var(--card-background-color,#1c1c1c)');
     } else if (!dark) {
       set('--cui-panel-bg', '#f4f6f8'); set('--cui-panel-fg', '#1d2125'); set('--cui-panel-line', 'rgba(0,0,0,.14)'); set('--cui-panel-raised', '#f1f4f7'); set('--cui-panel-surface', '#ffffff');
     } else for (const k of ['bg', 'fg', 'line', 'raised', 'surface']) set('--cui-panel-' + k, null);
@@ -342,7 +446,13 @@ ${dialogSkin('dialog.cui-dialog', follow)}`;
   /* --- 노드 유지(렌더가 DOM을 교체해도 다시 붙인다) --- */
   ensure() {
     const root = this.root; if (!root) return;
-    for (const n of [this.styleEl, this.menuStyle, this.dialog]) if (n && n.parentNode !== root) root.append(n);
+    for (const n of [this.styleEl, this.menuStyle, this.dialog]) {
+      if (!n || n.parentNode === root) continue;
+      const reopen = n === this.dialog && n.hasAttribute('open');   // 열린 모달이 DOM 교체로 풀렸다면 다시 모달로 연다
+      if (reopen) n.removeAttribute('open');
+      root.append(n);
+      if (reopen) n.showModal();
+    }
     if (this.kind === 'dash') {
       const top = root.querySelector('.top');
       if (top && this.gear && this.gear.parentNode !== top) top.append(this.gear);
@@ -401,10 +511,10 @@ ${dialogSkin('dialog.cui-dialog', follow)}`;
     d.innerHTML = `<header class="settings-dialog-header"><div><h2 id="cuiTitle">${t.title}</h2></div><button type="button" data-k="close" aria-label="${t.closeAria}">${t.close}</button></header><div class="cui-body"></div><footer class="cui-foot"><button type="button" data-k="reset">${t.reset}</button><button type="button" data-k="done" class="primary">${t.done}</button></footer>`;
     d.querySelector('.cui-body').append(this.appearanceNode(false));
     this.scope = d;
-    d.querySelector('[data-k=close]').onclick = () => d.close(); d.querySelector('[data-k=done]').onclick = () => d.close();
+    d.querySelector('[data-k=close]').onclick = () => this.closeDialog(); d.querySelector('[data-k=done]').onclick = () => this.closeDialog();
     d.querySelector('[data-k=reset]').onclick = () => this.resetAll();
-    d.addEventListener('click', e => { if (e.target === d) d.close(); });
-    d.addEventListener('close', () => this.gear?.focus());
+    d.addEventListener('click', e => { if (e.target === d) this.closeDialog(); });
+    d.addEventListener('close', () => this.afterClose());   // Esc 등 브라우저가 직접 닫는 경우
     const g = this.gear = document.createElement('button'); g.type = 'button'; g.className = 'cui-gear'; g.dataset.cui = '1'; g.setAttribute('aria-label', t.gear); g.title = t.gear; g.innerHTML = GEAR_ICON;
     g.onclick = async () => { journalDialogCss = await loadJournalDialogCss(); this.ensureCar(); this.signature = ''; this.sync(true); this.paint(); d.showModal(); };
   }
@@ -435,16 +545,18 @@ ${dialogSkin('dialog.cui-dialog', follow)}`;
       if (el.closest?.('[data-cui="1"]')) continue;
       if (el.tagName === 'STYLE') {
         if (!el.__cuiOrig) el.__cuiOrig = el.textContent;
-        const key = ACC ? `${ACC.h.toFixed(4)}|${ACC.k.toFixed(3)}|${mint}|${lightText}|${el.__cuiOrig.length}|${hashText(el.__cuiOrig)}` : null;
+        const xf = ACC || lightText;
+        const key = xf ? `${ACC ? ACC.h.toFixed(4) + '|' + ACC.k.toFixed(3) : 'none'}|${mint}|${lightText}|${el.__cuiOrig.length}|${hashText(el.__cuiOrig)}` : null;
         let t = el.__cuiOrig;
-        if (ACC) { t = styleCache.get(key); if (t == null) { t = remapCss(el.__cuiOrig, mint, lightText); if (styleCache.size > 24) styleCache.clear(); styleCache.set(key, t); } }
+        if (xf) { t = styleCache.get(key); if (t == null) { t = remapCss(el.__cuiOrig, mint, lightText); if (styleCache.size > 24) styleCache.clear(); styleCache.set(key, t); } }
         if (el.textContent !== t) el.textContent = t;
       }
       for (const att of ['style', 'fill', 'stroke', 'stop-color']) {
         if (!el.hasAttribute?.(att)) continue;
         const key = 'data-cui-orig-' + att;
         if (!el.hasAttribute(key)) el.setAttribute(key, el.getAttribute(att));
-        const t = ACC ? remapText(el.getAttribute(key), mint) : el.getAttribute(key);
+        let t = ACC ? remapText(el.getAttribute(key), mint) : el.getAttribute(key);
+        if (lightText && att === 'style') t = lightInline(t, mint);
         if (el.getAttribute(att) !== t) el.setAttribute(att, t);
       }
     }
@@ -484,4 +596,4 @@ export function attachCarrotUiTheme(card, opts = {}) {
   } catch (error) { console.warn('Carrot UI theme disabled:', error); return null; }
 }
 export function detachCarrotUiTheme(card) { card?._carrotUi?.stop(); }
-export const _test = {toOk, fromOk, fromY, lumOf, remapText, remapCss, isAccentRgb, parseColor, setAccent: a => { ACC = a; }, PRESETS};
+export const _test = {toOk, fromOk, fromY, lumOf, remapText, remapCss, isAccentRgb, parseColor, neutralToVar, dimColor, lightTextColor, lightInline, setAccent: a => { ACC = a; }, PRESETS};

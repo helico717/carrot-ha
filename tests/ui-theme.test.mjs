@@ -84,3 +84,36 @@ test('설정은 카드 모서리 곡률을 바꾸지 않는다', () => {
 });
 
 test('프리셋은 3개', () => assert.equal(_test.PRESETS.length, 3));
+
+// ---- 실제 HA 점검(2026-11-05)에서 찾은 버그 4건의 회귀 방지 ----
+test('버그2: 라이트에서 밝은 무채색 글자는 토큰으로, 어두운 글자는 그대로', () => {
+  const {neutralToVar} = _test;
+  assert.equal(neutralToVar('#ffffff'), 'var(--j-ink)');
+  assert.equal(neutralToVar('#d1d5db'), 'var(--j-sub)');
+  assert.equal(neutralToVar('#17272d'), '#17272d');
+  assert.equal(neutralToVar('#81e6c5'), '#81e6c5');                 // 유채색은 여기서 건드리지 않는다
+});
+
+test('버그4: 라이트 글자색 처리 — 포인트 변수·밝은 유채색은 어둡게, 배경은 그대로', () => {
+  const {lightTextColor, lightInline, lumOf, parseColor} = _test;
+  assert.equal(lightTextColor('var(--j-accent)', true), 'var(--cui-accent-text)');
+  const dimmed = parseColor(lightTextColor('#f59e0b', true)).rgb;
+  assert.ok(lumOf(dimmed) < lumOf([0xf5, 0x9e, 0x0b]) * .4);
+  const inline = lightInline('color:#81e6c5;background:#81e6c522;border:1px solid #81e6c566;--trend-color:#f59e0b', true);
+  assert.match(inline, /background:#81e6c522/);
+  assert.match(inline, /border:1px solid #81e6c566/);
+  assert.doesNotMatch(inline, /color:#81e6c5;/);
+  assert.doesNotMatch(inline, /--trend-color:#f59e0b/);
+});
+
+test('버그1·2·3: 모듈 소스 불변식', () => {
+  const src = read('carrot-ui-theme.js');
+  assert.match(src, /themePolarityDark\(\)/);                       // 글자색 극성으로 모드 판정
+  assert.match(src, /:host\(\[data-theme\]\)\{--ink:var\(--cui-ink\)/);   // Carrot 라이트 변수보다 우선
+  assert.doesNotMatch(src, /--cui-panel-raised', ov\(/);            // 패널 변수는 카드 범위 변수를 참조하지 않는다
+  assert.match(src, /renderDeferred/);
+  for (const name of ['carrot-dashboard-ko.js', 'carrot-dashboard-en.js']) {
+    const card = read(name);
+    assert.match(card, /render\(\)\{if\(this\._carrotUi\?\.dialogOpen\(\)\)\{this\._carrotUi\.deferRender\(\);return;\}/, name);
+  }
+});

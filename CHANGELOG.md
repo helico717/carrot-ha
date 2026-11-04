@@ -1,3 +1,13 @@
+## 2026-11-05 — 실제 HA 테마 23종 점검에서 찾은 버그 4건 수정
+
+- 점검: 사용자 Chrome(Claude in Chrome)으로 HA에 설치된 테마 23개를 라이트·다크로 전환하며 대시보드·차계부의 글자 대비(자동 측정)와 화면을 확인. 결과 목록은 대화에 정리(수정은 사용자 승인 후).
+- 버그1 설정 창이 화면 갱신 때 모달에서 풀려 카드 아래로 밀림 → 열려 있는 동안 render()를 미루고 닫을 때 반영, DOM이 교체돼도 다시 모달로 연다(carrot-dashboard-ko/en.js render 가드, carrot-ui-theme.js).
+- 버그2 visionOS 라이트·Liquid Glass 라이트·단일 다크 테마(Graphite)에서 글자 섞임 → 모드 판정을 테마 글자색 극성으로, `--ink/--muted/--line` 우선순위 상향.
+- 버그3 차계부 상단 버튼(☰·설정)이 라이트에서 안 보임 → 패널 변수가 카드 범위 변수를 참조하던 것을 수정.
+- 버그4 차계부 라이트 글자 대비(약 178개 요소가 1.0~1.3) → 글자색 규칙 변환 + 대비 보호막. 합성 데이터·패널 구조 흉내 환경에서 HA 라이트 따라가기 221건→0~7건, 고정 라이트 0건.
+- 관련 파일: custom_components/carrot_ha/frontend/{carrot-ui-theme,carrot-dashboard-ko,carrot-dashboard-en}.js, tests/ui-theme.test.mjs(10개), docs/dashboard-theme-settings.md, preview/theme-style/audit.js.
+- 검증(로컬): 신규 ui-theme 10개·의존성·lazy-runtime·view-state·live-loading·charge-payment 통과, 기존 실패 5건(camera-360·charging-curve·debug-freshness·motion-status·range-c3)은 변경 전과 동일. 배포 상태: 커밋 후 HA 직접 반영 예정(릴리즈 없음). 미확인: 실제 HA에서의 재측정.
+
 ## 2026-11-05 — 차계부 라이트 고정이 다크로만 보이던 버그 수정
 - 배포 상태: 커밋 0d308ee를 HA에 SSH 직접 반영. 반영 전 carrot-ui-theme.js(e0fd23a판)·carrot-journal-panel-runtime.js를 /homeassistant/carrot_ha/deployment-backups/ui-theme-fix1-0d308ee/before 에 백업(rollback.sh 포함, 이 수정만 되돌림). 반영 후 HA 파일·HTTP 응답 SHA-256: carrot-ui-theme.js 0180806f9e7e, carrot-journal-panel-runtime.js 4008038b6c81, 프런트 버전 0.9.0-618e7c1e84b2. 재시작 불필요(새로고침).
 - 사고 기록: 첫 반영 시도에서 배포 스크립트의 반복문이 파일 이름을 한 문자열로 처리해(zsh 단어 분리 없음) 원격 carrot-ui-theme.js가 약 1분간 0바이트가 되었다(그동안 대시보드·차계부가 새 모듈 로드 실패 가능). 백업 해시와 새 파일로 즉시 재반영해 크기·해시를 검증했다. 이후 배포는 파일 이름을 명시한 반복문만 쓴다.
