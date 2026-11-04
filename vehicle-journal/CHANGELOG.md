@@ -1,4 +1,6 @@
 ## 2026-11-05 — 실제 HA 테마 23종 점검에서 찾은 버그 4건 수정
+- 배포 상태: 커밋 b7cdd57을 HA에 SSH 직접 반영(2026-11-05). 반영 전 ko·en·ui-theme(0d308ee판)이 HA 파일과 일치함을 확인하고 /homeassistant/carrot_ha/deployment-backups/ui-theme-fix2-b7cdd57/before 에 백업(rollback.sh 포함, 이 수정만 되돌림). 반영 후 HA 파일·HTTP 응답 SHA-256 앞 12자리가 커밋과 일치: carrot-ui-theme.js 5fff5a9e8cb1, carrot-dashboard-ko.js 6f4cd5fd1b8b, carrot-dashboard-en.js a7241e85c942, 프런트 버전 0.9.0-d08f92110a03. 재시작 불필요. 릴리즈 없음.
+- 실제 HA 재측정: 버그1 설정 창이 라이브 갱신 약 22초 동안 모달·고정 위치(y=50) 유지, 강제 render()도 미뤘다가 닫을 때 반영. 버그2 visionOS·Liquid Glass 라이트·Graphite·E-ink Dark가 모두 글자색 극성(dark)으로 판정, 글자 변수가 테마 값. 버그3·4 차계부 HA 기본 라이트 글자 대비 미달 178→0, 기록 유형 팝업 10→0, 상단 버튼 어두운 글자+10% 오버레이, Frosted Glass Light 0, 다크 변동 없음(46). 남은 항목(수정 대상 아님): 차계부 설정 창 2~16건, 배경 사진 테마·Graphite 다크의 보조 글자 3~4대 대비, 대시보드 라이트 팔레트의 기존 문제.
 
 - 점검: 사용자 Chrome(Claude in Chrome)으로 HA에 설치된 테마 23개를 라이트·다크로 전환하며 대시보드·차계부의 글자 대비(자동 측정)와 화면을 확인. 결과 목록은 대화에 정리(수정은 사용자 승인 후).
 - 버그1 설정 창이 화면 갱신 때 모달에서 풀려 카드 아래로 밀림 → 열려 있는 동안 render()를 미루고 닫을 때 반영, DOM이 교체돼도 다시 모달로 연다(carrot-dashboard-ko/en.js render 가드, carrot-ui-theme.js).
