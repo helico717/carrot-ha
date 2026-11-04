@@ -401,11 +401,23 @@ class Archive(ChargeCosts):
         km, wh = best
         if km < 1 or wh < min_wh:
             return {}
-        return {'window_efficiency_kpl': round(min(10.0, max(1.0, km/(wh/1000))), 2),
-                'window_efficiency_distance_km': round(km, 1),
-                'window_efficiency_source': source}
+        result = {'window_efficiency_kpl': round(min(10.0, max(1.0, km/(wh/1000))), 2),
+                  'window_efficiency_distance_km': round(km, 1),
+                  'window_efficiency_source': source}
+        # Separate bounded baseline. Never sum overlapping states and trips.
+        since = (now - timedelta(days=30)).isoformat()
+        baseline_states = self._window_from_states(device, 300, max_rows, page, since=since)
+        baseline_trips = self._window_from_trips(device, 300, since=since, until=now.isoformat())
+        baseline, baseline_source = ((baseline_trips, 'trips') if baseline_trips[0] > baseline_states[0]
+                                     else (baseline_states, 'states'))
+        base_km, base_wh = baseline
+        if base_km >= 1 and base_wh >= min_wh:
+            result.update(baseline_efficiency_kpl=round(min(10.0, max(1.0, base_km/(base_wh/1000))), 4),
+                          baseline_efficiency_distance_km=round(base_km, 1),
+                          baseline_efficiency_source=baseline_source)
+        return result
 
-    def _window_from_states(self, device, window_km, max_rows, page):
+    def _window_from_states(self, device, window_km, max_rows, page, since=None):
         km = wh = 0.0
         newer = None
         scanned = 0
@@ -413,7 +425,8 @@ class Archive(ChargeCosts):
             while scanned < max_rows and km < window_km:
                 rows = db.execute(
                     "SELECT body FROM events WHERE device=? AND kind='state' "
-                    "ORDER BY observed DESC LIMIT ? OFFSET ?", (device, page, scanned)).fetchall()
+                    "AND (? IS NULL OR observed>=?) ORDER BY observed DESC LIMIT ? OFFSET ?",
+                    (device, since, since, page, scanned)).fetchall()
                 if not rows:
                     break
                 scanned += len(rows)
@@ -428,21 +441,23 @@ class Archive(ChargeCosts):
                                 and not new_bad and not old_bad):
                             moved, used = new_km - old_km, old_wh - new_wh
                             if 0 <= moved <= 30 and abs(used) <= 15000 and (moved > 0 or new_driving or old_driving):
-                                km += moved
-                                wh += used
+                                share = min(1.0, (window_km-km)/moved) if moved else 1.0
+                                km += moved*share
+                                wh += used*share
                     newer = point
                     if km >= window_km:
                         break
         return km, wh
 
-    def _window_from_trips(self, device, window_km):
+    def _window_from_trips(self, device, window_km, since=None, until=None):
         """Newest trips first until window_km; the last trip counts proportionally."""
         with self.connect() as db:
             rows = db.execute(
                 """SELECT te.distance_km, te.energy_kwh FROM trip_energy te
                    JOIN events e ON te.device = e.device AND te.id = e.id
                    WHERE te.device = ? AND te.energy_kwh > 0 AND te.distance_km >= 1
-                   ORDER BY e.observed DESC""", (device,)).fetchall()
+                   AND (? IS NULL OR e.observed>=?) AND (? IS NULL OR e.observed<=?)
+                   ORDER BY e.observed DESC""", (device, since, since, until, until)).fetchall()
         km = kwh = 0.0
         for trip_km, trip_kwh in rows:
             if not (math.isfinite(trip_km) and math.isfinite(trip_kwh)):

@@ -239,20 +239,28 @@ def values(runtime):
             and distance >= 1 and energy >= 0.5 else None
         )
 
-    # Like the cluster, follow only the most recent ~50 km of driving (hills, style, season).
+    # Blend consumption (kWh/km), not arithmetic averages of km/kWh.
     # Only a car with no driving record at all uses the user-set reference efficiency.
     if data.get('range_km') is None and data.get('battery_kwh') is not None:
         window = data.get('window_efficiency_kpl')
         reference = runtime['entry'].options.get('reference_efficiency_kpl', DEFAULT_REFERENCE_EFFICIENCY_KPL)
         data['range_estimated'] = True
         if window is not None:
-            efficiency = window
-            data['range_efficiency_basis'] = 'recent_distance_window'
+            baseline = data.get('baseline_efficiency_kpl')
+            if baseline is not None and baseline > 0 and window > 0:
+                efficiency = 1 / (0.7 / baseline + 0.3 / window)
+                data['range_efficiency_basis'] = 'blended_300km_50km'
+                data['range_baseline_weight'] = 0.7
+                data['range_recent_weight'] = 0.3
+            else:
+                efficiency = window
+                data['range_efficiency_basis'] = 'recent_distance_window'
         else:
             efficiency = reference
             data['range_efficiency_basis'] = 'reference_efficiency'
             data['reference_efficiency_kpl'] = reference
-        data['range_km'] = int(round(data['battery_kwh'] * efficiency))
+        data['range_efficiency_kpl'] = round(efficiency, 4)
+        data['range_km'] = int(round(data['battery_wh'] / 1000 * efficiency))
 
     # Never present stale locks/doors/health as current, including older collectors.
     for key in OPTIONAL_FIELDS:

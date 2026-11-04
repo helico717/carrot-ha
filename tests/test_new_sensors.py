@@ -166,6 +166,15 @@ class TestNewSensors(unittest.TestCase):
         self.assertEqual(res.get('range_km'), 426)  # 63.5 * 6.71
         self.assertEqual(res.get('range_efficiency_basis'), 'recent_distance_window')
 
+    def test_estimated_range_blends_consumption_not_efficiency(self):
+        runtime = self._make_runtime({'battery_wh': 50000.0},
+            summary={'window_efficiency_kpl': 2.5, 'baseline_efficiency_kpl': 5.0})
+        res = values(runtime)
+        self.assertEqual(res['range_km'], 192)  # 50 / (0.7/5 + 0.3/2.5)
+        self.assertEqual(res['range_efficiency_basis'], 'blended_300km_50km')
+        self.assertEqual(res['range_baseline_weight'], 0.7)
+        self.assertEqual(res['range_recent_weight'], 0.3)
+
     def test_charging_cannot_change_driving_efficiency(self):
         summary = {'month_distance_km': 480.5, 'month_energy_distance_km': 480.5,
                    'month_drive_energy_kwh': 80.0, 'month_energy_coverage_percent': 100}

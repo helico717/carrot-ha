@@ -1,3 +1,10 @@
+## 2026-11-04 — 주행가능거리 장·단기 소비율 혼합
+
+- 사용자 요청: 최근 50km만으로 계산해 비관적이고 흔들리는 추정치를 최근 30일·최대 300km 기준 70% + 최근 50km 30%로 조정해 관찰한다. km/kWh 산술 평균 대신 kWh/km 소비율을 혼합한다. SOC 표시·배터리 잔량 모델·공조 소비 계산은 변경하지 않는다.
+- 장기 기록은 30일 안에서 확보된 만큼 사용하며 상태/주행 기록 중 거리 커버리지가 큰 한 경로만 선택해 중복 합산을 막는다. 장기 기록이 없으면 기존 최근 50km, 주행 기록 자체가 없으면 설정 참고 전비를 사용한다. 센서에 혼합 전비·각 기준 전비·거리·출처·가중치를 노출한다. 상태 구간의 마지막 경계도 목표 거리만큼 비례 반영한다.
+- 관련 파일: custom_components/carrot_ha/storage.py, vehicle.py, sensors_v3.py, tests/test_range_efficiency.py, tests/test_new_sensors.py.
+- 검증·배포: 관련 합성 회귀 96개 통과, diff 공백 검사 통과. HA 직접 반영·사용자 재시작·실차/계기판 비교 미완료. 버전 상승·태그·릴리즈 없음. 추정 개선이 모든 SOC에서 계기판 일치를 보장하지 않는다.
+
 ## 2026-11-03 — 대시보드 차량 색상 피커 HA 직접 반영
 
 - 335fdbf의 carrot-dashboard-ko.js·carrot-dashboard-en.js·carrot-vehicle-3d.js를 반영 전 해시가 직전 커밋과 같음을 확인하고 백업(`/config/carrot_ha/deployment-backups/335fdbf/frontend/`)한 뒤 반영했다. 파일·HTTP 응답 SHA-256이 커밋과 일치하고 권한(root:root 644)도 기존과 같다. 브라우저 새로고침으로 적용되며 HA 재시작은 필요 없다. 실제 HA 화면 확인은 사용자 대기. 릴리즈 발행 없음.

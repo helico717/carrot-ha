@@ -62,6 +62,46 @@ class RangeEfficiencyTests(fixtures.TestTripEnergy):
         self.assertEqual(result['window_efficiency_distance_km'], 50)
         self.assertEqual(result['window_efficiency_kpl'], 5.56)  # 50 km / (5 + 4) kWh
 
+    def test_baseline_caps_distance_and_excludes_old_trips(self):
+        self.put('expired', 31, 300, 150)
+        self.put('older', 10, 300, 60)
+        self.put('newer', 1, 50, 20)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['window_efficiency_kpl'], 2.5)
+        self.assertEqual(result['baseline_efficiency_distance_km'], 300)
+        self.assertAlmostEqual(result['baseline_efficiency_kpl'], 300/70, places=4)
+
+    def test_baseline_uses_available_recent_distance(self):
+        self.put('expired', 31, 300, 100)
+        self.put('recent', 2, 20, 4)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['baseline_efficiency_distance_km'], 20)
+        self.assertEqual(result['baseline_efficiency_kpl'], 5)
+
+    def test_expired_history_remains_recent_fallback_only(self):
+        self.put('expired', 31, 50, 10)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['window_efficiency_kpl'], 5)
+        self.assertNotIn('baseline_efficiency_kpl', result)
+
+    def test_baseline_states_exclude_older_than_30_days(self):
+        self.state('old_a', 31*24*60+10, 70000, 1000, driving=True)
+        self.state('old_b', 31*24*60, 60000, 1030, driving=True)
+        self.state('charge', 30*24*60, 70000, 1030, charging=True)
+        self.state('new_a', 20, 50000, 1030, driving=True)
+        self.state('new_b', 10, 48000, 1040, driving=True)
+        result = self.archive._window_efficiency(self.device, self.now)
+        self.assertEqual(result['baseline_efficiency_distance_km'], 10)
+        self.assertEqual(result['baseline_efficiency_kpl'], 5)
+
+    def test_state_window_prorates_boundary(self):
+        self.state('a', 20, 50000, 1000, driving=True)
+        self.state('b', 10, 44000, 1030, driving=True)
+        self.state('c', 0, 41000, 1060, driving=True)
+        km, wh = self.archive._window_from_states(self.device, 50, 3000, 500)
+        self.assertEqual(km, 50)
+        self.assertEqual(wh, 7000)
+
     def test_window_without_any_driving_returns_nothing(self):
         self.assertEqual(self.archive._window_efficiency(self.device, self.now), {})
 
