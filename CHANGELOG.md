@@ -1,3 +1,10 @@
+## 2026-11-05 — 테마 되돌림(065eaac) HA 직접 반영
+
+- 반영 전 HA의 carrot-dashboard-ko/en.js, carrot-vehicle-journal.js, carrot-charge-payment.js, carrot-journal-panel-runtime.js, carrot-ui-theme.js SHA-256이 6306496과 모두 일치함을 확인했다. 6개 파일을 `/homeassistant/carrot_ha/deployment-backups/ui-theme-revert-065eaac/before/`에 백업하고 SHA256SUMS.before로 검증했다.
+- 065eaac의 5개 파일을 root:root 644로 반영하고 carrot-ui-theme.js를 삭제했다. HA 파일과 `/carrot_ha_static/` HTTP 응답의 SHA-256 앞 12자리가 커밋과 일치: ko a744aaaf2350, en b6202ed5f788, journal f87742e69c37, charge-payment aab0e2aa439b, journal-panel-runtime 20951b10481b. carrot-ui-theme.js는 HTTP 404.
+- 첫 시도는 HA 로그인 셸이 변수를 단어 분리하지 않아 백업 복사에서 중단됐다(운영 파일 변경 없음). sh 스크립트로 다시 실행했다.
+- 프런트 버전 값(manifest+JS 해시)은 HA 시작 시 계산되므로 HA 재시작 전까지 갱신되지 않는다. 브라우저 강력 새로고침(Ctrl+F5)으로 적용하며, 이전 화면이 남으면 HA 재시작이 필요하다. 실제 HA 화면 확인은 사용자 대기. 원복은 백업 폴더 파일을 frontend로 복사하면 된다. 릴리즈 없음.
+
 ## 2026-11-05 — HA 테마 연동·포인트 색상 설정 전체 되돌림(아카이브 보존)
 
 - 사용자 요청으로 통합 화면 설정(HA 테마 따르기/라이트/다크 3단 모드, 포인트 색상, 공용 팝업 스킨, 차계부 라이트 팔레트)을 모두 되돌렸다. 대상 커밋: e0fd23a, 696ff48, 0d308ee, c76a571, b7cdd57, 6306496.
