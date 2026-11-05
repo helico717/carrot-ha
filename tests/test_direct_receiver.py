@@ -103,6 +103,80 @@ class ReceiverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trip['distance_quality'], self.trip()['distanceQuality'])
         self.assertEqual(trip['max_speed_mps'], 12)
 
+    def assist(self, both=8000.0, manual=2000.0):
+        basis = both + manual
+        return {'version': 1, 'basisDistanceM': basis, 'manualM': manual, 'latOnlyM': 0.0, 'longOnlyM': 0.0,
+                'bothM': both, 'unknownM': 0.0, 'knownDurationS': 500, 'assistDurationS': 400,
+                'enabled': {'onM': both, 'offM': manual, 'unknownM': 0.0},
+                'engagements': 1, 'disengagements': 1, 'longestStreakM': both, 'longestStreakS': 400,
+                'streakCount': 1,
+                'streaks': [{'startAt': '2026-10-14T10:02:00+00:00', 'endAt': '2026-10-14T10:08:40+00:00',
+                             'distanceM': both, 'brokenByGap': False}],
+                'buckets': [{'at': '2026-10-14T10:00:00+00:00', 'manualM': manual, 'latOnlyM': 0.0,
+                             'longOnlyM': 0.0, 'bothM': both, 'unknownM': 0.0}]}
+
+    async def trip_page(self, after=0):
+        return (await self.request('/api/trip-changes?device_id=car&after=' + str(after)))[1]
+
+    async def test_assist_is_forwarded_and_legacy_trips_keep_their_output(self):
+        await self.request('/api/trips', self.trip())
+        legacy = (await self.trip_page())['trips'][0]
+        self.assertNotIn('assist', legacy)
+        # Downward odometer recovery: the final distance is below the wheel basis.
+        await self.request('/api/trips', {**self.trip(9000), 'id': 'assisted', 'assist': self.assist()})
+        trip = next(t for t in (await self.trip_page())['trips'] if t['id'] == 'assisted')
+        self.assertEqual(trip['assist'], self.assist())
+        self.assertIsNone(trip['assist_error'])
+        self.assertEqual(trip['assist_conflicts'], 0)
+
+    async def test_assist_first_valid_value_survives_resends(self):
+        await self.request('/api/trips', {**self.trip(), 'assist': self.assist()})
+        cursor = (await self.trip_page())['next_cursor']
+        # Older body without assist, e.g. a revision from a collector that predates it.
+        await self.request('/api/trips', self.trip(1100))
+        page = await self.trip_page(cursor)
+        self.assertEqual(page['trips'][0]['distance_m'], 1100)
+        self.assertEqual(page['trips'][0]['assist'], self.assist())
+        cursor = page['next_cursor']
+        # Same version, different value: kept first, counted once per distinct body.
+        changed = {**self.trip(1100), 'assist': self.assist(both=7000.0, manual=3000.0)}
+        for _ in range(2):
+            await self.request('/api/trips', changed)
+        page = await self.trip_page(cursor)
+        self.assertEqual(page['trips'][0]['assist'], self.assist())
+        self.assertEqual(page['trips'][0]['assist_conflicts'], 1)
+        cursor = page['next_cursor']
+        await self.request('/api/trips', changed)  # identical conflicting retry is not a new revision
+        self.assertEqual((await self.trip_page(cursor))['trips'], [])
+        # A valid stored value is never replaced by an invalid one either.
+        broken = self.assist(); broken['bothM'] = 1
+        await self.request('/api/trips', {**self.trip(1100), 'assist': broken})
+        self.assertEqual((await self.trip_page())['trips'][0]['assist'], self.assist())
+
+    async def test_invalid_assist_is_reported_without_rejecting_the_trip(self):
+        cases = {'class_sum_mismatch': {'bothM': 1.0},
+                 'unsupported_version': {'version': 2},
+                 'bucket_sum_mismatch': {'buckets': []},
+                 'invalid_longest': {'longestStreakM': 99999.0},
+                 'invalid_buckets': {'buckets': [{'at': '2026-10-14T10:07:00+00:00', 'manualM': 2000.0,
+                                                  'latOnlyM': 0.0, 'longOnlyM': 0.0, 'bothM': 8000.0, 'unknownM': 0.0}]}}
+        for index, (reason, change) in enumerate(cases.items()):
+            body = {**self.trip(), 'id': 'bad-%d' % index, 'assist': {**self.assist(), **change}}
+            self.assertEqual((await self.request('/api/trips', body))[0], 200)
+        trips = {t['id']: t for t in (await self.trip_page())['trips']}
+        for index, reason in enumerate(cases):
+            self.assertIsNone(trips['bad-%d' % index]['assist'])
+            self.assertEqual(trips['bad-%d' % index]['assist_error'], reason)
+            self.assertEqual(trips['bad-%d' % index]['distance_m'], 1000)
+
+    async def test_invalid_stored_assist_is_replaced_by_a_valid_one(self):
+        broken = self.assist(); broken['bothM'] = 1
+        await self.request('/api/trips', {**self.trip(), 'assist': broken})
+        await self.request('/api/trips', {**self.trip(), 'assist': self.assist()})
+        trip = (await self.trip_page())['trips'][0]
+        self.assertEqual(trip['assist'], self.assist())
+        self.assertEqual(trip['assist_conflicts'], 0)
+
     async def test_capacity_failure_never_acknowledged_and_other_lane_survives(self):
         self.store.max_bytes = 1
         status, reply = await self.request('/api/telemetry', self.telemetry())

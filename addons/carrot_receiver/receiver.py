@@ -138,6 +138,111 @@ def trip_measurements(raw):
     return {'start': point(raw.get('start')), 'end': point(raw.get('end')), 'complete': raw.get('complete') is True}
 
 
+ASSIST_CLASSES = ('manualM', 'latOnlyM', 'longOnlyM', 'bothM', 'unknownM')
+ASSIST_ACTIVE = ('latOnlyM', 'longOnlyM', 'bothM')
+ASSIST_MAX_BUCKETS = 200
+ASSIST_MAX_STREAKS = 50
+
+
+def assist_value(raw):
+    """Validate a collector `assist` object (docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md).
+
+    Returns (normalized, None) or (None, reason). Totals are checked against
+    the wheel-integrated basisDistanceM, never the final trip distanceM.
+    """
+    if not isinstance(raw, dict):
+        return None, 'not_object'
+    if raw.get('version') != 1 or type(raw.get('version')) is not int:
+        return None, 'unsupported_version'
+    def number(value):
+        return type(value) in (int, float) and math.isfinite(value) and value >= 0
+    def count(value):
+        return type(value) is int and value >= 0
+    def near(total, parts, tolerance):
+        return abs(total - sum(parts)) <= tolerance
+    def utc(value):
+        try:
+            return datetime.fromisoformat(timestamp(value))
+        except (TypeError, ValueError):
+            return None
+    basis = raw.get('basisDistanceM')
+    totals = [raw.get(key) for key in ASSIST_CLASSES]
+    enabled = raw.get('enabled')
+    if not number(basis) or not all(number(v) for v in totals):
+        return None, 'invalid_distance'
+    if not near(basis, totals, 1):
+        return None, 'class_sum_mismatch'
+    if (not isinstance(enabled, dict) or not all(number(enabled.get(k)) for k in ('onM', 'offM', 'unknownM'))
+            or not near(basis, [enabled[k] for k in ('onM', 'offM', 'unknownM')], 1)):
+        return None, 'invalid_enabled'
+    known, active_s = raw.get('knownDurationS'), raw.get('assistDurationS')
+    if not number(known) or not number(active_s) or active_s > known + 1:
+        return None, 'invalid_duration'
+    if not all(count(raw.get(k)) for k in ('engagements', 'disengagements', 'streakCount')):
+        return None, 'invalid_count'
+    active = sum(raw[k] for k in ASSIST_ACTIVE)
+    longest, longest_s = raw.get('longestStreakM'), raw.get('longestStreakS')
+    if not number(longest) or not number(longest_s) or longest > active + 1:
+        return None, 'invalid_longest'
+    buckets = raw.get('buckets')
+    if not isinstance(buckets, list) or len(buckets) > ASSIST_MAX_BUCKETS:
+        return None, 'invalid_buckets'
+    normalized_buckets, seen = [], set()
+    for bucket in buckets:
+        at = utc(bucket.get('at')) if isinstance(bucket, dict) else None
+        if (at is None or at.minute % 15 or at.second or at.microsecond or at in seen
+                or not all(number(bucket.get(k)) for k in ASSIST_CLASSES)):
+            return None, 'invalid_buckets'
+        seen.add(at)
+        normalized_buckets.append({'at': at.isoformat(), **{k: bucket[k] for k in ASSIST_CLASSES}})
+    if not near(basis, [b[k] for b in normalized_buckets for k in ASSIST_CLASSES], max(1, 0.25 * len(buckets))):
+        return None, 'bucket_sum_mismatch'
+    streaks = raw.get('streaks')
+    if not isinstance(streaks, list) or len(streaks) > ASSIST_MAX_STREAKS or raw['streakCount'] < len(streaks):
+        return None, 'invalid_streaks'
+    normalized_streaks = []
+    for streak in streaks:
+        start = utc(streak.get('startAt')) if isinstance(streak, dict) else None
+        end = utc(streak.get('endAt')) if isinstance(streak, dict) else None
+        if (start is None or end is None or start > end or not number(streak.get('distanceM'))
+                or streak['distanceM'] > longest + 1 or type(streak.get('brokenByGap')) is not bool):
+            return None, 'invalid_streaks'
+        normalized_streaks.append({'startAt': start.isoformat(), 'endAt': end.isoformat(),
+                                   'distanceM': streak['distanceM'], 'brokenByGap': streak['brokenByGap']})
+    return {'version': 1, 'basisDistanceM': basis, **{k: raw[k] for k in ASSIST_CLASSES},
+            'knownDurationS': known, 'assistDurationS': active_s,
+            'enabled': {k: enabled[k] for k in ('onM', 'offM', 'unknownM')},
+            'engagements': raw['engagements'], 'disengagements': raw['disengagements'],
+            'longestStreakM': longest, 'longestStreakS': longest_s, 'streakCount': raw['streakCount'],
+            'streaks': normalized_streaks, 'buckets': normalized_buckets}, None
+
+
+def preserve_assist(body, old):
+    """First valid assist wins for a trip; v1 supports no corrections.
+
+    Missing values keep the stored one, identical values change nothing, and a
+    different value never replaces a valid stored one: it is counted once per
+    distinct body as a conflict. Without a valid stored value, the new one is kept.
+    """
+    stored = old.get('assist')
+    conflict = old.get('assistConflict')
+    if conflict is not None and 'assistConflict' not in body:
+        body = {**body, 'assistConflict': conflict}
+    if stored is None:
+        return body
+    incoming = body.get('assist')
+    if incoming is None:
+        return {**body, 'assist': stored}
+    if incoming == stored or assist_value(stored)[0] is None:
+        return body
+    digest = hashlib.sha256(encoded(incoming).encode()).hexdigest()
+    previous = conflict if isinstance(conflict, dict) else {'count': 0, 'lastHash': None}
+    if previous.get('lastHash') != digest:
+        previous = {'count': int(previous.get('count') or 0) + 1, 'lastHash': digest}
+        LOG.warning('trip_assist_conflict kept_first count=%d', previous['count'])
+    return {**body, 'assist': stored, 'assistConflict': previous}
+
+
 class Store:
     def __init__(self, path, max_bytes=1073741824):
         self.path = str(path)
@@ -265,6 +370,7 @@ class Store:
                     body = {**body, 'tripMeasurements': old['tripMeasurements']}
                 if 'partial' not in body and 'partial' in old:
                     body = {**body, 'partial': old['partial']}
+                body = preserve_assist(body, old)
             raw = packed(body)
             if not previous or previous['raw'] != raw:
                 self.capacity()
@@ -310,6 +416,11 @@ class Store:
             result['distance_quality'] = {'complete': quality.get('complete') is True, 'estimated': quality.get('estimated') is True}
         else:
             result['distance_source'] = result['distance_quality'] = None
+        # Added only when the collector sent assist, so older trips keep their exact API output.
+        if 'assist' in raw:
+            result['assist'], result['assist_error'] = assist_value(raw['assist'])
+            conflict = raw.get('assistConflict')
+            result['assist_conflicts'] = conflict.get('count', 0) if isinstance(conflict, dict) else 0
         return result
 
     def latest(self, device):
@@ -501,7 +612,7 @@ def create_app(config, store):
     async def handler(request):
         path = request.path
         if path == '/health' and request.method == 'GET':
-            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.4'})
+            return web.json_response({'ok': True, 'schema': 'carrot-receiver-v1', 'version': '0.1.5'})
         if path == '/api/source' and request.method != 'GET':
             raise web.HTTPMethodNotAllowed(request.method, ['GET'])
         upload = (path in ('/api/telemetry', '/api/trips', '/api/settings/sync', '/api/params/ack') and request.method == 'POST'
@@ -613,7 +724,7 @@ def create_app(config, store):
                     LOG.error('Maintenance deferred (%s)', type(error).__name__)
         task = asyncio.create_task(loop())
         summary_task = asyncio.create_task(summaries())
-        LOG.info('receiver_started version=0.1.4 devices=%d database_limit_mb=%d log_level=%s',
+        LOG.info('receiver_started version=0.1.5 devices=%d database_limit_mb=%d log_level=%s',
                  len(devices), store.max_bytes // 1048576, logging.getLevelName(LOG.level))
         yield
         task.cancel()

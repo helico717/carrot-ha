@@ -1,3 +1,11 @@
+## 2026-11-05 — 오픈파일럿 사용 통계: 수신 앱 0.1.5 (HAOS 앱 업데이트 대기)
+
+- 변경: 수신 앱이 주행 기록의 `assist`를 검증해 `/api/trip-changes` 응답에 `assist`·`assist_error`·`assist_conflicts`로 내보낸다. `assist`가 없는 과거 주행의 응답 형식은 바뀌지 않는다. 합계 검증은 휠 적산 기준 거리(basisDistanceM)와 비교하며, 최종 distanceM과는 비교하지 않는다. 15분 경계 정렬, 연속 구간 범위, 버전 1만 허용한다. 같은 주행 재전송 때는 처음 받은 유효값을 지킨다: 없는 본문은 기존 값 유지, 다른 값은 기존 값 보존 후 서로 다른 본문마다 충돌 1회 기록, 같은 충돌 재전송은 새 리비전이 아님. 저장된 값이 무효일 때만 새 값으로 바꾼다. 잘못된 통계도 주행 기록 자체는 거부하지 않는다.
+- 이유: docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md 8-2·9절. 배포 순서 수신 앱 → HA → Comma의 첫 단계.
+- 관련 파일: addons/carrot_receiver/receiver.py, config.yaml(0.1.5), CHANGELOG.md, tests/test_direct_receiver.py.
+- 검증: test_direct_receiver 14개 통과(새 4개: 전달·과거 형식 유지, 재전송 보존·충돌, 무효값 5종, 무효 저장값 교체). openpilot carrot-ha-assist-stats 7862875 엔진이 만든 3시간 혼합 주행(15분 경계·공백·재시작·연속 구간 58개, 약 8KB)의 assist가 수신 앱 검증을 통과했다. 수신 앱 관련 test_direct_receiver_setup·test_receiver_diagnostics·test_receiver_recovery와 test_incremental_sync·test_history_cache 통과, test_cloud_live는 UTF-8 모드에서 통과. test_receiver_options는 이 PC에 voluptuous가 없어 실행되지 않았고, 변경 전에도 같았다.
+- 배포 상태: 커밋·푸시만 했다. 사용자가 HAOS 앱 스토어에서 0.1.5로 업데이트해야 하며, HA 통합은 아직 assist를 저장하지 않는다. Comma 변경은 병합 전. 릴리즈·HA 직접 반영 없음.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계: Comma 수집기 구현(기능 브랜치, 미배포)
 
 - 변경: openpilot `carrot-ha-assist-stats` 브랜치 `7862875`(기준 carrot-wip-model_selector-ha `1bfc105a`). 수집기가 1초마다 휠 속도로 적산하는 거리 증가분을 직전 carControl 표본(수동/조향만/가감속만/둘 다)에 귀속하고, selfdriveState.enabled는 시스템 활성 거리로 따로 집계한다. 2초 넘게 끊긴 신호와 거리 공백은 상태 모름으로 남기고 연속 구간을 끊는다. 켜짐·해제는 1초 표본 기준이며 공백·재시작 뒤 재관측은 세지 않는다. 주행 기록에 `assist`(휠 적산 기준 거리, 다섯 칸, UTC 15분 소계, 100m 이상 연속 구간 최대 50개, 최장 연속 거리)를 추가했다. 기존 텔레메트리 enabled(10초)는 그대로다.
