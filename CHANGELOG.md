@@ -1,3 +1,9 @@
+## 2026-11-05 — 오픈파일럿 사용 통계: HA 재시작 확인·Comma 브랜치 병합
+
+- HA 재시작 확인(읽기 전용): 사용 중인 기록 DB 01M23RJD…(414MB)에 assist_trips·assist_buckets·assist_streaks·assist_meta가 생성됐다(모두 0행, 아직 assist 주행 없음). 재시작 뒤에도 상태 기록이 계속 저장되어(UTC 11:47:16, 확인 시각 11:48:34) 바뀐 put_cloud 경로에서 동기화가 정상이다. HA 코어 로그는 비대화형 SSH의 `ha core logs`가 출력하지 않아 확인하지 못했다. websocket 응답은 미확인.
+- Comma: openpilot `carrot-ha-assist-stats`의 7862875를 carrot-wip-model_selector-ha에 빨리 감기로 병합했다(11ac6aa1..7862875). 정정: 앞선 기록의 기준 커밋 1bfc105a는 틀렸고 실제 기준은 11ac6aa1이다. 푸시 전 test_assist_stats·test_trip_measurements·test_outbox_lanes·test_param_polling을 다시 통과했다.
+- 수신 앱 0.1.5 실행 중(공개 /health). 사용자 Comma `git pull --ff-only`·재부팅 대기. 실차 첫 주행의 assist 도착·HA 저장은 미확인. 릴리즈 없음.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계(5306594) HA 직접 반영
 
 - CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42020031513 (regression, radar-ha-python).
