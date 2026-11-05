@@ -5,7 +5,6 @@
  * via an embedded sandboxed view (/carrot_ha_static/carrot_web/settings.html)
  * communicating with Home Assistant and Vehicle receiver Relay.
  */
-import { isPilotPaused, syncPilotPause, PILOT_CHECK_MS } from './carrot-pilot-pause.js?v=20261102-iq';
 
 class CarrotParamsCard extends HTMLElement {
   constructor() {
@@ -96,7 +95,7 @@ class CarrotParamsCard extends HTMLElement {
     this._pollTimer = setInterval(() => {
       this._renderHeaderStatus();
       if (!this._entryId || document.hidden || this.getClientRects?.().length === 0) return;
-      if (this._pending.size && !this._pilotPaused) this._checkPendingStatus();
+      if (this._pending.size) this._checkPendingStatus();
       if (Date.now() - this._lastSnapshotFetch >= 15000) this._loadData();
     }, 4000);
   }
@@ -164,11 +163,9 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   async _resolveDevice() {
-    // Re-read occasionally so an IQ.drive switch shows without reloading the page.
-    if (this._device && this._entryId && Date.now() - (this._deviceCheckedAt || 0) < PILOT_CHECK_MS) return this._entryId;
+    if (this._device && this._entryId) return this._entryId;
     try {
       const resp = await this._hass.callApi('GET', 'carrot_ha/v1/devices');
-      this._deviceCheckedAt = Date.now();
       const devices = resp && resp.devices ? resp.devices : [];
       const requested = this._config?.device_id;
       const device = devices.find(d => d.device_id === requested) || (!requested ? devices[0] : null);
@@ -176,13 +173,12 @@ class CarrotParamsCard extends HTMLElement {
         this._device = device;
         this._entryId = device.entry_id;
         this._deviceId = device.device_id;
-        this._pilotPaused = isPilotPaused(device);
         return this._entryId;
       }
     } catch (err) {
       console.warn('[carrot-params-card] devices lookup error:', err);
     }
-    return this._device ? this._entryId : null;
+    return null;
   }
 
   async _loadData() {
@@ -202,8 +198,6 @@ class CarrotParamsCard extends HTMLElement {
         this._render();
         return;
       }
-      // Paused: no receiver settings reads; the existing view stays blurred underneath.
-      if (this._pilotPaused) return;
 
       const query = new URLSearchParams();
       if (!document.hidden && this.getClientRects?.().length !== 0) query.set('active', '1');
@@ -518,11 +512,6 @@ class CarrotParamsCard extends HTMLElement {
   }
 
   _render() {
-    this._renderContent();
-    syncPilotPause(this, this._pilotPaused, '파라미터 설정');
-  }
-
-  _renderContent() {
     // Keep the original UI, focus, scroll and in-flight dialogs mounted.
     if (this.shadowRoot.getElementById('carrotSettingsFrame')) {
       this._renderHeaderStatus();

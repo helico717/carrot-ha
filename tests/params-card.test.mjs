@@ -11,10 +11,7 @@ const context = vm.createContext({
   setInterval,
   clearInterval
 });
-// The IQ.drive pause module is an ES import; this script harness stubs it (covered in the browser preview).
-vm.runInContext(source
-  .replace(/^import .*carrot-pilot-pause\.js.*$/m, 'const isPilotPaused = () => false, syncPilotPause = () => {}, PILOT_CHECK_MS = 30000;')
-  .replace('export default CarrotParamsCard;', 'globalThis.Card = CarrotParamsCard;'), context);
+vm.runInContext(source.replace('export default CarrotParamsCard;', 'globalThis.Card = CarrotParamsCard;'), context);
 const card = Object.create(context.Card.prototype);
 Object.assign(card, {
   _catalog: {items_by_group: {조향: [{name: 'PathOffset', title: '차선 보정'}]}, categories: [

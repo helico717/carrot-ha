@@ -13,7 +13,7 @@ from homeassistant.components.http import HomeAssistantView
 from .store import CHUNK
 from .upload import UploadManager, request_segments
 from .runtime import store_for
-from .transfer_policy import device_policy_for, policy_for, set_enabled, require_permission, public_status
+from .transfer_policy import policy_for, set_enabled, require_permission, public_status
 
 
 def upload_token(terminal_token):
@@ -38,9 +38,6 @@ class SessionView(HomeAssistantView):
         runtime = runtime_for(self.hass, entry_id)
         if not request['hass_user'].is_admin:
             raise web.HTTPForbidden()
-        from .pilot import IQPILOT, runtime_pilot
-        if runtime_pilot(runtime) == IQPILOT:
-            return web.json_response({'paused': IQPILOT}, status=409, headers={'Cache-Control': 'no-store'})
         sessions = runtime.setdefault('driving_log_sessions', {})
         now = time.monotonic()
         for key, expiry in list(sessions.items()):
@@ -89,7 +86,7 @@ class DeviceView(HomeAssistantView):
         if action != 'state':
             raise web.HTTPNotFound()
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
-            policy = await device_policy_for(self.hass, runtime)
+            policy = await policy_for(self.hass, runtime)
             if request.query.get('generation') == policy['generation'] and policy['generation']:
                 runtime['driving_log_transfer_ack'] = {'generation': policy['generation'], 'seen': time.monotonic()}
             if not policy['enabled']:
@@ -108,7 +105,7 @@ class DeviceView(HomeAssistantView):
             raise web.HTTPBadRequest()
         lock = runtime.setdefault('driving_log_lock', asyncio.Lock())
         async with lock:
-            policy = await device_policy_for(self.hass, runtime)
+            policy = await policy_for(self.hass, runtime)
             try:
                 require_permission(policy, request.headers.get('X-Transfer-Generation'),
                                    float(request.headers.get('X-Recording-Started', 'nan')))
@@ -133,7 +130,7 @@ class DeviceView(HomeAssistantView):
     async def put(self, request, device_id, action, segment=None, filename=None):
         runtime = self.runtime(request, device_id)
         # Reject before consuming the upload body when transfer is disabled.
-        policy = await device_policy_for(self.hass, runtime)
+        policy = await policy_for(self.hass, runtime)
         try:
             require_permission(policy, request.headers.get('X-Transfer-Generation'),
                                float(request.headers.get('X-Recording-Started', 'nan')))
@@ -150,7 +147,7 @@ class DeviceView(HomeAssistantView):
             raise web.HTTPBadRequest()
         data = await request.read()
         async with runtime.setdefault('driving_log_lock', asyncio.Lock()):
-            policy = await device_policy_for(self.hass, runtime)
+            policy = await policy_for(self.hass, runtime)
             try:
                 require_permission(policy, request.headers.get('X-Transfer-Generation'),
                                    float(request.headers.get('X-Recording-Started', 'nan')))

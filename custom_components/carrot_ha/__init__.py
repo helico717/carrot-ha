@@ -346,12 +346,10 @@ class DevicesView(HomeAssistantView):
     async def get(self, request):
         if not request['hass_user'].is_admin:
             return web.Response(status=403)
-        from .driving_logs.pilot import runtime_pilot
         return web.json_response({'devices': [
             {'entry_id': key, 'device_id': value['entry'].data['device_id'], 'name': value['entry'].title,
              'cloud_status': value.get('cloud_status', 'not_configured'),
-             'cloud_trip_count': value.get('cloud_trip_count'), 'cloud_last_sync': value.get('cloud_last_sync'),
-             'pilot_software': runtime_pilot(value)}
+             'cloud_trip_count': value.get('cloud_trip_count'), 'cloud_last_sync': value.get('cloud_last_sync')}
             for key, value in self.hass.data[DOMAIN].items()
         ]})
 
@@ -468,10 +466,6 @@ class ParamSetView(HomeAssistantView):
         runtime = self.hass.data[DOMAIN].get(entry_id)
         if runtime is None:
             return web.Response(status=404)
-        from .driving_logs.pilot import IQPILOT, runtime_pilot
-        if runtime_pilot(runtime) == IQPILOT:
-            # Queued Carrot parameters would apply after returning to Carrot; refuse them.
-            return web.json_response({'ok': False, 'error': 'paused_iqpilot'}, status=409)
 
         options = runtime['entry'].options
         direct = bool(options.get('receiver_url'))

@@ -1,7 +1,5 @@
 /** Original Carrot Web logs, backed by HA's bounded local segment archive. */
 import {logsSettingsStyles, logsSettingsMarkup, bindLogSettings} from './carrot-logs-settings.js';
-import {isPilotPaused, syncPilotPause, PILOT_CHECK_MS} from './carrot-pilot-pause.js?v=20261102-iq';
-const LOGS_URL = '/carrot_ha_static/carrot_logs/logs.html';
 class CarrotLogsCard extends HTMLElement {
   constructor() {
     super(); this.attachShadow({mode:'open'}); this._config = {};
@@ -29,7 +27,7 @@ class CarrotLogsCard extends HTMLElement {
       const summary=this.shadowRoot.getElementById('storageSummary');if(summary)summary.textContent='';
       this._session = null; this._generation = (this._generation || 0) + 1; this._ready = false;
       const frame = this.shadowRoot.querySelector('iframe');
-      if (frame) frame.src = this._paused ? 'about:blank' : LOGS_URL;
+      if (frame) frame.src = '/carrot_ha_static/carrot_logs/logs.html';
     }
     this._render();
     if (this._hass) this._connect();
@@ -40,7 +38,6 @@ class CarrotLogsCard extends HTMLElement {
     document.addEventListener('visibilitychange', this._visible);
     this._render(); this._connect();
     this._renew = setInterval(() => { if (!document.hidden) this._connect(); }, 45 * 60 * 1000);
-    this._pilotTimer = setInterval(() => { if (!document.hidden) this._connect(); }, PILOT_CHECK_MS);
   }
   disconnectedCallback() {
     this._detachAi?.(); this._aiBinding=null;
@@ -48,7 +45,6 @@ class CarrotLogsCard extends HTMLElement {
     window.removeEventListener('message', this._onMessage);
     document.removeEventListener('visibilitychange', this._visible);
     clearInterval(this._renew);
-    clearInterval(this._pilotTimer);
     this._generation = (this._generation || 0) + 1;
     this._session = null;
   }
@@ -70,35 +66,19 @@ class CarrotLogsCard extends HTMLElement {
     };
     aiButton.onclick=()=>this._openAi();
   }
-  _setPaused(paused) {
-    if (paused === Boolean(this._paused)) return syncPilotPause(this, paused, '주행 로그');
-    this._paused = paused;
-    // Paused stops the logs screen itself, not just its input; it reloads on return.
-    this._session = null; this._ready = false;
-    const frame = this.shadowRoot.querySelector('iframe');
-    if (frame) frame.src = paused ? 'about:blank' : LOGS_URL;
-    if (paused) this._closeLogSettings?.();
-    syncPilotPause(this, paused, '주행 로그');
-  }
   _send() {
     if (this._ready && this._session) this.shadowRoot.querySelector('iframe').contentWindow.postMessage(
       {type:'carrot:logs_session', ...this._session, language:this._hass?.locale?.language}, location.origin);
   }
   async _connect() {
     if (!this._hass || !this.isConnected || this._loading) return;
-    // Recheck the pilot at most every PILOT_CHECK_MS; otherwise reuse the live session.
-    if (this._session && Date.now() < this._expires && Date.now() - (this._pilotCheckedAt || 0) < PILOT_CHECK_MS) { this._send(); return; }
-    this._pilotCheckedAt = Date.now();
+    if (this._session && Date.now() < this._expires) { this._send(); return; }
     this._loading = true;
     const generation = this._generation || 0;
     try {
       const result = await this._hass.callApi('GET','carrot_ha/v1/devices');
       const device = result.devices.find(item => this._config.device_id ? item.device_id === this._config.device_id : true);
       if (!device) throw new Error('Carrot HA 차량을 찾을 수 없습니다.');
-      if (generation !== (this._generation || 0) || !this.isConnected) return;
-      this._setPaused(isPilotPaused(device));
-      if (this._paused) return;
-      if (this._session && Date.now() < this._expires) { this._send(); return; }
       const session = await this._hass.callApi('POST',`carrot_ha/v1/driving_logs/${device.entry_id}/session`,{});
       if (generation !== (this._generation || 0) || !this.isConnected) return;
       this._session = session; this._expires = Date.now() + 50 * 60 * 1000;

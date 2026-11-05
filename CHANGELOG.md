@@ -1,3 +1,10 @@
+## 2026-11-05 — HA 실행 코드의 IQ.drive 분기 제거
+
+- 사용자 요청으로 IQpilot 정리를 실행 코드까지 확대했다. fdb0c5a·8561893·6f38582의 실행 코드 부분만 되돌렸다.
+- 제거: `driving_logs/pilot.py`, `frontend/carrot-pilot-pause.js`, devices API의 `pilot_software` 필드, 파라미터 대기열과 주행 로그 세션의 `iq-` 브랜치 409 거부, 장치 전송 정책의 IQ 일시정지(`device_policy_for`는 `policy_for`로 대체), 로그·파라미터 카드의 30초 IQ 재확인과 흐림 화면, 터미널 카드의 IQ.drive 업데이트 버튼 분기(Pull은 항상 당근 명령). 관련 테스트 `test_pilot_pause.py`와 IQ 케이스도 제거했다.
+- 영향: Comma가 당근 브랜치일 때 동작은 이전과 같다. 로그 카드의 30초 장치 재조회가 사라져 HA 요청이 줄어든다.
+- 검증: 이 PC에서 params-card·terminal-git-status·대시보드 회귀 4종과 driving_logs Python 묶음이 통과했다. 남은 Python 10개·JS 6개 실패는 수정 전 origin/main에서도 똑같이 실패하는 Windows 환경 문제다. Linux CI와 HA 직접 반영 결과는 아래 반영 기록에 남긴다. 릴리즈 없음.
+
 ## 2026-11-05 — IQpilot 이식 도구·문서 정리
 
 - 사용자가 IQpilot을 더 이상 사용하지 않고 앞으로도 사용할 계획이 없다고 알려 IQ HA 이식 작업을 정리했다. openpilot `carrot-wip`의 IQ HA upstream refresh가 IQ.OS 4.9.9.9.2→4.9.9.9.4 요구 변경으로 매일 NEEDS_REVIEW(종료 코드 3) 실패 알림을 보내던 것이 계기다.

@@ -1,3 +1,9 @@
+## 2026-11-05 — 주행 로그의 IQ.drive 일시정지 제거
+
+- IQpilot을 더 이상 쓰지 않아 fdb0c5a의 주행 로그 부분을 되돌렸다. `driving_logs/pilot.py` 삭제, `http.py` 세션의 IQ 409 거부 제거, `transfer_policy.device_policy_for` 삭제 후 장치 경로 4곳이 `policy_for`를 직접 사용한다. `carrot-logs-card.js`의 IQ 재확인 타이머와 일시정지 화면도 제거했다.
+- 저장된 전송 선택·활성화 기준은 그대로 유지한다. 당근 브랜치에서는 동작이 같다.
+- 검증: driving_logs Python 묶음 로컬 통과. CI·HA 직접 반영은 공통 CHANGELOG에 기록한다. 실차 업로드 검증 없음, 릴리즈 없음.
+
 ## 2026-11-04 — 충전 개선 CI 성공 확인
 
 - Carrot27e02e26b의41765211369및HA06cbfc5의41766513568모두success. Carrot결과기록cc0872fff게시완료. 충전실기록재생26건/에너지보존,구형partial정상출발패턴5건재현. HA직접반영·차량설치/재부팅·실차검증은미완료. VPN없이로컬분석/검증/Git게시까지완료했으며운영접속은별도복구후진행. IQ게시없음.

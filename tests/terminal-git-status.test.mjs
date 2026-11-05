@@ -51,20 +51,3 @@ test('commit row lies below workflow buttons and above terminal keys',()=>{
   assert.ok(source.indexOf('<div id="git-info"')>source.indexOf('<button id="btn-reboot"'));
   assert.ok(source.indexOf('<div id="git-info"')<source.indexOf('<!-- Navigation & Helper Keys -->'));
 });
-
-test('IQ.drive branch relabels pull and drops reset --hard',()=>{
-  const {card,nodes}=fixture();
-  const pull={textContent:'',title:'',onclick:null};nodes['btn-pull']=pull;
-  const sent=[];card._enqueue=data=>sent.push(data);card._active=true;
-  card._gitStatus={installed_commit:'a'.repeat(40),branch:'iq-ha',comparison:'behind',behind:2,ahead:0};
-  card._paintGitStatus();
-  assert.equal(pull.textContent,'📥 IQ.drive 업데이트');
-  assert.match(nodes['git-status'].textContent,/^IQ\.drive · /);
-  card._gitStatus.branch='carrot-wip-model_selector-ha';card._paintGitStatus();
-  assert.equal(pull.textContent,'📥 당근 Git Pull');
-  const source=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-terminal-card.js','utf8');
-  const iqCommand=source.match(/iq: '([^']+)'\n\s*\+ '([^']+)'/);
-  assert.ok(iqCommand);
-  assert.doesNotMatch(iqCommand[1]+iqCommand[2],/reset|clean|--force/);
-  assert.match(iqCommand[1],/python3 bootstrap\/update_iq_ha\.py/);
-});

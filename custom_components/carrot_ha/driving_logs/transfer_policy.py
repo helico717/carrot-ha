@@ -29,19 +29,6 @@ async def policy_for(hass, runtime):
         return runtime['driving_log_transfer_policy']
 
 
-async def device_policy_for(hass, runtime):
-    """Policy the Comma sees: transfer pauses while IQpilot runs, without touching the saved choice.
-
-    A paused period resets the device's activation baseline, so segments recorded under
-    IQpilot are never uploaded after returning to Carrot.
-    """
-    from .pilot import IQPILOT, runtime_pilot
-    policy = await policy_for(hass, runtime)
-    if runtime_pilot(runtime) == IQPILOT:
-        return {**policy, 'enabled': False, 'paused': IQPILOT}
-    return policy
-
-
 def save(path, policy):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix('.tmp')
