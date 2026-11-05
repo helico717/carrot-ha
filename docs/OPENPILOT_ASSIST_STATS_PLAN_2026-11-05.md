@@ -161,6 +161,8 @@
 ```
 
 - `version`은 **계산 방식의 버전**이다. 같은 주행의 정정 번호가 아니다(9장).
+- 구현(openpilot `carrot-ha-assist-stats` `7862875`)에서는 위 항목에 `longestStreakM`·`longestStreakS`를 더 넣는다.
+  100m 미만 구간까지 포함한 주행 내 최장 연속 거리·시간이며, `streaks` 목록에는 100m 이상만 남는다.
 - 100m 미만 주행은 지금처럼 전송하지 않는다(11장 결정 사항).
 
 ### 8-2. 수신 앱 (`addons/carrot_receiver/receiver.py`)

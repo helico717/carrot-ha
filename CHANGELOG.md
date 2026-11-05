@@ -1,3 +1,11 @@
+## 2026-11-05 — 오픈파일럿 사용 통계: Comma 수집기 구현(기능 브랜치, 미배포)
+
+- 변경: openpilot `carrot-ha-assist-stats` 브랜치 `7862875`(기준 carrot-wip-model_selector-ha `1bfc105a`). 수집기가 1초마다 휠 속도로 적산하는 거리 증가분을 직전 carControl 표본(수동/조향만/가감속만/둘 다)에 귀속하고, selfdriveState.enabled는 시스템 활성 거리로 따로 집계한다. 2초 넘게 끊긴 신호와 거리 공백은 상태 모름으로 남기고 연속 구간을 끊는다. 켜짐·해제는 1초 표본 기준이며 공백·재시작 뒤 재관측은 세지 않는다. 주행 기록에 `assist`(휠 적산 기준 거리, 다섯 칸, UTC 15분 소계, 100m 이상 연속 구간 최대 50개, 최장 연속 거리)를 추가했다. 기존 텔레메트리 enabled(10초)는 그대로다.
+- 이유: docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md 구현 1단계. 계획서에 실제 추가 항목 longestStreakM·longestStreakS를 기록했다.
+- 관련 파일(openpilot): selfdrive/carrot/ha/engine.py, collector.py, tests/test_assist_stats.py.
+- 검증: 새 인수 테스트 9개 통과(GPS 없는 터널, 표본 귀속·전환 횟수, enabled=false·latActive=true, 보조 중 신호 단절, 하향 주행거리계 복구 시 기준 거리 유지, 재시작, 15분 경계 시간 비율 분할, 연속 구간 상한, 제어 신호 없음). Windows 로컬에서 데몬 테스트 파일 25개를 변경 전후 비교했고 결과가 같다. camera_probe·camera_upgrade·direct_connection·driving_logs·sync_workflows 5개는 변경 전부터 같은 실패다. 실차 검증 없음.
+- 배포 상태: 의도적으로 carrot-wip-model_selector-ha에 병합하지 않았다. 수신 앱이 assist를 HA로 넘기고 HA가 영구 요약을 저장하기 전에 Comma가 먼저 보내면, 수신 앱이 ACK 후 원본을 지워 값을 잃는다. 수신 앱·HA 반영 후 병합하고, 그때 사용자가 Comma에서 git pull·재부팅한다. 릴리즈·HA 직접 반영 없음.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계 백엔드 구현 계획서
 
 - 테슬라 FSD 통계와 같은 주행별·누적 오픈파일럿 사용 통계(보조 거리, 수동 거리, 사용 비율, 최장 연속 거리, 연속 사용 일수)를 위한 백엔드 계획서 docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md를 작성했다.
