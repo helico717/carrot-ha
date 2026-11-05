@@ -1,3 +1,11 @@
+## 2026-11-05 — 오픈파일럿 사용 통계: HA 영구 저장·집계 (HA 반영 대기)
+
+- 변경: 새 모듈 assist_stats.py가 주행별 assist를 영구 테이블 assist_trips·assist_buckets·assist_streaks·assist_meta에 저장한다. purge_expired(주행 90일·상태 14일)는 이 테이블을 지우지 않는다. 주행 이벤트 저장(put_cloud)과 같은 트랜잭션에서 기록하므로 실패한 페이지는 통째로 다시 받고, 같은 주행은 한 번만 집계된다. 같은 주행 재전송 규칙은 수신 앱과 같다(처음 유효값 유지, 다른 값은 충돌 1회). 통계 시작 이후 assist 없는 주행은 측정 안 된 거리로 상태 모름에 더한다. 집계는 HA 시간대의 일·주·월·연·전체 기간이며, 사용 비율 = 보조 ÷ (보조 + 수동), 사용한 날은 보조 1km 이상, 현재·최장 연속 사용 일수, 기간별 최장 연속 거리(시작일 귀속), 주행거리계 기준 기록되지 않은 거리(추정)를 낸다. 결과는 기기·기간별로 캐시한다(주행 변경 시 무효화, 그 외 60초). websocket carrot_ha/assist/summary를 추가했다. HA 시작 시 이 버전 이전에 받은 주행의 cloud_raw_trip 안 assist를 보충한다.
+- 이유: docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md 8-3절. 계획서에 구현 세부·용량 측정·남은 위험(DB 파일 삭제·재설치 시 함께 사라짐, NAS 백업 미포함)을 기록했다.
+- 관련 파일: custom_components/carrot_ha/assist_stats.py(신규), assist_ws.py(신규), storage.py, __init__.py, tests/test_assist_stats.py(신규), docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md.
+- 검증: test_assist_stats 12개 통과. 수신 앱 0.1.5 실제 출력 → HA 피드 파서 → 저장소 경로로 돌렸다(사용 비율 80% 두 예, 분모 0, 보관 기간 삭제 뒤 유지, 재전송·충돌, 페이지 중단 후 재수신 1회 집계, 한국 자정·월말 분할과 연속 구간 시작일 귀속, 1km 사용한 날·연속 일수, 시작 전·후 측정 안 된 주행, 보충, 기록되지 않은 거리, 무효 assist, 캐시). 이 PC에 tzdata가 없어 테스트에서만 Asia/Seoul을 고정 UTC+9로 대체했다. 전체 Python 테스트 59개 파일을 변경 전후로 비교해 새 파일 외에 결과가 같다. 16개 파일은 변경 전부터 이 PC 환경 문제(tzdata 없음, import 경로, Windows 파일 잠금 등)로 실패한다. 주행 저장 경로를 거치는 test_trip_repair·test_trip_energy·test_trip_boundary_truth·test_rolling_energy·test_monthly_energy·test_range_efficiency는 tests 경로를 넣어 101개 통과. 1년 가정 측정: 영구 테이블 약 2.7MB/년, 1년치 집계 약 21ms.
+- 배포 상태: 커밋·푸시만 했다. 버전 상승·릴리즈 없음(2026-10-21 정책). HA SSH 직접 반영과 사용자 HA 재시작 대기. Comma 변경은 병합 전. 실제 HA·실차 검증 없음.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계: 수신 앱 0.1.5 (HAOS 앱 업데이트 대기)
 
 - 변경: 수신 앱이 주행 기록의 `assist`를 검증해 `/api/trip-changes` 응답에 `assist`·`assist_error`·`assist_conflicts`로 내보낸다. `assist`가 없는 과거 주행의 응답 형식은 바뀌지 않는다. 합계 검증은 휠 적산 기준 거리(basisDistanceM)와 비교하며, 최종 distanceM과는 비교하지 않는다. 15분 경계 정렬, 연속 구간 범위, 버전 1만 허용한다. 같은 주행 재전송 때는 처음 받은 유효값을 지킨다: 없는 본문은 기존 값 유지, 다른 값은 기존 값 보존 후 서로 다른 본문마다 충돌 1회 기록, 같은 충돌 재전송은 새 리비전이 아님. 저장된 값이 무효일 때만 새 값으로 바꾼다. 잘못된 통계도 주행 기록 자체는 거부하지 않는다.

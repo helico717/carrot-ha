@@ -15,6 +15,7 @@ import shutil
 
 _LOGGER = logging.getLogger(__name__)
 from . import trip_repair
+from . import assist_stats
 
 from .charge_costs import ChargeCosts
 
@@ -28,6 +29,8 @@ class Archive(ChargeCosts):
         self.revision = 0
         self._derived_lock = threading.RLock()
         self._compression_write_lock = threading.RLock()
+        self.assist_revision = 0
+        self._assist_cache = {}
         with self.connect() as db:
             db.execute('CREATE TABLE IF NOT EXISTS events (device TEXT, id TEXT, observed TEXT, kind TEXT, body TEXT, PRIMARY KEY(device,id))')
             db.execute('CREATE TABLE IF NOT EXISTS trip_derivations (device TEXT, id TEXT, body TEXT, PRIMARY KEY(device,id))')
@@ -38,6 +41,8 @@ class Archive(ChargeCosts):
             db.execute("CREATE INDEX IF NOT EXISTS events_started ON events(device,kind,julianday(COALESCE(json_extract(body,'$.data.started_at'),observed)) DESC)")
 
             self.init_charge_costs(db)
+            # Permanent assist statistics; purge_expired never touches these tables.
+            assist_stats.init(db)
             db.execute('CREATE TABLE IF NOT EXISTS journal_outbox (device TEXT PRIMARY KEY, generation INTEGER NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0)')
             db.execute('INSERT OR IGNORE INTO journal_outbox(device,generation) SELECT DISTINCT device,1 FROM events')
             # Device-specific queue triggers avoid scanning all history per mutation.
@@ -247,6 +252,12 @@ class Archive(ChargeCosts):
                        (event['device_id'], event['event_id'], observed, event['kind'], self._stored_body(body))).rowcount
             if changed:
                 self.capture_charge(db, event)
+            # Same transaction as the trip itself: a failed page is retried whole
+            # and re-storing is idempotent, so each trip is counted once.
+            assist_changed = event['kind'] == 'trip' and assist_stats.store_trip(
+                db, event['device_id'], event['event_id'], event['data'])
+        if assist_changed:
+            self._assist_changed()
         if changed:
             if event['kind'] == 'charge':
                 self.invalidate_charge_costs()
@@ -254,6 +265,35 @@ class Archive(ChargeCosts):
                 self.revision += 1
                 self._derived_ready.discard(event['device_id'])
         return bool(changed)
+
+    def _assist_changed(self):
+        with self._derived_lock:
+            self.assist_revision += 1
+            self._assist_cache.clear()
+
+    def assist_backfill(self, device):
+        """Store assist already archived inside raw trips (synced before this version)."""
+        with self._compression_write_lock, self.connect() as db:
+            changed = assist_stats.backfill(db, device)
+        if changed:
+            self._assist_changed()
+        return changed
+
+    def assist_summary(self, device, period='all', date=None, now=None, ttl=60):
+        """Shared by every card/client: one computation per revision and minute."""
+        now = now or datetime.now(timezone.utc)
+        key = (device, period, date, self.charge_timezone)
+        with self._derived_lock:
+            cached = self._assist_cache.get(key)
+            if cached and cached[0] == self.assist_revision and (now - cached[1]).total_seconds() < ttl:
+                return cached[2]
+            revision = self.assist_revision
+        with self.connect() as db:
+            result = assist_stats.summary(db, device, self.charge_timezone, now=now, period=period, date=date)
+        with self._derived_lock:
+            if revision == self.assist_revision:
+                self._assist_cache[key] = (revision, now, result)
+        return result
 
     def history(self, device, kind, limit=100, offset=0, since=None):
         if kind not in ('state', 'trip', 'charge') or not 1 <= limit <= 500 or offset < 0:

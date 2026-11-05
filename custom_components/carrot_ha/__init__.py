@@ -45,6 +45,8 @@ async def async_setup(hass, config):
     async_register_terminal_ws(hass)
     from .charge_ws import async_register as async_register_charge_ws
     async_register_charge_ws(hass)
+    from .assist_ws import async_register as async_register_assist_ws
+    async_register_assist_ws(hass)
     from .can_capture import register as register_can_capture
     register_can_capture(hass)
     from .vehicle_journal.vehicles import setup as setup_journal_vehicles
@@ -117,6 +119,11 @@ async def async_setup_entry(hass, entry):
     from .entity_migration import migrate_entities
     migrate_entities(hass, entry)
     runtime = hass.data[DOMAIN][entry.entry_id]
+    try:
+        # Assist kept inside archived raw trips (synced before this version) becomes permanent.
+        await hass.async_add_executor_job(archive.assist_backfill, entry.data['device_id'])
+    except Exception:
+        _LOGGER.warning('Assist statistics backfill failed; it retries on next start', exc_info=True)
     await refresh_runtime_costs(hass, runtime)
     try:
         # Rebuild the 12V level/low-run state from the last hour so a restart does not reset it.
