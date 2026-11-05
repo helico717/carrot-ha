@@ -1,3 +1,11 @@
+## 2026-11-05 — 오픈파일럿 사용 통계(5306594) HA 직접 반영
+
+- CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42020031513 (regression, radar-ha-python).
+- 반영 전 HA의 storage.py·__init__.py SHA-256이 5306594^와 일치했고, assist_stats.py·assist_ws.py는 없었다. `/config/carrot_ha/deployment-backups/assist-5306594/before/`에 백업하고 SHA256SUMS.before로 검증했다.
+- 커밋 5306594의 파일을 staging에 올려 HA 서버 Python으로 문법을 검사한 뒤 root:root 644로 반영했다. SHA-256 앞 16자리가 커밋과 일치한다: assist_stats 6ed4e8473ec2c138, assist_ws 58c5076c4fc41658, storage 749eb9855810c533, __init__ 2f6cbcdf06c63012. 남은 임시 파일 없음.
+- 수신 앱 공개 /health가 0.1.5를 반환했다(사용자가 이미 업데이트).
+- 사용자 HA 재시작 대기. 재시작 뒤 영구 테이블 생성·보충 처리·websocket 응답은 미확인. Comma 변경은 아직 병합 전이라 새 통계는 아직 들어오지 않는다. 릴리즈 없음.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계: HA 영구 저장·집계 (HA 반영 대기)
 
 - 변경: 새 모듈 assist_stats.py가 주행별 assist를 영구 테이블 assist_trips·assist_buckets·assist_streaks·assist_meta에 저장한다. purge_expired(주행 90일·상태 14일)는 이 테이블을 지우지 않는다. 주행 이벤트 저장(put_cloud)과 같은 트랜잭션에서 기록하므로 실패한 페이지는 통째로 다시 받고, 같은 주행은 한 번만 집계된다. 같은 주행 재전송 규칙은 수신 앱과 같다(처음 유효값 유지, 다른 값은 충돌 1회). 통계 시작 이후 assist 없는 주행은 측정 안 된 거리로 상태 모름에 더한다. 집계는 HA 시간대의 일·주·월·연·전체 기간이며, 사용 비율 = 보조 ÷ (보조 + 수동), 사용한 날은 보조 1km 이상, 현재·최장 연속 사용 일수, 기간별 최장 연속 거리(시작일 귀속), 주행거리계 기준 기록되지 않은 거리(추정)를 낸다. 결과는 기기·기간별로 캐시한다(주행 변경 시 무효화, 그 외 60초). websocket carrot_ha/assist/summary를 추가했다. HA 시작 시 이 버전 이전에 받은 주행의 cloud_raw_trip 안 assist를 보충한다.
