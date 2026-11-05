@@ -39,14 +39,6 @@
         "8767"
       ],
       "port": 8767
-    },
-    {
-      "name": "iq-pause-preview",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [
-        "preview/iq-pause/server.mjs"
-      ],
-      "port": 8768
     }
   ]
 }

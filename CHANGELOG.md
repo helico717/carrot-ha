@@ -1,3 +1,10 @@
+## 2026-11-05 — IQpilot 이식 도구·문서 정리
+
+- 사용자가 IQpilot을 더 이상 사용하지 않고 앞으로도 사용할 계획이 없다고 알려 IQ HA 이식 작업을 정리했다. openpilot `carrot-wip`의 IQ HA upstream refresh가 IQ.OS 4.9.9.9.2→4.9.9.9.4 요구 변경으로 매일 NEEDS_REVIEW(종료 코드 3) 실패 알림을 보내던 것이 계기다.
+- 삭제: `compat/iqpilot/`, `scripts/{build_iqpilot_ha_candidate,fetch_iqpilot_can_runtime,prepare_iq_ha_recovery,prepare_iqpilot_ha,refresh_iq_ha}.py`, `tools/iq-ha-restore.py`, `tests/test_iqpilot_*.py`(8)·`test_iq_recovery_kit.py`·`test_iq_restore_transport.py`·`test_refresh_iq_ha.py`, `docs/IQPILOT_HA_*.md`(6), `preview/iq-pause/`·`preview/iq-pull/`와 `.claude/launch.json` 항목. `tools/receiver-recovery.py`의 `--iqpilot` 옵션과 해당 테스트도 제거했다.
+- 유지: HA 실행 코드의 IQ 브랜치 감지·일시정지(`driving_logs/pilot.py`, `carrot-pilot-pause.js`, 터미널 카드 IQ 분기)는 `iq-` 브랜치에서만 동작하므로 이번에 바꾸지 않았다. 과거 변경 기록·평가·감사 문서와 원격 `iq-ha` 브랜치도 보존했다. 전체 내용은 Git 이력에서 복원 가능하다.
+- 검증: 이 PC에서 test_receiver_recovery·test_pilot_pause와 대시보드 회귀 4종(12건)이 통과했다. 전체 Python 묶음에서 실패한 10개와 vehicle-journal, terminal-git-status는 수정 전 origin/main에서도 똑같이 실패해 Windows 환경 문제로 판단했다. Linux CI 결과로 최종 확인한다. HA 실행 코드 변경이 없어 버전 상승·릴리즈·HA 반영·재시작은 필요 없다.
+
 ## 2026-11-05 — 테마 되돌림(065eaac) HA 직접 반영
 
 - 반영 전 HA의 carrot-dashboard-ko/en.js, carrot-vehicle-journal.js, carrot-charge-payment.js, carrot-journal-panel-runtime.js, carrot-ui-theme.js SHA-256이 6306496과 모두 일치함을 확인했다. 6개 파일을 `/homeassistant/carrot_ha/deployment-backups/ui-theme-revert-065eaac/before/`에 백업하고 SHA256SUMS.before로 검증했다.

@@ -12,7 +12,7 @@ REMOTE = ('cd /data/openpilot && '
           'else python3 -m openpilot.selfdrive.carrot.ha.direct_connection; fi')
 
 
-def configure(host, identity, url, device, token, iqpilot=False):
+def configure(host, identity, url, device, token):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,252}', host):
         raise ValueError('Use an IP address or hostname, without a username or shell syntax.')
     address = urlsplit(url)
@@ -26,23 +26,22 @@ def configure(host, identity, url, device, token, iqpilot=False):
         raise ValueError('Use a 32–256 character upload token without whitespace.')
     payload = {'transport': 'direct', 'url': url.rstrip('/'), 'device': device, 'token': token}
     subprocess.run(['ssh', '-i', str(Path(identity).expanduser()), '-o', 'ConnectTimeout=15',
-                    ('iq@' if iqpilot else 'comma@') + host, ("cd /data/openpilot && /usr/local/venv/bin/python3 -m iqpilot.selfdrive.carrot.ha.direct_connection" if iqpilot else REMOTE)], input=json.dumps(payload), text=True, check=True)
+                    'comma@' + host, REMOTE], input=json.dumps(payload), text=True, check=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', required=True)
     parser.add_argument('--identity', required=True)
-    parser.add_argument('--iqpilot', action='store_true')
     parser.add_argument('--config', type=Path, help='Private receiver.json; credentials are sent via stdin')
     args = parser.parse_args()
     try:
         if args.config:
             config = json.loads(args.config.read_text())
-            configure(args.host, args.identity, config['url'], config['device'], config['token'], args.iqpilot)
+            configure(args.host, args.identity, config['url'], config['device'], config['token'])
         else:
             configure(args.host, args.identity, input('External receiver HTTPS URL: ').strip(),
-                      input('Existing receiver device ID: ').strip(), getpass.getpass('Receiver upload token: ').strip(), args.iqpilot)
+                      input('Existing receiver device ID: ').strip(), getpass.getpass('Receiver upload token: ').strip())
     except (ValueError, KeyError, subprocess.CalledProcessError, OSError) as error:
         raise SystemExit('Configuration failed: ' + (str(error) if isinstance(error, ValueError) else type(error).__name__))
     print('Configuration saved. Reboot Comma yourself, then verify reception in HA.')
