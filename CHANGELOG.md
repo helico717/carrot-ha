@@ -4,7 +4,7 @@
 - 이유: docs/OPENPILOT_ASSIST_STATS_PLAN_2026-11-05.md 구현 1단계. 계획서에 실제 추가 항목 longestStreakM·longestStreakS를 기록했다.
 - 관련 파일(openpilot): selfdrive/carrot/ha/engine.py, collector.py, tests/test_assist_stats.py.
 - 검증: 새 인수 테스트 9개 통과(GPS 없는 터널, 표본 귀속·전환 횟수, enabled=false·latActive=true, 보조 중 신호 단절, 하향 주행거리계 복구 시 기준 거리 유지, 재시작, 15분 경계 시간 비율 분할, 연속 구간 상한, 제어 신호 없음). Windows 로컬에서 데몬 테스트 파일 25개를 변경 전후 비교했고 결과가 같다. camera_probe·camera_upgrade·direct_connection·driving_logs·sync_workflows 5개는 변경 전부터 같은 실패다. 실차 검증 없음.
-- 배포 상태: 의도적으로 carrot-wip-model_selector-ha에 병합하지 않았다. 수신 앱이 assist를 HA로 넘기고 HA가 영구 요약을 저장하기 전에 Comma가 먼저 보내면, 수신 앱이 ACK 후 원본을 지워 값을 잃는다. 수신 앱·HA 반영 후 병합하고, 그때 사용자가 Comma에서 git pull·재부팅한다. 릴리즈·HA 직접 반영 없음.
+- 배포 상태: 의도적으로 carrot-wip-model_selector-ha에 병합하지 않았다. 정정: 처음 기록한 "수신 앱이 ACK 후 원본을 지워 값을 잃는다"는 틀렸다. 수신 앱은 HA가 받아 간 주행을 90일이 지난 뒤에만 지운다(receiver.py 보관 정리). Comma를 먼저 올리면 assist는 수신 앱 원본에 90일간 남지만, 현재 수신 앱 응답과 HA 저장 경로가 assist를 넘기지 않아 HA에는 저장되지 않는다. 수신 앱·HA 구현 후 이미 받아 간 주행을 다시 읽는 1회 보충 동기화가 있어야 90일 안의 값을 살릴 수 있다. 현재는 수신 앱·HA 반영 후 병합하는 순서를 유지하며, 병합 뒤 사용자가 Comma에서 git pull·재부팅한다. 릴리즈·HA 직접 반영 없음.
 
 ## 2026-11-05 — 오픈파일럿 사용 통계 백엔드 구현 계획서
 

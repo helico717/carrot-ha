@@ -247,7 +247,7 @@ Comma는 주행이 끝날 때 `assist`를 한 번 계산하므로, 같은 주행
 3. **Comma 수집기**: 커밋·푸시 후 사용자가 `cd /data/openpilot && git pull --ff-only && sudo reboot`.
    기기 파일을 SSH/SCP로 고치지 않는다.
 
-거꾸로 하면 HA가 받기 전에 수신 앱이 기록을 지워 값을 잃을 수 있다.
+Comma를 먼저 올려도 assist는 수신 앱 원본에 90일간 남는다(수신 앱은 HA가 받아 간 주행을 90일 뒤에만 지운다). 하지만 현재 수신 앱 응답과 HA 저장 경로가 assist를 넘기지 않으므로 HA에는 저장되지 않는다. 이 순서로 가려면 HA 단계에 이미 받아 간 주행을 수신 앱에서 다시 읽는 1회 보충 동기화가 필요하다.
 각 단계는 따로 검증하고 변경 기록(`CHANGELOG.md`, 수신 앱 CHANGELOG, openpilot 쪽 기록)에 남긴다.
 pre-release·정식 발행은 사용자의 명시적 승인이 있을 때만 한다.
 
