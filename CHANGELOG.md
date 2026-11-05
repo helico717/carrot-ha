@@ -1,3 +1,11 @@
+## 2026-11-05 — IQ.drive 실행 코드 제거(66f7162) HA 직접 반영
+
+- CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42012464437
+- 반영 전 HA의 대상 8개 파일 SHA-256이 0cd121a와 모두 일치함을 확인했다. `/config/carrot_ha/deployment-backups/iq-runtime-66f7162/before/`에 백업하고 SHA256SUMS.before로 검증했다.
+- 6개 파일을 root:root 644로 반영하고 `driving_logs/pilot.py`, `frontend/carrot-pilot-pause.js`를 삭제했다. SHA-256 앞 16자리가 커밋과 일치한다: __init__ 0c444c20c5aa60bc, http ead55838a210f349, transfer_policy 52a7805fd7e7ee7c, logs-card c7c4d201085b7899, parameter-tuning-card d32d1abc438d51b0, terminal-card 87641a3eee11b897. `/carrot_ha_static/`의 세 카드 응답도 같은 해시이고, carrot-pilot-pause.js는 HTTP 404. 남은 pilot 참조 없음.
+- 첫 시도는 Windows의 `git archive`가 CRLF로 바꾼 파일을 올려 해시가 달랐다(동작에는 영향 없는 줄바꿈 차이). 곧바로 Git blob 원본으로 다시 반영해 일치를 확인했다.
+- Python 백엔드 변경은 HA 재시작 후 적용된다. 재시작과 실제 화면 확인은 사용자 대기. 원복은 백업 폴더 파일을 원위치로 복사하면 된다. 릴리즈 없음.
+
 ## 2026-11-05 — HA 실행 코드의 IQ.drive 분기 제거
 
 - 사용자 요청으로 IQpilot 정리를 실행 코드까지 확대했다. fdb0c5a·8561893·6f38582의 실행 코드 부분만 되돌렸다.
