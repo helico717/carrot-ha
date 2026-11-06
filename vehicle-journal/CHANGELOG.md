@@ -1,3 +1,9 @@
+## 2026-11-06 — 추세 순위 막대 dbf56ff HA 직접 반영
+
+- 배포 커밋: dbf56ff(main 푸시, 원격 대비 미푸시 0). HA 기존 두 화면 파일이 직전 배포 커밋 4cb71ac와 SHA-256 일치(카드 8e57fbcbb374, 디자인 f66e2372f66c)함을 확인한 뒤 `/config/carrot_ha/deployment-backups/trend-rank-dbf56ff/before/`에 백업했다.
+- `carrot-vehicle-journal.js`, `carrot-journal-design.js` 두 파일만 반영했다. 설치 파일과 HA 로컬 HTTP(`/carrot_ha_static/`) 응답 SHA-256이 커밋과 일치(카드 b13d7364ff58, 디자인 7cbb90aaeb9a). `/api/carrot_ha/frontend-version` HTTP 200.
+- 운영 DB·설정·사진·Python 코드 변경 및 HA 재시작 없음. 사용자 브라우저 새로고침 후 실제 화면(순위 막대·툴팁·강조·1,680px/3열) 확인은 대기. 이전 화면이 보이면 새 화면 버전 적용 또는 사용자 HA 재시작이 필요할 수 있다. 새 릴리즈/태그 없음.
+
 ## 2026-11-06 — 추세 순위 막대·기간 툴팁·변동 카드 강조·넓은 화면 3열
 
 - 커밋 제목: `vehicle-journal: rank trend bars with period tooltips and wide layout`
