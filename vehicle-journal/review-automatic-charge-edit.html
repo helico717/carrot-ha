@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>자동 충전 기록 수정 검토</title>
+<title>충전량·단가 입력값 수정 검토</title>
 <!--
   검토용 하네스: 실제 carrot-vehicle-journal.js 모듈을 그대로 불러오고, '개편안'에서는
   기록 입력창에 제안 CSS와 최소한의 DOM 이동만 덧입힌다(프로덕션 파일은 수정하지 않음).
@@ -34,7 +34,7 @@
 </head>
 <body>
 <div class="bar" id="bar">
-  <b>자동 충전 기록 수정 검토</b>
+  <b>충전량·단가 입력값 수정 검토 · 2차</b>
   <span class="seg" id="deviceSeg"><button data-device="desktop">데스크톱</button><button data-device="mobile">모바일 390×844</button></span>
   <span class="seg" id="modeSeg"><button data-mode="charging">자동 측정값</button><button data-mode="refueling">수정 후 재열기</button><button data-mode="maintenance">누락된 측정값</button></span>
   <button class="reopen" id="reopenTop">기록창 다시 열기</button>
@@ -107,7 +107,7 @@ card.automaticLocations=false;card.load=async()=>{};
 const root=card.shadowRoot,$=id=>root.getElementById(id),dialog=$('recordDialog');
 
 // 검토용 오버레이만 적용: 프로덕션 코드는 수정하지 않는다.
-const auto={id:'demo-charge',version:1,kind:'expense',origin:'automatic',status:'active',category:'charging',accounting_date:'2026-11-06',actual_krw:12000,odometer_km:45678,battery_charge_kwh:35.2,billed_charge_kwh:null,automatic_charge:{odometer_km:45678,battery_charge_kwh:35.2,billed_charge_kwh:null,session_count:1},unit_price:{krw:341,unit:'kWh',approximate:true},location:charging[0],attachments:[]};
+const auto={id:'demo-charge',version:1,kind:'expense',origin:'automatic',status:'active',category:'charging',accounting_date:'2026-11-06',actual_krw:5888,odometer_km:84531,battery_charge_kwh:18.4,billed_charge_kwh:null,automatic_charge:{odometer_km:84531,battery_charge_kwh:18.4,billed_charge_kwh:null,session_count:1},unit_price:{krw:320,unit:'kWh',approximate:true},location:charging[0],attachments:[]};
 let savedInput=null;
 const realSave=hass.callWS;
 hass.callWS=async msg=>{if(msg.type.endsWith('/record/save')){savedInput={...msg.payload};auto.version++;auto.actual_krw=savedInput.actual_krw;return {id:auto.id,version:auto.version};}return realSave(msg);};

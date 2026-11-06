@@ -63,8 +63,13 @@ const fs=require('fs');
  const deletion=await page.evaluate(()=>window.calls.find(c=>c.type.endsWith('/record/purge')));if(deletion?.confirm!==true||deletion?.entry_id!=='manual'||deletion?.expected_version!==2)throw Error('permanent delete payload');
  // Automatic source facts are visible without treating battery energy as billed energy.
  await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');window.autoCharge={id:'auto-charge',version:1,origin:'automatic',kind:'expense',category:'charging',accounting_date:'2026-10-13',actual_krw:12000,odometer_km:45678,billed_charge_kwh:null,automatic_charge:{odometer_km:45678,battery_charge_kwh:35.2},unit_price:{krw:341,approximate:true}};c.openRecord(window.autoCharge);});
- if(await root.locator('[name=odometer_km]').inputValue()!=='45,678'||await root.locator('[name=billed_charge_kwh]').inputValue()!=='')throw Error('automatic prefill or battery/billed distinction');
- if(!(await root.locator('#automaticChargeInfo').textContent()).includes('35.2')||!(await root.locator('#automaticChargeInfo').textContent()).includes('341'))throw Error('automatic context missing');
+ if(await root.locator('[name=odometer_km]').inputValue()!=='45,678'||await root.locator('[name=billed_charge_kwh]').inputValue()!=='35.2')throw Error('automatic prefill or battery/billed distinction');
+ if(await root.locator('[name=unit_price_krw]').inputValue()!=='341'||await root.locator('#automaticChargeInfo,[data-charge-edit-hint]').count())throw Error('automatic price prefill / removed notices');
+ await root.locator('[name=memo]').fill('memo only, preserve automatic quantity');
+ await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+ const unchanged=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
+ if('billed_charge_kwh' in unchanged||'unit_price_krw' in unchanged)throw Error('automatic display promoted to manual correction');
+ await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').openRecord(window.autoCharge));
  await root.locator('[name=odometer_km]').fill('45680');await root.locator('[name=billed_charge_kwh]').fill('36.5');await root.locator('[name=unit_price_krw]').fill('338');
  await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
  const corrected=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
