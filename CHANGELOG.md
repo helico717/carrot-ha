@@ -1,3 +1,11 @@
+## 2026-11-06 — 오픈파일럿 사용 통계 엔터티 ID를 계획대로 변경
+
+- 확인(재시작 후, 읽기 전용): 엔터티 2개가 생겨 Carrot 엔터티가 86개에서 88개가 됐다. 두 엔터티 모두 일반·활성이다. 다만 ID가 계획서의 `sensor.id_4_…`가 아니라 `sensor.caryang_id_4_openpilot_assist_ratio`·`…_distance`였다. 이 HA는 새 엔터티에 `caryang_`을 붙이며, 기존 19개 엔터티도 이 형식이다. 등록 이름은 `ID.4`다.
+- 변경(사용자 선택: 코드로 id_4_ 변경): entity_migration.py가 HA 시작 때 한 번만 두 엔터티의 생성된 형식 ID(`…_<key>`)를 `sensor.<등록 이름 slug>_<key>`로 바꾼다. 대상 ID가 이미 있거나, 사용자가 붙인 다른 형식이거나, 등록 이름에서 ASCII slug가 나오지 않으면 바꾸지 않는다. 실행 후 entry data에 `assist_entity_id_version: 1`을 남겨, 이후 사용자가 직접 바꾼 ID를 다시 덮어쓰지 않는다. 새로 설치할 때도 같은 ID가 되도록 두 엔터티가 처음 등록될 때 `sensor.id_4_<key>`를 요청한다(기존 등록 엔터티에는 영향 없음).
+- 관련 파일: entity_migration.py, sensors_v3.py, tests/test_entity_migration.py, tests/test_assist_entities.py.
+- 검증: test_entity_migration 8개(새 2개: 1회 변경·다른 엔터티 유지·이후 사용자 ID 보존 / 충돌·사용자 ID·비ASCII 등록 이름 건너뜀), test_assist_entities 4개(요청 ID 포함), test_new_sensors 24개, test_assist_stats 14개 통과.
+- 배포 상태: 커밋·푸시 후 HA SSH 직접 반영 예정. 사용자 HA 재시작 후 실제 ID 확인 필요. 릴리즈 없음.
+
 ## 2026-11-06 — 오픈파일럿 사용 통계 엔터티(9f2ca74) HA 직접 반영
 
 - CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42170192467 (regression, radar-ha-python).

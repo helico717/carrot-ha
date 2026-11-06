@@ -50,6 +50,9 @@ class AssistEntityTests(unittest.TestCase):
         self.assertEqual((distance._attr_native_unit_of_measurement, distance._attr_state_class,
                           distance._attr_device_class), ('km', 'total_increasing', 'distance'))
         self.assertFalse(hasattr(ratio, '_attr_entity_category'))
+        # Requested on first registration so fresh installs get the planned IDs.
+        self.assertEqual(ratio.entity_id, 'sensor.id_4_openpilot_assist_ratio')
+        self.assertEqual(distance.entity_id, 'sensor.id_4_openpilot_assist_distance')
 
     def test_unknown_before_the_first_measured_trip(self):
         empty = assist_stats.entity_values({'measured': False, 'total': {}}, {'total': {}}, {'total': {}})

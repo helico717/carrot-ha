@@ -4,7 +4,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EntityCategory
 from .entity import VehicleEntity
 from .telemetry import SENSOR_FIELDS, CHARGE_TEMPERATURE_DISPLAY, battery_monitor_attributes
-from .entity_migration import COMPACT_SENSORS, BATTERY_TEMPERATURE_DETAILS
+from .entity_migration import COMPACT_SENSORS, BATTERY_TEMPERATURE_DETAILS, title_slug
 from .display_soc import display_integer as soc_display
 
 GEAR_DISPLAY = {
@@ -255,6 +255,13 @@ class AssistSensor(VehicleEntity, SensorEntity):
     """
     _attr_suggested_display_precision = 1
     ATTRIBUTES = {}
+
+    def configure(self, entry, key, name, icon):
+        super().configure(entry, key, name, icon)
+        # Requested only when the entity is first registered (plan: sensor.id_4_<key>);
+        # an existing registry entry keeps its ID.
+        if title_slug(entry):
+            self.entity_id = 'sensor.' + title_slug(entry) + '_' + key
 
     @property
     def native_value(self):

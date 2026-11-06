@@ -112,6 +112,32 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(registry.async_get('sensor.id_4_comma_cpu_temperature_c').device_id, 'comma')
         self.assertEqual(registry.async_get('binary_sensor.id_4_comma_online').device_id, 'comma')
 
+    def test_assist_entity_ids_are_renamed_once_to_the_planned_ids(self):
+        registry = Registry({'openpilot_assist_ratio': 'sensor.caryang_id_4_openpilot_assist_ratio',
+                             'openpilot_assist_distance': 'sensor.caryang_id_4_openpilot_assist_distance',
+                             'soc_percent': 'sensor.caryang_id_4_battery'})
+        entry = types.SimpleNamespace(entry_id='entry', title='ID.4', data={'device_id': 'car'}, options={})
+        self.migrate(registry, entry)
+        self.assertEqual(registry.async_get('sensor.id_4_openpilot_assist_ratio').unique_id, 'car_openpilot_assist_ratio')
+        self.assertEqual(registry.async_get('sensor.id_4_openpilot_assist_distance').unique_id, 'car_openpilot_assist_distance')
+        self.assertIsNotNone(registry.async_get('sensor.caryang_id_4_battery'))  # other entities untouched
+        self.assertEqual(entry.data[migration.ASSIST_ENTITY_ID_KEY], 1)
+        # A later user-chosen generated-looking ID is never renamed back.
+        registry.async_update_entity('sensor.id_4_openpilot_assist_ratio', new_entity_id='sensor.mine_openpilot_assist_ratio')
+        self.migrate(registry, entry)
+        self.assertIsNotNone(registry.async_get('sensor.mine_openpilot_assist_ratio'))
+
+    def test_assist_rename_skips_collisions_custom_ids_and_missing_titles(self):
+        registry = Registry({'openpilot_assist_ratio': 'sensor.caryang_id_4_openpilot_assist_ratio',
+                             'openpilot_assist_distance': 'sensor.my_assist_km',
+                             'other': 'sensor.id_4_openpilot_assist_ratio'})
+        self.migrate(registry, types.SimpleNamespace(entry_id='entry', title='ID.4', data={'device_id': 'car'}, options={}))
+        self.assertIsNotNone(registry.async_get('sensor.caryang_id_4_openpilot_assist_ratio'))
+        self.assertIsNotNone(registry.async_get('sensor.my_assist_km'))
+        registry = Registry({'openpilot_assist_ratio': 'sensor.caryang_openpilot_assist_ratio'})
+        self.migrate(registry, types.SimpleNamespace(entry_id='entry', title='차량', data={'device_id': 'car'}, options={}))
+        self.assertIsNotNone(registry.async_get('sensor.caryang_openpilot_assist_ratio'))
+
     def test_custom_ids_and_collisions(self):
         registry = Registry({'range_km': 'sensor.my_range',
                              'month_charge_kwh': 'sensor.id_4_month_charge_kwh',

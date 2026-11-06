@@ -1,5 +1,6 @@
 """Preserve unique IDs while updating entity presentation and device ownership."""
 import logging
+import re
 
 DOMAIN = 'carrot_ha'
 # Retained for reversible compatibility; values live on composite sensors.
@@ -21,6 +22,9 @@ DIAGNOSTIC_KEYS = {
     'blower_volt', 'parking_at', 'cloud_status', 'gear', 'dcdc_temperature_c',
     'gps_accuracy_m', 'last_sync', 'soc_capacity_kwh', 'hv_aux_power_w', 'climate_power_request_w'
 }
+# openpilot assist entities: planned IDs sensor.<title>_<key> (docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md).
+ASSIST_ENTITY_KEYS = ('openpilot_assist_ratio', 'openpilot_assist_distance')
+ASSIST_ENTITY_ID_KEY = 'assist_entity_id_version'
 ESTIMATED_OBJECT_IDS = {
     'range_km': 'estimated_range_km',
     'measured_capacity_kwh': 'estimated_measured_capacity_kwh',
@@ -38,6 +42,11 @@ ESTIMATED_OBJECT_IDS = {
 }
 
 
+def title_slug(entry):
+    """ASCII object-ID prefix from the entry title, e.g. 'ID.4' -> 'id_4'; '' when none."""
+    return re.sub(r'[^a-z0-9]+', '_', str(getattr(entry, 'title', '') or '').lower()).strip('_')
+
+
 def comma_device_info(entry):
     return {'identifiers': {(DOMAIN, entry.data['device_id'] + '_comma')},
             'name': 'Comma', 'manufacturer': 'comma.ai'}
@@ -51,6 +60,9 @@ def migrate_entities(hass, entry):
     prefix = entry.data['device_id'] + '_'
     compact = entry.data.get(COMPACTION_DATA_KEY, 0) < 1
     compact_temperature = entry.data.get(BATTERY_TEMPERATURE_COMPACTION_KEY, 0) < 1
+    # Once only: later user-chosen IDs are never overwritten on another restart.
+    rename_assist = entry.data.get(ASSIST_ENTITY_ID_KEY, 0) < 1
+    slug = title_slug(entry)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if entity.platform != DOMAIN or not entity.unique_id.startswith(prefix):
             continue
@@ -83,12 +95,21 @@ def migrate_entities(hass, entry):
                     updates['new_entity_id'] = candidate
                 else:
                     logging.getLogger(__name__).warning('Cannot rename %s: %s already exists', entity.entity_id, candidate)
+        if rename_assist and slug and entity.domain == 'sensor' and key in ASSIST_ENTITY_KEYS:
+            target = 'sensor.' + slug + '_' + key
+            # Only the generated form (e.g. sensor.caryang_id_4_<key>) is renamed.
+            if entity.entity_id != target and object_id.endswith('_' + key):
+                if registry.async_get(target) is None:
+                    updates['new_entity_id'] = target
+                else:
+                    logging.getLogger(__name__).warning('Cannot rename %s: %s already exists', entity.entity_id, target)
         if updates:
             registry.async_update_entity(entity.entity_id, **updates)
-    if compact or compact_temperature:
+    if compact or compact_temperature or rename_assist:
         # Persist only after registry updates succeed. Do not disable a sensor
         # again after the user explicitly re-enables it on a later restart.
         # Entry data survives options-form replacement (which only keeps its
         # declared fields). An options save must not re-run this migration.
         hass.config_entries.async_update_entry(entry, data={**entry.data, COMPACTION_DATA_KEY: 1,
-                                                          BATTERY_TEMPERATURE_COMPACTION_KEY: 1})
+                                                          BATTERY_TEMPERATURE_COMPACTION_KEY: 1,
+                                                          ASSIST_ENTITY_ID_KEY: 1})
