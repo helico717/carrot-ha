@@ -1,3 +1,10 @@
+## 2026-11-06 — 엔터티 ID 변경(28e7088) HA 직접 반영
+
+- CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42171538435 (regression, radar-ha-python).
+- 반영 전 HA의 entity_migration.py·sensors_v3.py SHA-256이 28e7088^와 일치했다. `/config/carrot_ha/deployment-backups/assist-entity-id-28e7088/before/`에 백업하고 SHA256SUMS.before로 검증했다.
+- 문법 검사 후 root:root 644로 반영했다. SHA-256 앞 16자리가 커밋과 일치한다: entity_migration bccd9233a4a19418, sensors_v3 8899d756ab0816a5. 남은 임시 파일 없음.
+- 사용자 HA 재시작 대기. 재시작 후 ID 변경 결과는 미확인. 릴리즈 없음.
+
 ## 2026-11-06 — 오픈파일럿 사용 통계 엔터티 ID를 계획대로 변경
 
 - 확인(재시작 후, 읽기 전용): 엔터티 2개가 생겨 Carrot 엔터티가 86개에서 88개가 됐다. 두 엔터티 모두 일반·활성이다. 다만 ID가 계획서의 `sensor.id_4_…`가 아니라 `sensor.caryang_id_4_openpilot_assist_ratio`·`…_distance`였다. 이 HA는 새 엔터티에 `caryang_`을 붙이며, 기존 19개 엔터티도 이 형식이다. 등록 이름은 `ID.4`다.
