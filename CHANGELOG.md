@@ -1,3 +1,12 @@
+## 2026-11-06 — 위치 디버깅 UI 제거 fb2fe42 HA 반영 확인
+
+- fb2fe4211f5f7290a410d06710b9dc0b04f7774d main 커밋·푸시 및 원격 대비 미푸시 커밋 0 확인. 동시 완료된 자동 충전 수정 6aeed30을 보존했다.
+- HA 기존 두 파일이 직전 커밋과 일치함을 재확인하고 `/homeassistant/carrot_ha/deployment-backups/location-debug-fb2fe4211f5f/before/`에 원본 백업 및 deployment.json 해시 기록 후 두 화면 파일만 반영했다.
+- 설치 파일과 HA HTTP 응답 SHA-256 일치: carrot-vehicle-journal.js `03cfed5b8c77`, carrot-journal-design.js `f66e2372f66c`. DB·사진·설정·Python·수신기·Comma 수정 및 HA 재시작·릴리즈 발행 없음.
+- 실제 사용자 Chrome HTTPS 차계부를 새로고침하고 상세 기록 11월/10월을 확인했다. 10월 30행에서 진단 컨트롤 0개·일반 분류 30개를 확인하고 장소/금액/수정·삭제 버튼 렌더링을 시각 검증했다. 최초 기존 탭의 연결 끊김은 새로고침 후 정상 로딩됐다. 등록 패널과 하위 모듈의 Network URL 개별 추출은 미실시다.
+- 로컬 node --check 및 합성 전체 모듈 Chromium 1280/390/320px의 진단 제거·분류/장소·수정창 통과. 기존 browser-check.cjs는 변경 전 HEAD에서도 jIcon 미정의로 실패한다. 하네스 아이콘을 메모리에서 보완한 추가 실행도 기존 저장 검증에서 actual_krw 미정의로 실패하여 전체 회귀 통과로 보고하지 않는다. 테스트 파일은 수정하지 않았다.
+- 승인된 로컬 검토 HTML은 검토용으로 유지하며 운영 배포/커밋에는 포함하지 않았다. 다른 미커밋 작업과 변경 기록은 보존한다.
+
 ## 2026-11-06 — 상세 기록 위치 디버깅 UI 제거
 
 - 커밋 제목: vehicle-journal: remove temporary location diagnostic UI
