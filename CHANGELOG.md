@@ -1,3 +1,9 @@
+## 2026-11-06 — 오픈파일럿 사용 통계: 첫 주행 수집 확인(미수집, Comma 미업데이트)
+
+- 읽기 전용 확인(UTC 05:21): HA 영구 테이블은 0행이다. 최근 주행 5건(최신 UTC 00:19 종료, 368.8m)의 수신 앱 응답에 assist 항목 자체가 없어, Comma가 보낸 원본에 assist가 없었다.
+- 원인: Comma 최신 상태(comma_git_measured_at UTC 05:19:53)의 실행 커밋이 11ac6aa1이다. assist 수집기는 그다음 커밋 7862875에 있다. 원격 carrot-wip-model_selector-ha는 dbfaa535이며 7862875를 포함한다(그 위에 7da0657b indicator 정리, dbfaa535 자동 동기화). Comma의 git pull·재부팅이 아직 적용되지 않았다.
+- 코드·설정·DB 변경 없음. 사용자 Comma 업데이트 후 재확인 필요.
+
 ## 2026-11-05 — 오픈파일럿 사용 통계: HA 재시작 확인·Comma 브랜치 병합
 
 - HA 재시작 확인(읽기 전용): 사용 중인 기록 DB 01M23RJD…(414MB)에 assist_trips·assist_buckets·assist_streaks·assist_meta가 생성됐다(모두 0행, 아직 assist 주행 없음). 재시작 뒤에도 상태 기록이 계속 저장되어(UTC 11:47:16, 확인 시각 11:48:34) 바뀐 put_cloud 경로에서 동기화가 정상이다. HA 코어 로그는 비대화형 SSH의 `ha core logs`가 출력하지 않아 확인하지 못했다. websocket 응답은 미확인.
