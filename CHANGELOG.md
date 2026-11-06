@@ -1,3 +1,10 @@
+## 2026-11-06 — 엔터티 ID 변경 HA 재시작 확인
+
+- 확인(읽기 전용, HA 재시작 15:43 KST 이후): HA API에서 `sensor.id_4_openpilot_assist_ratio`·`sensor.id_4_openpilot_assist_distance`가 200(상태 unknown, 계획한 속성 존재)이고, 예전 `caryang_` ID는 404다. 엔터티 레지스트리 파일도 15:46:52 KST에 두 ID로 저장됐다. 플래그 `assist_entity_id_version: 1`이 기록됐다. Carrot 엔터티는 88개 그대로다(`caryang_` 19개는 기존 엔터티).
+- 처음 확인 때 레지스트리 파일이 재시작 전 내용이라 변경 실패로 보였다. HA의 지연 저장 때문이었고, 같은 코드를 실제 등록 값으로 돌린 시험에서도 정상 변경을 확인했다. 비대화형 SSH에서는 `ha core logs`에 Supervisor 토큰이 넘어오지 않으므로, 토큰을 출력하지 않고 컨테이너 환경 파일에서 읽어 조회했다.
+- 15:44:38 KST에 `Carrot cloud sync failed (OperationalError)`가 1회 기록됐다. 메시지에 오류 종류만 남아 원인 문장은 확인하지 못했다. HA 시작 직후 여러 작업이 같은 DB를 쓰는 시점이었고, 10-30에도 시작 시 같은 종류(database is locked)가 기록된 적이 있다. 다음 동기화부터 정상이다(상태 15:46:04 KST 수신). 이번 버전에서 추가한 시작 시 보충 처리의 영향이 없다고 단정하지 않으며, 다음 재시작 때 재발 여부를 본다.
+- 코드·설정·DB 변경 없음.
+
 ## 2026-11-06 — 주행 전비 경계 측정값 반영 bd81b48 재시작 후 운영 확인
 
 - 사용자 HA 재시작 후 읽기 전용 조회로 확인했다. 설치 `trip_repair.py` SHA-256 e12418338e53(bd81b48)과 일치.
