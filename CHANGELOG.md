@@ -1,3 +1,8 @@
+## 2026-11-06 — 주행 전비 경계 측정값 반영 bd81b48 HA 직접 반영
+
+- 배포 커밋: bd81b48(main 푸시, 원격 대비 미푸시 0). HA `trip_repair.py`가 직전 커밋과 SHA-256 일치(279bbd7f723d)함을 확인하고 `/config/carrot_ha/deployment-backups/trip-energy-bd81b48/before/`에 백업한 뒤 이 파일만 반영했다. 설치 파일 SHA-256 e12418338e53이 커밋과 일치하고 HA의 Python으로 구문 검사를 통과했다.
+- 운영 DB·설정·사진·다른 코드 변경 없음. Python 변경이므로 **사용자 HA 재시작 후** 적용된다. 재시작 후 첫 조회에서 주행 판정이 다시 계산되고 차계부 다음 동기화에서 10월 전비 거리 약 4,035km(커버리지 약 93%) 반영을 확인해야 한다. 새 릴리즈/태그 없음.
+
 ## 2026-11-06 — 경계 몇 초 밖 배터리 측정값도 주행 전비 요약에 반영
 
 - 커밋 제목: `fix(trip-energy): count near-boundary battery samples in summaries`
