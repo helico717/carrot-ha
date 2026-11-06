@@ -266,3 +266,38 @@ class RevisionTests(unittest.TestCase):
         d=self.archive.history(self.device,'trip')[0]['data']
         self.assertTrue(d['energy_rejected'])
         self.assertNotIn('energy_wh',d)
+
+class SummaryBoundarySlackTests(fixtures.TestTripEnergy):
+    """Battery samples a few seconds outside a trip still count toward summaries when no neighbour shares them."""
+
+    def summary_flags(self):
+        trips = self.archive.history(self.device, 'trip')
+        enriched = self.archive.enrich_trips_energy(self.device, trips, 78.0)
+        return {t['event_id']: t['data'].get('energy_verified_for_summary') for t in enriched}
+
+    def test_samples_just_outside_trip_are_summary_eligible(self):
+        self.archive.put(self._make_state('s1', -10, 50000))
+        self.archive.put(self._make_state('s2', 610, 49000))
+        self.archive.put_cloud(self._make_trip('cloud-slack', 0, 600, 6000))
+        self.assertTrue(self.summary_flags()['cloud-slack'])
+
+    def test_sample_shared_with_previous_trip_is_not_summary_eligible(self):
+        self.archive.put(self._make_state('s1', -10, 50000))
+        self.archive.put(self._make_state('s2', 610, 49000))
+        self.archive.put_cloud(self._make_trip('cloud-before', -400, -5, 3000))
+        self.archive.put_cloud(self._make_trip('cloud-after', 0, 600, 6000))
+        self.assertFalse(self.summary_flags()['cloud-after'])
+
+    def test_sample_beyond_slack_is_not_summary_eligible(self):
+        self.archive.put(self._make_state('s1', -40, 50000))
+        self.archive.put(self._make_state('s2', 600, 49000))
+        self.archive.put_cloud(self._make_trip('cloud-far', 0, 600, 6000))
+        self.assertFalse(self.summary_flags()['cloud-far'])
+
+    def test_rule_without_neighbours_or_timestamps(self):
+        energy = {'start': {'at': 90.0}, 'end': {'at': 215.0}}
+        self.assertTrue(trip_repair.summary_eligible(energy, 100.0, 200.0))
+        self.assertFalse(trip_repair.summary_eligible(energy, 100.0, 200.0, previous_end=95.0))
+        self.assertFalse(trip_repair.summary_eligible(energy, 100.0, 200.0, next_start=210.0))
+        self.assertFalse(trip_repair.summary_eligible({'start': {}, 'end': {'at': 150.0}}, 100.0, 200.0))
+

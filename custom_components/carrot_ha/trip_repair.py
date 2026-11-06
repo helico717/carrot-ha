@@ -308,6 +308,37 @@ def derive(data, samples, old=None):
     return result
 
 
+# Telemetry cadence often puts the nearest battery sample a few seconds outside
+# the trip (October 2026: at most 15 s). Such energy is still this trip's when
+# no neighbouring trip shares that slack and no charging was seen (checked in derive).
+# Samples 30 s outside stay excluded (test_monthly_energy).
+SUMMARY_BOUNDARY_SLACK_S = 20
+
+
+def summary_eligible(energy, start, end, previous_end=None, next_start=None):
+    a, b = (energy.get('start') or {}).get('at'), (energy.get('end') or {}).get('at')
+    if not finite(a) or not finite(b):
+        return False
+    if a >= start and b <= end:
+        return True
+    return (start-a <= SUMMARY_BOUNDARY_SLACK_S and b-end <= SUMMARY_BOUNDARY_SLACK_S
+            and (previous_end is None or a >= previous_end)
+            and (next_start is None or b <= next_start))
+
+
+def relax_summary_boundaries(windows, results):
+    """Allow near-boundary energy in summaries when it cannot belong to a neighbouring trip."""
+    ordered = sorted(windows, key=lambda item: (item[1], item[2]))
+    latest_end = None
+    for index, (key, start, end) in enumerate(ordered):
+        energy = results[key].get('energy')
+        if energy and not energy.get('summary_eligible'):
+            next_start = ordered[index+1][1] if index+1 < len(ordered) else None
+            if summary_eligible(energy, start, end, latest_end, next_start):
+                results[key]['energy'] = {**energy, 'summary_eligible': True}
+        latest_end = end if latest_end is None else max(latest_end, end)
+
+
 def refresh(db, device):
     trips = db.execute("SELECT id,body FROM events WHERE device=? AND kind='trip'", (device,)).fetchall()
     if not trips:
@@ -322,9 +353,15 @@ def refresh(db, device):
         FROM events WHERE device=? AND kind='state' ORDER BY observed""", (device,)).fetchall()
     samples = Samples(rows)
     old = {key: json.loads(body) for key,body in db.execute('SELECT id,body FROM trip_derivations WHERE device=?',(device,))}
+    results, windows = {}, []
     for key, body in trips:
         data = archive_codec.loads(body)['data']
-        result = derive(data, samples, old.get(key))
+        results[key] = derive(data, samples, old.get(key))
+        start, end = timestamp(data.get('started_at')), timestamp(data.get('ended_at'))
+        if start is not None and end is not None:
+            windows.append((key, start, end))
+    relax_summary_boundaries(windows, results)
+    for key, result in results.items():
         db.execute('INSERT INTO trip_derivations VALUES (?,?,?) ON CONFLICT(device,id) DO UPDATE SET body=excluded.body',
                    (device,key,json.dumps(result,allow_nan=False)))
 
