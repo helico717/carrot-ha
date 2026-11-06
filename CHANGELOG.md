@@ -1,3 +1,10 @@
+## 2026-11-06 — 오픈파일럿 사용 통계 엔터티(9f2ca74) HA 직접 반영
+
+- CI 성공 확인: https://github.com/helico717/carrot-ha/actions/runs/42170192467 (regression, radar-ha-python).
+- 반영 전 HA의 assist_stats.py·storage.py·sensors_v3.py·__init__.py SHA-256이 9f2ca74^와 일치했다. `/config/carrot_ha/deployment-backups/assist-entities-9f2ca74/before/`에 백업하고 SHA256SUMS.before로 검증했다.
+- 커밋 파일을 staging에서 HA 서버 Python으로 문법 검사한 뒤 root:root 644로 반영했다. SHA-256 앞 16자리가 커밋과 일치한다: assist_stats 232248fcb0bf6816, storage d235edd8690bef21, sensors_v3 09d8e7aa51b2494f, __init__ d332184405c3915e. 남은 임시 파일 없음.
+- 사용자 HA 재시작 대기. 재시작 뒤 실제 엔터티 ID와 값은 미확인. 아직 assist 주행이 없어 두 엔터티는 알 수 없음 상태가 정상이다. 릴리즈 없음.
+
 ## 2026-11-06 — 오픈파일럿 사용 통계 HA 엔터티 2개 추가
 
 - 변경: docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md(사용자 승인)대로 새 엔터티 2개를 추가했다. `sensor.id_4_openpilot_assist_ratio`(오픈파일럿 사용률, %, measurement)와 `sensor.id_4_openpilot_assist_distance`(오픈파일럿 누적 주행거리, km, distance, total_increasing)이다. 세부 숫자는 속성으로 묶었다(누적 보조·수동·상태 모름 거리, 이번 달 사용률·거리, 최장 연속 거리·시작 시각, 현재·최장 연속 사용 일수, 사용한 날, 측정 주행 수, 해제 횟수, 기록되지 않은 거리 추정 / 조향만·가감속만·둘 다·시스템 활성·오늘 거리). 기존 `sensor.id_4_last_trip`에는 이 주행의 사용률·보조·수동 거리·최장 연속 거리·해제 횟수 속성을 더했다(측정 안 된 주행은 null).
