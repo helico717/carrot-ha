@@ -2124,5 +2124,50 @@ export const journalDesign = `:host {
   #recordDialog .selected-loc-section{grid-template-columns:1fr;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px))}
   #recordDialog .selected-loc-name-field{grid-column:1;grid-row:3}
 }
+
+/* 추세 순위 막대 · 기간 툴팁 · 변동 카드 강조 · 넓은 화면 3열 (2026-11-06) */
+.trend-rank{margin-top:4px;min-width:0}
+.trend-rank-svg{display:block;width:100%;height:109px;overflow:hidden}
+.trend-rank-svg text{font-family:inherit;font-variant-numeric:tabular-nums}
+.trend-rank-label{font-size:9.5px;fill:var(--j-sub)}
+.trend-rank-top{font-size:10.5px;font-weight:750}
+.trend-rank-note{font-size:10px;fill:var(--j-sub)}
+.trend-rank .trend-chart-axis-labels{gap:8px;font-size:11.5px}
+.trend-hit{cursor:pointer;outline:none}
+.trend-hit:hover,.trend-hit:focus-visible,.trend-hit.active{fill:var(--trend-color);fill-opacity:.12;stroke:var(--trend-color);stroke-opacity:.5;stroke-width:1}
+.trend-tip{position:fixed;z-index:1100;pointer-events:none;width:300px;max-width:calc(100vw - 16px);box-sizing:border-box;padding:12px 14px;border:1px solid var(--j-border);border-radius:14px;background:var(--j-surface,#161e25);color:var(--j-ink,#f1f6fa);box-shadow:0 12px 42px rgba(0,0,0,.4);font-size:12px;line-height:1.45}
+.trend-tip[hidden]{display:none}
+.trend-tip small{display:block;color:var(--j-sub);font-size:11px}
+.trend-tip strong{display:block;margin:3px 0 2px;font-size:20px;font-weight:850;font-variant-numeric:tabular-nums}
+.trend-tip .trend-tip-name{font-size:12px;font-weight:600;color:var(--j-sub);margin-left:4px}
+.trend-tip em{display:inline-block;font-style:normal;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:rgba(129,230,197,.16);color:var(--j-accent)}
+.trend-tip em.down{background:rgba(168,189,202,.18);color:var(--j-sub)}
+.trend-tip dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:10px 0 8px}
+.trend-tip dl div{background:var(--j-bg,#0b1014);border-radius:9px;padding:6px 7px;min-width:0}
+.trend-tip dt{font-size:10px;color:var(--j-sub)}
+.trend-tip dd{margin:0;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.trend-tip .trend-tip-sec{margin:0 0 4px;font-size:11px;color:var(--j-sub)}
+.trend-tip ul{list-style:none;margin:0 0 4px;padding:0}
+.trend-tip li{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:6px;padding:3px 0;border-top:1px solid var(--j-border)}
+.trend-tip li span{color:var(--j-sub);font-variant-numeric:tabular-nums}
+.trend-tip li b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trend-tip li b u{text-decoration:none;color:var(--j-sub);font-weight:400;font-size:11px}
+.trend-tip li i{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+.trend-tip li.none{display:block;color:var(--j-sub)}
+#changingTrendsGrid .trend-card{border-color:color-mix(in srgb,var(--trend-color) 55%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--trend-color) 9%,#141c23) 0%,#141c23 70%);box-shadow:inset 0 3px 0 var(--trend-color),0 4px 18px rgba(0,0,0,.3)}
+#stableTrendsGrid .trend-card{opacity:.92}
+.trends-section-count{font-size:12.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(129,230,197,.15);color:var(--j-accent)}
+.trends-section-count.muted{background:rgba(168,189,202,.14);color:var(--j-sub)}
+/* Wide screens: every tab stops at 1,680px. The container query sits on the trends area only, so fixed overlays elsewhere keep the viewport as their containing block. */
+.shell{max-width:1680px;margin-inline:auto}
+.trends-container{container:journal-trends/inline-size}
+@container journal-trends (min-width:1400px){
+  .trends-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .trends-grid .trend-card,.trends-grid .trend-card:last-child:nth-child(odd){grid-column:span 2}
+  .trends-grid .trend-card:last-child:nth-child(3n+1){grid-column:1/-1}
+  .trends-grid .trend-card:nth-last-child(2):nth-child(3n+1),.trends-grid .trend-card:last-child:nth-child(3n+2){grid-column:span 3}
+  .trends-grid.single-item .trend-card{grid-column:1/-1}
+}
+@media(max-width:600px){.trend-rank-hint{display:none}}
 `;
 

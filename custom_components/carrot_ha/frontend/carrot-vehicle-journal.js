@@ -386,6 +386,7 @@ export class VehicleJournal extends HTMLElement {
     if(this.$('lightboxPrev'))this.$('lightboxPrev').onclick=()=>this.stepLightbox(-1);
     if(this.$('lightboxNext'))this.$('lightboxNext').onclick=()=>this.stepLightbox(1);
     if(this.$('photoViewerDialog'))this.$('photoViewerDialog').onclick=e=>{if(e.target===this.$('photoViewerDialog'))this.$('photoViewerDialog').close();};
+    this.setupTrendTooltip();
     this.shadowRoot.addEventListener('keydown',e=>{if(!this.$('photoViewerDialog')?.open)return;if(e.key==='ArrowLeft'){e.preventDefault();this.stepLightbox(-1);}if(e.key==='ArrowRight'){e.preventDefault();this.stepLightbox(1);}});
     if(this.$('gotoCompare'))this.$('gotoCompare').onclick=()=>this.selectTab(3);
     if(this.$('recordForm')){this.$('recordForm').onsubmit=event=>this.saveRecord(event);this.$('recordForm').addEventListener('invalid',event=>{this.$('recordError').textContent=event.target.validationMessage||'입력값을 확인해 주세요.';},true);}
@@ -953,6 +954,8 @@ export class VehicleJournal extends HTMLElement {
     const changingContainer=this.$('changingTrendsGrid');
     const stableContainer=this.$('stableTrendsGrid');
     if(!changingContainer||!stableContainer||!this.data)return;
+    // Bars are re-rendered; drop the old hover target and cached period records.
+    this.hideTrendTip();this.trendMetrics=new Map();this.trendTipCache?.clear();
 
     const daily=this.data.daily||[];
     const prevDaily=this.data.previous?.daily||[];
@@ -969,6 +972,7 @@ export class VehicleJournal extends HTMLElement {
       changingContainer.classList.remove('single-item');
       changingContainer.innerHTML='<div class="trends-empty-pill" style="grid-column: 1 / -1;">이 기간에 기록된 주행 및 충전 데이터가 아직 없어요.</div>';
       stableContainer.innerHTML='';
+      this.updateTrendCounts();
       return;
     }
 
@@ -1094,6 +1098,7 @@ export class VehicleJournal extends HTMLElement {
         pastAvg:hasPast?pastVal:null,avg:hasCurrent?currVal:null,
         pastPeriodLabel:`${isYear?`${Number(yearStr)-1}년`:prevPeriodName} ${options.total?'합계':'평균'}`,
         currPeriodLabel:`${isYear?`${yearStr}년`:`${monthNum}월`} ${options.total?'합계':'평균'}`,
+        isTotal:!!options.total,
         startLabel:isYear?'1월':'1일',
         endLabel:isYear?'12월':`${daysInMonth}일`,
         bars:bars||[]
@@ -1167,80 +1172,149 @@ export class VehicleJournal extends HTMLElement {
     }
 
     stableContainer.innerHTML=stableItems.map(m=>this.renderTrendCard(m)).join('');
+    this.updateTrendCounts();
   }
+  // Trend chart: periods ranked from highest to lowest. Each bar is a hover/tap target that opens that period's records.
   generateTrendCardChartHtml(m){
     if(m.avg==null)return '<div class="trends-empty-pill">데이터 수집 중</div>';
-    const bars=m.bars||[];
-    const isChanging=m.isChanging&&m.pastAvg!=null;
-    const maxVal=Math.max(1,...bars,m.avg||0,(m.pastAvg||0))*1.25;
-    const n=Math.max(1,bars.length);
-
-    const barElements=bars.map((val,idx)=>{
-      if(val==null)return '';
-      const heightPct=Math.max(3,(val/maxVal)*100);
-      const stepPct=100/n;
-      const barWPct=stepPct*0.58;
-      const xPct=idx*stepPct+(stepPct-barWPct)/2;
-      const yPct=100-heightPct;
-      return `<rect x="${xPct.toFixed(2)}%" y="${yPct.toFixed(2)}%" width="${barWPct.toFixed(2)}%" height="${heightPct.toFixed(2)}%" rx="2" fill="rgba(255,255,255,0.18)"><title>${trendValue(val,m.unit)}${m.unit}</title></rect>`;
-    }).join('');
-
-    let baselineLinesSvg='';
-    let overlayLabelsHtml='';
-    let axisLabelsHtml='';
-
-    if(isChanging){
-      const pastYPct=Math.max(8,Math.min(92,(1-m.pastAvg/maxVal)*100));
-      const currYPct=Math.max(8,Math.min(92,(1-m.avg/maxVal)*100));
-      const splitXPct=((n-4)/n)*100;
-
-      baselineLinesSvg=`
-        <line x1="0%" y1="${pastYPct.toFixed(1)}%" x2="${(splitXPct-1.5).toFixed(1)}%" y2="${pastYPct.toFixed(1)}%" stroke="#718698" stroke-width="3.5" stroke-linecap="round"/>
-        <line x1="${(splitXPct+1.5).toFixed(1)}%" y1="${currYPct.toFixed(1)}%" x2="100%" y2="${currYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="4" stroke-linecap="round"/>
-      `;
-
-      overlayLabelsHtml=`
-        <span class="trend-chart-avg-label pos-left" style="top:${pastYPct.toFixed(1)}%; color:#8fa4b5;">${trendValue(m.pastAvg,m.unit)}${m.unit}</span>
-        <span class="trend-chart-avg-label pos-right" style="top:${currYPct.toFixed(1)}%; color:${m.color};">${trendValue(m.avg,m.unit)}${m.unit}</span>
-      `;
-
-      axisLabelsHtml=`
-        <div class="trend-chart-axis-labels">
-          <span style="color:#718698;">${m.pastPeriodLabel}</span>
-          <span style="color:${m.color}; font-weight:750;">${m.currPeriodLabel}</span>
-        </div>
-      `;
-    }else{
-      const avgYPct=Math.max(8,Math.min(92,(1-m.avg/maxVal)*100));
-
-      baselineLinesSvg=`
-        <line x1="0%" y1="${avgYPct.toFixed(1)}%" x2="100%" y2="${avgYPct.toFixed(1)}%" stroke="${m.color}" stroke-width="4" stroke-linecap="round"/>
-      `;
-
-      overlayLabelsHtml=`
-        <span class="trend-chart-avg-label pos-left" style="top:${avgYPct.toFixed(1)}%; color:${m.color};">${trendValue(m.avg,m.unit)}${m.unit}</span>
-      `;
-
-      axisLabelsHtml=`
-        <div class="trend-chart-axis-labels">
-          <span>${m.startLabel}</span>
-          <span>${m.endLabel}</span>
-        </div>
-      `;
-    }
-
+    this.trendMetrics??=new Map();this.trendMetrics.set(m.id,m);
+    const bars=m.bars||[],n=Math.max(1,bars.length),values=bars.filter(v=>v!=null);
+    const past=this.trendBaseline(m),top=18,base=90,height=109;
+    const max=Math.max(1e-9,...values,past??0)*1.12,y=v=>base-(base-top)*v/max;
+    const order=bars.map((_,i)=>i).sort((a,b)=>(bars[b]??-Infinity)-(bars[a]??-Infinity));
+    const slot=100/n,width=slot*.62,every=n>12?2:1,pct=v=>`${v.toFixed(3)}%`;
+    let marks='',labels='',hits='';
+    order.forEach((i,k)=>{
+      const v=bars[i],cx=(k+.5)*slot;
+      marks+=v==null
+        ?`<line x1="${pct(cx-width/2)}" x2="${pct(cx+width/2)}" y1="${base}" y2="${base}" stroke="#a8bdca" stroke-dasharray="2 2"/>`
+        :`<rect x="${pct(cx-width/2)}" y="${y(v).toFixed(1)}" width="${pct(width)}" height="${(base-y(v)).toFixed(1)}" rx="3" fill="${m.color}" opacity="${k===0?1:(.85-.6*k/n).toFixed(2)}"/>`;
+      if(k%every===0)labels+=`<text x="${pct(cx)}" y="${base+13}" text-anchor="middle" class="trend-rank-label"${k===0?` fill="${m.color}"`:''}>${this.trendPeriodShort(i)}</text>`;
+      if(k===0&&v!=null)labels+=`<text x="${pct(cx-width/2)}" y="${Math.max(11,y(v)-5).toFixed(1)}" class="trend-rank-top" fill="${m.color}">1위 ${this.trendFormat(v,m.unit)}</text>`;
+      hits+=`<rect class="trend-hit" data-index="${i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(i).label} ${this.trendFormat(v,m.unit)}${v==null?'':m.unit}`)}" x="${pct(k*slot)}" y="0" width="${pct(slot)}" height="${height}" rx="6" fill="transparent"/>`;
+    });
+    const pastLine=past==null?'':`<line x1="0" x2="100%" y1="${y(past).toFixed(1)}" y2="${y(past).toFixed(1)}" stroke="#a8bdca" stroke-dasharray="3 4" opacity=".75"/><text x="100%" dx="-2" y="${(y(past)-5).toFixed(1)}" text-anchor="end" class="trend-rank-note">${esc(this.trendBaselineName(m))} ${this.trendFormat(past,m.unit)}</text>`;
     return `
-      <div class="trend-chart-box">
-        <div class="trend-chart-svg-wrap">
-          <svg class="trend-chart-svg" width="100%" height="100%">
-            <g>${barElements}</g>
-            ${baselineLinesSvg}
-          </svg>
-          ${overlayLabelsHtml}
-        </div>
-        ${axisLabelsHtml}
+      <div class="trend-rank">
+        <svg class="trend-rank-svg" width="100%" height="${height}" role="img" aria-label="${esc(m.name)} 기간별 순위">
+          <line x1="0" x2="100%" y1="${base}" y2="${base}" stroke="var(--j-border)"/>${pastLine}${marks}${labels}${hits}
+        </svg>
+        <div class="trend-chart-axis-labels"><span>높은 기간</span><span class="trend-rank-hint">${esc(m.unit)} · 막대를 눌러 기록 보기</span><span>낮은 기간</span></div>
       </div>
     `;
+  }
+  // Totals are period sums, so bins are compared with the previous period's per-bin average.
+  trendBaseline(m){return m.pastAvg==null?null:m.isTotal?m.pastAvg/Math.max(1,(m.bars||[]).length):m.pastAvg;}
+  trendBaselineName(m){return m.isTotal?(this.scope==='year'?'지난해 월 평균':'지난달 2일 평균'):m.pastPeriodLabel;}
+  trendFormat(value,unit){return value==null?'미관측':unit==='원'?numeric(value,0):numeric(value,1);}
+  trendPeriodShort(i){return this.scope==='year'?`${i+1}월`:`${i*2+1}일`;}
+  // Matches the bins built in renderTrendsDashboard: two-day bins (the last may be one day) or calendar months.
+  trendPeriod(i){
+    const start=this.range()?.from;if(!start)return {label:'',from:'',to:''};
+    const year=Number(start.slice(0,4)),pad=v=>String(v).padStart(2,'0');
+    if(this.scope==='year'){const last=new Date(year,i+1,0).getDate();return {label:`${year}년 ${i+1}월`,unit:'월 집계',from:`${year}-${pad(i+1)}-01`,to:`${year}-${pad(i+1)}-${pad(last)}`};}
+    const month=Number(start.slice(5,7)),days=new Date(year,month,0).getDate(),bins=Math.ceil(days/2);
+    const first=i*2+1,last=i===bins-1?days:Math.min(days,first+1),ym=`${year}-${pad(month)}`;
+    return {label:`${year}년 ${month}월 ${first}${last!==first?`–${last}`:''}일`,unit:last!==first?'2일 집계':'1일 집계',from:`${ym}-${pad(first)}`,to:`${ym}-${pad(last)}`};
+  }
+  setupTrendTooltip(){
+    const root=this.shadowRoot;if(!root||this.trendTip)return;
+    this.trendTip=document.createElement('div');this.trendTip.className='trend-tip';this.trendTip.setAttribute('role','tooltip');this.trendTip.hidden=true;root.append(this.trendTip);
+    this.trendTipCache=new Map();
+    root.addEventListener('pointermove',e=>{if(e.pointerType!=='touch')this.showTrendTip(e);});
+    root.addEventListener('focusin',e=>{if(e.target.closest?.('.trend-hit'))this.showTrendTip(e);});
+    root.addEventListener('focusout',e=>{if(e.target.closest?.('.trend-hit')&&!e.relatedTarget?.closest?.('.trend-hit'))this.hideTrendTip();});
+    root.addEventListener('click',e=>{
+      const hit=e.target.closest?.('.trend-hit');
+      if(!hit){if(!this.trendTip.hidden)this.hideTrendTip();return;}
+      if(e.pointerType==='touch'&&hit===this.trendTipHit&&!this.trendTip.hidden){this.hideTrendTip();return;}
+      this.showTrendTip(e);
+    });
+    root.addEventListener('keydown',e=>{if(e.key==='Escape')this.hideTrendTip();});
+    this.addEventListener('pointerleave',()=>this.hideTrendTip());
+  }
+  hideTrendTip(){if(!this.trendTip)return;this.trendTip.hidden=true;this.trendTipHit?.classList.remove('active');this.trendTipHit=null;clearTimeout(this.trendTipTimer);}
+  showTrendTip(e){
+    const hit=e.target.closest?.('.trend-hit');
+    if(!hit){if(e.type==='pointermove'&&this.trendTipHit)this.hideTrendTip();return;}
+    const m=this.trendMetrics?.get(hit.closest('[data-trend]')?.dataset.trend),i=Number(hit.dataset.index);if(!m)return;
+    if(this.trendTipHit!==hit){this.trendTipHit?.classList.remove('active');this.trendTipHit=hit;hit.classList.add('active');}
+    const period=this.trendPeriod(i),key=`${this.entry}|${period.from}|${period.to}`;
+    if(this.trendTip.dataset.key!==`${key}|${m.id}`||this.trendTip.hidden){
+      this.trendTip.dataset.key=`${key}|${m.id}`;
+      this.trendTip.innerHTML=this.trendTipHead(m,i,period)+this.trendTipBody(m,this.trendTipCache.get(key));
+      if(!this.trendTipCache.has(key)){
+        // Loaded only for the period being inspected, debounced and cached, so sweeping the chart stays cheap.
+        clearTimeout(this.trendTipTimer);
+        this.trendTipTimer=setTimeout(async()=>{
+          try{
+            const data=await this.call('query',{from:period.from,to:period.to});
+            if(this.trendTipCache.size>60)this.trendTipCache.clear();
+            this.trendTipCache.set(key,data);
+          }catch{this.trendTipCache.set(key,{error:true});}
+          if(this.trendTip.dataset.key===`${key}|${m.id}`&&!this.trendTip.hidden){this.trendTip.innerHTML=this.trendTipHead(m,i,period)+this.trendTipBody(m,this.trendTipCache.get(key));this.placeTrendTip(hit);}
+        },140);
+      }
+    }
+    this.trendTip.hidden=false;
+    this.placeTrendTip(hit,e);
+  }
+  placeTrendTip(hit,e){
+    const tip=this.trendTip,box=hit.getBoundingClientRect(),touch=!e||e.pointerType==='touch'||innerWidth<600||e.clientX==null||e.type==='focusin';
+    const x=touch?box.left+box.width/2:e.clientX,y=touch?box.bottom:e.clientY,w=tip.offsetWidth,h=tip.offsetHeight;
+    tip.style.left=`${Math.max(8,Math.min(innerWidth-w-8,touch?x-w/2:x+14))}px`;
+    let top=y+14;if(top+h>innerHeight-8)top=Math.max(8,box.top-h-10);
+    tip.style.top=`${top}px`;
+  }
+  trendTipHead(m,i,period){
+    const value=m.bars?.[i];
+    let compare='';
+    if(m.isTotal){if(value!=null&&m.avg>0)compare=`<em>${esc(m.currPeriodLabel)}의 ${Math.round(value/m.avg*100)}%</em>`;}
+    else if(value!=null&&m.pastAvg!=null){const diff=value-m.pastAvg;compare=`<em class="${diff>=0?'up':'down'}">${esc(m.pastPeriodLabel)} 대비 ${diff>=0?'+':'−'}${this.trendFormat(Math.abs(diff),m.unit)}${m.unit==='%'?'%p':` ${esc(m.unit)}`}</em>`;}
+    return `<small>${esc(period.label)} · ${esc(period.unit||'')}</small><strong><span style="color:${m.color}">${this.trendFormat(value,m.unit)}</span> ${value==null?'':esc(m.unit)} <span class="trend-tip-name">${esc(m.name)}</span></strong>${compare}`;
+  }
+  trendTipBody(m,data){
+    if(!data)return '<p class="trend-tip-sec">기록을 불러오는 중…</p>';
+    if(data.error)return '<p class="trend-tip-sec">기록을 불러오지 못했어요.</p>';
+    const t=data.totals||{},ice=this.isCombustion(),tz=data.timezone||'Asia/Seoul';
+    const chargeCount=(t.slow_count||0)+(t.fast_count||0)+(t.unknown_count||0);
+    const energy=ice
+      ?`<div><dt>주유</dt><dd>${numeric(data.fuel_facts?.totals?.fuel_count??0,0)}회 · ${numeric(data.fuel_facts?.totals?.fuel_liters??0,1)} L</dd></div>`
+      :`<div><dt>충전</dt><dd>${numeric(chargeCount,0)}회 · ${numeric(t.battery_charge_kwh??0,1)} kWh</dd></div>`;
+    const distance=ice?(data.odometer_facts?.distance_km??t.distance_km):t.distance_km;
+    const summary=`<dl><div><dt>주행</dt><dd>${distance==null?'미관측':`${numeric(distance,1)} km`}</dd></div>${energy}<div><dt>지출</dt><dd>${numeric(t.total_cost_krw??0,0)}원</dd></div></dl>`;
+    const records=this.trendRelatedRecords(m,data.records||[]);
+    const day=r=>r.accounting_date||(r.started_at?new Date(r.started_at).toLocaleDateString('sv-SE',{timeZone:tz}):'');
+    const time=r=>r.started_at?new Date(r.started_at).toLocaleTimeString('ko-KR',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}):'';
+    const name=r=>r.memo||(r.kind==='trip'?'주행':r.kind==='charge'?(r.charge_mode==='fast'?'급속 충전':r.charge_mode==='slow'?'완속 충전':'충전'):(r.subcategory&&r.subcategory!==r.category?r.subcategory:categories[r.category]||'지출'));
+    const amount=r=>r.actual_krw??r.estimated_krw;
+    const value=r=>r.kind==='trip'?`${numeric(r.distance_km,1)} km`:r.kind==='charge'?`${numeric(r.battery_charge_kwh,1)} kWh`:
+      `${r.category==='refueling'&&r.input?.fuel_liters!=null?`${numeric(Number(r.input.fuel_liters),1)} L · `:''}${numeric(amount(r),0)}원${r.actual_krw==null&&r.estimated_krw!=null?' 추정':''}`;
+    // Newest first: a long period returns only its latest page of records.
+    const sorted=records.sort((a,b)=>(day(b)+(b.started_at||'')).localeCompare(day(a)+(a.started_at||'')));
+    const rows=sorted.length?sorted.slice(0,4).map(r=>`<li><span>${esc(day(r).slice(5).replace('-','/'))}</span><b>${esc(name(r))}${time(r)?` <u>${time(r)}</u>`:''}</b><i>${esc(value(r))}</i></li>`).join(''):'<li class="none">이 지표에 연결된 기록이 없어요.</li>';
+    const more=sorted.length>4?`<small>외 ${sorted.length-4}건${data.has_more?' 이상':''} · 상세 기록에서 전체 보기</small>`:'';
+    return `${summary}<p class="trend-tip-sec">관련 기록 ${sorted.length}건${data.has_more?' 이상':''} · 최근순</p><ul>${rows}</ul>${more}`;
+  }
+  trendRelatedRecords(m,records){
+    const expense=r=>r.kind==='expense';
+    if(m.id.startsWith('cost_')&&m.id!=='cost100')return records.filter(r=>expense(r)&&r.category===m.id.slice(5));
+    if(m.id==='total_cost')return records.filter(expense);
+    if(m.id==='charge_rate')return records.filter(r=>expense(r)&&r.category==='charging');
+    if(/^fuel_/.test(m.id))return records.filter(r=>expense(r)&&r.category==='refueling');
+    if(/charge|fast_ratio|per_charge/.test(m.id))return records.filter(r=>r.kind==='charge');
+    return records.filter(r=>r.kind==='trip');
+  }
+  // Count badges next to the "변동 있는 추세" / "변동 없는 추세" headings.
+  updateTrendCounts(){
+    for(const [section,grid,word,muted] of [['changingTrendsSection','changingTrendsGrid','감지',false],['stableTrendsSection','stableTrendsGrid','유지',true]]){
+      const title=this.$(section)?.querySelector('.trends-section-title');if(!title)continue;
+      const count=this.$(grid)?.querySelectorAll('.trend-card').length||0;
+      let badge=title.querySelector('.trends-section-count');
+      if(!count){badge?.remove();continue;}
+      if(!badge){badge=document.createElement('span');badge.className=`trends-section-count${muted?' muted':''}`;title.append(badge);}
+      badge.textContent=`${count}개 ${word}`;
+    }
   }
   renderTrendCard(m){
     const chartHtml=this.generateTrendCardChartHtml(m);

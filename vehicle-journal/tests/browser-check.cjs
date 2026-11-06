@@ -65,7 +65,10 @@ const path=require('path');
    for(const previous of [null,{daily:original.daily,totals:{...original.totals,distance_km:21,battery_charge_kwh:10,efficiency_km_kwh:4,charge_effective_krw:2000,drive_soc_used_pp:5,fast_count:1,slow_count:0}}]){
     card.data={...original,previous};card.renderTrendsDashboard();
     if(card.shadowRoot.querySelectorAll('.trend-card').length!==13)throw Error('missing trend metrics: '+scope);
-    if(card.shadowRoot.querySelectorAll('.trend-chart-svg').length<6)throw Error('missing trend charts: '+scope);
+    if(card.shadowRoot.querySelectorAll('.trend-rank-svg').length<6)throw Error('missing trend charts: '+scope);
+    // Every period bar is a hover/tap target for the record tooltip (16 two-day bins in October, 12 months in a year).
+    for(const chart of card.shadowRoot.querySelectorAll('.trend-rank-svg'))if(chart.querySelectorAll('.trend-hit').length!==(scope==='year'?12:16))throw Error('trend tooltip targets missing: '+scope);
+    for(const [section,word] of [['changingTrendsSection','감지'],['stableTrendsSection','유지']]){const count=card.$(section.replace('Section','Grid')).querySelectorAll('.trend-card').length,badge=card.$(section).querySelector('.trends-section-count');if(count&&badge?.textContent!==`${count}개 ${word}`)throw Error('trend count badge mismatch: '+section);}
     if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
     if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
     for(const change of card.shadowRoot.querySelectorAll('.trend-change')){

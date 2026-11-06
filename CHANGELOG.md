@@ -1,3 +1,9 @@
+## 2026-11-06 — 차계부 추세 순위 막대·기간 툴팁·넓은 화면 3열
+
+- 커밋 제목: `vehicle-journal: rank trend bars with period tooltips and wide layout`. 상세는 `vehicle-journal/CHANGELOG.md`.
+- 추세 차트를 기간 순위 막대로 바꾸고 막대 hover/탭 시 그 기간의 요약·관련 기록을 HA 로컬 조회로 보여준다. 변동 카드에 지표 색 상단 바와 개수 배지, 모든 탭 최대 1,680px·추세 영역 1,400px 이상 3열.
+- 검증: 실제 HA 차계부 DB 읽기 전용 복제본으로 Chromium 1920/1280/375px·월/연·전기차/경유차 확인, `tests/dashboard-*` 통과. `browser-check.cjs`는 Playwright 부재로 미실행. 배포는 후속 기록. 새 릴리즈 없음.
+
 ## 2026-11-06 — 충전량·단가 입력값 표시 63197f0 HA 반영 완료
 
 - 배포 커밋: 63197f0b12dcc0b0b4173e4c61cfcace1e93878d(main 푸시). 격리된 Git 파일로 Chromium 320/360/390/430/1280px 기록 수정 회귀와 변경값 저장/재열기·자동값 수동 승격 방지를 재검증했다.
