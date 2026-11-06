@@ -389,6 +389,16 @@ class Archive(ChargeCosts):
             speeds = [p.get('speedMps',p.get('speed_mps')) for p in route]
             speeds = [v for v in speeds if isinstance(v,(int,float))]
             summary['last_trip_max_kph'] = round(max(speeds)*3.6,1) if speeds else None
+        # Shared, cached assist numbers for the two assist entities and the last trip.
+        # Isolated: an assist failure must never break the sensors fed by this summary.
+        try:
+            summary.update(assist_stats.entity_values(
+                self.assist_summary(device, now=now), self.assist_summary(device, 'month', now=now),
+                self.assist_summary(device, 'day', now=now)))
+            with self.connect() as db:
+                summary.update(assist_stats.trip_values(db, device, trips[0]['event_id'] if trips else None))
+        except Exception:
+            _LOGGER.warning('Assist statistics summary failed; other vehicle values are unaffected', exc_info=True)
         return summary
 
     def _recent_efficiency(self, device, max_trips=20, min_distance_km=5):

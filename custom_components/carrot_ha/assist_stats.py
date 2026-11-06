@@ -252,20 +252,21 @@ def summary(db, device, time_zone, now=None, period='all', date=None):
         _add(day, 'manual_m', manual); _add(day, 'lat_only_m', lat); _add(day, 'long_only_m', lon)
         _add(day, 'both_m', both); _add(day, 'unknown_signal_m', unknown)
         _add(day, 'assist_m', (lat or 0) + (lon or 0) + (both or 0))
-    trip_rows = db.execute('SELECT id,ended_at,measured,final_m,basis_m,engagements,disengagements,conflicts '
+    trip_rows = db.execute('SELECT id,ended_at,measured,final_m,basis_m,engagements,disengagements,conflicts,enabled_on_m '
                            'FROM assist_trips WHERE device=?', (device,)).fetchall()
     trip_days = {}
-    for trip_id, ended_at, measured, final, basis, engaged, disengaged, conflicts in trip_rows:
+    for trip_id, ended_at, measured, final, basis, engaged, disengaged, conflicts, enabled_on in trip_rows:
         day_key = _utc(ended_at).astimezone(tz).date()
         day = days.setdefault(day_key, _empty())
         counts = trip_days.setdefault(day_key, {'trips': 0, 'measured_trips': 0, 'engagements': 0,
-                                                'disengagements': 0, 'conflicts': 0})
+                                                'disengagements': 0, 'conflicts': 0, 'system_enabled_m': 0.0})
         counts['trips'] += 1
         counts['conflicts'] += conflicts or 0
         if measured:
             counts['measured_trips'] += 1
             counts['engagements'] += engaged or 0
             counts['disengagements'] += disengaged or 0
+            counts['system_enabled_m'] += enabled_on or 0.0
             if final is not None and basis is not None:
                 delta = final - basis
                 _add(day, 'recovery_added_m' if delta > 0 else 'recovery_shortfall_m', abs(delta))
@@ -278,7 +279,8 @@ def summary(db, device, time_zone, now=None, period='all', date=None):
     for value in selected.values():
         for key, amount in value.items():
             _add(total, key, amount)
-    counts = {'trips': 0, 'measured_trips': 0, 'engagements': 0, 'disengagements': 0, 'conflicts': 0}
+    counts = {'trips': 0, 'measured_trips': 0, 'engagements': 0, 'disengagements': 0, 'conflicts': 0,
+              'system_enabled_m': 0.0}
     for day_key, value in trip_days.items():
         if (lo is None or lo <= day_key) and (hi is None or day_key < hi):
             for key in counts:
@@ -327,7 +329,8 @@ def summary(db, device, time_zone, now=None, period='all', date=None):
             _add(month, key, amount)
     return {**result, 'measured': True, 'range': {'start': lo.isoformat() if lo else None,
                                                   'end': hi.isoformat() if hi else None},
-            'total': _finish(total), **counts, 'longest_streak': longest,
+            'total': _finish(total), **counts, 'system_enabled_m': round(counts['system_enabled_m'], 1),
+            'longest_streak': longest,
             'days': [{'date': d.isoformat(), 'active': v['assist_m'] >= ACTIVE_DAY_M, **_finish(v)}
                      for d, v in sorted(selected.items())],
             'months': [{'month': m, **_finish(v)} for m, v in sorted(months.items())],
@@ -371,3 +374,60 @@ def unrecorded_estimate(db, device):
     recorded = db.execute('SELECT COALESCE(SUM(final_m),0) FROM assist_trips WHERE device=? AND started_at>=? AND ended_at<=?',
                           (device, start_at, end_at)).fetchone()[0]
     return round(max(0.0, driven - recorded), 1)
+
+
+def _km(value):
+    return round(value / 1000, 1) if isinstance(value, (int, float)) else None
+
+
+def _percent(ratio):
+    return round(ratio * 100, 1) if isinstance(ratio, (int, float)) else None
+
+
+def entity_values(total, month, today):
+    """Compact numbers for the two HA entities (docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md).
+
+    Only scalars: day/month lists stay in the websocket API so the recorder
+    database does not grow.
+    """
+    t, m, d = total.get('total') or {}, month.get('total') or {}, today.get('total') or {}
+    longest = total.get('longest_streak') or {}
+    measured = bool(total.get('measured'))
+    return {
+        'assist_measured': measured,
+        'assist_ratio_percent': _percent(t.get('ratio')) if measured else None,
+        'assist_distance_km': _km(t.get('assist_m')) if measured else None,
+        'assist_since': total.get('since'),
+        'assist_manual_km': _km(t.get('manual_m')) if measured else None,
+        'assist_unknown_km': _km(t.get('unknown_m')) if measured else None,
+        'assist_lateral_only_km': _km(t.get('lat_only_m')) if measured else None,
+        'assist_longitudinal_only_km': _km(t.get('long_only_m')) if measured else None,
+        'assist_both_km': _km(t.get('both_m')) if measured else None,
+        'assist_system_enabled_km': _km(total.get('system_enabled_m')) if measured else None,
+        'assist_month_ratio_percent': _percent(m.get('ratio')) if measured else None,
+        'assist_month_km': _km(m.get('assist_m')) if measured else None,
+        'assist_today_km': _km(d.get('assist_m')) if measured else None,
+        'assist_longest_streak_km': _km(longest.get('distance_m')),
+        'assist_longest_streak_at': longest.get('start_at'),
+        'assist_current_streak_days': total.get('current_streak_days', 0),
+        'assist_best_streak_days': total.get('best_streak_days', 0),
+        'assist_active_days': total.get('active_days', 0),
+        'assist_measured_trips': total.get('measured_trips', 0),
+        'assist_disengagements': total.get('disengagements', 0),
+        'assist_unrecorded_estimate_km': _km(total.get('unrecorded_estimate_m')),
+    }
+
+
+def trip_values(db, device, trip_id):
+    """Per-trip numbers for the existing "최근 주행 결과" entity; None when unmeasured."""
+    row = db.execute('SELECT manual_m, lat_m, long_m, both_m, longest_m, disengagements FROM assist_trips '
+                     'WHERE device=? AND id=? AND measured=1', (device, trip_id)).fetchone()
+    if not row:
+        return {'last_trip_assist_ratio': None, 'last_trip_assist_km': None, 'last_trip_manual_km': None,
+                'last_trip_assist_longest_streak_km': None, 'last_trip_assist_disengagements': None}
+    manual, lat, lon, both, longest, disengaged = row
+    assisted = (lat or 0) + (lon or 0) + (both or 0)
+    known = assisted + (manual or 0)
+    return {'last_trip_assist_ratio': round(assisted / known * 100, 1) if known > 0 else None,
+            'last_trip_assist_km': _km(assisted), 'last_trip_manual_km': _km(manual),
+            'last_trip_assist_longest_streak_km': _km(longest), 'last_trip_assist_disengagements': disengaged}

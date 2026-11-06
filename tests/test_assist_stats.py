@@ -192,6 +192,26 @@ class AssistStatsTests(unittest.TestCase):
         self.put(self.trip('bad', broken))
         self.assertFalse(self.summary()['measured'])
 
+    def test_overview_feeds_entity_values_and_last_trip(self):
+        empty = self.archive.overview('car', now=NOW)
+        self.assertIs(empty['assist_measured'], False)
+        self.assertIsNone(empty['assist_ratio_percent'])
+        self.put(self.trip('a', assist()))
+        values = self.archive.overview('car', now=NOW)
+        self.assertEqual((values['assist_ratio_percent'], values['assist_distance_km'], values['assist_manual_km']),
+                         (80.0, 8.0, 2.0))
+        self.assertEqual((values['last_trip_assist_ratio'], values['last_trip_assist_km']), (80.0, 8.0))
+        self.assertEqual(values['assist_system_enabled_km'], 8.0)
+        self.put(self.trip('b', None, distance=3000, start='2026-11-02T01:00:00Z', end='2026-11-02T01:10:00Z'))
+        self.assertIsNone(self.archive.overview('car', now=NOW)['last_trip_assist_ratio'])
+
+    def test_overview_survives_an_assist_failure(self):
+        self.put(self.trip('a', assist()))
+        with mock.patch.object(self.archive, 'assist_summary', side_effect=RuntimeError('boom')):
+            values = self.archive.overview('car', now=NOW)
+        self.assertNotIn('assist_ratio_percent', values)
+        self.assertIn('last_trip_distance_km', values)
+
     def test_summary_is_cached_until_a_trip_changes_it(self):
         self.put(self.trip('a', assist()))
         first = self.archive.assist_summary('car', now=NOW)

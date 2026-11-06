@@ -208,6 +208,16 @@ async def async_setup_entry(hass, entry):
 
     entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_daily_purge()), timedelta(days=1)))
     entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_weekly_vacuum()), timedelta(days=7)))
+
+    async def refresh_after_midnight(now=None):
+        # Day-dependent assist values (today, day streaks) change at local midnight even
+        # when the receiver is unreachable and no sync refreshes the shared summary.
+        runtime['summary'] = await hass.async_add_executor_job(archive.overview, entry.data['device_id'])
+        async_dispatcher_send(hass, DOMAIN + entry.entry_id)
+
+    from homeassistant.helpers.event import async_track_time_change
+    entry.async_on_unload(async_track_time_change(
+        hass, lambda _: hass.async_create_task(refresh_after_midnight()), hour=0, minute=0, second=30))
     hass.async_create_task(run_daily_purge())
 
     return True

@@ -77,6 +77,8 @@ async def async_setup_entry(hass,entry,async_add_entities):
         CanCaptureStorageSensor(entry),
         CanCaptureReceiptSensor(entry),
         TodayDrivingSensor(entry),
+        AssistRatioSensor(entry),
+        AssistDistanceSensor(entry),
     ])
     async_add_entities(entities)
 
@@ -234,8 +236,65 @@ class LastTripSensor(VehicleEntity, SensorEntity):
             'avg_speed_kph': self.data.get('last_trip_avg_kph'),
             'max_speed_kph': self.data.get('last_trip_max_kph'),
             'ended_at': self.data.get('last_trip_at'),
+            # openpilot assist statistics of this trip; null when the trip was not measured.
+            'assist_ratio': self.data.get('last_trip_assist_ratio'),
+            'assist_km': self.data.get('last_trip_assist_km'),
+            'manual_km': self.data.get('last_trip_manual_km'),
+            'assist_longest_streak_km': self.data.get('last_trip_assist_longest_streak_km'),
+            'assist_disengagements': self.data.get('last_trip_assist_disengagements'),
         })
         return attrs
+
+
+class AssistSensor(VehicleEntity, SensorEntity):
+    """openpilot assist statistics (docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md).
+
+    Reads only the shared cached summary. Attributes are scalars without the
+    per-minute measurement timestamps, so unchanged statistics write no new
+    recorder rows.
+    """
+    _attr_suggested_display_precision = 1
+    ATTRIBUTES = {}
+
+    @property
+    def native_value(self):
+        return self.data.get(self.VALUE)
+
+    @property
+    def extra_state_attributes(self):
+        data = self.data
+        return {name: data.get(key) for name, key in self.ATTRIBUTES.items()}
+
+
+class AssistRatioSensor(AssistSensor):
+    VALUE = 'assist_ratio_percent'
+    _attr_native_unit_of_measurement = '%'
+    _attr_state_class = 'measurement'
+    ATTRIBUTES = {
+        'since': 'assist_since', 'assist_km': 'assist_distance_km', 'manual_km': 'assist_manual_km',
+        'unknown_km': 'assist_unknown_km', 'month_ratio': 'assist_month_ratio_percent',
+        'month_assist_km': 'assist_month_km', 'longest_streak_km': 'assist_longest_streak_km',
+        'longest_streak_at': 'assist_longest_streak_at', 'current_streak_days': 'assist_current_streak_days',
+        'best_streak_days': 'assist_best_streak_days', 'active_days': 'assist_active_days',
+        'measured_trips': 'assist_measured_trips', 'disengagements': 'assist_disengagements',
+        'unrecorded_estimate_km': 'assist_unrecorded_estimate_km'}
+
+    def __init__(self, entry):
+        self.configure(entry, 'openpilot_assist_ratio', '오픈파일럿 사용률', 'mdi:steering')
+
+
+class AssistDistanceSensor(AssistSensor):
+    VALUE = 'assist_distance_km'
+    _attr_device_class = 'distance'
+    _attr_native_unit_of_measurement = 'km'
+    _attr_state_class = 'total_increasing'
+    ATTRIBUTES = {
+        'lateral_only_km': 'assist_lateral_only_km', 'longitudinal_only_km': 'assist_longitudinal_only_km',
+        'both_km': 'assist_both_km', 'system_enabled_km': 'assist_system_enabled_km',
+        'today_assist_km': 'assist_today_km'}
+
+    def __init__(self, entry):
+        self.configure(entry, 'openpilot_assist_distance', '오픈파일럿 누적 주행거리', 'mdi:map-marker-path')
 
 
 class ChargingSessionSensor(VehicleEntity, SensorEntity):

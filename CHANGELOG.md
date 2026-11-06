@@ -1,3 +1,11 @@
+## 2026-11-06 — 오픈파일럿 사용 통계 HA 엔터티 2개 추가
+
+- 변경: docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md(사용자 승인)대로 새 엔터티 2개를 추가했다. `sensor.id_4_openpilot_assist_ratio`(오픈파일럿 사용률, %, measurement)와 `sensor.id_4_openpilot_assist_distance`(오픈파일럿 누적 주행거리, km, distance, total_increasing)이다. 세부 숫자는 속성으로 묶었다(누적 보조·수동·상태 모름 거리, 이번 달 사용률·거리, 최장 연속 거리·시작 시각, 현재·최장 연속 사용 일수, 사용한 날, 측정 주행 수, 해제 횟수, 기록되지 않은 거리 추정 / 조향만·가감속만·둘 다·시스템 활성·오늘 거리). 기존 `sensor.id_4_last_trip`에는 이 주행의 사용률·보조·수동 거리·최장 연속 거리·해제 횟수 속성을 더했다(측정 안 된 주행은 null).
+- 구현: 엔터티는 공유 요약(overview, 동기화 60초마다 갱신)만 읽고 수신 앱에 따로 묻지 않는다. overview가 캐시된 전체·이번 달·오늘 집계에서 숫자만 만든다. 통계 계산이 실패해도 다른 센서 값은 영향받지 않게 분리했다. 수신 앱 연결이 없어도 날짜 의존 값이 바뀌도록 자정 00:00:30에 요약을 다시 계산한다. 새 엔터티 속성에는 분 단위로 바뀌는 측정 시각을 넣지 않아, 통계가 그대로면 기록 DB에 새 행이 생기지 않는다. 일별·월별 목록은 엔터티에 넣지 않았다. 요약에 시스템 활성(enabled) 거리 합계를 추가했다.
+- 관련 파일: assist_stats.py, storage.py, sensors_v3.py, __init__.py, tests/test_assist_entities.py(신규), tests/test_assist_stats.py, docs/OPENPILOT_ASSIST_ENTITIES_PLAN_2026-11-06.md(신규).
+- 검증: test_assist_entities 4개(이름·ID·단위·클래스, 첫 측정 전 알 수 없음, 값·속성, 최근 주행 null), test_assist_stats 14개(overview 연결, 통계 실패 분리 추가), test_new_sensors 24개 통과. 전체 Python 테스트 60개 파일은 지난 실행 대비 새 테스트 외 결과가 같다(16개 파일은 기존 PC 환경 문제). 주행 저장 경로 6개 파일 101개 통과. 프론트엔드 변경 없음.
+- 배포 상태: 커밋·푸시 후 HA SSH 직접 반영 예정. 버전 상승·릴리즈 없음. 실제 엔터티 ID는 HA 재시작 후 확인 필요.
+
 ## 2026-11-06 — 위치 디버깅 UI 제거 fb2fe42 HA 반영 확인
 
 - fb2fe4211f5f7290a410d06710b9dc0b04f7774d main 커밋·푸시 및 원격 대비 미푸시 커밋 0 확인. 동시 완료된 자동 충전 수정 6aeed30을 보존했다.
