@@ -14,6 +14,8 @@ def soc_basis(journal):
 def snapshot(archive, journal):
     trips=[]; charges=[]
     capacity=soc_basis(journal)
+    with journal.connect() as journal_db:
+        saved_odometers=dict(journal_db.execute("SELECT r.source_id,m.odometer_km FROM records r JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id WHERE r.vehicle_id=? AND r.kind='charge'",(journal.vehicle,)))
     with archive.connect() as db:
         db.execute('BEGIN')
         generation=(db.execute('SELECT generation FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
@@ -56,6 +58,19 @@ def snapshot(archive, journal):
         excluded={key for key, in db.execute('SELECT event_id FROM charge_exclusions WHERE device=? AND excluded=1',(journal.device,))}
         deleted=[key for key, in db.execute('SELECT event_id FROM charge_deletions WHERE device=?',(journal.device,))]
         charge_rows = list(db.execute('SELECT id,body FROM charge_summaries WHERE device=? ORDER BY started,id',(journal.device,)))
+        # Backfill once, then inspect state only for newly discovered charge sessions.
+        backfill=journal.synced_charge_edit_version()!=1
+        pending=[json.loads(body) for key,body in charge_rows if backfill or key not in saved_odometers]
+        samples=None
+        if pending:
+            lower=min(stamp(d['started_at']) for d in pending)-timedelta(seconds=90)
+            upper=max(stamp(d['ended_at']) for d in pending)+timedelta(seconds=90)
+            samples=trip_repair.Samples(db.execute("""SELECT observed,
+                json_extract(body,'$.data.odometer_km'),json_extract(body,'$.data.field_measured_at.odometer_km'),
+                NULL,NULL,json_extract(body,'$.data.measured_at'),json_extract(body,'$.data.stale'),
+                json_extract(body,'$.data.charging'),json_extract(body,'$.data.driving')
+                FROM events WHERE device=? AND kind='state' AND observed>=? AND observed<=? ORDER BY observed""",
+                (journal.device,lower.isoformat(),upper.isoformat())))
         enriched = archive.enrich_charges_soc(journal.device, [{'data':json.loads(body)} for _,body in charge_rows], capacity)
         for (source,_), charge in zip(charge_rows, enriched):
             data=charge['data']
@@ -63,6 +78,12 @@ def snapshot(archive, journal):
                 ('fast' if is_fast_charge(data) else 'slow') if data.get('duration_s',0)>0 and number(data.get('energy_kwh')) is not None else 'unknown')
             value=dict(started_at=data['started_at'],ended_at=data['ended_at'],battery_charge_kwh=number(data.get('energy_kwh')),
                        charge_mode=mode,charged_soc_pp=number(data.get('soc_charged_percent')) if not data.get('soc_retroactive_estimated') else None)
+            odo=number(data.get('odometer_km'))
+            if odo is None:odo=saved_odometers.get(source)
+            if odo is None and samples and (backfill or source not in saved_odometers):
+                point=samples.nearest('odometer_km',stamp(data['started_at']).timestamp()) or samples.nearest('odometer_km',stamp(data['ended_at']).timestamp())
+                odo=point['value'] if point else saved_odometers.get(source)
+            value.update(odometer_km=odo,billed_charge_kwh=number(data.get('billed_charge_kwh')))
             quality={'origin':'automatic','charge_mode':'measured' if data.get('can_mode') in (4,6) else 'estimated',
                      'energy':data.get('source','estimated'),'partial':bool(data.get('partial'))}
             charges.append((source,value,quality,'excluded' if source in excluded else 'active'))
@@ -77,7 +98,7 @@ def sync(archive, journal, force=False):
         reconcile(archive,journal)
         with archive.connect() as db:
             row=db.execute('SELECT generation,acknowledged FROM journal_outbox WHERE device=?',(journal.device,)).fetchone()
-        if not force and row and row[0]==row[1] and journal.synced_soc_basis()==soc_basis(journal) and journal.synced_display_soc_version()==display_soc.VERSION:return False
+        if not force and row and row[0]==row[1] and journal.synced_soc_basis()==soc_basis(journal) and journal.synced_display_soc_version()==display_soc.VERSION and journal.synced_charge_edit_version()==1:return False
         archive._ensure_derivations(journal.device)
         facts=snapshot(archive,journal)
         journal.import_snapshot(*facts)

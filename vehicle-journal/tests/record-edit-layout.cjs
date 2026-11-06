@@ -48,7 +48,7 @@ const fs=require('fs');
  }
  // New charging entry: a searched place (phone/category_name) must save with only stored location keys.
  await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');c.openRecord(null,'charging');c.setLocation({name:'Synthetic Charger',address:'Synthetic road 1',latitude:37.1,longitude:127.1,provider:'kakao',station_id:'123',phone:'02-000-0000',category_name:'EV charger',selection_source:'manual'},null);});
- if((await root.locator('#billedField').textContent()).includes('청구')||!(await root.locator('#billedField').textContent()).startsWith('충전량 · kWh'))throw Error('billed label not renamed');
+ if(!(await root.locator('#billedField').evaluate(el=>el.childNodes[0].textContent)).startsWith('충전량 · kWh'))throw Error('billed label not renamed');
  await root.locator('#actualKrw').fill('12,000');await root.locator('[name=billed_charge_kwh]').fill('35.2');
  const hint=await root.locator('[name=unit_price_krw]').evaluate(el=>({value:el.value,placeholder:el.placeholder}));
  if(hint.value!==''||hint.placeholder!=='341')throw Error('unit price hint '+JSON.stringify(hint));
@@ -61,6 +61,17 @@ const fs=require('fs');
  page.once('dialog',dialog=>dialog.dismiss());await purge.click();if(await page.evaluate(()=>window.calls.some(c=>c.type.endsWith('/record/purge'))))throw Error('cancelled permanent delete sent request');
  page.once('dialog',dialog=>{if(!dialog.message().includes('복원할 수 없습니다'))throw Error('permanent delete warning missing');dialog.accept();});await purge.click();
  const deletion=await page.evaluate(()=>window.calls.find(c=>c.type.endsWith('/record/purge')));if(deletion?.confirm!==true||deletion?.entry_id!=='manual'||deletion?.expected_version!==2)throw Error('permanent delete payload');
+ // Automatic source facts are visible without treating battery energy as billed energy.
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal');window.autoCharge={id:'auto-charge',version:1,origin:'automatic',kind:'expense',category:'charging',accounting_date:'2026-10-13',actual_krw:12000,odometer_km:45678,billed_charge_kwh:null,automatic_charge:{odometer_km:45678,battery_charge_kwh:35.2},unit_price:{krw:341,approximate:true}};c.openRecord(window.autoCharge);});
+ if(await root.locator('[name=odometer_km]').inputValue()!=='45,678'||await root.locator('[name=billed_charge_kwh]').inputValue()!=='')throw Error('automatic prefill or battery/billed distinction');
+ if(!(await root.locator('#automaticChargeInfo').textContent()).includes('35.2')||!(await root.locator('#automaticChargeInfo').textContent()).includes('341'))throw Error('automatic context missing');
+ await root.locator('[name=odometer_km]').fill('45680');await root.locator('[name=billed_charge_kwh]').fill('36.5');await root.locator('[name=unit_price_krw]').fill('338');
+ await root.locator('#save').click();await root.locator('#recordDialog').waitFor({state:'hidden'});
+ const corrected=await page.evaluate(()=>window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload);
+ if(corrected.odometer_km!==45680||corrected.billed_charge_kwh!==36.5||corrected.unit_price_krw!==338)throw Error('automatic correction payload');
+ await page.evaluate(()=>{const c=document.querySelector('carrot-vehicle-journal'),input=window.calls.filter(c=>c.type.endsWith('/record/save')).at(-1).payload;c.openRecord({...window.autoCharge,input,version:2});});
+ if(await root.locator('[name=odometer_km]').inputValue()!=='45,680'||await root.locator('[name=billed_charge_kwh]').inputValue()!=='36.5'||await root.locator('[name=unit_price_krw]').inputValue()!=='338')throw Error('automatic correction reopen');
+ await page.evaluate(()=>document.querySelector('carrot-vehicle-journal').$('recordDialog').close());
  if(errors.length)throw Error(errors.join('\n'));
  await browser.close();console.log('PASS charging edit payload, date|odometer row, place results and permanent deletion confirmation at 320/360/390/430/1280px');
 })().catch(e=>{console.error(e);process.exit(1);});

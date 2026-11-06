@@ -1,3 +1,21 @@
+## 2026-11-06 — 자동 충전 기록 누적거리·충전량·단가 수정 반영 준비
+
+- 사용자 프리뷰 승인 후 실제 화면/조회/저장 경로를 수정했다. 자동 결제와 연결된 충전 세션의 누적거리·배터리량·청구량을 묶어서 조회하고 수동 보정값을 우선 적용한다. 조회 후 누적거리를 빈 값으로 덮어쓰던 오류를 수정했다.
+- 충전 당시 90초 이내 로컬 상태에서 누적거리를 복원한다. 최초 1회 이관 후 새 충전 세션만 조회하며, 과거 상태가 만료되어도 이미 보존한 거리는 유지한다. 측정이 없거나 오래된 값/다른 차량 값은 미확인으로 남긴다. 수신기/Comma 요청·수정 없음.
+- 수정창에 자동 원본 거리·배터리 충전량·단가를 안내한다. 누적거리·청구 충전량·단가를 편집하며 배터리량을 청구량으로 자동 복사하지 않는다. 수동 단가는 원장에도 표시하며 자동 원본과 보정값을 분리한다. 금액은 기존 charge_payment 내구성 큐를 유지한다.
+- 관련 파일: frontend/carrot-vehicle-journal.js, vehicle_journal/store.py·source.py·station_stats.py·charge_edit.py, vehicle-journal/tests/test_payment_sync.py·record-edit-layout.cjs, review-automatic-charge-edit.html.
+- 검증: node --check 통과. 실제 화면 Chromium 320/360/390/430/1280px 입력/위치/삭제 회귀 및 자동 거리/배터리·청구량 구분/단가/보정 저장·재열기 통과. 합성 DB 차계부 Python 110건 중 108 통과, 기존 NAS 백업 POSIX 디렉터리 fsync 2건은 Windows PermissionError(이번 수정 대상 아님). UTF-8 모드 및 임시 DB 정리 전 gc.collect로 Windows 테스트 환경 보완. 신규 수정 동기화·누락/0·차량 격리·상태 보존 검증 통과.
+- 배포 사전 확인: HA 기존 4개 파일 SHA-256이 현재 HEAD와 일치, charge_edit.py 부재 확인. 커밋/푸시 후 5개 파일 백업·직접 반영 예정. 운영 DB를 직접 수정하지 않는다.
+- 상태: 새 릴리즈/태그 없음. HA 반영 및 사용자 재시작·실사용 저장 확인은 아직 대기. 이전 프리뷰 조사와 기타 작업 변경은 보존한다.
+
+## 2026-11-06 — 자동 충전 기록 수정값 누락 조사·프리뷰 준비
+
+- 요청: 자동 충전 기록의 계기판 누적거리·충전량·단가 표시 및 수동 보정.
+- 확인: store.py 조회 후 odometer_km을 input 값으로 덮어쓰며, 자동 결제 expense의 연결 mobility 수량을 수정 입력으로 투영하지 않는다. openRecord는 billed_charge_kwh·unit_price 표시값을 입력에 연결하지 않는다. 금액은 charge_payment 연결 경로로 수정하며 원본/수동 보정을 분리해야 한다.
+- 관련 파일: custom_components/carrot_ha/vehicle_journal/store.py, station_stats.py, frontend/carrot-vehicle-journal.js(읽기 조사), vehicle-journal/review-automatic-charge-edit.html(합성 프리뷰).
+- 프리뷰 검증: Edge Chromium 1280/390/320px 가로 넘침 없음, 누적거리 45,678 표시 및 45,680·36.5 kWh·338원 수정/저장/재열기 통과(합성 응답). 운영 DB 저장·동기화는 미검증. 로컬 검토 주소 http://127.0.0.1:8766/vehicle-journal/review-automatic-charge-edit.html.
+- 상태: 프로덕션 미수정·미배포·릴리즈 없음. 프리뷰 승인 후 실제 조회/저장/재동기화 검증 예정. 기존 CHANGELOG.md 및 untracked 다른 작업 보존. git pull --ff-only: 최신 상태.
+
 ## 2026-11-05 — 테마 되돌림(065eaac) HA 직접 반영
 
 - 반영 전 HA의 carrot-dashboard-ko/en.js, carrot-vehicle-journal.js, carrot-charge-payment.js, carrot-journal-panel-runtime.js, carrot-ui-theme.js SHA-256이 6306496과 모두 일치함을 확인했다. 6개 파일을 `/homeassistant/carrot_ha/deployment-backups/ui-theme-revert-065eaac/before/`에 백업하고 SHA256SUMS.before로 검증했다.

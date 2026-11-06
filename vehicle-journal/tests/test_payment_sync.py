@@ -19,6 +19,58 @@ class PaymentSyncTests(unittest.TestCase):
     def edit(self,row,amount):
         return self.journal.save_manual(row['id'],row['version'],{'kind':'expense','date':row['accounting_date'],'category':'charging','actual_krw':amount,'memo':'synthetic'})
 
+    def test_charge_edit_context_and_corrections_survive_sync(self):
+        self.archive.put(self.event('state','odo',{'odometer_km':45678,'charging':True,'field_measured_at':{'odometer_km':'2026-09-01T15:30:00Z'}}))
+        row=self.record()
+        self.assertEqual(row['odometer_km'],45678)
+        self.assertEqual(row['battery_charge_kwh'],12)
+        self.assertIsNone(row['billed_charge_kwh'])
+        self.assertEqual(row['unit_price'],{'krw':300,'unit':'kWh','approximate':True})
+        payload={'kind':'expense','date':row['accounting_date'],'category':'charging','actual_krw':12345,'odometer_km':45680,'billed_charge_kwh':36.5,'unit_price_krw':338}
+        self.journal.save_manual(row['id'],row['version'],payload)
+        sync(self.archive,self.journal,True)
+        current=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertEqual(current['odometer_km'],45680)
+        self.assertEqual(current['billed_charge_kwh'],36.5)
+        self.assertEqual(current['unit_price']['krw'],338)
+        self.assertEqual(current['automatic_charge']['odometer_km'],45678)
+        self.assertEqual(current['automatic_charge']['battery_charge_kwh'],12)
+        self.assertEqual(self.archive.charge_history('car')[0]['data']['actual_cost_krw'],12345)
+        # Retention must not erase the previously preserved odometer.
+        with self.archive.connect() as db:db.execute("DELETE FROM events WHERE kind='state'")
+        sync(self.archive,self.journal,True)
+        current=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertEqual(current['automatic_charge']['odometer_km'],45678)
+        self.assertEqual(current['input']['unit_price_krw'],338)
+
+    def test_group_context_preserves_missing_and_zero_quantities(self):
+        row=self.record()
+        with self.journal.connect() as db:
+            db.execute('UPDATE mobility SET billed_charge_kwh=0,odometer_km=0 WHERE vehicle_id=?',(self.journal.vehicle,))
+        current=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertEqual(current['billed_charge_kwh'],0)
+        self.assertEqual(current['odometer_km'],0)
+        payload={'kind':'expense','date':row['accounting_date'],'category':'charging','actual_krw':0,'odometer_km':None}
+        self.journal.save_manual(row['id'],row['version'],payload)
+        current=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertIsNone(current['odometer_km'])
+        self.assertEqual(current['automatic_charge']['odometer_km'],0)
+
+    def test_distant_and_foreign_measurements_are_not_used(self):
+        self.archive.put(self.event('state','distant',{'odometer_km':99999}))
+        foreign=self.event('state','foreign',{'odometer_km':12345});foreign['device_id']='other'
+        self.archive.put(foreign)
+        event=self.charge();event['data'].update(started_at='2026-09-02T14:30:00Z',ended_at='2026-09-02T15:30:00Z')
+        self.archive.put(event);sync(self.archive,self.journal)
+        row=self.journal.query('2026-09-01','2026-09-30')['recent_records'][0]
+        self.assertIsNone(row['odometer_km'])
+
+    def test_missing_charge_odometer_remains_unknown(self):
+        row=self.record()
+        self.assertIsNone(row['odometer_km'])
+        self.assertIsNone(row['automatic_charge']['odometer_km'])
+        self.assertIsNone(row['billed_charge_kwh'])
+
     def test_both_directions_and_stale_editor(self):
         row=self.record();self.edit(row,8455);sync(self.archive,self.journal)
         group=self.archive.charge_history('car')[0]['data']

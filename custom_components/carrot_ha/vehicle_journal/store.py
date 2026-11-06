@@ -284,7 +284,12 @@ class Journal:
                 db.execute('''INSERT INTO sync_state VALUES (?,?,?,'complete',NULL,?)
                     ON CONFLICT(vehicle_id,source_kind) DO UPDATE SET cursor_json=excluded.cursor_json,
                     phase='complete',last_error=NULL,updated_at=excluded.updated_at''',
-                    (self.vehicle,'archive',encode({'generation':generation,'soc_capacity_kwh':basis,'display_soc_version':DISPLAY_SOC_VERSION}),now()))
+                    (self.vehicle,'archive',encode({'generation':generation,'soc_capacity_kwh':basis,'display_soc_version':DISPLAY_SOC_VERSION,'charge_edit_version':1}),now()))
+
+    def synced_charge_edit_version(self):
+        with self.connect() as db:
+            row=db.execute("SELECT cursor_json FROM sync_state WHERE vehicle_id=? AND source_kind='archive'",(self.vehicle,)).fetchone()
+        return json.loads(row[0]).get('charge_edit_version') if row else None
 
     def synced_display_soc_version(self, db=None):
         if db is None:
@@ -426,8 +431,10 @@ class Journal:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
             row['quality']=json.loads(row.pop('quality_json'))
         for row in records+recent_records:
-            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km');row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
+            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km',row.get('odometer_km'));row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         with self.lock,self.connect() as db:
+            from .charge_edit import project_charge_inputs
+            project_charge_inputs(db,self.vehicle,records+recent_records)
             from .station_stats import unit_price
             for row in records+recent_records:
                 price=unit_price(db,self.vehicle,row)
