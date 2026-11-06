@@ -1,3 +1,11 @@
+## 2026-11-06 — 자동 충전 기록 수정 6aeed30 HA 직접 반영
+
+- 커밋 6aeed30b88a1f37152e373227a9df02c005c3f50을 main에 푸시했다. 다른 작업의 변경 기록/미추적 프리뷰를 분리·보존했다. 원격 main 대비 미푸시 커밋 0 확인.
+- HA 기존 4개 파일이 직전 Git 기준 SHA-256과 일치하고 새 charge_edit.py가 없음을 다시 확인한 뒤 `/config/carrot_ha/deployment-backups/automatic-charge-edit-6aeed30b88a1/before/`에 원본을 백업했다. deployment.json에 원본/변경 해시와 배포 커밋을 기록했다.
+- 5개 파일 설치 해시 앞 12자리: frontend/carrot-vehicle-journal.js a6f22cda7ac5, vehicle_journal/store.py 0c672f34b2b9, source.py 3747d484b938, station_stats.py 768d1293aed7, charge_edit.py a0d2a3840467. Python 소스 compile 검증 및 HA 로컬 `/carrot_ha_static/carrot-vehicle-journal.js` HTTP 해시 일치.
+- 첫 실행은 Windows 명령 길이 제한으로 전송 전 중단, 두 번째는 root 소유 백업 디렉터리 권한으로 파일 변경 전 중단했다. SSH 표준입력·sudo -n 경로로 최종 반영했다. DB/사진/설정 수정 및 HA 재시작을 실행하지 않았다.
+- 상태: 파일 반영·HTTP 제공 확인. Python 변경 적용을 위한 사용자 HA 재시작, 등록 패널 URL/하위 모듈의 운영 브라우저 확인 및 실제 기록 저장·재동기화 검증은 대기. 기존에 충전 당시 상태가 보존되지 않은 기록의 누적거리는 자동 복구할 수 없어 직접 입력한다. 새 릴리즈/태그 없음.
+
 ## 2026-11-06 — 자동 충전 기록 누적거리·충전량·단가 수정 반영 준비
 
 - 사용자 프리뷰 승인 후 실제 화면/조회/저장 경로를 수정했다. 자동 결제와 연결된 충전 세션의 누적거리·배터리량·청구량을 묶어서 조회하고 수동 보정값을 우선 적용한다. 조회 후 누적거리를 빈 값으로 덮어쓰던 오류를 수정했다.
