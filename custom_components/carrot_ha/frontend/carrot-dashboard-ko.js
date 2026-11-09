@@ -6,11 +6,19 @@ const dependencyURL = name => {
   if (version) url.searchParams.set('v', version);
   return url.href;
 };
-const {bindChargePayments, chargeCostLabel} = await import(dependencyURL('./carrot-charge-payment.js'));
-const {preserveView,updateView} = await import(dependencyURL('./carrot-view-state.js'));
-const {assistPanelHtml, ensureAssist, bindAssist, animateAssist} = await import(dependencyURL('./carrot-assist-stats.js'));
-const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, tripDateKey, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} = await import(dependencyURL('./carrot-trip-days.js'));
-const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
+const [
+  {bindChargePayments, chargeCostLabel},
+  {preserveView, updateView},
+  {assistPanelHtml, ensureAssist, bindAssist, animateAssist},
+  {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, tripDateKey, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline},
+  {CarrotCamera360Modal}
+] = await Promise.all([
+  import(dependencyURL('./carrot-charge-payment.js')),
+  import(dependencyURL('./carrot-view-state.js')),
+  import(dependencyURL('./carrot-assist-stats.js')),
+  import(dependencyURL('./carrot-trip-days.js')),
+  import(dependencyURL('./carrot-camera-360.js'))
+]);
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // 3D 차체 색 선택지(차량 색상 피커). 고른 값은 이 브라우저의 localStorage에만 저장한다.
@@ -199,27 +207,37 @@ class CarrotDashboard extends HTMLElement {
       const id=encodeURIComponent(this.device.entry_id);
       this.loadLive();
       const costEpoch=this._chargeCostEpoch||0;
-      const [,tripsRes,chargesRes]=await Promise.all([
+      // Publish each independent resource immediately, including on a cold start.
+      // Settle every request before releasing busy so retries cannot overlap history.
+      const publish=()=>{this.saveCache();this.render();};
+      const results=await Promise.allSettled([
         this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}`).then(dash=>{
           this.v={...this.v,battery_history:dash.values.battery_history,...(costEpoch===(this._chargeCostEpoch||0)?{charge_cost_totals:dash.values.charge_cost_totals}:{})};
-          this.render();return dash;
+          publish();
         }),
-        loadRecentTrips(this._hass.callApi.bind(this._hass),id),
-        this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`)
+        loadRecentTrips(this._hass.callApi.bind(this._hass),id).then(tripsRes=>{
+          const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
+          this._rawTrips=tripsRes.events||[];
+          this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
+          this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
+          if(selectedStart!=null){
+            const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
+            this.selected=idx!==-1?idx:null;
+            if(this.selected!==null)this._pageSelection=this.selected;
+          }else{
+            this.selected=null;
+          }
+          publish();
+        }),
+        this._hass.callApi('GET',`carrot_ha/v1/history/${id}?kind=charge&limit=100&offset=0`).then(chargesRes=>{
+          if(costEpoch===(this._chargeCostEpoch||0)){
+            this.charges=chargesRes.charge_costs_grouped?chargesRes.events:mergeConsecutiveCharges(chargesRes.events);
+            publish();
+          }
+        })
       ]);
-      const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
-      this._rawTrips=tripsRes.events||[];
-      this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
-      this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
-      if(costEpoch===(this._chargeCostEpoch||0))this.charges=chargesRes.charge_costs_grouped?chargesRes.events:mergeConsecutiveCharges(chargesRes.events);
-      if(selectedStart!=null){
-        const idx=this.trips.findIndex(e=>e.data?.started_at===selectedStart);
-        this.selected=idx!==-1?idx:null;
-        if(this.selected!==null)this._pageSelection=this.selected;
-      }else{
-        this.selected=null;
-      }
-      this.saveCache();
+      const failure=results.find(result=>result.status==='rejected');
+      if(failure)throw failure.reason;
     }catch(e){this.error=e instanceof Error?e.message:'HA 조회 실패. 관리자 계정과 통합 업데이트를 확인하세요.';}
     finally{this.busy=false;if(this.removeAttribute)this.removeAttribute('data-loading');this.render();}
   }

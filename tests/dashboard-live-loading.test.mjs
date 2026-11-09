@@ -43,6 +43,44 @@ for(const [index,Card] of classes.entries()){
     assert.equal(card.isFromCache,false);
     assert.match(card.error,/history unavailable/);
   });
+  test(`${index}: cold-start resources publish independently and failures settle before retry`,async()=>{
+    const card=new Card();card.config={};card.render=()=>{};card.saveCache=()=>{};card.loadCache=()=>false;
+    const battery=deferred(),trips=deferred(),charges=deferred();
+    card._hass={callApi:async(method,path)=>{
+      if(path.endsWith('/devices'))return {devices:[{entry_id:'test'}]};
+      if(path.includes('live=1'))return {values:{soc_percent:72}};
+      if(path.includes('/dashboard/'))return battery.promise;
+      return path.includes('kind=trip')?trips.promise:charges.promise;
+    }};
+    const loading=card.load();await tick();
+    assert.equal(card.v.soc_percent,72);
+    charges.resolve({events:[{event_id:'charge',data:{}}],charge_costs_grouped:true});await tick();
+    assert.equal(card.charges[0].event_id,'charge');
+    assert.deepEqual(card.trips,[]);
+    battery.reject(Error('battery unavailable'));await tick();
+    assert.equal(card.busy,true,'do not unlock overlapping history requests on partial failure');
+    trips.resolve({events:[{event_id:'trip',data:{started_at:'2026-11-09T00:00:00Z'}}]});
+    await loading;
+    assert.equal(card.trips[0].event_id,'trip');
+    assert.equal(card.charges[0].event_id,'charge');
+    assert.equal(card.v.soc_percent,72);
+    assert.equal(card.busy,false);
+    assert.match(card.error,/battery unavailable/);
+  });
+  test(`${index}: trips publish while battery and charge requests remain pending`,async()=>{
+    const card=new Card();card.config={};card.render=()=>{};card.saveCache=()=>{};card.loadCache=()=>false;
+    const other=deferred();
+    card._hass={callApi:async(method,path)=>{
+      if(path.endsWith('/devices'))return {devices:[{entry_id:'test'}]};
+      if(path.includes('live=1'))return {values:{soc_percent:72}};
+      if(path.includes('kind=trip'))return {events:[{event_id:'trip',data:{started_at:'2026-11-09T00:00:00Z'}}]};
+      return other.promise;
+    }};
+    const loading=card.load();await tick();
+    assert.equal(card.trips[0].event_id,'trip');
+    assert.equal(card.busy,true);
+    other.resolve({values:{battery_history:[]},events:[]});await loading;
+  });
   test(`${index}: visibility resumes immediately and disconnect clears both timers`,()=>{
     let callback,removed;const intervals=new Map();
     const oldSet=globalThis.setInterval,oldClear=globalThis.clearInterval;

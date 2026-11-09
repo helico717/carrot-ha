@@ -1353,3 +1353,21 @@
 - GLB 바이너리 청크 완전 동일. meshes 135개·nodes 314개·animations 5개·images/textures 각 36개 및 accessors/bufferViews/scenes/extensions 모두 동일. 차이는 재질 45개 중 도장·주황 반사판·유리 2종 총 4개뿐이다.
 - 현재 viewer가 실행 중 적용하는 기본 색·도장·유리·반사판 값을 패키지에 미리 저장한 차이임을 기존 viewer 코드와 bake_ha_materials.py로 대조. HA 원본에 bake()를 메모리에서 적용한 결과 2,023,352B 및 SHA-256 61914d356a99a9c6a82e8f303049ce6af0ecdd8411c879b33bb1b1d7983dc7f7로 Git 패키지와 완전 일치했다. 운영 파일·설정 쓰기 없음.
 - 판단 정정: 앞선 해시 차이는 다른 형상의 모델이라는 근거가 아니다. 같은 형상/텍스처/애니메이션에 HA 기본 재질을 내장한 모델이다. 현재 viewer의 동일 설정에서 외관을 바꾸는 차이는 확인되지 않았고 모델 해시 차이만으로 정식 발행을 보류할 필요는 없다. 사용자 브라우저 IndexedDB/실제 렌더 픽셀 비교는 수행하지 않았으므로 화면 픽셀 완전 일치를 주장하지 않는다. 버전·태그·릴리즈·배포 없음.
+
+
+## 2026-11-09 — 대시보드 주행기록 로딩 경로 조사
+
+- 사용자 요청: 주행기록 탭 최신화·로딩 지연의 개선 방법 확인.
+- 확인: 한국어·영어 카드 load()는 배터리 이력/dashboard·주행·충전 조회를 Promise.all로 기다린 후 주행 데이터를 반영한다. loadRecentTrips는 최근 8일을 100건씩 순차 조회하며 카드가 보이면 60초마다 다시 실행한다.
+- 서버 후보: storage.history의 since 조회는 날짜 JSON 표현식으로 필터·정렬하고, trip 조회마다 기기 전체 trip_derivations를 읽는다. 실제 비용은 운영 데이터로 측정 필요.
+- 관련 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-trip-days.js, __init__.py, storage.py.
+- 제안: 주행 응답 독립 반영을 우선 검토하고, 페이지별 표시·선택일 상세 조회 및 HA 로컬 revision 기반 재사용을 후속 검토. 수신기 요청 증폭 금지와 선택·스크롤·지도 유지 준수.
+- 검증/배포: 코드 정적 조사만 수행. 운영 API/DB 소요시간 미측정, 실행 코드 수정·테스트·커밋·푸시·직접 반영·릴리즈 없음. 기존 공통/차계부 changelog 수정 및 미추적 작업 보존. 작업 트리가 깨끗하지 않아 pull은 수행하지 않음.
+
+## 2026-11-09 — 내 차 대시보드 캐시 없는 첫 로딩 개선
+
+- 사용자 요청을 모든 내 차 탭의 캐시 없는 첫 진입으로 확대. 한국어·영어 카드의 독립 모듈 import를 병렬 실행하고 배터리·주행·충전 응답을 각각 도착 즉시 반영하도록 변경. 화면 디자인·레이아웃·로딩 인디케이터 변경 없음.
+- Promise.allSettled로 느린 요청과 부분 실패를 격리하며 모든 이력 요청이 종료되기 전 busy를 풀지 않아 중복 실행 방지. 기존 live 상태·결제 변경 epoch·선택 주행 보존을 유지. 수신기 요청 수/주기 변경 없음.
+- 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, tests/dashboard-live-loading.test.mjs, tests/dashboard-cold-loading-browser.cjs.
+- 검증: Node 로딩/lazy runtime/view-state 14건 통과. 실제 Chromium 한국어·영어 캐시 없는 전체 5탭 접근, 독립 응답 반영 및 비동기 응답 후 2 animation frame 시점의 스크롤·카드 DOM 유지 통과. Python 서버 회귀 검사는 진행 중. 운영 지연 단축 수치 미측정.
+- 배포: HA SSH 연결 확인. 실행 코드 커밋·푸시·백업·파일 해시 검증 후 직접 반영 준비 중. 릴리즈/버전 상승·HA/Comma 재시작 없음. 기존 사용자 작업은 분리 보존.
