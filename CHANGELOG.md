@@ -6,7 +6,7 @@
 - 관련 파일: custom_components/carrot_ha/frontend/carrot-assist-stats.js(신규), carrot-dashboard-ko.js, carrot-dashboard-en.js, tests/dashboard-assist-stats.test.mjs(신규), tests/dashboard-dependency-version.test.mjs(의존 모듈 4→5개).
 - 검증: 신규 10개 시험과 의존 모듈 시험 통과. 실제 HA 집계(11-09 조회분)를 `callWS` 목으로 연결해 운영 카드 코드를 브라우저에서 확인했다(한국어·영어, 누적↔선택일, 기록 없는 날, 최근 7일 밖 막대, 스크롤 위치 유지). 전체 `tests/*.test.mjs`에서 camera-360, charging-curve, debug-freshness, motion-status, range-c3-and-fixes 5개 파일은 변경 전 origin/main에서도 같은 방식으로 실패한다(이번 변경과 무관).
 - 미확인·제외: 디버그 대시보드에는 적용하지 않았다. 실제 터치 기기, 게이지 전환의 움직임(검증 창이 숨김 상태라 끝 상태만 확인), 운영 HA 화면은 반영 후 확인이 필요하다. Python 시험은 변경이 없어 다시 돌리지 않았다. 릴리즈·태그 없음.
-- 배포 상태: 커밋·푸시 후 HA SSH 직접 반영 예정(사용자 승인).
+- 배포 상태: c272182를 origin/main에 푸시했고 HA SSH로 직접 반영했다(사용자 승인, 11:28 KST). 반영 전 HA의 ko/en 대시보드가 53340a0과 일치함(CR 제외)을 확인하고 `/homeassistant/carrot_ha/deployment-backups/assist-ui-c272182/before`에 백업(SHA256SUMS.before)했다. 신규 `carrot-assist-stats.js`와 ko/en 3개 파일의 크기·SHA-256이 커밋과 일치한다(24a8a951…, 7b622de3…, ba9330bd…). 서버가 반환하는 프런트엔드 버전이 `0.9.0-12d0e20a7de8`로 바뀌었고 정적 파일 200을 확인했다. HA 재시작은 필요 없고 브라우저 새로고침만 하면 된다. 운영 화면의 실제 표시와 사용자 브라우저 동작은 미확인이다. 릴리즈·태그 없음.
 
 ## 2026-11-06 — 엔터티 ID 변경 HA 재시작 확인
 
