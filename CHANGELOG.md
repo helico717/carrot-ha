@@ -1420,3 +1420,9 @@
 - 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-dashboard-runtime.js, tests/dashboard-lazy-runtime.test.mjs, tests/dashboard-cold-loading-browser.cjs. 시각 디자인/레이아웃 변경 없음.
 - 검증: Node 로딩·lazy runtime·view-state·의존 버전·통계·카메라 lifecycle 34건 통과. 한영 Chromium에서 초기 선택 자산 요청 없음(Leaflet CSS는 유지), 충전 탭 비동기 응답/카드 재생성 후 유지, 스크롤/DOM 유지, 카메라 다운로드 중 주행 interlock 통과. 별도 camera-360.test.mjs는 수정하지 않은 debug 모듈 VM 하네스의 CRLF/import.meta 및 export 처리 오류로 실패하여 전체 통과로 보고하지 않는다.
 - 배포: main 커밋·푸시 및 HA 기존 파일 검사·백업·해시 검증 후 직접 반영 예정. 프론트엔드만 변경하므로 HA 재시작은 필요 없다. 사용자 네트워크의 시크릿 모드 5초 달성·탭 이동 증상 재발 여부는 반영 후 확인 필요. 릴리즈/태그 없음.
+
+
+### 2026-11-09 — 첫 진입 경량화·탭 유지 HA 직접 반영 완료
+
+- 실행 코드 72a6af92dff0fde2177292569e2c8747c62d4812 main 게시. HA ko/en/runtime 3파일은 기준 0261f9f와 사전 일치 확인, 백업·반영 후 SHA-256 모두 일치.
+- 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-72a6af92dff0/before. HA/Comma 재시작·릴리즈·태그 없음. 브라우저 강력 새로고침으로 새 프론트엔드를 적용한다. 사용자 회선의 첫 표시 5초 달성과 탭 강제 이동 실사용 재발 여부는 미확인이다.
