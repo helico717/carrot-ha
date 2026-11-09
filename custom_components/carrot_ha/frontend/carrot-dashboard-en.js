@@ -11,13 +11,11 @@ const [
   {preserveView, updateView},
   {assistPanelHtml, ensureAssist, bindAssist, animateAssist},
   {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, tripDateKey, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline},
-  {CarrotCamera360Modal}
 ] = await Promise.all([
   import(dependencyURL('./carrot-charge-payment.js')),
   import(dependencyURL('./carrot-view-state.js')),
   import(dependencyURL('./carrot-assist-stats.js')),
-  import(dependencyURL('./carrot-trip-days.js')),
-  import(dependencyURL('./carrot-camera-360.js'))
+  import(dependencyURL('./carrot-trip-days.js'))
 ]);
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -94,6 +92,21 @@ function leaflet() {
 
 class CarrotDashboard extends HTMLElement {
   constructor(){super();this.attachShadow({mode:'open'});this.tab='overview';this.trips=[];this.charges=[];this.v={};this.offset=0;this.busy=false;this.isFromCache=false;this.selected=null;this.tripDay=null;this.chargeDay=null;this.batteryDay=null;this.batteryPage=0;this._mergeTripsEnabled=true;this._tripPage=1;this._maxTripPages=1;this._rawTrips=[];this._mergedTrips=[];this.cameraModal=null;}
+  get viewKey(){return 'carrot-view-'+(globalThis.location?.pathname||'')+'-'+JSON.stringify([this.config?.device_id||'default',this.config?.entity||'',this.config?.title||'']);}
+  saveViewState(){
+    try{sessionStorage.setItem(this.viewKey,JSON.stringify({tab:this.tab,chargeDay:this.chargeDay,tripDay:this.tripDay,batteryPage:this.batteryPage}));}catch{}
+  }
+  restoreViewState(){
+    if(this._viewKey===this.viewKey)return;
+    this._viewKey=this.viewKey;
+    try{
+      const saved=JSON.parse(sessionStorage.getItem(this.viewKey)||'null');
+      if(!saved||!['overview','trips','parking','charge','vehicle'].includes(saved.tab))return;
+      this.tab=saved.tab;
+      for(const field of ['chargeDay','tripDay'])if(/^\d{4}-\d{2}-\d{2}$/.test(saved[field]))this[field]=saved[field];
+      if(Number.isInteger(saved.batteryPage)&&saved.batteryPage>=0&&saved.batteryPage<=1)this.batteryPage=saved.batteryPage;
+    }catch{}
+  }
   get cacheKey(){return 'carrot-cache-'+(this.config?.device_id||'default');}
   loadCache(){
     try{
@@ -122,7 +135,7 @@ class CarrotDashboard extends HTMLElement {
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,cachedAt:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
-  setConfig(config){this.config=config;if(config.vehicle_3d!==false)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.warmVehicle3d(config)).catch(()=>{});this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.vehicleColor=null;try{this.vehicleColor=localStorage.getItem('carrot-vehicle-color-'+(config.device_id||'default'))||null;}catch{}if(this._colorControl)this.paintColorControl();this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
+  setConfig(config){this.config=config;this.restoreViewState();this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.vehicleColor=null;try{this.vehicleColor=localStorage.getItem('carrot-vehicle-color-'+(config.device_id||'default'))||null;}catch{}if(this._colorControl)this.paintColorControl();this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
@@ -139,7 +152,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.initialized)this._onVisible();
     this.setupTabsObserver();
   }
-  disconnectedCallback(){this._closeColorControl?.();if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
+  disconnectedCallback(){this.saveViewState();this._closeColorControl?.();if(this._v3d)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.disposeVehicle3d(this)).catch(()=>{});this._tabsObserver?.disconnect();this._tabsObserver=null;this._chargePaymentEditor?.remove();this._chargePaymentEditor=null;this.clearMiniMaps();clearInterval(this.timer);clearInterval(this.liveTimer);document.removeEventListener('visibilitychange',this._onVisible);if(this.map){this.map.remove();this.map=null;}if(this.cameraModal){try{this.cameraModal.destroy();}catch(e){}this.cameraModal=null;}}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;
@@ -239,7 +252,7 @@ class CarrotDashboard extends HTMLElement {
       const failure=results.find(result=>result.status==='rejected');
       if(failure)throw failure.reason;
     }catch(e){this.error=e instanceof Error?e.message:'HA request failed. Check your administrator account and integration version.';}
-    finally{this.busy=false;if(this.removeAttribute)this.removeAttribute('data-loading');this.render();}
+    finally{this._initialDataSettled=true;this.busy=false;if(this.removeAttribute)this.removeAttribute('data-loading');this.render();}
   }
   clearMiniMaps(){
     if(this._mapResizeObserver){try{this._mapResizeObserver.disconnect();}catch(e){}}
@@ -470,7 +483,7 @@ class CarrotDashboard extends HTMLElement {
 }
 .trip-soc.trip-missing,.trip-eff.trip-missing,:host([data-theme="dark"]) .trip-soc.trip-missing,:host([data-theme="dark"]) .trip-eff.trip-missing{background:rgba(239,68,68,.12)!important;border-color:rgba(239,68,68,.4)!important;color:#fca5a5!important}:host([data-theme="light"]) .trip-soc.trip-missing,:host([data-theme="light"]) .trip-eff.trip-missing{background:#fee2e2!important;border-color:#fca5a5!important;color:#b91c1c!important}.trip-missing .soc-used-tag,:host([data-theme="light"]) .trip-missing .soc-used-tag{color:inherit!important}
 </style><div class="carrot-floating-bubble" aria-hidden="true"><span class="bubble-dot"></span><span class="bubble-dot"></span><span class="bubble-dot"></span></div><ha-card><header class="top"><div><div class="brand">VOLKSWAGEN · CARROT HA</div><h1>${esc(this.config?.vehicle_name||this.v?.vehicle_model||'Volkswagen MEB')}</h1></div><span class="badge ${state.key}"><i class="dot"></i>${badge}</span></header><nav class="nav">${[['overview','My car'],['trips','Trips'],['parking','Location'],['charge','Charging'],['vehicle','Status']].map(([key,label])=>`<button data-tab="${key}" class="${this.tab===key?'active':''}">${label}</button>`).join('')}</nav><main class="main">${this.error||this.liveError?`<div class="error">${esc(this.error||this.liveError)}</div>`:''}${this.body(v,trip,isTrip)}<footer class="foot"><div>Vehicle receiver · ${esc(v.live_status||v.cloud_status||(this.busy?'Checking connection…':'Checking connection'))}<br>Last check ${time(v.live_checked_at||v.last_sync)}<br>Vehicle data received ${time(v.measured_at)}${this.isFromCache?' (updating…)':''}</div><button class="refresh">${this.busy?'Loading…':'↻ Refresh'}</button></footer></main></ha-card>`);
-    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();});
+    this.shadowRoot.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab==='trips'&&this.tab!=='trips'){this.selected=null;this.tripDay=null;}if(b.dataset.tab==='charge'&&this.tab!=='charge'){this.chargeDay=null;this.batteryDay=null;}this.tab=b.dataset.tab;this.render();this.saveViewState();});
     this.setupTabsObserver();
     const themeStyle=document.createElement('style');
     themeStyle.textContent=`
@@ -883,7 +896,7 @@ class CarrotDashboard extends HTMLElement {
         setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>Copy all</span>`;}},2000);
       }
     };
-    if(this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
+    if(this._initialDataSettled&&this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='Unable to load the map';});});
     if (typeof window !== 'undefined' && window.ResizeObserver) {
       this._mapResizeObserver = new ResizeObserver(() => {
         if (!this._resizeRaf) {
@@ -1522,6 +1535,7 @@ class CarrotDashboard extends HTMLElement {
   }
   // Interactive 3D vehicle: lazy-loaded, fed with the state this card already holds.
   syncVehicle3d(v,state){
+    if(!this._initialDataSettled)return;
     if(!this.shadowRoot.querySelector('.vehicle3d')&&!this._v3d)return;
     import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.syncVehicle3d(this,{v,status:state,dark:this.getAttribute('data-theme')==='dark'})).catch(()=>{});
   }
@@ -1554,8 +1568,14 @@ class CarrotDashboard extends HTMLElement {
     if(online!=='on'&&!this.isFromCache&&(!v||!Object.keys(v).length))return {key:'unknown',label:'Checking connection'};
     return {key:'unknown',label:online==='on'?'Checking status':'Checking connection'};
   }
-  openCamera360(triggerBtn){
+  async openCamera360(triggerBtn){
     if(!this.cameraModal){
+      let CarrotCamera360Modal;
+      try{({CarrotCamera360Modal}=await import(dependencyURL('./carrot-camera-360.js')));}
+      catch(error){this.error=error.message;this.render();return;}
+      // The vehicle may start driving while the camera code is downloading.
+      if(!this.isConnected||this.vehicleStatus(this.v).key==='driving')return;
+      if(this.cameraModal)return this.openCamera360(triggerBtn);
       this.cameraModal=new CarrotCamera360Modal({
         container:this.shadowRoot,
         lang:'en',

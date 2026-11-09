@@ -1409,3 +1409,14 @@
 
 - aa0213152ffc2889d4405dbc35c6045013441bd6 main 게시, 미푸시 0. HA 기존 코드 3파일 사전 검사 통과 후 백업·반영, 설치 SHA-256 모두 일치.
 - 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-aa0213152ffc/before. HA 재시작·운영 인덱스 수동 생성은 실행하지 않음. 사용자 HA 재시작 시 Archive 초기화에서 인덱스가 생성된다. 최종 운영 속도·인덱스 크기·잠금 감소는 재시작 후 측정 필요. 릴리즈·태그 없음.
+
+
+## 2026-11-09 — 첫 진입 추가 경량화·충전 탭 선택 유지
+
+- 사용자: 재시작 후에도 첫 진입 10~15초, 충전 탭을 보던 중 갱신 시 내 차 탭으로 이동 보고. 첫 표시 5초 목표는 아직 운영에서 미달이다.
+- 운영 읽기 전용 재측정: 배터리 이력 2.771초, 충전 목록 0.017초/SOC 보정 1.043초, 주행 목록 0.220초/보정 0.074초. 인덱스 적용 전 36~40초/21.6초 대비 서버 계산 단축 확인. 이는 브라우저 전체 응답시간 측정은 아니다.
+- 첫 데이터가 준비되기 전 자동 3D 모델 warmup/뷰어와 내 차 미니지도 스크립트 요청을 보류하고 기존 정적 차량 이미지를 유지한다. 카메라 78KB 모듈은 실제 열기 요청 시 로드하며 다운로드 중 주행 전환·카드 분리 시 열지 않는다. 필수 모듈 4개만 버전된 modulepreload로 병렬 요청해 구현 파일 이후 추가 다운로드 왕복을 줄인다. 수신기 조회 주기·배터리 측정·계산 변경 없음.
+- HA 갱신 중 locale 누락 시 현재 언어를 유지해 불필요한 카드 교체를 방지한다. 선택 탭/주행·충전 날짜/배터리 페이지를 경로·차량·카드 설정별 sessionStorage에 보존·복구해 카드 재생성 때 overview로 초기화되는 경로를 막는다. 저장소 접근 실패는 기존 동작으로 fallback한다.
+- 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-dashboard-runtime.js, tests/dashboard-lazy-runtime.test.mjs, tests/dashboard-cold-loading-browser.cjs. 시각 디자인/레이아웃 변경 없음.
+- 검증: Node 로딩·lazy runtime·view-state·의존 버전·통계·카메라 lifecycle 34건 통과. 한영 Chromium에서 초기 선택 자산 요청 없음(Leaflet CSS는 유지), 충전 탭 비동기 응답/카드 재생성 후 유지, 스크롤/DOM 유지, 카메라 다운로드 중 주행 interlock 통과. 별도 camera-360.test.mjs는 수정하지 않은 debug 모듈 VM 하네스의 CRLF/import.meta 및 export 처리 오류로 실패하여 전체 통과로 보고하지 않는다.
+- 배포: main 커밋·푸시 및 HA 기존 파일 검사·백업·해시 검증 후 직접 반영 예정. 프론트엔드만 변경하므로 HA 재시작은 필요 없다. 사용자 네트워크의 시크릿 모드 5초 달성·탭 이동 증상 재발 여부는 반영 후 확인 필요. 릴리즈/태그 없음.

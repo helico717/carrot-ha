@@ -1,6 +1,16 @@
 const version=new URL(import.meta.url).searchParams.get('v');
 if(!version)throw new Error('Carrot HA: load carrot-dashboard.js, not the runtime directly.');
 const moduleURL=name=>{const url=new URL(name,import.meta.url);url.searchParams.set('v',version);return url.href;};
+const preloaded=new Set();
+function preloadDashboard(filename){
+  if(!/^\.\/carrot-dashboard-(ko|en)\.js$/.test(filename)||!document.head)return;
+  for(const name of ['./carrot-charge-payment.js','./carrot-view-state.js','./carrot-assist-stats.js','./carrot-trip-days.js']){
+    const href=moduleURL(name);if(preloaded.has(href))continue;
+    preloaded.add(href);
+    const link=document.createElement('link');link.rel='modulepreload';link.href=href;
+    document.head.appendChild(link);
+  }
+}
 // Register lightweight shells synchronously; load only cards actually mounted.
 function lazyCard(tag, filename) {
   if(customElements.get(tag))return;
@@ -14,6 +24,7 @@ function lazyCard(tag, filename) {
     async mount(){
       if(this.loading||this.card||!this.config||!this.isConnected)return;
       this.loading=true;
+      preloadDashboard(filename);
       try{
         const {default:Card}=await import(moduleURL(filename));
         if(!this.isConnected)return;
@@ -48,7 +59,7 @@ class LocalizedDashboard extends HTMLElement {
     if(!this.config)return;
     const requested=this.config.language;
     if((!requested||requested==='auto')&&!this._hass)return;
-    const language=(!requested||requested==='auto')?(this._hass?.locale?.language||this._hass?.language||navigator.language):requested;
+    const language=(!requested||requested==='auto')?(this._hass?.locale?.language||this._hass?.language||this.lang||navigator.language):requested;
     const lang=String(language).toLowerCase().startsWith('ko')?'ko':'en';
     if(this.lang!==lang){
       this.card?.remove();this.lang=lang;
