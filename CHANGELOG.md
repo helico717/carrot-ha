@@ -1403,3 +1403,9 @@
 - 검증: projection 4건, 표시 SOC/주행 에너지 31건, 충전 SOC 6건, 충전 그래프 29건, 결제 12건 통과. SQLite bytecode에서 원본 테이블 본문을 읽지 않음 확인. 기존 DB 인덱스 생성 전후 원본 행 동일 확인. 압축 8건은 Windows 미수거 SQLite 핸들 때문에 기본 teardown 2건 실패, teardown 전에 gc.collect를 적용한 검증 실행은 8건 통과(제품/테스트 파일 수정 없음).
 - 필수 서버 회귀 cloud_live/incremental_sync/history_cache/direct_receiver 26건은 aiohttp가 있는 기존 .receiver-venv에서 통과. 이전 asyncio 정체는 sandbox socketpair 생성에서 확인되어 로컬 서버 허용 실행으로 해소했다. Node 로딩/lazy/view-state 14건 통과.
 - 배포: 검증·커밋·푸시 후 HA 코드 백업/해시 확인 예정. 새 인덱스 생성과 Python 코드 적용은 사용자 HA 재시작 필요. 초기 인덱스 구축 시간과 최종 운영 소요시간·잠금 재발 여부는 미검증. 새 릴리즈/태그 발행 없음.
+
+
+### 2026-11-09 — 이력 조회 최적화 코드 HA 반영·재시작 대기
+
+- aa0213152ffc2889d4405dbc35c6045013441bd6 main 게시, 미푸시 0. HA 기존 코드 3파일 사전 검사 통과 후 백업·반영, 설치 SHA-256 모두 일치.
+- 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-aa0213152ffc/before. HA 재시작·운영 인덱스 수동 생성은 실행하지 않음. 사용자 HA 재시작 시 Archive 초기화에서 인덱스가 생성된다. 최종 운영 속도·인덱스 크기·잠금 감소는 재시작 후 측정 필요. 릴리즈·태그 없음.
