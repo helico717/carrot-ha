@@ -6,11 +6,11 @@ import vm from 'node:vm';
 for (const language of ['ko','en','debug']) {
   test(`${language}: every dependency bypasses stale unversioned modules`,()=>{
     const source=readFileSync(`custom_components/carrot_ha/frontend/carrot-dashboard-${language}.js`,'utf8');
-    const prefix=source.slice(0,source.indexOf('const {'));
+    const prefix=source.slice(0,source.indexOf('};')+2);
     const context={URL};vm.createContext(context);
     vm.runInContext(prefix.replaceAll('import.meta.url',JSON.stringify(`https://ha.test/carrot_ha_static/carrot-dashboard-${language}.js?v=0.8.12-beta.4`))+'\nthis.resolve=dependencyURL;',context);
-    const dependencies=[...source.matchAll(/await import\(dependencyURL\('([^']+)'\)\)/g)].map(m=>m[1]);
-    assert.equal(dependencies.length,5);
+    const dependencies=[...new Set([...source.matchAll(/import\(dependencyURL\('([^']+)'\)\)/g)].map(m=>m[1]))];
+    assert.equal(dependencies.length,language==='debug'?5:6);
     if(language!=='debug') assert.ok(dependencies.includes('./carrot-assist-stats.js'));
     if(language==='debug') assert.ok(dependencies.includes('./carrot-debug-3d.js'));
     assert.doesNotMatch(source,/\bfrom\s+['"]\.\//);

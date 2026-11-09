@@ -107,7 +107,7 @@ test('실패하면 기존 표시를 유지하고 15초 뒤에 다시 시도하�
 test('한국어·영어 대시보드는 같은 모듈을 쓰고 주행 탭 레이아웃 뒤에서만 패널을 그린다', () => {
   for (const lang of ['ko', 'en']) {
     const src = readFileSync(new URL(`../custom_components/carrot_ha/frontend/carrot-dashboard-${lang}.js`, import.meta.url), 'utf8');
-    assert.match(src, /await import\(dependencyURL\('\.\/carrot-assist-stats\.js'\)\)/);
+    assert.match(src, /import\(dependencyURL\('\.\/carrot-assist-stats\.js'\)\)/);
     assert.ok(src.includes(`\${this.tripHistory(isTrip)}</div>\${isTrip?assistPanelHtml(this,'${lang}'):''}`));
     assert.ok(src.includes("if(this.tab==='trips'){animateAssist(this);ensureAssist(this);}"));
   }

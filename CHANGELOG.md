@@ -1371,3 +1371,10 @@
 - 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, tests/dashboard-live-loading.test.mjs, tests/dashboard-cold-loading-browser.cjs.
 - 검증: Node 로딩/lazy runtime/view-state 14건 통과. 실제 Chromium 한국어·영어 캐시 없는 전체 5탭 접근, 독립 응답 반영 및 비동기 응답 후 2 animation frame 시점의 스크롤·카드 DOM 유지 통과. Python 서버 회귀 검사는 진행 중. 운영 지연 단축 수치 미측정.
 - 배포: HA SSH 연결 확인. 실행 코드 커밋·푸시·백업·파일 해시 검증 후 직접 반영 준비 중. 릴리즈/버전 상승·HA/Comma 재시작 없음. 기존 사용자 작업은 분리 보존.
+
+
+### 2026-11-09 — 첫 로딩 개선 통합 검증
+
+- 원격 main의 주행 통계 패널 cbbdc06을 보존해 병렬 모듈 목록에 통합했다. 모듈 버전 테스트를 병렬 import 및 지연 import에도 적용하고, 통계 연결 테스트가 순차 await 문법에 의존하지 않게 수정했다.
+- Node 회귀 27건 통과, 한국어·영어 Chromium 전체 탭과 비동기 갱신 후 스크롤 보존 재검증 통과. Python 서버 회귀는 로컬/번들 런타임에서 진행이 멈춰 통과 여부 미확인(서버 코드 변경 없음). pytest는 설치되지 않음.
+- 사용자 기존 공통/차계부 changelog 수정은 별도 백업 후 최신 main에 병합·복구했고 다른 작업을 커밋하지 않았다. HA 직접 반영은 아래 후속 기록으로 확인한다.
