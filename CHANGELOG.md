@@ -1,3 +1,13 @@
+## 2026-11-09 — 오픈파일럿 사용 통계 패널(주행 탭)
+
+- 변경: 한국어·영어 대시보드의 '주행' 탭, 지도·최근 주행 카드 아래에 오픈파일럿 사용 통계 패널을 추가했다. 270° 게이지(누적 사용률), 오픈파일럿·전체 주행 거리, 최장 연속 기록, N일 연속 기록(월~일 칩), 월별 거리·일별 사용률 막대(마우스 올림·탭 말풍선)로 구성한다. 게이지 위의 `누적 | 선택일` 탭으로 누적과 선택한 날짜를 전환하며, 호는 CSS 전환, 숫자는 0.55초 동안 올리거나 내린다. 요일 칩·일별 막대를 누르면 '최근 주행'의 날짜와 함께 선택된다.
+- 이유: 백엔드(수집기 7862875·수신 앱 0.1.5·HA 영구 집계 `assist_stats`·`carrot_ha/assist/summary`)가 이미 데이터를 모으고 있어 화면만 없었다. 테슬라 'Self-Driving Stats' 화면을 참고했고, 프리뷰(`preview/assist-stats/`)에서 사용자가 구성을 승인했다.
+- 동작: 데이터는 HA WebSocket `carrot_ha/assist/summary`(HA 로컬 집계, 서버 60초 캐시)만 읽는다. 수신 앱 요청은 추가하지 않는다. 주행 탭이 보일 때만 요청하고, 같은 카드는 60초 안에 다시 요청하지 않으며, 선택일 범위일 때만 날짜 요청을 더한다. 실패하면 기존 표시를 유지하고 15초 뒤에 한 번 다시 시도한다. 기록 없는 날은 0%가 아니라 '기록 없음'으로 표시하고, 시각은 HA 시간대로 변환한다. 계산 과정 설명 문구는 표시하지 않는다.
+- 관련 파일: custom_components/carrot_ha/frontend/carrot-assist-stats.js(신규), carrot-dashboard-ko.js, carrot-dashboard-en.js, tests/dashboard-assist-stats.test.mjs(신규), tests/dashboard-dependency-version.test.mjs(의존 모듈 4→5개).
+- 검증: 신규 10개 시험과 의존 모듈 시험 통과. 실제 HA 집계(11-09 조회분)를 `callWS` 목으로 연결해 운영 카드 코드를 브라우저에서 확인했다(한국어·영어, 누적↔선택일, 기록 없는 날, 최근 7일 밖 막대, 스크롤 위치 유지). 전체 `tests/*.test.mjs`에서 camera-360, charging-curve, debug-freshness, motion-status, range-c3-and-fixes 5개 파일은 변경 전 origin/main에서도 같은 방식으로 실패한다(이번 변경과 무관).
+- 미확인·제외: 디버그 대시보드에는 적용하지 않았다. 실제 터치 기기, 게이지 전환의 움직임(검증 창이 숨김 상태라 끝 상태만 확인), 운영 HA 화면은 반영 후 확인이 필요하다. Python 시험은 변경이 없어 다시 돌리지 않았다. 릴리즈·태그 없음.
+- 배포 상태: 커밋·푸시 후 HA SSH 직접 반영 예정(사용자 승인).
+
 ## 2026-11-06 — 엔터티 ID 변경 HA 재시작 확인
 
 - 확인(읽기 전용, HA 재시작 15:43 KST 이후): HA API에서 `sensor.id_4_openpilot_assist_ratio`·`sensor.id_4_openpilot_assist_distance`가 200(상태 unknown, 계획한 속성 존재)이고, 예전 `caryang_` ID는 404다. 엔터티 레지스트리 파일도 15:46:52 KST에 두 ID로 저장됐다. 플래그 `assist_entity_id_version: 1`이 기록됐다. Carrot 엔터티는 88개 그대로다(`caryang_` 19개는 기존 엔터티).

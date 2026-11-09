@@ -8,6 +8,7 @@ const dependencyURL = name => {
 };
 const {bindChargePayments, chargeCostLabel} = await import(dependencyURL('./carrot-charge-payment.js'));
 const {preserveView,updateView} = await import(dependencyURL('./carrot-view-state.js'));
+const {assistPanelHtml, ensureAssist, bindAssist, animateAssist} = await import(dependencyURL('./carrot-assist-stats.js'));
 const {tripDisplayEnergyWh, tripDisplayEfficiency, tripDisplayEstimated, tripEnergyWh, tripEfficiency, tripEnergyLabel, tripSoc, DEFAULT_SOC_CAPACITY_KWH, tripDays, tripDateKey, loadRecentTrips, mergeConsecutiveCharges, mergeConsecutiveTrips, tripTimeline} = await import(dependencyURL('./carrot-trip-days.js'));
 const { CarrotCamera360Modal } = await import(dependencyURL('./carrot-camera-360.js'));
 const assetBase = new URL('./carrot-assets/', import.meta.url).href;
@@ -181,7 +182,7 @@ class CarrotDashboard extends HTMLElement {
       }
       apply(await this._hass.callApi('GET',`carrot_ha/v1/dashboard/${id}?live=1&refresh=1`));
     }catch(e){this.liveError=e instanceof Error?e.message:String(e);this.render();}
-    finally{this.liveBusy=false;}
+    finally{this.liveBusy=false;if(this.tab==='trips')ensureAssist(this);}
   }
   async load(quiet=false){
     if(this.busy){this.loadLive();return;}this.busy=true;if(this.setAttribute)this.setAttribute('data-loading','true');this.error='';
@@ -228,7 +229,7 @@ class CarrotDashboard extends HTMLElement {
     const maps=this.miniMaps||[];this.miniMaps=[];
     for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
   }
-  render(){return preserveView(this,()=>this.renderContent());}
+  render(){const out=preserveView(this,()=>this.renderContent());bindAssist(this);if(this.tab==='trips'){animateAssist(this);ensureAssist(this);}return out;}
   renderContent(){
     this._renderId=(this._renderId||0)+1;
     const mapContext=JSON.stringify([this.tab,this.tripDay,this.selected===null?null:this.trips[this.selected]?.data?.started_at]);
@@ -1008,7 +1009,7 @@ class CarrotDashboard extends HTMLElement {
         )
       :`<b>${v.parking_latitude!=null?`${n(v.parking_latitude,5)}, ${n(v.parking_longitude,5)}`:'위치 정보 대기 중'}</b><div class="sub">최근 주차 또는 마지막 주행 도착 위치</div>`;
 
-    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${panelTitle}</h2><span class="sub">${panelTime}</span></div><div class="map"></div><div class="route-caption">${routeCaption}</div></section>${this.tripHistory(isTrip)}</div>${!isTrip?`<h2 class="section">차량 컨디션</h2><div class="tiles">${metric('외부 온도',n(v.outside_temp_c),'°C','thermometer')}${metric('12V 배터리',n(v.aux_voltage,2),'V','car-battery')}${metric('에어컨',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('송풍 단계',n(v.blower_level,0),'','fan')}</div>`:''}`;
+    return `<div class="tiles">${tiles}</div><div class="layout"><section class="panel"><div class="paneltitle"><h2>${panelTitle}</h2><span class="sub">${panelTime}</span></div><div class="map"></div><div class="route-caption">${routeCaption}</div></section>${this.tripHistory(isTrip)}</div>${isTrip?assistPanelHtml(this,'ko'):''}${!isTrip?`<h2 class="section">차량 컨디션</h2><div class="tiles">${metric('외부 온도',n(v.outside_temp_c),'°C','thermometer')}${metric('12V 배터리',n(v.aux_voltage,2),'V','car-battery')}${metric('에어컨',v.ac_on==null?'—':v.ac_on?'ON':'OFF','','snowflake')}${metric('송풍 단계',n(v.blower_level,0),'','fan')}</div>`:''}`;
   }
   vehicleStatusView(v){
     const row=(ico,label,val,unit='',isBadge=false,badgeType='dim')=>{
