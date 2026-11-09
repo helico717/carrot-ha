@@ -1378,3 +1378,11 @@
 - 원격 main의 주행 통계 패널 cbbdc06을 보존해 병렬 모듈 목록에 통합했다. 모듈 버전 테스트를 병렬 import 및 지연 import에도 적용하고, 통계 연결 테스트가 순차 await 문법에 의존하지 않게 수정했다.
 - Node 회귀 27건 통과, 한국어·영어 Chromium 전체 탭과 비동기 갱신 후 스크롤 보존 재검증 통과. Python 서버 회귀는 로컬/번들 런타임에서 진행이 멈춰 통과 여부 미확인(서버 코드 변경 없음). pytest는 설치되지 않음.
 - 사용자 기존 공통/차계부 changelog 수정은 별도 백업 후 최신 main에 병합·복구했고 다른 작업을 커밋하지 않았다. HA 직접 반영은 아래 후속 기록으로 확인한다.
+
+
+### 2026-11-09 — 첫 로딩 개선 HA 직접 반영 완료
+
+- main 게시: 54d79a4(실행 코드), 2d30114760c7d0ad9e96bb78a46f63d63a4332cb(통합 검증). origin/main과 로컬 미푸시 커밋 0 확인.
+- HA 사전 검사: cbbdc06 기준 대시보드 ko/en 2파일 모두 일치. scripts/deploy_driving_logs_ha.py로 백업 후 두 파일 반영, 설치 SHA-256 모두 배포 커밋과 일치.
+- 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-2d30114760c7/before. HA/Comma 재시작·릴리즈·태그 없음. 사용자는 대시보드 강력 새로고침으로 적용 가능.
+- 운영 브라우저 체감 지연과 실제 네트워크 응답시간은 미측정. Python 서버 회귀 검사는 런타임 진행 정체로 중단하여 미검증으로 남김. 프론트엔드 Node 27건/실제 Chromium 한영 검증 통과.
