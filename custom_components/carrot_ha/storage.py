@@ -40,6 +40,8 @@ class Archive(ChargeCosts):
             db.execute('CREATE INDEX IF NOT EXISTS events_device_kind_observed ON events(device,kind,observed DESC)')
             db.execute("CREATE INDEX IF NOT EXISTS events_started ON events(device,kind,julianday(COALESCE(json_extract(body,'$.data.started_at'),observed)) DESC)")
 
+            from .state_projection import initialize
+            initialize(db)
             self.init_charge_costs(db)
             # Permanent assist statistics; purge_expired never touches these tables.
             assist_stats.init(db)
@@ -795,29 +797,21 @@ class Archive(ChargeCosts):
             max_time = (max(parsed) + timedelta(minutes=5)).isoformat()
 
             with self.connect() as db:
-                rows = db.execute(
-                    """SELECT
-                        COALESCE(
-                            CASE WHEN json_extract(body, '$.data.battery_wh') IS NOT NULL
-                                 THEN json_extract(body, '$.data.field_measured_at.battery_wh')
-                                 ELSE json_extract(body, '$.data.field_measured_at.soc_percent') END,
-                            json_extract(body, '$.data.measured_at'),
-                            observed
-                        ) AS ts,
-                        json_extract(body, '$.data.soc_percent') AS soc,
-                        json_extract(body, '$.data.battery_wh') AS wh,
-                        json_extract(body, '$.data.display_soc_candidate_percent') AS candidate,
-                        json_extract(body, '$.data.field_measured_at.display_soc_candidate_percent') AS candidate_at,
-                        observed
-                    FROM events
-                    WHERE device=? AND kind='state'
-                        AND julianday(observed) >= julianday(?) AND julianday(observed) <= julianday(?)
-                        AND (json_extract(body, '$.data.soc_percent') IS NOT NULL
-                             OR json_extract(body, '$.data.battery_wh') IS NOT NULL
-                             OR json_extract(body, '$.data.display_soc_candidate_percent') IS NOT NULL)
-                    ORDER BY observed""",
-                    (device, min_time, max_time)
-                ).fetchall()
+                from .state_projection import samples as state_samples
+                # Preserve the old julianday boundary semantics (millisecond
+                # rounding) while bounding the indexed UTC text range first.
+                lower = (min(parsed)-timedelta(minutes=5, seconds=1)).isoformat()
+                upper = (max(parsed)+timedelta(minutes=5, seconds=1)).isoformat()
+                rows = []
+                for observed, event in state_samples(db, device, lower, upper, (min_time,max_time)):
+                    v=event['data']; measured=v['field_measured_at']; wh=v.get('battery_wh'); soc=v.get('soc_percent')
+                    candidate=v.get(display_soc.KEY)
+                    if soc is None and wh is None and candidate is None:
+                        continue
+                    ts=(measured.get('battery_wh') if wh is not None else measured.get('soc_percent'))
+                    ts=ts if ts is not None else v.get('measured_at')
+                    ts=ts if ts is not None else observed
+                    rows.append((ts,soc,wh,candidate,measured.get(display_soc.KEY),observed))
 
             for ts_str, soc, wh, candidate, candidate_at, observed in rows:
                 if soc is None and wh is None and candidate is None:

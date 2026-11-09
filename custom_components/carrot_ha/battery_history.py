@@ -1,6 +1,6 @@
 """Fourteen local days, measured samples only; gaps are never interpolated."""
 import json
-from . import archive_codec, display_soc
+from . import display_soc
 import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -37,10 +37,10 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                                              datetime.fromisoformat(b.replace('Z','+00:00')).timestamp()+300))
     valid_samples = []
     with archive.connect() as db:
-        rows = db.execute("SELECT body FROM events WHERE device=? AND kind='state' AND observed>=? ORDER BY observed", (device, datetime.fromtimestamp(start-300, timezone.utc).isoformat().replace('+00:00', 'Z')))
-        for (body,) in rows:
-            e = archive_codec.calculation_event(body)
-            v = e.get('data', {})
+        from .state_projection import samples
+        rows = samples(db, device, datetime.fromtimestamp(start-300, timezone.utc).isoformat().replace('+00:00', 'Z'))
+        for _, e in rows:
+            v = e['data']
             try:
                 obs_dt = datetime.fromisoformat(e['observed_at'].replace('Z', '+00:00'))
                 received = obs_dt.astimezone(tz)

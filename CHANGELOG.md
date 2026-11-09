@@ -1386,3 +1386,20 @@
 - HA 사전 검사: cbbdc06 기준 대시보드 ko/en 2파일 모두 일치. scripts/deploy_driving_logs_ha.py로 백업 후 두 파일 반영, 설치 SHA-256 모두 배포 커밋과 일치.
 - 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-2d30114760c7/before. HA/Comma 재시작·릴리즈·태그 없음. 사용자는 대시보드 강력 새로고침으로 적용 가능.
 - 운영 브라우저 체감 지연과 실제 네트워크 응답시간은 미측정. Python 서버 회귀 검사는 런타임 진행 정체로 중단하여 미검증으로 남김. 프론트엔드 Node 27건/실제 Chromium 한영 검증 통과.
+
+
+## 2026-11-09 — 운영 대시보드 10초 이상 로딩 실측 조사
+
+- 사용자가 캐시 없는 충전 탭에서 10초 이상 로딩을 보고했고 날짜 클릭과 무관하게 실제 지연임을 재확인했다. 앞선 독립 응답 반영만으로 운영 조회 시간을 줄이지 못한 한계를 기록한다.
+- scripts/profile_dashboard_readonly.py로 HA 설치 코드의 배터리/충전/주행 연산을 읽기 전용 SQLite 연결로 측정한다. Archive 초기화·마이그레이션·파생 갱신을 실행하지 않고 기존 파생값을 사용한다. 원본 위치·이벤트·토큰을 출력하지 않는다.
+- 운영 대상 DB 414,400,512 bytes, state 29,300 / charge 74 / trip 349 확인. 개별 연산 소요시간은 후속 기록 예정. 운영 코드/DB 변경·재시작·발행 없음.
+
+## 2026-11-09 — 배터리·충전 이력 실제 조회 병목 개선
+
+- 운영 실측(읽기 전용): 414.4MB DB/state 약 29,300건에서 배터리 14일 이력 39.571초(재측정 36.480초), 충전 목록 0.111초, 충전 SOC 보정 21.612초. SQLite 잠금 오류도 관측했다. 화면 독립 반영만으로 해결되지 않는 서버 병목이다.
+- 전체 상태 본문 대신 필요한 필드만 SQL로 추출한 중간 후보는 운영 메모리 실행에서 17.874초였으나 충분하지 않아, 최종 후보는 SQLite 표현식 인덱스 events_state_calculation_v1에 작은 계산 필드를 유지하도록 변경했다. 원본 이벤트·GPS·에너지 값 변경 없음. 별도 원격 DB DDL은 실행하지 않는다.
+- 배터리 이력과 충전 SOC 보정이 공유 인덱스를 이용해 큰 본문 접근을 피한다. 충전 조회에는 UTC 텍스트 범위와 기존 julianday 판정을 함께 적용해 경계 의미를 보존한다. 압축 이벤트·필드 누락/명시 null/boolean·지역 시간대·갱신/롤백을 검증했다.
+- 관련 파일: custom_components/carrot_ha/state_projection.py, storage.py, battery_history.py, tests/test_state_projection.py, scripts/profile_dashboard_readonly.py.
+- 검증: projection 4건, 표시 SOC/주행 에너지 31건, 충전 SOC 6건, 충전 그래프 29건, 결제 12건 통과. SQLite bytecode에서 원본 테이블 본문을 읽지 않음 확인. 기존 DB 인덱스 생성 전후 원본 행 동일 확인. 압축 8건은 Windows 미수거 SQLite 핸들 때문에 기본 teardown 2건 실패, teardown 전에 gc.collect를 적용한 검증 실행은 8건 통과(제품/테스트 파일 수정 없음).
+- 필수 서버 회귀 cloud_live/incremental_sync/history_cache/direct_receiver 26건은 aiohttp가 있는 기존 .receiver-venv에서 통과. 이전 asyncio 정체는 sandbox socketpair 생성에서 확인되어 로컬 서버 허용 실행으로 해소했다. Node 로딩/lazy/view-state 14건 통과.
+- 배포: 검증·커밋·푸시 후 HA 코드 백업/해시 확인 예정. 새 인덱스 생성과 Python 코드 적용은 사용자 HA 재시작 필요. 초기 인덱스 구축 시간과 최종 운영 소요시간·잠금 재발 여부는 미검증. 새 릴리즈/태그 발행 없음.
