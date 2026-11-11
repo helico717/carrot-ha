@@ -366,7 +366,7 @@ class Journal:
         record_filter=" AND r.kind!='trip'" if not include_trips else ''
         if manual_records:record_filter=" AND (r.kind='expense' OR (r.kind='trip' AND r.origin='manual'))"
         elif expenses_only:record_filter=" AND r.kind='expense'"
-        time_order=('COALESCE(e.accounting_date,m.started_at) DESC,COALESCE(m.started_at,(SELECT MAX(m3.started_at) FROM expense_members em3 '
+        time_order=('COALESCE(e.accounting_date,m.started_at) DESC,COALESCE(json_extract(r.extra_json,\'$.occurred_at\'),m.started_at,(SELECT MAX(m3.started_at) FROM expense_members em3 '
                     'JOIN mobility m3 ON m3.vehicle_id=em3.vehicle_id AND m3.record_id=em3.charge_id WHERE em3.vehicle_id=r.vehicle_id AND em3.expense_id=r.id),r.created_at) DESC,r.rowid DESC')
         record_order=time_order if record_sort=='time' else 'COALESCE(e.actual_krw,e.estimated_krw) IS NULL,COALESCE(e.actual_krw,e.estimated_krw) '+('DESC' if record_sort=='amount_desc' else 'ASC')+','+time_order
         filter_params=[]
@@ -393,6 +393,7 @@ class Journal:
             record_sql='''SELECT r.id,r.kind,r.origin,r.status,r.version,r.quality_json,r.extra_json,
                 m.started_at,m.ended_at,m.odometer_km,m.distance_km,m.drive_energy_kwh,m.battery_charge_kwh,m.billed_charge_kwh,
                 COALESCE(m.charge_mode,(SELECT m2.charge_mode FROM expense_members em JOIN mobility m2 ON m2.vehicle_id=em.vehicle_id AND m2.record_id=em.charge_id WHERE em.vehicle_id=r.vehicle_id AND em.expense_id=r.id LIMIT 1)) AS charge_mode,
+                (SELECT MIN(m5.started_at) FROM expense_members em5 JOIN mobility m5 ON m5.vehicle_id=em5.vehicle_id AND m5.record_id=em5.charge_id WHERE em5.vehicle_id=r.vehicle_id AND em5.expense_id=r.id) AS session_started_at,
                 m.memo AS mobility_memo,e.accounting_date,e.category,e.subcategory,
                 e.actual_krw,e.estimated_krw,e.memo AS expense_memo,e.payment_owner,e.payment_id,e.payment_version
                 FROM records r LEFT JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id
@@ -431,7 +432,11 @@ class Journal:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
             row['quality']=json.loads(row.pop('quality_json'))
         for row in records+recent_records:
-            extra=json.loads(row.pop('extra_json'));row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km',row.get('odometer_km'));row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
+            extra=json.loads(row.pop('extra_json'));session=row.pop('session_started_at',None)
+            # Real time of day only: entered time, manual start time, or measured automatic start. Never a date-only placeholder.
+            manual_start=(extra.get('input') or {}).get('started_at') if row['origin']=='manual' else None
+            row['occurred_at']=extra.get('occurred_at') or manual_start or (row.get('started_at') or session if row['origin']=='automatic' else None)
+            row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km',row.get('odometer_km'));row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         with self.lock,self.connect() as db:
             from .charge_edit import project_charge_inputs
             project_charge_inputs(db,self.vehicle,records+recent_records)
@@ -462,7 +467,7 @@ class Journal:
         if type(expected) is not int or expected<0 or not isinstance(payload,dict):raise ValueError('잘못된 기록이에요.')
         allowed={'kind','date','ended_date','started_at','ended_at','distance_km','drive_energy_kwh',
                  'battery_charge_kwh','billed_charge_kwh','charge_mode','category','subcategory','actual_krw',
-                 'memo','unit_price_source','unit_price_observed_at','fuel_quantity_source','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location','remove_attachment_ids'}
+                 'memo','time','unit_price_source','unit_price_observed_at','fuel_quantity_source','fuel_type','fuel_liters','unit_price_krw','full_tank','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent','location','remove_attachment_ids'}
         if set(payload)-allowed:raise ValueError('지원하지 않는 기록 항목이에요.')
         removals=payload.get('remove_attachment_ids',[])
         if not isinstance(removals,list) or len(removals)>10 or any(not isinstance(x,str) for x in removals) or len(set(removals))!=len(removals):raise ValueError('사진 삭제 항목을 확인해 주세요.')
@@ -473,6 +478,13 @@ class Journal:
         if kind not in ('trip','charge','expense'):raise ValueError('기록 종류를 확인해 주세요.')
         value=day(data['date']).isoformat()
         if day(value)>datetime.now(self.tz).date():raise ValueError('미래 날짜는 기록할 수 없어요.')
+        occurred=None
+        if 'time' in data:
+            clock=data['time']
+            if kind!='expense' or not isinstance(clock,str) or len(clock)!=5 or clock[2]!=':' or not clock[:2].isdigit() or not clock[3:].isdigit() or int(clock[:2])>23 or int(clock[3:])>59:raise ValueError('시각을 확인해 주세요.')
+            local=datetime.combine(day(value),datetime.strptime(clock,'%H:%M').time(),self.tz)
+            if local>datetime.now(self.tz)+timedelta(minutes=1):raise ValueError('미래 시각은 기록할 수 없어요.')
+            occurred=local.astimezone(UTC).isoformat()
         if len(data.get('memo',''))>4000 or len(data.get('subcategory',''))>100:raise ValueError('메모가 너무 길어요.')
         for field in METRICS+('fuel_liters','unit_price_krw','wash_cost_krw','odometer_km','soc_start_percent','soc_end_percent'):
             if data.get(field) is not None and (number(data[field]) is None or data[field]>100000000):raise ValueError('측정값을 확인해 주세요.')
@@ -517,6 +529,9 @@ class Journal:
             linked=bool(old and old[1]=='automatic' and kind=='expense' and extra.get('payment_linked'))
             if linked and (data.get('category')!='charging' or (data.get('actual_krw') is not None and data['actual_krw']>999999999)):raise ValueError('자동 충전 결제의 분류는 바꿀 수 없어요.')
             extra.update(input=payload, journal_override=bool(old and old[1]=='automatic'))
+            # Entered time of day as UTC, for display and same-day ordering; absent means date only.
+            if occurred:extra['occurred_at']=occurred
+            else:extra.pop('occurred_at',None)
             if 'location' in payload:extra['location']=payload['location']
             db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
             if kind=='trip' and db.execute("SELECT COUNT(*) FROM attachments WHERE vehicle_id=? AND record_id=? AND status='active'",(self.vehicle,key)).fetchone()[0]>1:raise ValueError('주행 기록 사진은 최대 1장이에요.')
