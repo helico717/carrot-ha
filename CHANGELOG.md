@@ -13,6 +13,14 @@
 - 미확인·제외: 디버그 대시보드에는 적용하지 않았다. 실제 터치 기기, 게이지 전환의 움직임(검증 창이 숨김 상태라 끝 상태만 확인), 운영 HA 화면은 반영 후 확인이 필요하다. Python 시험은 변경이 없어 다시 돌리지 않았다. 릴리즈·태그 없음.
 - 배포 상태: c272182를 origin/main에 푸시했고 HA SSH로 직접 반영했다(사용자 승인, 11:28 KST). 반영 전 HA의 ko/en 대시보드가 53340a0과 일치함(CR 제외)을 확인하고 `/homeassistant/carrot_ha/deployment-backups/assist-ui-c272182/before`에 백업(SHA256SUMS.before)했다. 신규 `carrot-assist-stats.js`와 ko/en 3개 파일의 크기·SHA-256이 커밋과 일치한다(24a8a951…, 7b622de3…, ba9330bd…). 서버가 반환하는 프런트엔드 버전이 `0.9.0-12d0e20a7de8`로 바뀌었고 정적 파일 200을 확인했다. HA 재시작은 필요 없고 브라우저 새로고침만 하면 된다. 운영 화면의 실제 표시와 사용자 브라우저 동작은 미확인이다. 릴리즈·태그 없음.
 
+## 2026-11-09 — 오픈파일럿 사용 통계 준비 상태 조사
+
+- FSD 형태 누적/일별 사용률·최장 연속 거리 조사. 전체 거리·enabled 기반은 있으나 활성 거리/구간 영속 집계·전용 API 미확인.
+- 근거·필요 작업: docs/openpilot-usage-stats-readiness-2026-11-09.md. collector/engine.py, receiver.py, HA storage/cloud_feed/history 및 driving_logs 정적 조사.
+- 검증: HEAD 6306496 기준. openpilot 경로 부재·pull 권한 제한으로 최신 차량 소스/운영 DB 미확인. 기존 사용자 변경과 복사본 보존.
+- 배포: 코드/UI 수정·재시작·릴리즈 없음. 조사 기록은 로컬 작성, 커밋·푸시 미수행.
+- 추가 기록(2026-11-11): 당시 로컬에만 남아 있던 이 조사 기록을 사용자 요청으로 커밋했다. 이후 사용 통계는 구현되어 루트 CHANGELOG.md의 2026-11-09 사용 통계 항목들에 기록돼 있다. 프리뷰 폴더 preview/assist-stats(약 40MB, 실제 주행 통계 포함)는 커밋하지 않았다.
+
 ## 2026-11-06 — 엔터티 ID 변경 HA 재시작 확인
 
 - 확인(읽기 전용, HA 재시작 15:43 KST 이후): HA API에서 `sensor.id_4_openpilot_assist_ratio`·`sensor.id_4_openpilot_assist_distance`가 200(상태 unknown, 계획한 속성 존재)이고, 예전 `caryang_` ID는 404다. 엔터티 레지스트리 파일도 15:46:52 KST에 두 ID로 저장됐다. 플래그 `assist_entity_id_version: 1`이 기록됐다. Carrot 엔터티는 88개 그대로다(`caryang_` 19개는 기존 엔터티).

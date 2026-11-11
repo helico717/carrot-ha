@@ -1,3 +1,11 @@
+## 2026-11-09 — 오픈파일럿 사용 통계 준비 상태 조사
+
+- FSD 형태 누적/일별 사용률·최장 연속 거리 조사. 전체 거리·enabled 기반은 있으나 활성 거리/구간 영속 집계·전용 API 미확인.
+- 근거·필요 작업: docs/openpilot-usage-stats-readiness-2026-11-09.md. collector/engine.py, receiver.py, HA storage/cloud_feed/history 및 driving_logs 정적 조사.
+- 검증: HEAD 6306496 기준. openpilot 경로 부재·pull 권한 제한으로 최신 차량 소스/운영 DB 미확인. 기존 사용자 변경과 복사본 보존.
+- 배포: 코드/UI 수정·재시작·릴리즈 없음. 조사 기록은 로컬 작성, 커밋·푸시 미수행.
+- 추가 기록(2026-11-11): 당시 로컬에만 남아 있던 이 조사 기록을 사용자 요청으로 커밋했다. 이후 사용 통계는 구현되어 루트 CHANGELOG.md의 2026-11-09 사용 통계 항목들에 기록돼 있다. 프리뷰 폴더 preview/assist-stats(약 40MB, 실제 주행 통계 포함)는 커밋하지 않았다.
+
 ## 2026-11-05 — 주행 로그의 IQ.drive 일시정지 제거
 
 - IQpilot을 더 이상 쓰지 않아 fdb0c5a의 주행 로그 부분을 되돌렸다. `driving_logs/pilot.py` 삭제, `http.py` 세션의 IQ 409 거부 제거, `transfer_policy.device_policy_for` 삭제 후 장치 경로 4곳이 `policy_for`를 직접 사용한다. `carrot-logs-card.js`의 IQ 재확인 타이머와 일시정지 화면도 제거했다.
