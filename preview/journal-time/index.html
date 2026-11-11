@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>차계부 시각 표시 검토</title>
+<!--
+  검토용 하네스. 이 폴더의 carrot-vehicle-journal.js / carrot-journal-design.js 는 운영 파일의 사본에
+  apply_ui.py 를 적용한 것이다(운영 파일은 승인 전까지 수정하지 않는다). 나머지 모듈은 운영 파일을 그대로 불러온다.
+  저장소 루트에서  python3 -m http.server 8770  실행 후
+  http://localhost:8770/preview/journal-time/index.html
+  차량·기록·주소·좌표는 모두 합성 데이터이고, 카카오 지도/검색과 서버 응답도 합성이다.
+-->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  html,body{height:100%}
+  body{margin:0;display:flex;flex-direction:column;overflow:hidden;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard",sans-serif}
+  .scroller{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+  .bar{flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)} .bar small{color:var(--j-sub);flex:1 1 260px;line-height:1.45}
+  .bar button{background:var(--j-raised);color:var(--j-ink);border:1px solid var(--j-border);border-radius:9999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .bar button:hover{border-color:var(--j-accent)}
+  #log{flex-basis:100%;color:var(--j-sub);font-size:12px;min-height:16px}
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>기록 시각 표시</b>
+  <small>원장 탭의 날짜 옆에 시각이 보여요. 자동 주행·충전·충전 결제는 실제 시각, 직접 기록은 입력한 시각만 표시하고, 시각이 없던 과거 기록(마이클 이관 등)은 날짜만 보여요. [기록 추가] 또는 [수정]에서 시각 입력란을 확인하세요.</small>
+  <button id="addRecord" type="button">정비 기록 추가</button>
+  <button id="addTrip" type="button">주행 기록 추가</button>
+  <button id="reset" type="button">처음 상태로</button>
+  <div id="log"></div>
+</div>
+<div class="scroller"><main id="mount"></main></div>
+<script>
+if(location.protocol==='file:')document.getElementById('mount').innerHTML='<p style="margin:24px 14px;line-height:1.6">파일로 직접 열면 모듈을 불러오지 못해요. 저장소 루트에서 <code>python3 -m http.server 8770</code> 실행 후 http://localhost:8770/preview/journal-time/index.html 로 열어 주세요.</p>';
+</script>
+<script type="module">
+/* ---------- 합성 카카오 지도 ---------- */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+class LatLng{constructor(a,b){this.a=a;this.b=b}getLat(){return this.a}getLng(){return this.b}}
+class FakeMap{
+  constructor(el,o){this.el=el;this.listeners=[];this.center=o?.center||new LatLng(37.5665,126.978);
+    el.replaceChildren();const root=document.createElement('div');root.style.cssText='position:relative;width:100%;height:100%;min-height:160px;cursor:crosshair;overflow:hidden;background-color:#dfe7e2;background-image:linear-gradient(rgba(0,0,0,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.08) 1px,transparent 1px);background-size:36px 36px';root.innerHTML='<span style="position:absolute;left:8px;top:8px;font-size:11px;color:#33433b;background:rgba(255,255,255,.8);padding:2px 6px;border-radius:6px">합성 지도</span>';el.append(root);this.root=root;
+    root.addEventListener('click',e=>{const r=root.getBoundingClientRect();const lat=this.center.getLat()+(0.5-(e.clientY-r.top)/r.height)*0.01;const lng=this.center.getLng()+((e.clientX-r.left)/r.width-0.5)*0.016;this.listeners.forEach(f=>f({latLng:new LatLng(lat,lng)}));});}
+  setCenter(p){this.center=p;this.marker?.draw()} getCenter(){return this.center} relayout(){}
+}
+class Marker{
+  constructor(o){this.pos=o.position;this.map=null}
+  setPosition(p){this.pos=p;this.draw()}
+  setMap(m){this.map=m;if(m)m.marker=this;this.draw()}
+  draw(){if(!this.map)return;const root=this.map.root;let pin=root.querySelector('.pin');if(!pin){pin=document.createElement('div');pin.className='pin';pin.style.cssText='position:absolute;width:22px;height:22px;margin:-22px 0 0 -11px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#e5484d;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)';root.append(pin)}
+    const c=this.map.center;pin.style.left=clamp(50+(this.pos.getLng()-c.getLng())/0.016*100,3,97)+'%';pin.style.top=clamp(50-(this.pos.getLat()-c.getLat())/0.01*100,8,98)+'%';}
+}
+window.__journalKakaoKey='demo';window.__journalKakao=Promise.resolve({Map:FakeMap,LatLng,Marker,event:{addListener:(m,ev,fn)=>{if(ev==='click')m.listeners.push(fn)}}});
+
+/* ---------- 합성 데이터 (차량·장소·금액 모두 가상) ---------- */
+const kst=(date,time)=>new Date(`${date}T${time}:00+09:00`).toISOString();
+const ID=k=>'00000000-0000-4000-8000-'+String(k).padStart(12,'0');
+let n=0,records;
+const place=(name,address)=>({name,address,latitude:37.36,longitude:126.97,provider:'kakao'});
+const autoTrip=(date,s,e,km,odo)=>({id:ID(++n),kind:'trip',origin:'automatic',status:'active',version:1,started_at:kst(date,s),ended_at:kst(date,e),occurred_at:kst(date,s),distance_km:km,odometer_km:odo,attachments:[]});
+const autoChargePay=(date,s,krw,kwh,loc)=>({id:ID(++n),kind:'expense',origin:'automatic',status:'active',version:1,accounting_date:date,occurred_at:kst(date,s),category:'charging',actual_krw:krw,estimated_krw:null,battery_charge_kwh:kwh,automatic_charge:{battery_charge_kwh:kwh,session_count:1},unit_price:{krw:Math.round(krw/kwh),unit:'kWh',approximate:true},location:loc,attachments:[]});
+const manual=(date,category,sub,krw,extra={})=>({id:ID(++n),kind:'expense',origin:'manual',status:'active',version:1,accounting_date:date,category,subcategory:sub,actual_krw:krw,estimated_krw:null,attachments:[],input:{date,category,subcategory:sub,actual_krw:krw,...(extra.input||{})},...extra,occurred_at:extra.input?.time?kst(date,extra.input.time):undefined});
+const michael=(date,krw,liters,price,odo,station)=>({id:ID(++n),kind:'expense',origin:'manual',status:'active',version:1,accounting_date:date,category:'refueling',actual_krw:krw,estimated_krw:null,odometer_km:odo,location:place(station,'충남 솔빛군 해안로 400'),attachments:[],input:{date,category:'refueling',actual_krw:krw},import_source:{provider:'michael',sheet:'주유',row:n,fields:{'날짜':date.replaceAll('-','.'),'금액':krw.toLocaleString('ko-KR'),'주유량':String(liters),'단가':price.toLocaleString('ko-KR'),'누적주행거리':odo.toLocaleString('ko-KR'),'장소명':station}}});
+const seed=()=>{n=0;records=[
+  michael('2026-09-23',74000,41.46,1785,97335,'솔빛 해안주유소'),
+  michael('2026-10-05',90948,50.11,1815,99172,'솔빛 해안주유소'),
+  manual('2026-10-12','maintenance','엔진오일 교환',89000,{memo:'시각 입력 기능 전에 남긴 기록'}),
+  {id:ID(++n),kind:'trip',origin:'manual',status:'active',version:1,started_at:kst('2026-10-20','00:00'),ended_at:kst('2026-10-20','00:00'),odometer_km:84990,attachments:[],input:{kind:'trip',date:'2026-10-20',odometer_km:84990}},
+  autoTrip('2026-11-08','08:12','08:47',23.4,85120),
+  autoChargePay('2026-11-08','21:10',13472,39.05,place('한빛마을 전기차충전소','경기 가람시 한빛로 12')),
+  manual('2026-11-09','washing','손세차',25000,{input:{time:'14:30'},location:place('가람 디테일링','경기 가람시 중앙로 5')}),
+  autoTrip('2026-11-10','18:02','18:41',17.8,85160),
+  autoChargePay('2026-11-10','19:05',6240,18.07,place('가람마트 전기차충전소','경기 가람시 시청로 11')),
+].reverse();};
+seed();
+const log=text=>{document.getElementById('log').textContent=text;};
+const hass={callWS:async msg=>{
+  const t=msg.type;
+  if(t.endsWith('/entries'))return [{entry_id:'demo',title:'검토용 전기차',linked:true,fuel:'electric'}];
+  if(t.endsWith('/query')){
+    let rows=records.filter(r=>msg.include_trips!==false||msg.record_categories?.includes('trip')||r.kind!=='trip');if(msg.record_categories?.length)rows=rows.filter(r=>msg.record_categories.includes(r.kind==='trip'?'trip':r.category));
+    const sortKey=r=>(r.accounting_date||r.started_at.slice(0,10))+(r.occurred_at||'');rows=[...rows].sort((a,b)=>sortKey(b).localeCompare(sortKey(a)));
+    return {totals:{},daily:[],records:rows,recent_records:rows.filter(r=>r.kind==='expense'),record_count:rows.length,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},latest:{},station_stats:{places:[],unlocated_records:0,basis:''},expense_category_groups_supported:true,manual_trip_records_supported:true,record_filters_supported:true};
+  }
+  if(t.endsWith('/map/config'))return {key:'demo',rest_configured:true};
+  if(t.endsWith('/location/search'))return [];
+  if(t.endsWith('/favorite/list'))return [];
+  if(t.endsWith('/record/save')){
+    let r=records.find(x=>x.id===msg.record_id);const p=msg.payload;
+    if(!r){r={id:msg.record_id,kind:p.kind,origin:'manual',status:'active',version:0,attachments:[],estimated_krw:null};records.unshift(r);}
+    Object.assign(r,{version:r.version+1,input:p,accounting_date:p.kind==='expense'?p.date:undefined,category:p.category,subcategory:p.subcategory,memo:p.memo,location:p.location||null});
+    if(p.kind==='trip'){const s=p.started_at||kst(p.date,'00:00');Object.assign(r,{started_at:s,ended_at:s,odometer_km:p.odometer_km});}
+    if(p.actual_krw!=null)r.actual_krw=p.actual_krw;if('odometer_km' in p)r.odometer_km=p.odometer_km;
+    r.occurred_at=p.time?kst(p.date,p.time):p.started_at||undefined;
+    log(`저장한 값: 날짜 ${p.date} · ${p.time?`시각 ${p.time}`:p.started_at?`시작 시각 ${new Date(p.started_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})}`:'시각 없음'}`);
+    return {id:r.id,version:r.version};
+  }
+  return {};
+}};
+await import('./carrot-vehicle-journal.js');
+const card=document.createElement('carrot-vehicle-journal');
+document.getElementById('mount').append(card);card.setConfig({});card.hass=hass;window.card=card;window.preview={get records(){return records}};
+const ledger=()=>card.selectTab(3);
+const refresh=async()=>{card.offset=0;await card.load(true);ledger();};
+document.getElementById('addRecord').onclick=()=>card.openRecord?.(null,'maintenance');
+document.getElementById('addTrip').onclick=()=>card.openRecord?.(null,'trip');
+document.getElementById('reset').onclick=()=>{seed();log('처음 상태로 되돌렸어요.');refresh();};
+setTimeout(ledger,600);
+</script>
+</body>
+</html>

@@ -39,6 +39,16 @@
         "8767"
       ],
       "port": 8767
+    },
+    {
+      "name": "journal-time-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8771"
+      ],
+      "port": 8771
     }
   ]
 }
