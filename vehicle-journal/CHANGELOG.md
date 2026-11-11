@@ -1,3 +1,10 @@
+## 2026-11-11 — OCR 다운로드 진행률 a509f47 HA 직접 반영
+
+- 반영 전 HA의 carrot-receipt-ocr.js(a61617cbc2cc)·carrot-vehicle-journal.js(afc03d7fafbe)·carrot-journal-design.js(12bb0ef520a4)가 직전 배포 e30b1e6 기준 파일과 일치함을 확인했다.
+- 백업: `/config/carrot_ha/deployment-backups/receipt-ocr-progress-a509f47/before`(SHA256SUMS.before), 되돌리기는 같은 폴더 `rollback.sh`. 첫 시도는 원격 zsh가 파일 목록을 나누지 않아 백업 단계에서 중단됐고(파일 변경 없음, HTTP 해시 그대로 확인) POSIX sh로 다시 실행했다.
+- 반영 후 세 파일 SHA-256이 커밋 a509f47과 일치(d4fce286cd24, d6ac70e3f291, db4912097622)하고 `/carrot_ha_static/` HTTP 응답도 같다. frontend-version이 재시작 없이 `0.9.0-0bb90d23d612`로 바뀌었다.
+- 상태: HA 재시작 불필요(새로고침). 실제 컴패니언 앱에서 진행률 표시·Cache Storage 보관은 사용자 확인 대기. 새 릴리즈·태그 없음.
+
 ## 2026-11-11 — 영수증 OCR 모델 다운로드 진행률 표시·모델 보관 (사용자 승인)
 
 - 커밋 제목: vehicle-journal: show receipt OCR model download progress

@@ -1,3 +1,7 @@
+## 2026-11-11 — 차계부 OCR 다운로드 진행률 HA 직접 반영
+
+- a509f47의 차계부 화면 모듈 3개를 백업 후 HA에 반영, 해시·HTTP 확인. 재시작 불필요. 실제 앱 확인 대기. 상세: vehicle-journal/CHANGELOG.md.
+
 ## 2026-11-11 — 차계부 영수증 OCR 모델 다운로드 진행률
 
 - 첫 사용 시 OCR 화면에 모델 다운로드 진행 막대·MB·%를 표시하고, 받은 모델을 Cache Storage에 보관한다(HTTPS 접속). 사용자 프리뷰 승인 후 반영. 상세: vehicle-journal/CHANGELOG.md.
