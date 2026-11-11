@@ -1,3 +1,7 @@
+## 2026-11-11 — 차계부 기록 창 시각 입력·입력칸 배치 수정 HA 직접 반영
+
+- iPhone에서 시각 입력칸이 잘리던 문제, 시각을 지울 수 없던 문제(✕ 버튼 추가), 충전·주유·사고 기록 입력칸 줄이 다 차지 않던 문제를 고쳤다. 커밋 ef63ef9, main 푸시, HA SSH 직접 반영(파일·HTTP 해시 일치, 백업·rollback.sh 포함). 화면 전용이라 새로고침으로 적용. 상세: vehicle-journal/CHANGELOG.md.
+
 ## 2026-11-11 — 차계부 기록 시각 HA 직접 반영 (재시작 대기)
 
 - a21069e의 store.py와 차계부 화면 2개 파일을 백업(`deployment-backups/record-time-a21069e`, rollback.sh 포함) 후 반영, 파일·HTTP 해시 일치 확인. HA 재시작 후 동작. 상세: `vehicle-journal/CHANGELOG.md`.
