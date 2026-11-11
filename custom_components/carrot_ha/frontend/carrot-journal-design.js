@@ -2176,6 +2176,20 @@ export const journalDesign = `:host {
   .trends-grid.single-item .trend-card{grid-column:1/-1}
 }
 @media(max-width:600px){.trend-rank-hint{display:none}}
+/* Record time: iOS gives time inputs an intrinsic width that ignores the grid cell; reuse the date fix. */
+#recordDialog input[type=time]{appearance:none;-webkit-appearance:none;display:block;min-inline-size:0;inline-size:100%;box-sizing:border-box}
+#recordDialog input[type=time]::-webkit-date-and-time-value{min-width:0;text-align:left}
+#recordDialog .time-input-wrap{min-width:0}
+#recordDialog .time-input-wrap input[type=time]{padding-right:44px!important}
+#recordDialog .input-clear-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;inline-size:30px;block-size:30px;min-height:0!important;padding:0!important;border:0!important;border-radius:9999px!important;background:var(--j-raised)!important;color:var(--j-sub)!important;font-size:17px;line-height:1;cursor:pointer;box-shadow:none!important}
+#recordDialog .input-clear-btn[hidden]{display:none!important}
+#recordDialog .input-clear-btn:hover{color:var(--j-ink)!important}
+#recordDialog .input-clear-btn:focus-visible{outline:2px solid var(--j-accent);outline-offset:1px}
+/* With date|time on the first row, a field left without a partner spans the full row so no row ends with a gap:
+   charging/refuelling odometer (amount·quantity·price stay three across), refuelling wash cost, accident amount. */
+#recordDialog[data-mode=charging] .fields #odometerField,#recordDialog[data-mode=refueling] .fields #odometerField,
+#recordDialog[data-mode=refueling] .fields #washCostField,#recordDialog[data-mode=accident] .fields #amountField{grid-column:1 / -1!important}
+#recordDialog[data-mode=refueling] .fields #fuelTypeField{order:5;grid-column:span 3!important}
 /* Charging ledger rows: address line under the place name. */
 .ledger-main-title.ledger-charge-place,#page3 .ledger-table .ledger-main-title.ledger-charge-place{font-weight:750}
 .ledger-place-address{font-size:.88em;font-weight:700;color:var(--j-sub);opacity:.78;line-height:1.4;overflow-wrap:anywhere;min-width:0}
