@@ -48,6 +48,10 @@ const clockLabel=v=>{const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return '';con
 LEDGER_OLD = "return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>"
 LEDGER_NEW = "const clock=clockLabel(recordClock(r,d.timezone));\n      return `<tr><td><b class=\"ledger-day\">${esc(dayLabel(recordDay(r,d.timezone)))}</b>${clock?`<span class=\"ledger-time\">${clock}</span>`:''}<small>"
 
+# Active records need no status label; only deleted/excluded keep one.
+STATUS_OLD = "'자동 기록'} · ${r.status==='deleted'?'삭제됨':r.status==='excluded'?'제외됨':'보관 중'}</small>"
+STATUS_NEW = "'자동 기록'}${r.status==='deleted'?' · 삭제됨':r.status==='excluded'?' · 제외됨':''}</small>"
+
 RECENT_OLD = "<small class=\"recent-date-sub\">${esc(record.accounting_date||'미확인')} · "
 RECENT_NEW = "<small class=\"recent-date-sub\">${record.accounting_date?`<b>${esc(dayLabel(record.accounting_date))}</b>`:'미확인'}${recordClock(record,this.data?.timezone)?` ${clockLabel(recordClock(record,this.data?.timezone))}`:''} · "
 
@@ -74,6 +78,7 @@ SAVE_NEW = """    const clockValue=form.elements.time.value;
 patch('carrot-vehicle-journal.js', [
     (HELPER_OLD, HELPER_NEW),
     (LEDGER_OLD, LEDGER_NEW),
+    (STATUS_OLD, STATUS_NEW),
     (RECENT_OLD, RECENT_NEW),
     (FIELD_OLD, FIELD_NEW),
     (VISIBLE_OLD, VISIBLE_NEW),
