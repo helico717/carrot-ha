@@ -1,5 +1,5 @@
 // Carrot HA Vehicle Journal - Fuel Receipt OCR & Parser Module
-// Local WASM Tesseract.js wrapper with image pre-processing and receipt parsing.
+// On-device PaddleOCR (onnxruntime-web WASM) and receipt parsing.
 
 /**
  * Clean OCR noise numbers (blacklist patterns like business reg, card number, etc.)
@@ -14,6 +14,8 @@ export function filterOcrNoise(text) {
     let clean = line.replace(/\b\d{3}-\d{2}-\d{5}\b/g, ' [BIZ_NO] ');
     // Mask card number: 5317-64**-****-4794 or 16-digit cards
     clean = clean.replace(/\b\d{4}[-\s]?[*0-9]{4}[-\s]?[*0-9]{4}[-\s]?\d{4}\b/g, ' [CARD_NO] ');
+    // Masked card numbers ending in '*' or with groups merged by OCR: 4364-2000-****-588*, 0190-********-0664
+    clean = clean.replace(/\d{3,4}(?:[-\s]?[*0-9]{3,8}){2,3}\*?/g, m => (m.includes('*') ? ' [CARD_NO] ' : m));
     // Mask phone number: 031-423-2323, 02-123-4567
     clean = clean.replace(/(?:Tel|TEL|전화)?\s*0\d{1,2}[-)\s]*\d{3,4}[-\s]*\d{4}/g, ' [TEL_NO] ');
     // Mask customer / member / device / slip / receipt / approval / seq / pos / transaction IDs
@@ -264,11 +266,15 @@ export function extractTotalAmount(text) {
  * price × quantity = amount. Layout, column order and line breaks do not matter, and a
  * misread digit breaks the equation instead of silently producing a wrong value.
  */
-export function solveFuelTriple(text) {
+// Point balances, card details and receipt identifiers are never price, quantity or amount.
+const NON_FUEL_NUMBER_LINE = /(?:포인트|적립|카드\s*(?:번호|종류)|할\s*부|매\s*입|승인\s*번호|사업자|ODT)/i;
+
+export function solveFuelTriple(text, preferredAmounts = null) {
   const lines = (text || '').split('\n');
   const prices = [], quantities = [], amounts = [];
   let tokenId = 0;
   lines.forEach((line, lineIndex) => {
+    if (NON_FUEL_NUMBER_LINE.test(line)) return;
     for (const token of lineNumberTokens(line)) {
       const id = tokenId++;
       for (const r of token.readings) {
@@ -294,6 +300,7 @@ export function solveFuelTriple(text) {
         if (p.labeled) score += 1;
         if (q.labeled) score += 1;
         if (p.weak || q.weak || a.weak) score -= 2;
+        if (preferredAmounts?.has(a.value)) score += 5;
         if (!best || score > best.score) best = { unit_price_krw: p.value, fuel_liters: q.value, row_amount: a.value, score };
       }
     }
@@ -471,25 +478,32 @@ export function parseFuelReceipt(rawOcrText) {
   }
   const fuelType = voteWinner(fuelVotes);
 
-  // 4. Price × quantity = amount, agreed across passes
+  // 4. Total paid amount
+  const totals = cleaned.flatMap(text => totalAmountCandidates(text));
+  const bestTier = totals.length ? Math.min(...totals.map(c => c.tier)) : null;
+  const totalVotes = new Map();
+  totals.filter(c => c.tier === bestTier).forEach(c => totalVotes.set(c.value, (totalVotes.get(c.value) || 0) + 1));
+  const total = voteWinner(totalVotes);
+  const hasDiscount = cleaned.some(text => DISCOUNT_WORDS.test(text));
+
+  // 5. Price × quantity = amount, agreed across passes; rows matching a printed total rank first
+  const totalValues = new Set(totals.map(c => c.value));
   const tripleVotes = new Map();
   for (const text of cleaned) {
-    const triple = solveFuelTriple(text);
+    const triple = solveFuelTriple(text, totalValues);
     if (!triple) continue;
     const key = `${triple.unit_price_krw}|${triple.fuel_liters}|${triple.row_amount}`;
     const prev = tripleVotes.get(key);
     tripleVotes.set(key, { triple, score: (prev ? prev.score + 3 : 0) + triple.score });
   }
   const rankedTriples = [...tripleVotes.values()].sort((a, b) => b.score - a.score);
-  const triple = rankedTriples.length && !(rankedTriples.length > 1 && rankedTriples[1].score === rankedTriples[0].score)
+  let triple = rankedTriples.length && !(rankedTriples.length > 1 && rankedTriples[1].score === rankedTriples[0].score)
     ? rankedTriples[0].triple : null;
-
-  // 5. Total paid amount
-  const totals = cleaned.flatMap(text => totalAmountCandidates(text));
-  const bestTier = totals.length ? Math.min(...totals.map(c => c.tier)) : null;
-  const totalVotes = new Map();
-  totals.filter(c => c.tier === bestTier).forEach(c => totalVotes.set(c.value, (totalVotes.get(c.value) || 0) + 1));
-  const total = voteWinner(totalVotes);
+  // A coincidental equation from unrelated small numbers (e.g. 701 × 2.9 ≈ 2,000 against a
+  // printed 100,000 total) is rejected; a near miss of the total is still read as a misread total.
+  if (triple && total !== null && !totalValues.has(triple.row_amount) && !hasDiscount && triple.row_amount < total * 0.5) {
+    triple = null;
+  }
 
   let actualKrw = null;
   let consistencyPassed = false;
@@ -497,7 +511,7 @@ export function parseFuelReceipt(rawOcrText) {
     if (totals.some(c => c.value === triple.row_amount) || total === null) {
       actualKrw = triple.row_amount;
       consistencyPassed = true;
-    } else if (cleaned.some(text => DISCOUNT_WORDS.test(text))) {
+    } else if (hasDiscount) {
       // Discount or extra items: card total differs from the fuel row on purpose
       actualKrw = total;
     } else {
@@ -671,6 +685,7 @@ export function matchStationFromReceipt(stationInfo, searchCandidates) {
   return null;
 }
 
+
 /**
  * Decode the photo once (EXIF orientation applied by the browser), bounded for mobile memory.
  */
@@ -698,7 +713,6 @@ async function decodeReceiptImage(file, maxEdge = 3000) {
 }
 
 function rotateCanvas(source, degrees) {
-  if (!degrees) return source;
   const canvas = document.createElement('canvas');
   canvas.width = source.height;
   canvas.height = source.width;
@@ -709,259 +723,312 @@ function rotateCanvas(source, degrees) {
   return canvas;
 }
 
-function grayPixels(data) {
-  const gray = new Uint8ClampedArray(data.length / 4);
-  for (let i = 0, j = 0; i < data.length; i += 4, j++) gray[j] = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000;
-  return gray;
+// ---------------------------------------------------------------------------
+// PaddleOCR (PP-OCRv5 mobile detection + Korean recognition) on onnxruntime-web.
+// Runs on the viewer's device; the receipt never leaves the browser for OCR.
+// Measured 2026-11-11: ~3.3 s and 7/7 fields on an iPhone for a receipt the previous
+// Tesseract pipeline read in 44.5 s with wrong price/amount.
+// ---------------------------------------------------------------------------
+
+const PADDLE_ASSET_VERSION = 'ppocrv5-ko-1';
+const DET_LIMIT = 1280;          // longest side fed to the detector
+const DET_THRESH = 0.3, BOX_THRESH = 0.5, UNCLIP = 1.6;
+// Vertical padding is capped: padded too tall, double-height receipt digits shrink until
+// CTC collapses repeated characters ("100,000" -> "10,00").
+const HEIGHT_PAD = 0.3;
+const REC_H = 48, REC_BATCH = 8, REC_MAX_W = 1600;
+
+let paddlePromise = null;
+
+function paddleUrl(assetBase, name) {
+  return `${new URL(`paddleocr/${name}`, assetBase).href}?v=${PADDLE_ASSET_VERSION}`;
 }
 
-/**
- * Locate the receipt paper: the largest bright region (Otsu threshold on a thumbnail).
- * Returns a box in source pixels, or null when no clear paper region exists.
- */
-export function findReceiptPaper(source) {
-  const size = 240, scale = size / Math.max(source.width, source.height);
-  const w = Math.max(1, Math.round(source.width * scale)), h = Math.max(1, Math.round(source.height * scale));
-  const thumb = document.createElement('canvas');
-  thumb.width = w;
-  thumb.height = h;
-  const ctx = thumb.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(source, 0, 0, w, h);
-  const gray = grayPixels(ctx.getImageData(0, 0, w, h).data);
-
-  const hist = new Array(256).fill(0);
-  for (const v of gray) hist[v]++;
-  let sum = 0;
-  for (let i = 0; i < 256; i++) sum += i * hist[i];
-  let sumB = 0, weightB = 0, bestVar = 0, threshold = 128;
-  for (let t = 0; t < 256; t++) {
-    weightB += hist[t];
-    if (!weightB) continue;
-    const weightF = gray.length - weightB;
-    if (!weightF) break;
-    sumB += t * hist[t];
-    const between = weightB * weightF * (sumB / weightB - (sum - sumB) / weightF) ** 2;
-    if (between > bestVar) { bestVar = between; threshold = t; }
-  }
-
-  const label = new Uint8Array(w * h);
-  let bestArea = 0, bestBox = null;
-  for (let start = 0; start < w * h; start++) {
-    if (gray[start] <= threshold || label[start]) continue;
-    const stack = [start];
-    label[start] = 1;
-    let area = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
-    while (stack.length) {
-      const p = stack.pop(), px = p % w, py = (p / w) | 0;
-      area++;
-      if (px < x0) x0 = px;
-      if (px > x1) x1 = px;
-      if (py < y0) y0 = py;
-      if (py > y1) y1 = py;
-      const next = [px > 0 ? p - 1 : -1, px < w - 1 ? p + 1 : -1, p - w, p + w];
-      for (const q of next) {
-        if (q < 0 || q >= w * h || label[q] || gray[q] <= threshold) continue;
-        label[q] = 1;
-        stack.push(q);
-      }
-    }
-    if (area > bestArea) { bestArea = area; bestBox = [x0, y0, x1, y1]; }
-  }
-  // Too small = no paper found; nearly the whole frame = already a close-up, no crop needed
-  const coverage = bestArea / (w * h);
-  if (!bestBox || coverage < 0.04 || coverage > 0.85) return null;
-  const [x0, y0, x1, y1] = bestBox;
-  const pad = 2;
-  const x = Math.max(0, (x0 - pad) / scale), y = Math.max(0, (y0 - pad) / scale);
-  return {
-    x, y,
-    w: Math.min(source.width - x, (x1 - x0 + 1 + 2 * pad) / scale),
-    h: Math.min(source.height - y, (y1 - y0 + 1 + 2 * pad) / scale)
+async function loadPaddle(assetBase) {
+  const ort = await import(paddleUrl(assetBase, 'ort-wasm.min.js'));
+  ort.env.wasm.wasmPaths = {
+    mjs: paddleUrl(assetBase, 'ort-wasm-simd-threaded.js'),
+    wasm: paddleUrl(assetBase, 'ort-wasm-simd-threaded.wasm'),
   };
+  // Home Assistant pages are not cross-origin isolated, so WASM threads are unavailable.
+  ort.env.wasm.numThreads = globalThis.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+  const opts = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+  const [det, rec, dictText] = await Promise.all([
+    ort.InferenceSession.create(paddleUrl(assetBase, 'det.onnx'), opts),
+    ort.InferenceSession.create(paddleUrl(assetBase, 'rec.onnx'), opts),
+    fetch(paddleUrl(assetBase, 'dict.txt')).then(r => {
+      if (!r.ok) throw new Error(`OCR 사전 파일을 불러오지 못했어요 (${r.status}).`);
+      return r.text();
+    }),
+  ]);
+  const chars = dictText.split('\n').map(l => l.replace(/\r$/, ''));
+  if (chars[chars.length - 1] === '') chars.pop();
+  return { ort, det, rec, chars: ['', ...chars, ' '] };
 }
 
 /**
- * Render one OCR pass: crop to the paper, scale text to a Tesseract-friendly size,
- * optionally squash vertically (double-height receipt digits) and threshold locally.
+ * Start loading the OCR engine and models in the background (about 30 MB on first use,
+ * then served from the browser cache). Safe to call repeatedly; a failure is retried next time.
  */
-export function renderOcrPass(source, box, { yScale = 1, adaptive = false, targetWidth = 1400, maxPixels = 4200000 } = {}) {
-  const b = box || { x: 0, y: 0, w: source.width, h: source.height };
-  let scale = targetWidth / b.w;
-  if (b.w * scale * b.h * scale * yScale > maxPixels) scale = Math.sqrt(maxPixels / (b.w * b.h * yScale));
-  const width = Math.max(1, Math.round(b.w * scale)), height = Math.max(1, Math.round(b.h * scale * yScale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error('OCR 캔버스 생성 실패');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(source, b.x, b.y, b.w, b.h, 0, 0, width, height);
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const data = imgData.data;
-  const gray = grayPixels(data);
+export function preloadReceiptOcr(assetBase) {
+  if (!paddlePromise) {
+    paddlePromise = loadPaddle(assetBase).catch(err => {
+      paddlePromise = null;
+      throw err;
+    });
+  }
+  return paddlePromise;
+}
 
-  if (adaptive) {
-    // Local mean threshold handles shadows and paper curl
-    const stride = width + 1, integral = new Float64Array(stride * (height + 1)), r = 20, offset = 12;
-    for (let y = 0; y < height; y++) {
-      let row = 0;
-      for (let x = 0; x < width; x++) {
-        row += gray[y * width + x];
-        integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + row;
-      }
+function makeCanvas(w, h) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  return [canvas, canvas.getContext('2d', { willReadFrequently: true })];
+}
+
+async function detectText(engine, src) {
+  const { ort, det } = engine;
+  const scale = Math.min(1, DET_LIMIT / Math.max(src.width, src.height));
+  const w = Math.max(32, Math.round(src.width * scale / 32) * 32);
+  const h = Math.max(32, Math.round(src.height * scale / 32) * 32);
+  const [, ctx] = makeCanvas(w, h);
+  ctx.drawImage(src, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  const plane = w * h;
+  const input = new Float32Array(3 * plane);
+  for (let i = 0, j = 0; j < plane; i += 4, j++) {
+    input[j] = px[i + 2] / 127.5 - 1;
+    input[plane + j] = px[i + 1] / 127.5 - 1;
+    input[2 * plane + j] = px[i] / 127.5 - 1;
+  }
+  const out = await det.run({ [det.inputNames[0]]: new ort.Tensor('float32', input, [1, 3, h, w]) });
+  return { prob: out[det.outputNames[0]].data, w, h, sx: src.width / w, sy: src.height / h };
+}
+
+function convexHull(points) {
+  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const p of points) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+function minAreaRect(hull) {
+  if (hull.length < 3) return null;
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const c = Math.cos(angle), s = Math.sin(angle);
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const p of hull) {
+      const u = p[0] * c + p[1] * s, v = -p[0] * s + p[1] * c;
+      if (u < minU) minU = u;
+      if (u > maxU) maxU = u;
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
     }
-    for (let y = 0; y < height; y++) {
-      const ya = Math.max(0, y - r), yb = Math.min(height, y + r + 1);
-      for (let x = 0; x < width; x++) {
-        const xa = Math.max(0, x - r), xb = Math.min(width, x + r + 1);
-        const mean = (integral[yb * stride + xb] - integral[ya * stride + xb] - integral[yb * stride + xa] + integral[ya * stride + xa]) / ((xb - xa) * (yb - ya));
-        const v = gray[y * width + x] < mean - offset ? 0 : 255, k = (y * width + x) * 4;
-        data[k] = data[k + 1] = data[k + 2] = v;
-      }
-    }
-  } else {
-    // Plain grayscale: Tesseract's LSTM reads thin thermal print better without a hard stretch
-    for (let j = 0; j < gray.length; j++) {
-      const k = j * 4;
-      data[k] = data[k + 1] = data[k + 2] = gray[j];
+    const area = (maxU - minU) * (maxV - minV);
+    if (!best || area < best.area) {
+      const cu = (minU + maxU) / 2, cv = (minV + maxV) / 2;
+      best = { area, angle, w: maxU - minU, h: maxV - minV, cx: cu * c - cv * s, cy: cu * s + cv * c };
     }
   }
-  ctx.putImageData(imgData, 0, 0);
+  if (best.h > best.w) {
+    [best.w, best.h] = [best.h, best.w];
+    best.angle += Math.PI / 2;
+  }
+  while (best.angle > Math.PI / 2) best.angle -= Math.PI;
+  while (best.angle < -Math.PI / 2) best.angle += Math.PI;
+  return best;
+}
+
+// DB post-processing: threshold, 2x2 dilation, connected components, rotated boxes, unclip.
+function textBoxes({ prob, w, h, sx, sy }) {
+  const size = w * h;
+  const bin = new Uint8Array(size);
+  for (let i = 0; i < size; i++) if (prob[i] > DET_THRESH) bin[i] = 1;
+  const mask = new Uint8Array(size);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (bin[i] || (x > 0 && bin[i - 1]) || (y > 0 && bin[i - w]) || (x > 0 && y > 0 && bin[i - w - 1])) mask[i] = 1;
+    }
+  }
+  const seen = new Uint8Array(size);
+  const boxes = [];
+  const stack = [];
+  for (let start = 0; start < size; start++) {
+    if (!mask[start] || seen[start]) continue;
+    seen[start] = 1;
+    stack.push(start);
+    const rowMin = new Map(), rowMax = new Map();
+    let sum = 0, count = 0;
+    while (stack.length) {
+      const p = stack.pop();
+      const x = p % w, y = (p - x) / w;
+      sum += prob[p];
+      count++;
+      if (!rowMin.has(y) || x < rowMin.get(y)) rowMin.set(y, x);
+      if (!rowMax.has(y) || x > rowMax.get(y)) rowMax.set(y, x);
+      if (x > 0 && mask[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack.push(p - 1); }
+      if (x < w - 1 && mask[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack.push(p + 1); }
+      if (y > 0 && mask[p - w] && !seen[p - w]) { seen[p - w] = 1; stack.push(p - w); }
+      if (y < h - 1 && mask[p + w] && !seen[p + w]) { seen[p + w] = 1; stack.push(p + w); }
+    }
+    if (count < 10 || sum / count < BOX_THRESH) continue;
+    const pts = [];
+    for (const [y, x0] of rowMin) {
+      const x1 = rowMax.get(y) + 1;
+      pts.push([x0, y], [x0, y + 1], [x1, y], [x1, y + 1]);
+    }
+    const r = minAreaRect(convexHull(pts));
+    if (!r || Math.min(r.w, r.h) < 3) continue;
+    const d = (r.w * r.h * UNCLIP) / (2 * (r.w + r.h));
+    r.w += 2 * d;
+    r.h += 2 * Math.min(d, HEIGHT_PAD * r.h);
+    if (r.h < 5) continue;
+    const c = Math.cos(r.angle), s = Math.sin(r.angle);
+    boxes.push({
+      cx: r.cx * sx,
+      cy: r.cy * sy,
+      w: Math.hypot(r.w * c * sx, r.w * s * sy),
+      h: Math.hypot(-r.h * s * sx, r.h * c * sy),
+      angle: Math.atan2(r.w * s * sy, r.w * c * sx),
+    });
+  }
+  return boxes;
+}
+
+function cropTextLine(src, box) {
+  const dw = Math.max(8, Math.min(REC_MAX_W, Math.round(REC_H * box.w / box.h)));
+  const [canvas, ctx] = makeCanvas(dw, REC_H);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, dw, REC_H);
+  ctx.setTransform(dw / box.w, 0, 0, REC_H / box.h, dw / 2, REC_H / 2);
+  ctx.rotate(-box.angle);
+  ctx.translate(-box.cx, -box.cy);
+  ctx.drawImage(src, 0, 0);
   return canvas;
 }
 
-/**
- * Image preprocessing for OCR (first pass): decode, crop to the receipt and enhance.
- * Separated from storage JPEG compression pipeline.
- */
-export async function prepareOcrImage(file) {
-  const source = await decodeReceiptImage(file);
-  return renderOcrPass(source, findReceiptPaper(source));
+async function recognizeLines(engine, crops, abortSignal) {
+  const { ort, rec, chars } = engine;
+  const order = crops.map((_, i) => i).sort((a, b) => crops[a].width - crops[b].width);
+  const texts = new Array(crops.length).fill('');
+  for (let start = 0; start < order.length; start += REC_BATCH) {
+    if (abortSignal?.aborted) throw new Error('Aborted');
+    const ids = order.slice(start, start + REC_BATCH);
+    const W = Math.max(...ids.map(i => crops[i].width));
+    const plane = REC_H * W;
+    const input = new Float32Array(ids.length * 3 * plane); // 0 = mid grey padding after normalisation
+    ids.forEach((id, k) => {
+      const crop = crops[id];
+      const px = crop.getContext('2d').getImageData(0, 0, crop.width, REC_H).data;
+      const off = k * 3 * plane;
+      for (let y = 0; y < REC_H; y++) {
+        for (let x = 0; x < crop.width; x++) {
+          const i = (y * crop.width + x) * 4, j = y * W + x;
+          input[off + j] = px[i + 2] / 127.5 - 1;
+          input[off + plane + j] = px[i + 1] / 127.5 - 1;
+          input[off + 2 * plane + j] = px[i] / 127.5 - 1;
+        }
+      }
+    });
+    const out = await rec.run({ [rec.inputNames[0]]: new ort.Tensor('float32', input, [ids.length, 3, REC_H, W]) });
+    const logits = out[rec.outputNames[0]];
+    const [, T, C] = logits.dims;
+    ids.forEach((id, k) => {
+      let text = '', prev = -1;
+      for (let step = 0; step < T; step++) {
+        const base = (k * T + step) * C;
+        let bestIndex = 0, bestValue = -Infinity;
+        for (let ci = 0; ci < C; ci++) {
+          const v = logits.data[base + ci];
+          if (v > bestValue) { bestValue = v; bestIndex = ci; }
+        }
+        if (bestIndex !== 0 && bestIndex !== prev) text += chars[bestIndex] ?? '';
+        prev = bestIndex;
+      }
+      texts[id] = text;
+    });
+  }
+  return texts;
 }
 
-let tesseractLoadingPromise = null;
-
-/**
- * Ensure Tesseract.js script is loaded lazily on demand
- */
-export async function loadTesseractScript(assetBase) {
-  if (window.Tesseract) return window.Tesseract;
-  if (tesseractLoadingPromise) return tesseractLoadingPromise;
-
-  tesseractLoadingPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = new URL('tesseract/tesseract.min.js', assetBase).href;
-    script.onload = () => {
-      if (window.Tesseract) resolve(window.Tesseract);
-      else reject(new Error('Tesseract 라이브러리 초기화 실패'));
-    };
-    script.onerror = () => reject(new Error('Tesseract 스크립트를 불러오지 못했어요.'));
-    document.head.append(script);
-  });
-  return tesseractLoadingPromise;
+// Rebuild printed lines from boxes so "수량 단가 금액" columns stay on one text line.
+function joinTextLines(boxes, texts) {
+  const items = boxes
+    .map((b, i) => ({ y: b.cy, x: b.cx - b.w / 2, h: b.h, text: texts[i] }))
+    .filter(item => item.text.trim())
+    .sort((a, b) => a.y - b.y);
+  const lines = [];
+  let current = [];
+  for (const item of items) {
+    if (current.length) {
+      const meanY = current.reduce((s, c) => s + c.y, 0) / current.length;
+      const medianH = current.map(c => c.h).sort((a, b) => a - b)[current.length >> 1];
+      if (Math.abs(item.y - meanY) > medianH / 3.2) {
+        lines.push(current);
+        current = [];
+      }
+    }
+    current.push(item);
+  }
+  if (current.length) lines.push(current);
+  return lines.map(line => line.sort((a, b) => a.x - b.x).map(c => c.text).join(' ')).join('\n');
 }
 
-// Tesseract output swings with text size, so text is read at two sizes and fields are voted.
-// Squashed passes read the double-height digits of the fuel row.
-const OCR_PASSES = [
-  { targetWidth: 1000 },
-  { yScale: 0.55 },
-  { targetWidth: 1600 },
-  { targetWidth: 1300 },
-  { yScale: 0.55, adaptive: true }
-];
-// Stop early only after both text sizes and one digit pass have voted.
-const MIN_OCR_PASSES = 3;
+async function readReceiptText(engine, src, abortSignal) {
+  const boxes = textBoxes(await detectText(engine, src));
+  if (abortSignal?.aborted) throw new Error('Aborted');
+  const texts = await recognizeLines(engine, boxes.map(b => cropTextLine(src, b)), abortSignal);
+  return joinTextLines(boxes, texts);
+}
+
 const RECEIPT_WORDS = /(?:주유|합계|금액|단가|수량|경유|휘발유|카드|매출|승인|부가세)/g;
 
 function receiptWordCount(text) {
   return (text.match(RECEIPT_WORDS) || []).length;
 }
 
-function receiptComplete(parsed) {
-  return parsed.confidence.consistency_passed && parsed.date && parsed.fuel_type &&
-    parsed.station_address && (parsed.station_name || parsed.station_phone);
-}
-
 /**
- * Run fuel receipt OCR with worker lifecycle and cancellation support.
- * Several passes of the same photo are combined by parseFuelReceipt.
+ * Run fuel receipt OCR with cancellation support.
+ * One PaddleOCR read of the photo; a sideways photo is retried at 90° and 270°.
  */
 export async function runReceiptOcr(file, assetBase, onProgress, abortSignal) {
-  const T = await loadTesseractScript(assetBase);
+  const progress = status => { if (typeof onProgress === 'function') onProgress({ status }); };
+  progress('loading engine');
+  const engine = await preloadReceiptOcr(assetBase);
   if (abortSignal?.aborted) throw new Error('Aborted');
 
   const decoded = await decodeReceiptImage(file);
   if (abortSignal?.aborted) throw new Error('Aborted');
 
-  const tesseractBase = new URL('tesseract/', assetBase).href;
-  const workerPath = new URL('worker.min.js', tesseractBase).href;
-  const corePath = tesseractBase;
-  const langPath = new URL('lang/', tesseractBase).href;
-
-  let worker = null;
-  const abortHandler = () => {
-    if (worker) {
-      try { worker.terminate(); } catch (_) {}
-    }
-  };
-  if (abortSignal) abortSignal.addEventListener('abort', abortHandler, { once: true });
-
-  try {
-    worker = await T.createWorker('kor+eng', 1, {
-      workerPath,
-      corePath,
-      langPath,
-      logger: m => {
-        if (onProgress && typeof onProgress === 'function') {
-          onProgress(m);
-        }
-      }
-    });
-
-    if (abortSignal?.aborted) throw new Error('Aborted');
-
-    const recognize = async canvas => {
-      const ret = await worker.recognize(canvas);
-      if (abortSignal?.aborted) throw new Error('Aborted');
-      return ret?.data?.text || '';
-    };
-
-    // Pass 1, and a sideways retry when the photo shows no receipt words at all
-    let source = decoded;
-    let box = findReceiptPaper(source);
-    let firstText = await recognize(renderOcrPass(source, box, OCR_PASSES[0]));
-    if (receiptWordCount(firstText) < 2) {
-      for (const degrees of [90, 270]) {
-        const rotated = rotateCanvas(decoded, degrees);
-        const rotatedBox = findReceiptPaper(rotated);
-        const text = await recognize(renderOcrPass(rotated, rotatedBox, OCR_PASSES[0]));
-        if (receiptWordCount(text) > receiptWordCount(firstText)) {
-          source = rotated;
-          box = rotatedBox;
-          firstText = text;
-        }
-      }
-    }
-
-    const texts = [firstText];
-    let parsed = parseFuelReceipt(texts);
-    for (let i = 1; i < OCR_PASSES.length; i++) {
-      if (onProgress && typeof onProgress === 'function') onProgress({ status: 'receipt pass', pass: i + 1, total: OCR_PASSES.length });
-      texts.push(await recognize(renderOcrPass(source, box, OCR_PASSES[i])));
-      parsed = parseFuelReceipt(texts);
-      if (texts.length >= MIN_OCR_PASSES && receiptComplete(parsed)) break;
-    }
-
-    return {
-      rawText: texts.join('\n\n'),
-      passes: texts,
-      parsed
-    };
-  } finally {
-    if (abortSignal) abortSignal.removeEventListener('abort', abortHandler);
-    if (worker) {
-      try { await worker.terminate(); } catch (_) {}
+  progress('recognizing text');
+  let text = await readReceiptText(engine, decoded, abortSignal);
+  if (receiptWordCount(text) < 2) {
+    for (const degrees of [90, 270]) {
+      const rotatedText = await readReceiptText(engine, rotateCanvas(decoded, degrees), abortSignal);
+      if (receiptWordCount(rotatedText) > receiptWordCount(text)) text = rotatedText;
+      if (receiptWordCount(text) >= 2) break;
     }
   }
+
+  return {
+    rawText: text,
+    passes: [text],
+    parsed: parseFuelReceipt([text])
+  };
 }

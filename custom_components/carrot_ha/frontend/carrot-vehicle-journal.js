@@ -16,7 +16,7 @@ const recordDay=(r,tz)=>r?.accounting_date||(r?.started_at?new Date(r.started_at
 const dayLabel=v=>{const m=/^\d{4}-(\d{2})-(\d{2})/.exec(v||'');return m?`${Number(m[1])}월 ${Number(m[2])}일`:(v||'');};
 const clockLabel=v=>{const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return '';const h=Number(m[1]),min=Number(m[2]);return `${h<12?'오전':'오후'} ${h%12||12}시${min?` ${min}분`:''}`;};
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
-const {parseFuelReceipt,runReceiptOcr,matchStationFromReceipt}=await import(journalModuleURL('./carrot-receipt-ocr.js'));
+const {parseFuelReceipt,runReceiptOcr,preloadReceiptOcr,matchStationFromReceipt}=await import(journalModuleURL('./carrot-receipt-ocr.js'));
 const assetBase=new URL('./carrot-assets/',import.meta.url).href;
 const JOURNAL_ICONS={
   bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
@@ -417,6 +417,8 @@ export class VehicleJournal extends HTMLElement {
       const type=button.dataset.recordType;
       this.$('recordTypeDialog').close();
       if(type==='receipt'){
+        // Fetch the OCR models while the photo is being taken or picked.
+        preloadReceiptOcr(assetBase).catch(()=>{});
         this.$('receiptSourceDialog').showModal();
         return;
       }

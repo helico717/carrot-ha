@@ -529,4 +529,85 @@ ODT No : 35
   print('✓ Test 27 Passed: Phone and name-only station matching');
 }
 
-print('\nALL RECEIPT PARSER TESTS (27/27) PASSED SUCCESSFULLY!');
+// 28. Test: Card number and point balance digits never form a fuel row (2026-11-11 field report:
+// 4364-2000-****-588* and 가용포인트 701 produced 2,000원 / 701원 / 2.9L on a 100,000원 receipt)
+{
+  const text = `
+매 출 전 표
+2026-11-11 18:28:15 (054-321-7788)
+매장명 : 한빛들 주유소
+01 경유 09
+55.2Z9 1,8O9 1OO,OOO
+합 계(주유금액) 100,000원
+[포인트 적립]
+카드 번호 : 0190-****-****-0664
+발생포인트 : 55
+가용포인트 : 701
+거래 일시 : 2026/11/11 18:26:22
+카드 번호 : 4364-2000-****-588*
+2.9
+승인 금액 : 100,000원
+`;
+  const result = parseFuelReceipt(text);
+  assertEquals(result.actual_krw, 100000, 'Printed total kept');
+  assertEquals(result.unit_price_krw, null, 'No unit price from point balance');
+  assertEquals(result.fuel_liters, null, 'No liters from stray numbers');
+  assert(filterOcrNoise('카드 번호 : 4364-2000-****-588*').includes('[CARD_NO]'), 'Card number ending in * masked');
+  assert(filterOcrNoise('0190-********-0664').includes('[CARD_NO]'), 'Merged masked card groups masked');
+  print('✓ Test 28 Passed: Card and point digits rejected as fuel row');
+}
+
+// 29. Test: PaddleOCR line output (columns joined, label spacing, cancelled pre-authorisation)
+{
+  const text = `
+매 전 표
+2026-11-11 18:30:11 (054-321-7788)
+ODT.NO : 35
+한빛들 주유소
+사업자번호:1234567890
+(12345)경상북도 예시시 가온면 한
+빛로 1021(가온리,한빛들주유소(GS))
+제품명 수량 단가 노즐번호(Nozzle No) 금액
+01경유 09
+3.317 1,809 6,000
+부가세 과세 물가 5,455 545
+합 계(주유금액) 6,000원
+[포인트 적립]
+포인트종 :GS&POINT 보너스카드
+0190-****-****-0664
+발생포인트 :3
+가용포인트:787
+2026/11/1118:29:56
+현대카드
+4890-1600-****-424*
+일시불
+00278562
+선승인금액 :149,900원(취소)
+실승인금액 :6,000원
+`;
+  const result = parseFuelReceipt([text]);
+  assertEquals(result.date, '2026-11-11', 'Date');
+  assertEquals(result.fuel_type, 'diesel', 'Diesel');
+  assertEquals(result.actual_krw, 6000, 'Final approved amount, not cancelled pre-authorisation');
+  assertEquals(result.unit_price_krw, 1809, 'Unit price');
+  assertEquals(result.fuel_liters, 3.317, 'Liters');
+  assertEquals(result.station_phone, '054-321-7788', 'Station phone');
+  assert(result.confidence.consistency_passed, 'Row matches total');
+  print('✓ Test 29 Passed: PaddleOCR line output parsed');
+}
+
+// 30. Test: Fuel row matching the printed total wins over another valid-looking equation
+{
+  const text = `
+01 휘발유
+2.000 1,000 2,000
+30.303 1,650 50,000
+합계 50,000
+`;
+  const result = parseFuelReceipt(text);
+  assertEquals(result.actual_krw, 50000, 'Total');
+  assertEquals(result.fuel_liters, 30.303, 'Row agreeing with total chosen');
+  print('✓ Test 30 Passed: Total-matching fuel row preferred');
+}
+
+print('\nALL RECEIPT PARSER TESTS (30/30) PASSED SUCCESSFULLY!');
