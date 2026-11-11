@@ -1507,3 +1507,5 @@
 
 - Added dedicated control button and result label; fixed control CLI action follows the same mode35/CAN reinit/timing/restore path but creates no publisher and emits neither request nor neutral frame. Existing lock/unlock retained. Per-request result history added on Comma.
 - CLI6 and HA backend/WebSocket5 focused tests passed. No new Panda firmware source change, actual field control, automatic requests or reboot. Comma Git update/user reboot and HA user restart required. HA deployment pending after commit.
+
+- Deployment completed: HAd8a94a4 five files hash verified; backup/rollback at /config/carrot_ha/deployment-backups/tm01-d8a94a441bce. Comma7ff2acd2c pushed, user update/reboot and HA restart pending. No new Panda firmware source or actual control trial. Independent review document updated with reviewer critique and remaining hypotheses.
