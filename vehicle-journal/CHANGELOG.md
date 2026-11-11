@@ -1,3 +1,11 @@
+## 2026-11-11 — 영수증 OCR 교체 02bae85 HA 직접 반영
+
+- 반영 전 HA의 carrot-receipt-ocr.js(62d767a4e45f)·carrot-vehicle-journal.js(f98c95083094) SHA-256이 직전 커밋 b91e5ad와 일치함을 확인했다.
+- 백업: `/config/carrot_ha/deployment-backups/receipt-ocr-02bae85/before`(두 JS, SHA256SUMS.before, 이동한 기존 carrot-assets/tesseract). 되돌리기: 같은 폴더 `rollback.sh`(이 변경만 되돌림).
+- 반영: 두 JS와 carrot-assets/paddleocr 7개 파일. 첫 전송은 Windows git archive의 줄바꿈 변환으로 텍스트 파일 해시가 달라 `core.autocrlf=false`로 텍스트 6개를 다시 반영했다. 최종 9개 파일 SHA-256이 커밋 02bae85와 일치한다.
+- HTTP: `/carrot_ha_static/` JS는 text/javascript, .wasm은 application/wasm, .onnx는 application/octet-stream으로 200 응답. `/api/carrot_ha/frontend-version`이 재시작 없이 `0.9.0-b4a04d5d44fb`로 바뀌었다.
+- 상태: 화면 모듈·정적 자산만 변경이라 HA 재시작 불필요(브라우저 새로고침). 실제 HA 화면에서의 영수증 인식, Android 기기, 다른 영수증 양식은 미확인. DB·사진·설정 변경 없음. 새 릴리즈·태그 없음.
+
 ## 2026-11-11 — 주유 영수증 OCR을 기기 내 PaddleOCR로 교체
 
 - 커밋 제목: vehicle-journal: replace receipt OCR with on-device PaddleOCR
