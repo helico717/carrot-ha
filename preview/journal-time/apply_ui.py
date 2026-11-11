@@ -40,13 +40,16 @@ const recordClock=(r,tz)=>{
   return '';
 };
 // Local accounting day; started_at is UTC, so slicing it shows the previous day for early-morning KST.
-const recordDay=(r,tz)=>r?.accounting_date||(r?.started_at?new Date(r.started_at).toLocaleDateString('sv-SE',{timeZone:tz||'Asia/Seoul'}):'');"""
+const recordDay=(r,tz)=>r?.accounting_date||(r?.started_at?new Date(r.started_at).toLocaleDateString('sv-SE',{timeZone:tz||'Asia/Seoul'}):'');
+// Display: "11월 10일" and "오후 7시 5분" (on the hour: "오후 7시").
+const dayLabel=v=>{const m=/^\d{4}-(\d{2})-(\d{2})/.exec(v||'');return m?`${Number(m[1])}월 ${Number(m[2])}일`:(v||'');};
+const clockLabel=v=>{const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return '';const h=Number(m[1]),min=Number(m[2]);return `${h<12?'오전':'오후'} ${h%12||12}시${min?` ${min}분`:''}`;};"""
 
 LEDGER_OLD = "return `<tr><td>${esc(r.accounting_date||r.started_at?.slice(0,10))}<small>"
-LEDGER_NEW = "const clock=recordClock(r,d.timezone);\n      return `<tr><td>${esc(recordDay(r,d.timezone))}${clock?`<span class=\"ledger-time\">${clock}</span>`:''}<small>"
+LEDGER_NEW = "const clock=clockLabel(recordClock(r,d.timezone));\n      return `<tr><td><b class=\"ledger-day\">${esc(dayLabel(recordDay(r,d.timezone)))}</b>${clock?`<span class=\"ledger-time\">${clock}</span>`:''}<small>"
 
 RECENT_OLD = "<small class=\"recent-date-sub\">${esc(record.accounting_date||'미확인')} · "
-RECENT_NEW = "<small class=\"recent-date-sub\">${esc(record.accounting_date||'미확인')}${recordClock(record,this.data?.timezone)?` ${recordClock(record,this.data?.timezone)}`:''} · "
+RECENT_NEW = "<small class=\"recent-date-sub\">${record.accounting_date?`<b>${esc(dayLabel(record.accounting_date))}</b>`:'미확인'}${recordClock(record,this.data?.timezone)?` ${clockLabel(recordClock(record,this.data?.timezone))}`:''} · "
 
 FIELD_OLD = '<label id="dateField">기록 날짜<input name="date" type="date" required></label>'
 FIELD_NEW = FIELD_OLD + '<label id="timeField">시각 (선택)<input name="time" type="time" step="60"></label>'
@@ -84,7 +87,10 @@ CSS_NEW = CSS_OLD + """
 #recordDialog[data-mode] .fields #dateField,#recordDialog[data-mode] .fields #timeField{grid-column:span 3!important}
 #recordDialog[data-mode] .fields #timeField{order:2}
 #recordDialog[data-mode=trip] .fields #odometerField{grid-column:1 / -1!important}
-.ledger-table td:nth-child(1) .ledger-time{margin-left:6px;font-variant-numeric:tabular-nums;color:var(--j-sub);font-weight:600}"""
+.ledger-table td:nth-child(1) .ledger-day{display:block;font-weight:700;color:var(--j-ink)}
+.ledger-table td:nth-child(1) .ledger-time{display:block;margin-top:2px;color:var(--j-sub);font-weight:600}
+@media (max-width:760px){.ledger-table td:nth-child(1) .ledger-day{font-size:13px}.ledger-table td:nth-child(1) .ledger-time{display:inline;margin:0}}
+.recent-date-sub b{color:var(--j-ink);font-weight:700}"""
 
 patch('carrot-journal-design.js', [(CSS_OLD, CSS_NEW)])
 print('applied')

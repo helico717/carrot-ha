@@ -1733,7 +1733,10 @@ export const journalDesign = `:host {
 #recordDialog[data-mode] .fields #dateField,#recordDialog[data-mode] .fields #timeField{grid-column:span 3!important}
 #recordDialog[data-mode] .fields #timeField{order:2}
 #recordDialog[data-mode=trip] .fields #odometerField{grid-column:1 / -1!important}
-.ledger-table td:nth-child(1) .ledger-time{margin-left:6px;font-variant-numeric:tabular-nums;color:var(--j-sub);font-weight:600}
+.ledger-table td:nth-child(1) .ledger-day{display:block;font-weight:700;color:var(--j-ink)}
+.ledger-table td:nth-child(1) .ledger-time{display:block;margin-top:2px;color:var(--j-sub);font-weight:600}
+@media (max-width:760px){.ledger-table td:nth-child(1) .ledger-day{font-size:13px}.ledger-table td:nth-child(1) .ledger-time{display:inline;margin:0}}
+.recent-date-sub b{color:var(--j-ink);font-weight:700}
 
 /* Receipt OCR Loading Overlay & Auto-fill styles */
 .receipt-ocr-overlay {
