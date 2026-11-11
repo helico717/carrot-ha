@@ -45,7 +45,7 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
         raw=command['message']['data'];self.assertIn('--action unlock --bus 0',raw)
         nonce=re.search(r'--request-id ([0-9a-f]{32})',raw)[1]
         text='TM01_RESULT '+nonce+' '+json.dumps({'request_id':nonce,'status':'target_state_observed','restored':True})+'\r\n'
-        await self.ws.send_json({'type':'terminal','session_id':sid,'message':{'type':'pty_output','data':base64.b64encode(text.encode()).decode()}})
+        await self.ws.send_json({'type':'terminal','session_id':sid,'message':{'type':'pty_output','b64':base64.b64encode(text.encode()).decode()}})
         result=await asyncio.wait_for(task,3)
         self.assertEqual(result['status'],'target_state_observed')
         self.assertFalse(result['vehicle_acceptance_verified'])

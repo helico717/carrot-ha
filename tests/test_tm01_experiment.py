@@ -27,7 +27,7 @@ class Relay:
         # Chunking includes a partial marker and JSON across terminal messages.
         for chunk in (data[:17],data[17:61],data[61:]):
             for callback in self.callbacks.values():
-                callback({'type':'terminal','message':{'type':'pty_output','data':base64.b64encode(chunk.encode()).decode()}})
+                callback({'type':'terminal','message':{'type':'pty_output','b64':base64.b64encode(chunk.encode()).decode()}})
     async def release(self,key,reason):self.released+=1;self.controller=None;self.session_id=None
 
 class Tests(unittest.IsolatedAsyncioTestCase):

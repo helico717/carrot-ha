@@ -48,7 +48,7 @@ class TrialController:
             if event.get('type') != 'terminal' or message.get('type') != 'pty_output':
                 return
             try:
-                chunk = base64.b64decode(message.get('data', ''), validate=True).decode('utf-8', errors='replace')
+                chunk = base64.b64decode(message.get('b64', ''), validate=True).decode('utf-8', errors='replace')
             except (ValueError, TypeError):
                 return
             buffer = (buffer+chunk)[-32768:]
