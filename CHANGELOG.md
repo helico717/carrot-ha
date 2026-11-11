@@ -1509,3 +1509,9 @@
 - CLI6 and HA backend/WebSocket5 focused tests passed. No new Panda firmware source change, actual field control, automatic requests or reboot. Comma Git update/user reboot and HA user restart required. HA deployment pending after commit.
 
 - Deployment completed: HAd8a94a4 five files hash verified; backup/rollback at /config/carrot_ha/deployment-backups/tm01-d8a94a441bce. Comma7ff2acd2c pushed, user update/reboot and HA restart pending. No new Panda firmware source or actual control trial. Independent review document updated with reviewer critique and remaining hypotheses.
+
+## 2026-11-11 — TM_01 회선·인증 문헌 조사
+
+- 사용자 후속 조사 요청: 비공개 연구 저장소 docs/tm01-route-auth-followup-2026-11-11.md에 공식 공조/도어 서비스 지원 구분, DBC 서명 정의의 한계, matched control 결과와 flipped 컨트롤러 매핑 정정, 다음 세분 관측 사양을 기록했다.
+- 검증: Comma7ff2/DBC hash·공개1차 자료 대조. 연구 문서만 변경하여 제품 테스트 반복 없음. 세분 로깅은 아직 미구현이며 정상 OCU 인증/회선 수용 미확인.
+- 배포: 공통 기록만. HA/Comma 실행 파일·펌웨어·차량 접속/송신·설치·재시작·릴리즈 없음. 기존 사용자 untracked 프리뷰와 연구 rev2 원본은 보존한다.
