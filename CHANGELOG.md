@@ -1497,3 +1497,8 @@
 ## 2026-11-11 - TM01 independent evaluation handoff
 
 - Added detailed Korean experiment/review brief in meb-can-research docs/tm01-independent-review-2026-11-11.md: actual sequence, fixed source commits, firmware/transport constraints, wake/auth hypotheses, observation limits, rollback and independent reviewer questions. Documentation only; no vehicle action or deployment.
+
+## 2026-11-11 - TM01 physical outcome review
+
+- Preserved latest unlock result read-only outside Git: three publications/returns, no reject flag, 9548 received frames after request, actual lock remains true, restoration confirmed; no independent delivery proof.
+- Updated research independent-review MD with lock/interrupted-unlock/latest-unlock outcomes and planned matched mode35/reinit no-frame control. Current receive-only stage is not equivalent to the transmit stage. No new vehicle action, code deployment or control-test implementation in this update.
