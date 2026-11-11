@@ -1848,6 +1848,39 @@ export const journalDesign = `:host {
   margin: 0;
   min-height: 22px;
 }
+.ocr-progress {
+  width: min(240px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ocr-progress[hidden] {
+  display: none !important;
+}
+.ocr-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.ocr-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #81e6c5;
+  box-shadow: 0 0 8px rgba(129, 230, 197, 0.5);
+  transition: width 0.12s linear;
+}
+.ocr-progress-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--j-sub);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ocr-progress-fill { transition: none; }
+}
 .ocr-cancel-btn {
   margin-top: 6px;
   background: rgba(255, 255, 255, 0.08);

@@ -738,42 +738,127 @@ const DET_THRESH = 0.3, BOX_THRESH = 0.5, UNCLIP = 1.6;
 const HEIGHT_PAD = 0.3;
 const REC_H = 48, REC_BATCH = 8, REC_MAX_W = 1600;
 
+// Large files are downloaded with byte progress and kept in Cache Storage per asset version,
+// so the HA companion app does not depend on the WebView's HTTP cache. Sizes are fallbacks
+// for servers that omit Content-Length.
+const PADDLE_FILES = [
+  { name: 'ort-wasm-simd-threaded.wasm', bytes: 11246032 },
+  { name: 'det.onnx', bytes: 4819576 },
+  { name: 'rec.onnx', bytes: 13401252 },
+  { name: 'dict.txt', bytes: 47451 },
+];
+const PADDLE_CACHE = `carrot-receipt-ocr-${PADDLE_ASSET_VERSION}`;
+
 let paddlePromise = null;
+let loadState = { phase: 'idle', loaded: 0, total: PADDLE_FILES.reduce((s, f) => s + f.bytes, 0) };
+const loadListeners = new Set();
+
+function setLoadState(patch) {
+  loadState = { ...loadState, ...patch };
+  for (const fn of loadListeners) {
+    try { fn(loadState); } catch (_) { /* a listener must not break loading */ }
+  }
+}
+
+/** Current engine load state: phase idle | downloading | preparing | ready | error, bytes loaded/total. */
+export function receiptOcrLoadState() {
+  return loadState;
+}
+
+/** Subscribe to engine load progress; the listener is called immediately. Returns an unsubscribe function. */
+export function onReceiptOcrLoad(fn) {
+  loadListeners.add(fn);
+  fn(loadState);
+  return () => loadListeners.delete(fn);
+}
 
 function paddleUrl(assetBase, name) {
   return `${new URL(`paddleocr/${name}`, assetBase).href}?v=${PADDLE_ASSET_VERSION}`;
 }
 
+async function openPaddleCache() {
+  try {
+    if (!globalThis.caches) return null; // Cache Storage needs a secure context (HTTPS)
+    const names = await caches.keys();
+    await Promise.all(names.filter(n => n.startsWith('carrot-receipt-ocr-') && n !== PADDLE_CACHE).map(n => caches.delete(n)));
+    return await caches.open(PADDLE_CACHE);
+  } catch (_) {
+    return null;
+  }
+}
+
+async function readWithProgress(response, onBytes) {
+  if (!response.body?.getReader) {
+    const buffer = await response.arrayBuffer();
+    onBytes(buffer.byteLength);
+    return buffer;
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+    onBytes(value.byteLength);
+  }
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
+  return out.buffer;
+}
+
+async function downloadPaddleFiles(assetBase) {
+  const cache = await openPaddleCache();
+  const cached = cache ? await Promise.all(PADDLE_FILES.map(f => cache.match(paddleUrl(assetBase, f.name)).catch(() => null))) : [];
+  const need = PADDLE_FILES.filter((f, i) => !cached[i]);
+  const total = need.reduce((s, f) => s + f.bytes, 0);
+  let loaded = 0;
+  if (need.length) setLoadState({ phase: 'downloading', loaded: 0, total });
+  const buffers = await Promise.all(PADDLE_FILES.map(async (f, i) => {
+    const url = paddleUrl(assetBase, f.name);
+    if (cached[i]) return cached[i].arrayBuffer();
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`OCR 모델 파일을 받지 못했어요 (${f.name}, ${response.status}).`);
+    const buffer = await readWithProgress(response, n => {
+      loaded += n;
+      setLoadState({ phase: 'downloading', loaded: Math.min(loaded, total), total });
+    });
+    if (cache) {
+      cache.put(url, new Response(buffer, { headers: { 'Content-Type': response.headers.get('Content-Type') || 'application/octet-stream' } })).catch(() => {});
+    }
+    return buffer;
+  }));
+  return Object.fromEntries(PADDLE_FILES.map((f, i) => [f.name, buffers[i]]));
+}
+
 async function loadPaddle(assetBase) {
+  const files = await downloadPaddleFiles(assetBase);
+  setLoadState({ phase: 'preparing' });
   const ort = await import(paddleUrl(assetBase, 'ort-wasm.min.js'));
-  ort.env.wasm.wasmPaths = {
-    mjs: paddleUrl(assetBase, 'ort-wasm-simd-threaded.js'),
-    wasm: paddleUrl(assetBase, 'ort-wasm-simd-threaded.wasm'),
-  };
+  ort.env.wasm.wasmPaths = { mjs: paddleUrl(assetBase, 'ort-wasm-simd-threaded.js') };
+  ort.env.wasm.wasmBinary = files['ort-wasm-simd-threaded.wasm'];
   // Home Assistant pages are not cross-origin isolated, so WASM threads are unavailable.
   ort.env.wasm.numThreads = globalThis.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
   const opts = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-  const [det, rec, dictText] = await Promise.all([
-    ort.InferenceSession.create(paddleUrl(assetBase, 'det.onnx'), opts),
-    ort.InferenceSession.create(paddleUrl(assetBase, 'rec.onnx'), opts),
-    fetch(paddleUrl(assetBase, 'dict.txt')).then(r => {
-      if (!r.ok) throw new Error(`OCR 사전 파일을 불러오지 못했어요 (${r.status}).`);
-      return r.text();
-    }),
-  ]);
-  const chars = dictText.split('\n').map(l => l.replace(/\r$/, ''));
+  const det = await ort.InferenceSession.create(new Uint8Array(files['det.onnx']), opts);
+  const rec = await ort.InferenceSession.create(new Uint8Array(files['rec.onnx']), opts);
+  const chars = new TextDecoder().decode(files['dict.txt']).split('\n').map(l => l.replace(/\r$/, ''));
   if (chars[chars.length - 1] === '') chars.pop();
+  setLoadState({ phase: 'ready' });
   return { ort, det, rec, chars: ['', ...chars, ' '] };
 }
 
 /**
- * Start loading the OCR engine and models in the background (about 30 MB on first use,
- * then served from the browser cache). Safe to call repeatedly; a failure is retried next time.
+ * Start loading the OCR engine and models in the background (about 29 MB on first use,
+ * then from Cache Storage). Safe to call repeatedly; a failure is retried next time.
  */
 export function preloadReceiptOcr(assetBase) {
   if (!paddlePromise) {
     paddlePromise = loadPaddle(assetBase).catch(err => {
       paddlePromise = null;
+      setLoadState({ phase: 'error', error: String(err?.message || err) });
       throw err;
     });
   }

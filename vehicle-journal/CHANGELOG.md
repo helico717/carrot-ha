@@ -1,3 +1,13 @@
+## 2026-11-11 — 영수증 OCR 모델 다운로드 진행률 표시·모델 보관 (사용자 승인)
+
+- 커밋 제목: vehicle-journal: show receipt OCR model download progress
+- 요청: HA 컴패니언 앱을 자주 쓰므로 첫 사용 시 모델(약 28MB) 다운로드 진행을 확인할 수 있어야 한다. 사용자가 기존 'OCR로 인식하는 중이에요.' 화면 안에 표시하는 방식을 지정했다.
+- 변경: OCR 화면 상태 문구 아래에 민트색 진행 막대와 `받은 MB / 전체 MB · % · 처음 한 번만 받아요`를 표시한다. 단계 문구는 '인식 모델을 내려받는 중이에요.' → '인식 엔진을 준비하는 중이에요.'(막대 가득, '곧 인식을 시작해요') → 기존 'OCR로 인식하는 중이에요.'. 모델이 이미 있으면 막대를 표시하지 않는다. 영수증 메뉴 선택 때 시작된 미리 받기도 이어서 표시한다. 화면 갱신은 프레임당 한 번으로 묶었다.
+- 엔진: 모델·WASM·사전 파일을 스트림으로 읽어 바이트 진행을 알리고(`onReceiptOcrLoad`, `receiptOcrLoadState`), 받은 파일을 자산 버전별 Cache Storage(`carrot-receipt-ocr-ppocrv5-ko-1`)에 보관해 WebView HTTP 캐시가 비워져도 다시 받지 않는다. 이전 버전 캐시는 삭제한다. ORT에는 받은 WASM 바이너리와 모델 바이트를 직접 넘긴다. Cache Storage는 HTTPS에서만 사용 가능해 HTTP LAN 접속은 기존처럼 브라우저 HTTP 캐시에 의존한다.
+- 관련 파일: frontend/carrot-receipt-ocr.js, carrot-vehicle-journal.js, carrot-journal-design.js. 검토 하네스는 Git 제외 폴더(vehicle-journal/ocr-samples/progress-preview)에 두었다.
+- 검증: 승인 전 실제 모듈 프리뷰(390×844)에서 1MB/s 제한 시 막대 폭과 표시 비율 일치(20→35→49→63→77%), 이후 인식 결과 100,000원·1,809원·55.279L·경유·2026-11-11 입력, Cache Storage 4개 파일 저장, 저장된 모델 재실행 시 막대 없이 인식 확인. 처음 막대가 64KB마다 재시작하는 전환 때문에 뒤처지던 문제를 프레임 단위 갱신으로 고쳤다. 영수증 파서 30/30, node --check 통과. 승인 후 프로덕션 파일이 프리뷰와 동일함을 확인했다.
+- 배포: 커밋·푸시 후 HA 직접 반영 예정. 화면 모듈만 변경되어 HA 재시작 불필요. 실제 컴패니언 앱(iOS/Android WebView)에서의 진행률 표시와 Cache Storage 동작은 미확인. 새 릴리즈·태그 없음.
+
 ## 2026-11-11 — 영수증 OCR 교체 02bae85 HA 직접 반영
 
 - 반영 전 HA의 carrot-receipt-ocr.js(62d767a4e45f)·carrot-vehicle-journal.js(f98c95083094) SHA-256이 직전 커밋 b91e5ad와 일치함을 확인했다.
