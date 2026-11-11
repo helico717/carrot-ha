@@ -2169,5 +2169,30 @@ export const journalDesign = `:host {
   .trends-grid.single-item .trend-card{grid-column:1/-1}
 }
 @media(max-width:600px){.trend-rank-hint{display:none}}
+/* Charging ledger rows: address line under the place name. */
+.ledger-main-title.ledger-charge-place,#page3 .ledger-table .ledger-main-title.ledger-charge-place{font-weight:750}
+.ledger-place-address{font-size:.88em;font-weight:700;color:var(--j-sub);opacity:.78;line-height:1.4;overflow-wrap:anywhere;min-width:0}
+/* Favorite chargers in the record dialog. */
+#recordDialog .loc-favorite-row{grid-column:1 / -1;display:flex;align-items:center;gap:10px;margin-top:8px;padding:9px 12px;border:1px solid var(--j-border);border-radius:12px;background:var(--j-surface);cursor:pointer;min-width:0}
+#recordDialog .loc-favorite-row[hidden],#recordDialog .loc-favorite-past[hidden],#recordDialog .favorite-places[hidden]{display:none!important}
+#recordDialog .loc-favorite-row input,#recordDialog .loc-favorite-past input{position:absolute;opacity:0;width:1px;height:1px;min-height:0;margin:0;pointer-events:none}
+#recordDialog .loc-favorite-star{flex:0 0 auto;font-size:18px;line-height:1;color:var(--j-sub);opacity:.55;transition:color .15s ease,opacity .15s ease}
+#recordDialog .loc-favorite-row.on{border-color:var(--j-accent)}
+#recordDialog .loc-favorite-row.on .loc-favorite-star{color:var(--j-accent);opacity:1}
+#recordDialog .loc-favorite-row:has(input:focus-visible),#recordDialog .loc-favorite-past:has(input:focus-visible){outline:2px solid var(--j-accent);outline-offset:2px}
+#recordDialog .loc-favorite-text{display:flex;flex-direction:column;gap:1px;min-width:0}
+#recordDialog .loc-favorite-text b{font-size:13px;font-weight:700;color:var(--j-ink)}
+#recordDialog .loc-favorite-text small{font-size:11.5px;color:var(--j-sub);line-height:1.35}
+#recordDialog .loc-favorite-past{grid-column:1 / -1;display:flex;align-items:center;gap:8px;padding:4px 12px 0;font-size:12px;color:var(--j-sub);cursor:pointer}
+#recordDialog .loc-favorite-past::before{content:'';flex:0 0 14px;width:14px;height:14px;box-sizing:border-box;border:1.5px solid var(--j-border);border-radius:4px;background:var(--j-bg)}
+#recordDialog .loc-favorite-past:has(input:checked){color:var(--j-ink)}
+#recordDialog .loc-favorite-past:has(input:checked)::before{background:var(--j-accent);border-color:var(--j-accent);box-shadow:inset 0 0 0 2.5px var(--j-bg)}
+#recordDialog .favorite-places{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;min-width:0}
+#recordDialog .favorite-places-title{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--j-accent)}
+#recordDialog .favorite-chip{display:inline-flex;align-items:stretch;max-width:100%;min-width:0;border:1px solid var(--j-border);border-radius:9999px;background:var(--j-surface);overflow:hidden}
+#recordDialog .favorite-chip button{border:0!important;background:transparent!important;color:var(--j-ink)!important;font-size:12px!important;min-height:28px!important;height:auto!important;padding:4px 4px 4px 11px!important;border-radius:0!important;cursor:pointer;min-width:0;box-shadow:none!important}
+#recordDialog .favorite-chip .favorite-chip-pick{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#recordDialog .favorite-chip .favorite-chip-remove{flex:0 0 auto;padding:4px 10px 4px 5px!important;color:var(--j-sub)!important}
+#recordDialog .favorite-chip button:hover{background:var(--j-raised)!important}
 `;
 
