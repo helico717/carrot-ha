@@ -1,3 +1,12 @@
+## 2026-11-11 — 자주 가는 충전소 8e115bd HA 직접 반영 (재시작 대기)
+
+- 대상 커밋 8e115bd(화면) + de1fc73(백엔드), origin/main 푸시 완료. 반영 전 HA의 7개 파일 SHA-256이 직전 기준 4ab192b와 모두 일치함을 확인했다.
+- 백업: `/homeassistant/carrot_ha/deployment-backups/favorite-charger-8e115bd/before`(SHA256SUMS.before 포함), 되돌리기는 같은 폴더의 `rollback.sh`(이 변경만 되돌림, 이후 HA 재시작 필요).
+- 반영 파일(로컬에서 추출·비어 있지 않음 확인 후 스트리밍, 원격 임시 파일 해시 검증 뒤 교체): vehicle_journal/{schema.sql a2e92a4598c8, store.py 504fc9452ed5, automatic_locations.py 95b593584555, api.py 5b2d9a573ef0, station_stats.py d55f377633c6}, frontend/{carrot-journal-design.js 3455cb4da165, carrot-vehicle-journal.js 8d917652c8e8}. HA 파일 해시가 커밋과 일치하고, HA HTTP(`/carrot_ha_static/`) 응답 해시도 두 화면 파일 모두 일치. 프런트 버전 API `0.9.0-4a6c6ff79925`.
+- HA에서 읽기 전용 확인: 반영된 Python 4개 문법 검사 통과, schema.sql을 메모리 DB에 적용해 `favorite_places` 생성 확인. 운영 DB는 건드리지 않았다.
+- 적용 시점: 상세 기록 3줄 표시와 충전량 소수 1자리는 브라우저/앱 새로고침으로 적용. 즐겨찾기 등록·자동 적용은 Python 변경이라 **사용자 HA 재시작 후** 동작한다(재시작 전에는 즐겨찾기 UI가 숨겨진다).
+- 미확인: 재시작 후 실제 HA에서 즐겨찾기 등록·다음 자동 충전의 이름 기록·이전 기록 적용, 실제 화면 표시(에이전트는 HA 로그인 불가). 릴리즈 발행 없음.
+
 ## 2026-11-11 — 자주 가는 충전소 화면을 운영 파일에 적용 (사용자 승인)
 
 - 사용자가 프리뷰(`preview/favorite-charger/`)를 확인하고 반영을 승인했다. 프리뷰에 쓴 `apply_ui.py`를 그대로 운영 파일에 적용해 프리뷰 사본과 바이트 단위로 같음을 확인했다(cmp).
