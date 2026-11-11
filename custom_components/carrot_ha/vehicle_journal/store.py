@@ -566,7 +566,7 @@ class Journal:
         if 'provider' in location and location['provider'] not in ('kakao','opinet','manual'):raise ValueError('장소 제공사를 확인해 주세요.')
         if 'station_id' in location and (not isinstance(location['station_id'],str) or not 1<=len(location['station_id'])<=100):raise ValueError('장소 ID를 확인해 주세요.')
         if 'station_type' in location and location['station_type'] not in ('charging','refueling'):raise ValueError('장소 종류를 확인해 주세요.')
-        if 'selection_source' in location and location['selection_source'] not in ('automatic','automatic_address','manual'):raise ValueError('장소 선택 출처를 확인해 주세요.')
+        if 'selection_source' in location and location['selection_source'] not in ('automatic','automatic_address','manual','favorite'):raise ValueError('장소 선택 출처를 확인해 주세요.')
         lat,lon=location.get('latitude'),location.get('longitude')
         if (lat is None)!=(lon is None):raise ValueError('위도와 경도를 함께 입력해 주세요.')
         if lat is not None and (type(lat) not in (float,int) or type(lon) not in (float,int) or not math.isfinite(lat) or not math.isfinite(lon) or not -90<=lat<=90 or not -180<=lon<=180):raise ValueError('좌표 범위를 확인해 주세요.')
@@ -582,6 +582,55 @@ class Journal:
             db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),self.vehicle,key))
             db.execute('INSERT INTO change_log(vehicle_id,record_id,actor,operation,after_json,changed_at) VALUES (?,?,?,?,?,?)',(self.vehicle,key,'administrator','location',encode(location),now()))
         return {'id':key,'version':expected+1}
+
+    def favorites(self):
+        with self.connect() as db:
+            return [{'id':r[0],'location':json.loads(r[1]),'anchors':json.loads(r[2]),'created_at':r[3]}
+                    for r in db.execute('SELECT id,location_json,anchors_json,created_at FROM favorite_places WHERE vehicle_id=? ORDER BY created_at,id',(self.vehicle,))]
+
+    def save_favorite(self,location,record_id=None,apply_past=False):
+        """Remember the charger the user picked as the usual one for that spot.
+
+        Anchors are the charge-start GPS points of the record it was picked on, so a later charge
+        at the same parking spot resolves to this charger instead of an address-only place."""
+        self.validate_location(location)
+        if not isinstance(location,dict) or not location.get('name','').strip():raise ValueError('즐겨찾는 충전소 이름을 입력해 주세요.')
+        if location.get('latitude') is None and not location.get('address'):raise ValueError('지도에서 위치를 지정한 뒤 즐겨찾기로 등록해 주세요.')
+        place={k:v for k,v in location.items() if k!='selection_source'};place['name']=place['name'].strip();place['station_type']='charging'
+        with self.lock,self.connect() as db:
+            anchors=[]
+            if record_id:
+                rows=db.execute("""SELECT r.extra_json FROM records r WHERE r.vehicle_id=? AND r.kind='charge' AND r.status='active'
+                    AND (r.id=? OR r.id IN (SELECT charge_id FROM expense_members WHERE vehicle_id=? AND expense_id=?))""",(self.vehicle,record_id,self.vehicle,record_id)).fetchall()
+                for text, in rows:
+                    point=json.loads(text).get('source_position') or {}
+                    if number(point.get('latitude')) is not None and number(point.get('longitude')) is not None:
+                        anchors.append({'latitude':point['latitude'],'longitude':point['longitude']})
+            def same(other):
+                if place.get('station_id') or other.get('station_id'):return (place.get('provider'),place.get('station_id'))==(other.get('provider'),other.get('station_id'))
+                return (place['name'],place.get('address',''))==(other['name'],other.get('address',''))
+            existing=db.execute('SELECT id,location_json,anchors_json FROM favorite_places WHERE vehicle_id=?',(self.vehicle,)).fetchall()
+            found=next((r for r in existing if same(json.loads(r[1]))),None)
+            if found:
+                key=found[0]
+                for anchor in json.loads(found[2]):
+                    if anchor not in anchors:anchors.append(anchor)
+                db.execute('UPDATE favorite_places SET location_json=?,anchors_json=?,updated_at=? WHERE vehicle_id=? AND id=?',(encode(place),encode(anchors[:12]),now(),self.vehicle,key))
+            else:
+                if len(existing)>=50:raise ValueError('즐겨찾는 충전소는 50곳까지 등록할 수 있어요.')
+                key=str(uuid4())
+                db.execute('INSERT INTO favorite_places VALUES (?,?,?,?,?,?)',(self.vehicle,key,encode(place),encode(anchors[:12]),now(),now()))
+        applied=0
+        if apply_past:
+            from .automatic_locations import apply_favorites
+            applied=apply_favorites(self)
+        return {'id':key,'anchors':len(anchors[:12]),'applied':applied}
+
+    def remove_favorite(self,key):
+        """Forget a favorite; records it already named keep their location."""
+        with self.lock,self.connect() as db:
+            if not db.execute('DELETE FROM favorite_places WHERE vehicle_id=? AND id=?',(self.vehicle,key)).rowcount:raise Conflict('이미 삭제된 즐겨찾기예요.')
+        return {'id':key}
 
     def cleanup_purged_photos(self):
         base=(Path(self.path).with_suffix('')/'attachments').resolve()

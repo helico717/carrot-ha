@@ -57,7 +57,7 @@ def place_record_ids(db,vehicle,start,end,place):
     for rid,text,started in db.execute("SELECT r.id,r.extra_json,m.started_at FROM records r JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id WHERE r.vehicle_id=? AND r.kind='charge' AND r.status='active'",(vehicle,)):
         if rid in accounted or not start<=stamp(started).astimezone(ZoneInfo(timezone)).date().isoformat()<=end:continue
         extra=json.loads(text);location=extra.get('location',(extra.get('input') or {}).get('location'))
-        if location and (location.get('station_id') or location.get('selection_source')=='automatic_address') and place_identity(location,rid)==place:ids.add(rid)
+        if location and (location.get('station_id') or location.get('selection_source') in ('automatic_address','favorite')) and place_identity(location,rid)==place:ids.add(rid)
     return ids
 
 
@@ -93,6 +93,7 @@ def facts(db,vehicle,start,end):
         if not location:continue
         if location.get('station_id'):identity=location.get('provider','manual')+':'+location['station_id']
         elif location.get('selection_source')=='automatic_address' and location.get('address') and location.get('latitude') is not None:identity='address:'+location['address']
+        elif location.get('selection_source')=='favorite' and location.get('latitude') is not None:identity=place_identity(location,rid)
         else:continue
         g=groups.setdefault(('charging',identity),{'id':identity,'kind':'charging','location':location,'resolved':True,'visits':0,'actual_krw':0,'estimated_krw':0,'fuel_liters':0,'billed_kwh':0,'battery_kwh':0,'fuel_priced_liters':0,'fuel_priced_cost':0,'billed_priced_kwh':0,'billed_priced_cost':0,'battery_priced_kwh':0,'battery_priced_cost':0,'unknown_quantity_count':0})
         g['address_only']=identity.startswith('address:');g['visits']+=1

@@ -1,3 +1,15 @@
+## 2026-11-11 — 자주 가는 충전소(즐겨찾기) 백엔드와 화면 프리뷰 (승인 대기)
+
+- 사용자 요청(전기차만): 같은 주소에 충전소가 여러 곳이면 자동 기록이 주소만 남는다. 자주 가는 곳은 수정 창에서 고른 충전소를 즐겨찾기로 등록해, 이후 그 위치의 자동 충전에 충전소 이름이 들어가게 한다. 상세 기록의 충전 행은 충전소 이름(흰색 굵게) / 주소(회색 굵게, 조금 작게) / 충전량 kWh · 누적 주행거리 3줄로 보여 준다. 수정 창의 자동 충전량은 소수 1자리만 표시한다.
+- 백엔드(운영 코드, 로컬 커밋만): `favorite_places` 테이블(차량별, 장소 + 등록한 기록의 충전 시작 GPS 기준점), `Journal.favorites/save_favorite/remove_favorite`, 웹소켓 `carrot_ha/journal/favorite/{list,save,delete}`(관리자), 위치 출처 `favorite` 추가.
+- 자동 적용 규칙(`automatic_locations.py`): (1) 충전 시작 GPS가 즐겨찾기 기준점 50m 이내면 제공사 조회 없이 그 충전소로 기록. (2) 그 외에는 기존 조회를 그대로 하고, 충전소가 확정되지 않아 주소만 남길 상황(여러 곳·150m 밖·조회 실패)에서 즐겨찾기 장소 좌표 150m 이내 또는 도로명 주소가 같으면 즐겨찾기로 기록. 확정된 단일 충전소 결과는 바꾸지 않는다. 즐겨찾기 두 곳이 25m 이내로 경합하면 적용하지 않는다. 사용자가 직접 지정한 위치는 건드리지 않는다.
+- 이전 기록 적용은 선택 사항(`apply_past`): 주소만 있거나 위치가 없는 자동 충전 중 같은 규칙에 맞는 것만 이름을 채우고 지출 행으로 전파한다. 즐겨찾기를 지워도 이미 기록된 이름은 유지한다.
+- 수신기·Comma 요청 추가 없음. 즐겨찾기 일치 시 카카오 조회가 오히려 줄어든다. 스키마 버전(3)은 유지하고 `CREATE TABLE IF NOT EXISTS`로 기존 DB에 추가된다.
+- 화면은 운영 파일을 수정하지 않았다. `preview/favorite-charger/`에 운영 프런트 사본 + `apply_ui.py` 적용본과 합성 데이터 하네스를 두었고, 승인 후 같은 스크립트를 운영 파일에 적용한다. 내용: 충전 행 3줄 표시, 위치 영역의 ★ 등록 토글·이전 기록 적용 선택·즐겨찾기 빠른 선택 칩(삭제 포함), 자동 충전량 소수 1자리 표시(손대지 않고 저장하면 측정값을 덮어쓰지 않음).
+- 관련 파일: custom_components/carrot_ha/vehicle_journal/{schema.sql,store.py,automatic_locations.py,api.py,station_stats.py}, vehicle-journal/schema/001_initial.sql, vehicle-journal/tests/test_favorite_places.py, preview/favorite-charger/.
+- 검증(로컬): 신규 test_favorite_places 6개 통과. 차계부 전체는 116개 중 14개 오류로 변경 전과 동일(이 Mac의 Python 3.9·PIL 미설치 환경 문제). 프리뷰를 데스크톱·375px 모바일에서 실제 조작: 3줄 표시, 검색→선택→★ 등록→저장 시 `record/save` 뒤 `favorite/save` 호출, 이전 2건 적용, 새 자동 충전이 즐겨찾기 이름으로 기록, 충전량 39.04999→39.0 표시와 미수정 저장 시 충전량 미전송을 확인.
+- 배포 상태: 브랜치 `favorite-charger`(origin/main 4ab192b 기준 작업 트리)에 로컬 커밋만. main 병합·푸시·HA 반영·릴리즈 없음. 미확인: 실제 HA 데이터·실제 카카오 응답에서의 동작, 라이트 테마 표시. Python 변경이라 반영 시 HA 재시작 필요.
+
 ## 2026-11-06 — 주행 전비 경계 측정값 반영 bd81b48 재시작 후 운영 확인
 
 - 사용자 HA 재시작 후 읽기 전용 조회로 확인했다. 설치 `trip_repair.py` SHA-256 e12418338e53(bd81b48)과 일치.

@@ -13,6 +13,57 @@ from ..archive_codec import loads
 LOOKUP_VERSION=5
 RETRY_DAY=86400
 RETRY_TRANSIENT=900
+# A charge-start fix this close to one learned on an earlier visit is the same parking spot.
+FAVORITE_ANCHOR_M=50
+# Same limit as an automatic station: the favorite's own map coordinate.
+FAVORITE_PLACE_M=150
+FAVORITE_MARGIN_M=25
+
+
+def favorite_match(favorites,point=None,address=None,anchors_only=False):
+    """The user's usual charger for this spot, or None when no favorite fits or two compete.
+
+    anchors_only is the strict rule used before any provider lookup; the wider rule (place
+    coordinate or identical road address) only replaces an address-only result."""
+    scored=[]
+    for favorite in favorites:
+        place=favorite['location'];best=None
+        if point:
+            for anchor in favorite.get('anchors') or []:
+                gap=distance_m(point['latitude'],point['longitude'],anchor['latitude'],anchor['longitude'])
+                if gap<=FAVORITE_ANCHOR_M and (best is None or gap<best):best=gap
+            if best is None and not anchors_only and place.get('latitude') is not None:
+                gap=distance_m(point['latitude'],point['longitude'],place['latitude'],place['longitude'])
+                if gap<=FAVORITE_PLACE_M:best=gap
+        if best is None and not anchors_only and address and place.get('address')==address:best=FAVORITE_PLACE_M
+        if best is not None:scored.append((best,favorite))
+    scored.sort(key=lambda item:item[0])
+    if not scored or (len(scored)>1 and scored[1][0]-scored[0][0]<FAVORITE_MARGIN_M):return None
+    return scored[0][1]
+
+
+def favorite_location(favorite):
+    return {**favorite['location'],'station_type':'charging','selection_source':'favorite'}
+
+
+def apply_favorites(journal):
+    """Name earlier automatic charges that only got a road address (or nothing) at a favorite spot."""
+    favorites=journal.favorites();changed=0
+    if not favorites:return 0
+    with journal.lock,journal.connect() as db:
+        rows=db.execute("SELECT id,extra_json FROM records WHERE vehicle_id=? AND kind='charge' AND origin='automatic' AND status='active'",(journal.vehicle,)).fetchall()
+        for key,text in rows:
+            extra=json.loads(text);place=extra.get('location')
+            if extra.get('location_user_override') or (place and place.get('selection_source')!='automatic_address'):continue
+            point=extra.get('source_position')
+            if point and not (finite(point.get('latitude')) and finite(point.get('longitude'))):point=None
+            favorite=favorite_match(favorites,point,(place or {}).get('address'))
+            if not favorite:continue
+            extra['location']=favorite_location(favorite)
+            db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),journal.vehicle,key))
+            changed+=1
+    if changed:propagate(journal)
+    return changed
 
 def provisional(place,lookup):
     """Road address saved while the provider was failing; replaced by the station once a lookup succeeds."""
@@ -168,6 +219,7 @@ def save(journal,item,point,location,message,candidates=None,transient=False,dia
 def identity(place):
     if place.get('station_id'):return (place.get('provider'),place['station_id'])
     if place.get('selection_source')=='automatic_address' and place.get('address'):return ('address',place['address'])
+    if place.get('selection_source')=='favorite' and place.get('name'):return ('favorite',place['name'],place.get('address'),place.get('latitude'),place.get('longitude'))
 
 
 def propagate(journal):
@@ -178,7 +230,7 @@ def propagate(journal):
             locations=[json.loads(r[0]).get('location') for r in db.execute('SELECT r.extra_json FROM expense_members x JOIN records r ON r.vehicle_id=x.vehicle_id AND r.id=x.charge_id WHERE x.vehicle_id=? AND x.expense_id=?',(journal.vehicle,expense))]
             ids={identity(p) for p in locations if p and identity(p)}
             if len(ids)!=1 or not locations or any(not p or not identity(p) for p in locations):
-                if (extra.get('location') or {}).get('selection_source') in ('automatic','automatic_address'):
+                if (extra.get('location') or {}).get('selection_source') in ('automatic','automatic_address','favorite'):
                     extra.pop('location',None)
                     db.execute('UPDATE records SET extra_json=?,version=version+1,updated_at=? WHERE vehicle_id=? AND id=?',(encode(extra),now(),journal.vehicle,expense))
                 continue
@@ -241,21 +293,27 @@ def electric_vehicle(manager,journal):
 async def enrich(hass,manager,archive,journal):
     if not manager.automatic_locations or not manager.kakao_rest_key:return
     if not electric_vehicle(manager,journal):return
-    for item in await hass.async_add_executor_job(pending,journal):
+    items=await hass.async_add_executor_job(pending,journal)
+    favorites=await hass.async_add_executor_job(journal.favorites) if items else []
+    for item in items:
         point=await hass.async_add_executor_job(position,archive,journal,item[3])
         selected=None;candidates=None;address=None;transient=False;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
         steps={'gps':'fail','station':'skip','address':'skip'};diagnostic={'steps':steps}
         if not electric_vehicle(manager,journal):return
         if point:
             steps['gps']='ok';diagnostic['evidence']=point_evidence(point,item[3]);code=None
-            try:
-                result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']
-                if not selected:
-                    code='station_'+(result.get('reason') or 'none')
-                    candidates=[{'name':c['location']['name'],'distance_m':round(c['distance_m'])} for c in result['candidates'][:3]] or None
-            except ProviderError as error:message=str(error);transient=True;code='provider_error';diagnostic['provider']=message
-            except ValueError as error:message=str(error);code='provider_error';diagnostic['provider']=message
-            if selected:steps['station']='ok';diagnostic['code']='station_selected'
+            # Same parking spot as an earlier visit to a favorite: no provider lookup needed.
+            favorite=favorite_match(favorites,point,anchors_only=True)
+            if not favorite:
+                try:
+                    result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']
+                    if not selected:
+                        code='station_'+(result.get('reason') or 'none')
+                        candidates=[{'name':c['location']['name'],'distance_m':round(c['distance_m'])} for c in result['candidates'][:3]] or None
+                except ProviderError as error:message=str(error);transient=True;code='provider_error';diagnostic['provider']=message
+                except ValueError as error:message=str(error);code='provider_error';diagnostic['provider']=message
+            if favorite:pass
+            elif selected:steps['station']='ok';diagnostic['code']='station_selected'
             # Whenever the station itself is not settled, keep at least the verified road address.
             else:
                 steps['station']='fail' if code=='provider_error' else 'warn'
@@ -267,6 +325,13 @@ async def enrich(hass,manager,archive,journal):
                     message='충전소 이름을 확인하지 못해 도로명 주소로 먼저 기록했어요. '+('잠시 뒤 충전소 이름을 다시 조회할게요.' if transient else '실제 이용한 충전소를 선택하면 정확해져요.')
                 else:
                     steps['address']='fail';diagnostic.update(code='address_failed',station_code=code,address_reason=reason);diagnostic['evidence'].update(extra)
+                # The station is unsettled (several chargers at one address, none close, provider down): prefer the user's usual charger here.
+                favorite=favorite_match(favorites,point,address['address'] if address else None)
+            if favorite:
+                selected={'location':favorite_location(favorite)};candidates=None;transient=False
+                steps['station']='ok';diagnostic['code']='favorite_selected';diagnostic.pop('address_reason',None);diagnostic.pop('station_code',None)
+                if code:diagnostic['station_code']=code
+                message='즐겨찾는 충전소로 기록했어요.'
         else:
             code,evidence=await hass.async_add_executor_job(gps_diagnosis,archive,journal,item[3])
             diagnostic.update(code=code,evidence=evidence)

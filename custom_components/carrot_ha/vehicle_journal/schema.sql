@@ -228,5 +228,15 @@ CREATE TABLE IF NOT EXISTS dirty_days (
   updated_at TEXT NOT NULL,
   PRIMARY KEY(vehicle_id,day,accounting_timezone)
 );
+-- The user's usual charger per spot; anchors are charge-start GPS points learned from the records it was set on.
+CREATE TABLE IF NOT EXISTS favorite_places (
+  vehicle_id TEXT NOT NULL REFERENCES vehicles(id),
+  id TEXT NOT NULL,
+  location_json TEXT NOT NULL CHECK(json_valid(location_json) AND json_type(location_json)='object'),
+  anchors_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(anchors_json) AND json_type(anchors_json)='array'),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(vehicle_id,id)
+);
 INSERT OR IGNORE INTO journal_schema(version) VALUES(3);
 COMMIT;
