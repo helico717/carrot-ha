@@ -32,7 +32,7 @@ class Relay:
 
 class Tests(unittest.IsolatedAsyncioTestCase):
     async def test_fixed_lock_unlock_command_result_and_exclusive_cleanup(self):
-        for action in ('lock','unlock'):
+        for action in ('lock','unlock','control'):
             relay=Relay();c=module.TrialController(relay)
             result=await c.run(action)
             self.assertEqual(result['status'],'panda_echo_no_target_state')

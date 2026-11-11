@@ -22,7 +22,7 @@ class TrialController:
         return bool(r and r.ready and r.offroad and not r.controller and not r.session_id and not self.busy)
 
     async def run(self, action):
-        if action not in ('lock', 'unlock'):
+        if action not in ('lock', 'unlock', 'control'):
             raise ValueError('Unknown trial action')
         if not self.available:
             raise RuntimeError('Comma가 오프라인·주행 중이거나 터미널이 사용 중입니다.')

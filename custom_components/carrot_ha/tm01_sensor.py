@@ -28,7 +28,8 @@ class Tm01TrialSensor(SensorEntity):
                 'published_delivery_unconfirmed': '요청 발행 · 전달 미확인',
                 'delivery_or_result_unconfirmed': '연결 또는 결과 미확인',
                 'restoration_unconfirmed': '원래 설정 복귀 미확인',
-                'receive_only_completed': '수신 점검 완료'}.get(code, code)
+                'receive_only_completed': '수신 점검 완료',
+                'matched_control_completed': '명령 없는 대조 완료'}.get(code, code)
 
     @property
     def extra_state_attributes(self):

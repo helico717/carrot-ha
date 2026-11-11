@@ -7,7 +7,8 @@ from .tm01_experiment import controller, device_info
 
 async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities([Tm01Button(entry, 'lock', '잠금 요청', 'mdi:lock'),
-                        Tm01Button(entry, 'unlock', '잠금해제 요청', 'mdi:lock-open')])
+                        Tm01Button(entry, 'unlock', '잠금해제 요청', 'mdi:lock-open'),
+                        Tm01Button(entry, 'control', '통신 활성화 대조 · 명령 없음', 'mdi:flask-outline')])
 
 
 class Tm01Button(ButtonEntity):

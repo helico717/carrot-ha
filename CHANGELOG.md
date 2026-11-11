@@ -1502,3 +1502,8 @@
 
 - Preserved latest unlock result read-only outside Git: three publications/returns, no reject flag, 9548 received frames after request, actual lock remains true, restoration confirmed; no independent delivery proof.
 - Updated research independent-review MD with lock/interrupted-unlock/latest-unlock outcomes and planned matched mode35/reinit no-frame control. Current receive-only stage is not equivalent to the transmit stage. No new vehicle action, code deployment or control-test implementation in this update.
+
+## 2026-11-11 - Matched no-message TM01 control
+
+- Added dedicated control button and result label; fixed control CLI action follows the same mode35/CAN reinit/timing/restore path but creates no publisher and emits neither request nor neutral frame. Existing lock/unlock retained. Per-request result history added on Comma.
+- CLI6 and HA backend/WebSocket5 focused tests passed. No new Panda firmware source change, actual field control, automatic requests or reboot. Comma Git update/user reboot and HA user restart required. HA deployment pending after commit.
