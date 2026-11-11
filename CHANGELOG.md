@@ -1493,3 +1493,7 @@
 
 - 실행 코드 72a6af92dff0fde2177292569e2c8747c62d4812 main 게시. HA ko/en/runtime 3파일은 기준 0261f9f와 사전 일치 확인, 백업·반영 후 SHA-256 모두 일치.
 - 백업: /homeassistant/carrot_ha/deployment-backups/driving-logs-hud-72a6af92dff0/before. HA/Comma 재시작·릴리즈·태그 없음. 브라우저 강력 새로고침으로 새 프론트엔드를 적용한다. 사용자 회선의 첫 표시 5초 달성과 탭 강제 이동 실사용 재발 여부는 미확인이다.
+
+## 2026-11-11 - TM01 independent evaluation handoff
+
+- Added detailed Korean experiment/review brief in meb-can-research docs/tm01-independent-review-2026-11-11.md: actual sequence, fixed source commits, firmware/transport constraints, wake/auth hypotheses, observation limits, rollback and independent reviewer questions. Documentation only; no vehicle action or deployment.
