@@ -80,6 +80,8 @@ async def async_setup_entry(hass,entry,async_add_entities):
         AssistRatioSensor(entry),
         AssistDistanceSensor(entry),
     ])
+    from .tm01_sensor import Tm01TrialSensor
+    entities.append(Tm01TrialSensor(entry))
     async_add_entities(entities)
 
 ID4_DIAGNOSTIC_KEYS = {
