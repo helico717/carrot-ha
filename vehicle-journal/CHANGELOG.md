@@ -1,3 +1,12 @@
+## 2026-11-11 — 기록 시각 a21069e HA 직접 반영 (재시작 대기)
+
+- 반영 전 HA의 3개 파일 SHA-256이 직전 커밋(a21069e~1)과 일치함을 확인했다.
+- 백업: `/homeassistant/carrot_ha/deployment-backups/record-time-a21069e/before`(SHA256SUMS.before 포함), 되돌리기는 같은 폴더의 `rollback.sh`(이 변경만 되돌림, 이후 HA 재시작 필요).
+- 반영 파일(로컬 추출·비어 있지 않음 확인 후 스트리밍, 원격 임시 파일 해시 검증 뒤 교체): vehicle_journal/store.py f794b0cb30ea, frontend/carrot-vehicle-journal.js 8f17d6d112d1, frontend/carrot-journal-design.js c5a3f73693d0. HA 파일 해시와 HA HTTP(`/carrot_ha_static/`) 응답 해시가 커밋과 일치. HA에서 store.py 문법 검사 통과.
+- 운영 DB 사본(읽기 전용 백업 API로 복사, 확인 후 삭제)에 새 조회 코드를 실행: 2026-09~11 자동 충전 결제 72건·자동 충전 76건 모두 `occurred_at` 있음, 날짜만 있는 수동 기록 7건은 시각 없음. 운영 DB는 변경하지 않았다.
+- 적용 시점: 화면은 새로고침으로 바로 바뀌지만 시각 계산·저장은 Python 변경이라 **사용자 HA 재시작 후** 동작한다. 재시작 전에 시각을 입력해 저장하면 구버전 백엔드가 거부한다.
+- 미확인: 재시작 후 실제 HA 화면 표시와 시각 입력 저장(에이전트는 HA 로그인 불가). 릴리즈 없음.
+
 ## 2026-11-11 — 기록 시각 표시·입력 운영 적용 (사용자 승인)
 
 - 사용자가 프리뷰(`preview/journal-time/`)를 확인하고 적용을 지시했다. 화면은 프리뷰의 `apply_ui.py`를 운영 파일에 그대로 적용했고 프리뷰 사본과 바이트 단위로 같다(cmp).

@@ -1,3 +1,7 @@
+## 2026-11-11 — 차계부 기록 시각 HA 직접 반영 (재시작 대기)
+
+- a21069e의 store.py와 차계부 화면 2개 파일을 백업(`deployment-backups/record-time-a21069e`, rollback.sh 포함) 후 반영, 파일·HTTP 해시 일치 확인. HA 재시작 후 동작. 상세: `vehicle-journal/CHANGELOG.md`.
+
 ## 2026-11-11 — 차계부 기록 시각 표시·입력
 
 - 상세 기록·최근 기록에 `11월 10일` / `오후 7시 5분` 형식으로 실제 시각을 표시(자동 주행·충전·충전 결제는 과거 기록 포함), 수동 기록에 선택 시각 입력, `보관 중` 표시 제거, 수동 주행 날짜 하루 밀림 수정. 상세: `vehicle-journal/CHANGELOG.md`.
