@@ -32,6 +32,31 @@ class Registry:
 
 
 class MigrationTest(unittest.TestCase):
+    def test_retired_trial_cleanup_is_scoped_and_preserves_shared_devices(self):
+        trial = {'tm01_trial_lock', 'tm01_trial_unlock', 'tm01_trial_control'}
+        for shared, extra_entity, extra_identifier in ((False, False, False), (True, False, False),
+                                                       (False, True, False), (False, False, True)):
+            with self.subTest(shared=shared, extra=extra_entity, identifiers=extra_identifier):
+                registry = Registry({**{key: 'button.custom_' + key for key in trial},
+                                     'tm01_trial_result': 'sensor.custom_result',
+                                     'doors_locked': 'binary_sensor.actual_doors',
+                                     'other': 'sensor.other_vehicle_trial'})
+                registry.async_get('sensor.other_vehicle_trial').unique_id = 'another_tm01_trial_result'
+                identifiers = {('carrot_ha', 'car_tm01_trial')}
+                device = types.SimpleNamespace(id='trial', identifiers=identifiers | ({('other', 'alias')} if extra_identifier else set()),
+                                               config_entries={'entry', 'shared'} if shared else {'entry'})
+                for e in registry.entities.values():
+                    if e.unique_id.startswith('car_tm01_trial_'):
+                        e.device_id = 'trial'
+                if extra_entity:
+                    registry.async_get('binary_sensor.actual_doors').device_id = 'trial'
+                removed = []
+                devices = types.SimpleNamespace(async_get_or_create=lambda **kw: types.SimpleNamespace(id='comma'),
+                    async_get_device=lambda **kw: device, async_remove_device=removed.append)
+                self.migrate(registry, devices=devices)
+                self.assertEqual(removed, [] if shared or extra_entity or extra_identifier else ['trial'])
+                self.assertEqual(set(registry.entities), {'binary_sensor.actual_doors', 'sensor.other_vehicle_trial'})
+
     def test_temperature_compaction_after_existing_migration_and_manual_enable(self):
         registry = Registry({key: 'sensor.custom_' + key for key in
                              migration.BATTERY_TEMPERATURE_DETAILS | {'battery_temperature_c'}})
@@ -46,14 +71,16 @@ class MigrationTest(unittest.TestCase):
         self.migrate(registry, entry)
         self.assertIsNone(maximum.disabled_by)
 
-    def migrate(self, registry, entry=None):
+    def migrate(self, registry, entry=None, devices=None):
         helpers = types.ModuleType('homeassistant.helpers')
         helpers.entity_registry = types.SimpleNamespace(
             RegistryEntryDisabler=types.SimpleNamespace(INTEGRATION='integration'),
             async_get=lambda hass: registry,
-            async_entries_for_config_entry=lambda reg, entry: list(reg.entities.values()))
-        helpers.device_registry = types.SimpleNamespace(async_get=lambda hass: types.SimpleNamespace(
-            async_get_or_create=lambda **kw: types.SimpleNamespace(id='comma')))
+            async_entries_for_config_entry=lambda reg, entry: list(reg.entities.values()),
+            async_entries_for_device=lambda reg, device_id, **kw: [e for e in reg.entities.values() if e.device_id == device_id])
+        helpers.device_registry = types.SimpleNamespace(async_get=lambda hass: devices or types.SimpleNamespace(
+            async_get_or_create=lambda **kw: types.SimpleNamespace(id='comma'),
+            async_get_device=lambda **kw: None))
         entry = entry or types.SimpleNamespace(entry_id='entry', data={'device_id': 'car'}, options={})
         def update(entry, **kwargs):
             entry.data = kwargs['data']

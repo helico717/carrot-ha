@@ -15,6 +15,7 @@ BATTERY_TEMPERATURE_DETAILS = {'battery_min_temperature_c', 'battery_max_tempera
 BATTERY_TEMPERATURE_COMPACTION_KEY = 'battery_temperature_compaction_version'
 REMOVED_SENSORS = {
     'charge_power_w', 'charge_connection_evidence', 'bms_mode', 'month_energy_coverage_percent', 'month_drive_energy_kwh',
+    'tm01_trial_result',
     'display_soc_candidate_percent', 'bms_target_soc_percent', 'wheel_speed_kph', 'measured_capacity_kwh'
 }
 DIAGNOSTIC_KEYS = {
@@ -68,6 +69,7 @@ def migrate_entities(hass, entry):
             continue
         key = entity.unique_id[len(prefix):]
         if (entity.domain == 'sensor' and key in REMOVED_SENSORS) or (
+                entity.domain == 'button' and key in {'tm01_trial_lock', 'tm01_trial_unlock', 'tm01_trial_control'}) or (
                 entity.domain == 'binary_sensor' and key in {'doors_locked_external', 'doors_locked_internal', 'charge_plug_indication'}) or (
                 entity.domain == 'camera' and key in {'camera_wide', 'camera_driver', 'camera_road'}) or (
                 entity.domain == 'image' and key in {'image_wide', 'image_driver', 'image_road'}):
@@ -113,3 +115,12 @@ def migrate_entities(hass, entry):
         hass.config_entries.async_update_entry(entry, data={**entry.data, COMPACTION_DATA_KEY: 1,
                                                           BATTERY_TEMPERATURE_COMPACTION_KEY: 1,
                                                           ASSIST_ENTITY_ID_KEY: 1})
+
+    # Retired experiment: remove only its empty, exclusively owned child device.
+    devices = dr.async_get(hass)
+    identifiers = {(DOMAIN, entry.data['device_id'] + '_tm01_trial')}
+    retired = devices.async_get_device(identifiers=identifiers)
+    if (retired is not None and retired.identifiers == identifiers
+            and retired.config_entries == {entry.entry_id}
+            and not er.async_entries_for_device(registry, retired.id, include_disabled_entities=True)):
+        devices.async_remove_device(retired.id)

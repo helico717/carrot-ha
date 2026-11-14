@@ -13,18 +13,6 @@ on:
 permissions:
   contents: read
 jobs:
-  tm01-trial:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: python -m pip install aiohttp==3.13.3
-      - name: Trial request, actual reverse WebSocket and existing terminal guards
-        run: |
-          python -m unittest discover -s tests -p 'test_tm01_*.py' -v
-          python -m unittest discover -s tests -p test_terminal_relay.py -v
   radar-ha-python:
     runs-on: ubuntu-latest
     steps:
