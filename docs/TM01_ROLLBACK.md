@@ -32,3 +32,5 @@ cd /data/openpilot && git pull --ff-only && sudo reboot
 ## 발행·적용 기록
 
 소스 커밋과 HA 파일 반영 결과는 CHANGELOG.md의 최신 종료 기록을 따른다. HACS 릴리즈·태그 발행은 하지 않는다. 사용자 재시작 전에는 실행 중 HA 메모리에 기존 버튼이 남을 수 있다. Comma도 사용자 업데이트·재부팅 전에는 시험 펌웨어가 남아 있다.
+
+소스 발행 확인: Comma `fdd8294b8`, HA `51eefe2`. HA 직접 반영은6개 파일의 hash/삭제 검증까지 완료했으며 백업은 `/config/carrot_ha/deployment-backups/tm01-retire-51eefe21c50b`이다. HA 사용자 재시작과 Comma 사용자 업데이트·재부팅은 여전히 대기 상태다.
