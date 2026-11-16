@@ -5,12 +5,15 @@ import math
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+INTERVAL_MINUTES = 15
+SLOTS_PER_DAY = 24 * 60 // INTERVAL_MINUTES
+
 def history(archive, device, capacity, zone='Asia/Seoul', now=None):
     tz=ZoneInfo(zone)
     now=now or datetime.now(timezone.utc)
     today=now.astimezone(tz).date()
     dates=[today-timedelta(days=i) for i in range(13,-1,-1)]
-    days={str(d):dict(date=str(d),used=None,drive_s=0,charge_s=0,covered_s=0,received_samples=0,valid_samples=0,stale_samples=0,hours=[None]*24,charge_hours=[False]*24) for d in dates}
+    days={str(d):dict(date=str(d),used=None,drive_s=0,charge_s=0,covered_s=0,received_samples=0,valid_samples=0,stale_samples=0,interval_minutes=INTERVAL_MINUTES,hours=[None]*SLOTS_PER_DAY,charge_hours=[False]*SLOTS_PER_DAY) for d in dates}
     start=datetime.combine(dates[0],datetime.min.time(),tzinfo=tz).timestamp()
     previous=None
     # Exclusions correct inferred charging without changing measured battery energy.
@@ -83,9 +86,10 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
         day = days.get(str(local.date()))
         if day is not None:
             day['valid_samples'] += 1
+            slot = (local.hour * 60 + local.minute) // INTERVAL_MINUTES
             if charging:
-                day['charge_hours'][local.hour] = True
-            day['hours'][local.hour] = {'soc': min(100, soc), 'charging': charging, 'driving': driving, 'soc_source': v['_display_soc_source']}
+                day['charge_hours'][slot] = True
+            day['hours'][slot] = {'soc': min(100, soc), 'charging': charging, 'driving': driving, 'soc_source': v['_display_soc_source']}
         if (previous and t > previous[0] and t - previous[0] <= 300
                 and previous[2].get('_display_soc_source') == v.get('_display_soc_source')):
             pt, ps, pv = previous
@@ -105,15 +109,15 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
             previous = (t, soc, v)
     for d in days.values():
         if d['used'] is not None:d['used']=round(d['used'],1)
-    # Carry the last measured value only into elapsed, unmeasured hours.
+    # Carry the last measured value only into elapsed, unmeasured intervals.
     last=None
     for d in days.values():
         for h,x in enumerate(d['hours']):
-            hour_start=datetime.fromisoformat(d['date']).replace(hour=h,tzinfo=tz).timestamp()
+            slot_start=(datetime.fromisoformat(d['date']).replace(tzinfo=tz)+timedelta(minutes=h*INTERVAL_MINUTES)).timestamp()
             if x is not None:
                 x['last_known']=False
                 last=x['soc']
-            elif last is not None and hour_start<=now.timestamp():
+            elif last is not None and slot_start<=now.timestamp():
                 d['hours'][h]={'soc':last,'last_known':True,'charging':False,'driving':False}
     # Merge overlapping sessions so duplicate imports do not double count time.
     intervals={'trip':[], 'charge':[]}
@@ -154,9 +158,9 @@ def history(archive, device, capacity, zone='Asia/Seoul', now=None):
                     d['drive_s' if kind=='trip' else 'charge_s']+=end-a
                     if kind=='charge':
                         # Any overlap counts, including a brief charge before the last sample.
-                        for h in range(24):
-                            hs=datetime.combine(local.date(),datetime.min.time(),tzinfo=tz)+timedelta(hours=h)
-                            he=hs+timedelta(hours=1)
+                        for h in range(SLOTS_PER_DAY):
+                            hs=datetime.combine(local.date(),datetime.min.time(),tzinfo=tz)+timedelta(minutes=h*INTERVAL_MINUTES)
+                            he=hs+timedelta(minutes=INTERVAL_MINUTES)
                             if hs.timestamp()<end and he.timestamp()>a:d['charge_hours'][h]=True
                 a=end
     return list(days.values())
