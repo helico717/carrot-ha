@@ -4,7 +4,8 @@
 - 기본 모델 URL·IndexedDB 키는 전체 프런트 버전 대신 모델 SHA-256 앞 12자리로 분리. 모델 변경 시 revision 검증이 실패하도록 검사한다. 사용자 지정 URL·ETag 재검증·3D 끄기·기존 화면 디자인 유지. 키 전환 후 최초 1회 재다운로드 가능.
 - 관련 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-vehicle-3d.js, docs/VEHICLE_3D_MODEL.md 및 3D/첫 로딩 검사.
 - 검증: 관련 Node 41건 통과. 실제 Chromium 한국어/영어 전체 탭·비동기 응답 후 두 프레임 시점 스크롤/DOM/선택 탭 보존 통과. 이력 미완료 상태에서 실제 3D viewer 생성, 프라이밍 중 모델/엔진 요청 0, 화면 버전 변경 뒤 IndexedDB local 재사용과 지연된 ETag 요청 비차단 확인. 운영 클라이언트 속도 수치 미측정.
-- 배포: 커밋·푸시 및 백업/해시 확인 후 HA 직접 반영 예정. HA/Comma 재시작·버전 상승·태그·릴리즈 없음. 기존 미추적 문서/차계부 프리뷰는 작업에서 제외.
+- 배포: 구현 커밋 1e3f2ac main 푸시 완료(미푸시 0). HA 기존 3개 파일이 직전 커밋과 일치함을 확인하고 `/config/carrot_ha/deployment-backups/vehicle3d-1e3f2ac0a0e0`에 백업·manifest·rollback.sh를 보존한 뒤 직접 반영했다. 설치 파일 및 HA 내부 HTTP SHA-256 모두 일치(ko 9c398d95655d, en 9e6697dd5b2a, 연결 모듈 3b9646e1a2e). frontend-version 0.9.0-5b02b37913f7 확인. 브라우저 새로고침으로 적용하며 HA/Comma 재시작·버전 상승·태그·릴리즈 없음. 사용자 실제 클라이언트 체감 속도는 미확인. 다른 작업 문서/차계부 프리뷰는 별도 보존.
+- 사용자 추가 질문의 지도 지연 조사: 개요 미니 지도는 `_initialDataSettled` 이후 Leaflet을 로드하고 OpenStreetMap 외부 타일을 요청한다. 주차 좌표가 먼저 보여도 배터리/주행/충전 전체 종료를 기다리는 구조 확인. 첨부 화면만으로 지연 단계·운영 타일 응답 시간은 확정하지 않으며 지도 실행 코드는 이번에 변경하지 않았다.
 
 
 ## 2026-11-14 — TM_01 연구 종료·선택 원복 준비
