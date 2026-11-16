@@ -2241,12 +2241,25 @@ export const journalDesign = `:host {
 #recordDialog .loc-favorite-past::before{content:'';flex:0 0 14px;width:14px;height:14px;box-sizing:border-box;border:1.5px solid var(--j-border);border-radius:4px;background:var(--j-bg)}
 #recordDialog .loc-favorite-past:has(input:checked){color:var(--j-ink)}
 #recordDialog .loc-favorite-past:has(input:checked)::before{background:var(--j-accent);border-color:var(--j-accent);box-shadow:inset 0 0 0 2.5px var(--j-bg)}
-#recordDialog .favorite-places{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;min-width:0}
-#recordDialog .favorite-places-title{flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--j-accent)}
-#recordDialog .favorite-chip{display:inline-flex;align-items:stretch;max-width:100%;min-width:0;border:1px solid var(--j-border);border-radius:9999px;background:var(--j-surface);overflow:hidden}
 #recordDialog .favorite-chip button{border:0!important;background:transparent!important;color:var(--j-ink)!important;font-size:12px!important;min-height:28px!important;height:auto!important;padding:4px 4px 4px 11px!important;border-radius:0!important;cursor:pointer;min-width:0;box-shadow:none!important}
-#recordDialog .favorite-chip .favorite-chip-pick{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#recordDialog .favorite-chip .favorite-chip-remove{flex:0 0 auto;padding:4px 10px 4px 5px!important;color:var(--j-sub)!important}
 #recordDialog .favorite-chip button:hover{background:var(--j-raised)!important}
+
+/* 승인된 지도 위 즐겨찾기 알약과 드롭다운 (2026-11-16). */
+#recordDialog .favorite-places{display:block;position:absolute;top:72px;left:12px;z-index:4;min-width:0;margin:0;max-width:calc(100% - 24px)}
+@media(max-width:760px){#recordDialog .favorite-places{top:10px;left:10px;max-width:calc(100% - 20px)}}
+#recordDialog .favorite-dropdown{width:max-content;max-width:100%;position:relative}
+#recordDialog .favorite-dropdown summary{display:flex;align-items:center;gap:6px;list-style:none;cursor:pointer;padding:4px 10px;border-radius:999px;border:0;background:rgba(16,24,30,.7);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#f5f8fa;font-size:11.5px;line-height:1.4;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.3);box-sizing:border-box;min-height:0}
+#recordDialog .favorite-dropdown summary::-webkit-details-marker{display:none}
+#recordDialog .favorite-dropdown summary:focus-visible{outline:2px solid var(--j-accent);outline-offset:2px}
+#recordDialog .favorite-star{color:var(--j-accent)}
+#recordDialog .favorite-count{font-size:11px;color:#c4d1d9}
+#recordDialog .favorite-chevron{margin-left:auto;display:inline-block;transition:transform .15s}
+#recordDialog .favorite-dropdown[open] .favorite-chevron{transform:rotate(180deg)}
+#recordDialog .favorite-list{position:absolute;top:calc(100% + 4px);left:0;width:min(280px,calc(100vw - 48px));max-height:min(190px,28dvh);overflow:auto;overscroll-behavior:contain;padding:3px;box-sizing:border-box;border-radius:10px;border:1px solid var(--j-border);background:#162129;box-shadow:0 10px 28px rgba(0,0,0,.35)}
+#recordDialog .favorite-chip{display:flex;width:100%;max-width:100%;min-width:0;overflow:hidden;box-sizing:border-box;align-items:stretch;border:0;border-radius:8px;background:transparent}
+#recordDialog .favorite-chip+.favorite-chip{border-top:1px solid var(--j-border)}
+#recordDialog .favorite-chip .favorite-chip-pick{flex:1;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.4;padding:6px 9px!important;min-height:32px!important}
+#recordDialog .favorite-chip .favorite-chip-remove{flex:0 0 32px;padding:4px!important;min-height:32px!important;font-size:16px!important;color:var(--j-sub)!important}
+#recordDialog .favorite-chip button:focus-visible{outline:2px solid var(--j-accent);outline-offset:-3px}
 `;
 
