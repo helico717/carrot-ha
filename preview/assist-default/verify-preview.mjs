@@ -9,5 +9,5 @@ assistState(card).scope='all';assert.equal(assistScope(card),'all');assistPanelH
 card.tripDay='2026-11-15';assert.equal(assistScope(card),'all');
 card.tripDay='2026-11-16';assert.equal(assistScope(card),'day');
 all.days[0].active=true;html=assistPanelHtml(card);assert.match(html,/<svg viewBox="0 0 24 24" aria-hidden="true"/);assert(!html.includes('✓'));
-for(const lang of ['ko','en'])assert.match(assistPanelHtml(card,lang),/stroke-width:7/);
+for(const lang of ['ko','en'])assert.match(assistPanelHtml(card,lang),/stroke-width:14/);
 console.log('PASS date-first, no-data fallback, 0% record, explicit choice retention, date-change defaults, SVG check, wider gauge, request coalescing');
