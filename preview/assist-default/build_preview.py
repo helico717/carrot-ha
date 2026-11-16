@@ -5,6 +5,7 @@ out=Path('/private/tmp/carrot-assist-default-preview')
 shutil.copytree(root/'custom_components/carrot_ha/frontend',out/'frontend',dirs_exist_ok=True)
 p=out/'frontend/carrot-assist-stats.js';s=p.read_text()
 s=s.replace("scope: 'all'", "scope: 'auto'")
+s=s.replace("chart: 'month'", "chart: 'day'")
 a=s.index('// 주행 탭이 보일 때만 호출된다.')
 s=s[:a]+'''// Auto scope follows the selected trip date; explicit choices survive background refresh.
 export function assistScope(card) {
@@ -29,7 +30,7 @@ s=s.replace('    await Promise.all(job);', '''    await Promise.all(job);
     }''')
 s=s.replace("const scope = a.scope === 'day' && sel ? 'day' : 'all'", "const scope = assistScope(card)")
 s=s.replace("a.day = b.dataset.assistDay; a.scope = 'day';", "a.day = b.dataset.assistDay; a.scopeDate=a.day; a.scope = 'day';")
-s=s.replace('.as-gauge .track{stroke:var(--as-track);stroke-width:3}.as-gauge .fill{stroke:var(--as);stroke-width:5;', '.as-gauge .track{stroke:var(--as-track);stroke-width:10}.as-gauge .fill{stroke:var(--as);stroke-width:14;')
+s=s.replace('.as-gauge .track{stroke:var(--as-track);stroke-width:3}.as-gauge .fill{stroke:var(--as);stroke-width:5;', '.as-gauge .track{stroke:var(--as-track);stroke-width:8}.as-gauge .fill{stroke:var(--as);stroke-width:11;')
 s=s.replace('.as-chip.on i{background:', '.as-chip i svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}\n.as-chip.on i{background:')
 s=s.replace("${d && d.active ? '✓' : d ? '·' : ''}", '''${d && d.active ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg>' : d ? '·' : ''}''')
 s=s.replace('font-size:19cqw;', 'font-size:18cqw;')

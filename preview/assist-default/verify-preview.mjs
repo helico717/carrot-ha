@@ -9,5 +9,16 @@ assistState(card).scope='all';assert.equal(assistScope(card),'all');assistPanelH
 card.tripDay='2026-11-15';assert.equal(assistScope(card),'all');
 card.tripDay='2026-11-16';assert.equal(assistScope(card),'day');
 all.days[0].active=true;html=assistPanelHtml(card);assert.match(html,/<svg viewBox="0 0 24 24" aria-hidden="true"/);assert(!html.includes('✓'));
-for(const lang of ['ko','en'])assert.match(assistPanelHtml(card,lang),/stroke-width:14/);
+for(const lang of ['ko','en'])assert.match(assistPanelHtml(card,lang),/stroke-width:11/);
 console.log('PASS date-first, no-data fallback, 0% record, explicit choice retention, date-change defaults, SVG check, wider gauge, request coalescing');
+
+assert.equal(assistState(card).chart,'day');
+for(const lang of ['ko','en']){
+ for(const selected of ['2026-11-16','2026-11-15']){
+  card.tripDay=selected;const h=assistPanelHtml(card,lang);
+  assert.match(h,/data-assist-chart="day" class="on"/);
+  assert.match(h,/as-bars dense/);
+ }
+}
+assistState(card).chart='month';assistPanelHtml(card);assert.equal(assistState(card).chart,'month');
+console.log('PASS daily chart default with/without selected-day records; explicit monthly choice remains unchanged');
