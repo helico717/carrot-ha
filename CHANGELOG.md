@@ -1,3 +1,12 @@
+## 2026-11-16 — 충전소 드롭다운 206210f HA 직접 배포·운영 확인
+
+- 구현 커밋 `206210f78e8c4c501e1fc3c640533441de604403` main 푸시 완료(확인 당시 미푸시 0). 다른 작업의 지침/문서/프리뷰와 공통 CHANGELOG 변경은 별도 보존했다.
+- 반영 전 두 HA 파일이 구현 커밋 부모의 파일 해시와 일치함을 확인하고 `/config/carrot_ha/deployment-backups/favorite-dropdown-206210f78e8c`에 원본·manifest.json·실제 개행을 사용하는 rollback.sh를 보존했다. DB·사진·설정·Comma는 변경하지 않았다.
+- 반영 후 설치 및 HA 내부 HTTP SHA-256 일치: carrot-vehicle-journal.js `f39c28a84590bee737142965a4736ec06358832cef088ee4a1e73a19bb62dfb1`, carrot-journal-design.js `e038b1f26fd6fd08d5c79b3346f0fc09ba55e08b218d679d67f0201c6bfab0a7`. frontend-version `0.9.0-bb2e3d050e7d`.
+- 운영 외부 주소의 기존 Chrome에서 차계부를 열고 충전 기록창의 즐겨찾기 접힘→펼침을 확인했다. 실제 렌더 호스트 `carrot-journal-screen-0-9-0-bb2e3d050e7d`, 제목 높이24.09375px·radius999px·배경 rgba(16,24,30,0.7)·글자 rgb(245,248,250)·지도 컨테이너 부모 확인. 검증용 기록창은 저장하지 않고 닫았다. 운영 모바일 WebView는 사용자 확인 대기(합성 Chromium390px 검증 통과).
+- 관련 검증은 이전 항목 참고. 기존 browser-check는 변경 전 HEAD도 첫 headline 대기 타임아웃이며 전체 회귀 통과로 주장하지 않는다.
+- 상태: 파일/HTTP 제공·운영 데스크톱 화면 적용 확인 완료. 사용자는 열린 차계부를 새로고침하면 된다. HA/Comma 재시작·HACS 재다운로드·버전 상승·새 태그/릴리즈 없음.
+
 ## 2026-11-16 — 승인된 충전소 지도 오버레이 실제 반영 준비
 
 - 커밋 제목: vehicle-journal: compact favorite chargers into a map dropdown
