@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {assistPanelHtml, ensureAssist, assistState, weekKeys, lastDays, clock, dayKey, scopeValues, axisStep, pct, km, dayLabel}
+import {assistPanelHtml, ensureAssist, assistState, assistScope, weekKeys, lastDays, clock, dayKey, scopeValues, axisStep, pct, km, dayLabel}
   from '../custom_components/carrot_ha/frontend/carrot-assist-stats.js';
 
 const TZ = 'Asia/Seoul';
@@ -45,8 +45,8 @@ test('선택일 범위: 기록 없는 날은 0%가 아니라 null이며 누적�
   assert.equal(axisStep(135), 100);assert.equal(axisStep(1074), 500);
 });
 
-test('패널: 누적 기본 표시, 월별 막대, 요일 칩과 한국어 문구', () => {
-  const c = card();assistState(c).all = ALL;
+test('패널: 직접 선택한 누적 표시, 월별 막대, 요일 칩과 한국어 문구', () => {
+  const c = card();Object.assign(assistState(c),{all:ALL,scope:'all',chart:'month'});
   const html = assistPanelHtml(c, 'ko', NOW);
   assert.match(html, /오픈파일럿 사용 통계/);assert.match(html, /11월 6일부터 측정 · 11회 주행/);
   assert.match(html, /49\.1<small>%<\/small>/);assert.match(html, /135\.7 km/);assert.match(html, /276\.5 km/);
@@ -61,7 +61,7 @@ test('패널: 선택일 범위와 기록 없는 날 표시', () => {
   const c = card({tripDay: '2026-11-09'});const a = assistState(c);a.all = ALL;a.scope = 'day';a.days['2026-11-09'] = {...DAY, at: Date.now()};
   let html = assistPanelHtml(c, 'ko', NOW);
   assert.match(html, /61\.9<small>%<\/small>/);assert.match(html, /44\.6 km/);assert.match(html, /14\.4<i>km<\/i>/);assert.match(html, /08:08 → 08:19/);assert.match(html, /해제 12회/);
-  a.day = '2026-11-08';
+  a.day = '2026-11-08';a.scopeDate=a.day;a.scope='day';
   html = assistPanelHtml(c, 'ko', NOW);
   assert.match(html, /<b id="assistNum">—<\/b>/);assert.match(html, /기록 없음/);assert.match(html, /이 날은 측정된 주행이 없습니다/);
   assert.equal(a.target, null);
@@ -86,13 +86,13 @@ test('요청은 60초 안에 중복되지 않고, 선택일 범위에서만 날�
   const calls = [];
   const c = card({_hass: {config: {time_zone: TZ}, callWS: async m => {calls.push(m.period + (m.date ? ':' + m.date : ''));return m.period === 'all' ? ALL : DAY;}}});
   await ensureAssist(c, 1000);await ensureAssist(c, 20000);await ensureAssist(c, 59000);
-  assert.deepEqual(calls, ['all']);
+  assert.deepEqual(calls, ['all','day:2026-11-09']);
   assistState(c).scope = 'day';
   await ensureAssist(c, 30000);await ensureAssist(c, 31000);
   assert.deepEqual(calls, ['all', 'day:2026-11-09']);
-  await ensureAssist(c, 62000); // 누적은 60초가 지나 새로 고치지만, 30초에 받은 선택일은 아직 유효하다(누적 갱신이 날짜 캐시를 지우지 않는다)
-  assert.deepEqual(calls, ['all', 'day:2026-11-09', 'all']);
-  await ensureAssist(c, 95000); // 선택일도 60초가 지나면 새로 고친다
+  await ensureAssist(c, 62000); // 첫 조회에 누적/선택일을 함께 받았으므로 둘 다 60초 뒤 갱신한다.
+  assert.deepEqual(calls, ['all', 'day:2026-11-09', 'all', 'day:2026-11-09']);
+  await ensureAssist(c, 95000); // 두 캐시 모두 아직 유효하다
   assert.deepEqual(calls, ['all', 'day:2026-11-09', 'all', 'day:2026-11-09']);
 });
 
@@ -101,7 +101,7 @@ test('실패하면 기존 표시를 유지하고 15초 뒤에 다시 시도하�
   const c = card({_hass: {config: {time_zone: TZ}, callWS: async () => {n++;if (!ok) throw Error('boom');return ALL;}}});
   await ensureAssist(c, 1000);assert.equal(assistState(c).error, true);assert.equal(n, 1);
   await ensureAssist(c, 5000);assert.equal(n, 1);
-  ok = true;await ensureAssist(c, 17000);assert.equal(n, 2);assert.equal(assistState(c).error, false);assert.ok(assistState(c).all);
+  ok = true;await ensureAssist(c, 17000);assert.equal(n, 3);assert.equal(assistState(c).error, false);assert.ok(assistState(c).all);
 });
 
 test('한국어·영어 대시보드는 같은 모듈을 쓰고 주행 탭 레이아웃 뒤에서만 패널을 그린다', () => {
@@ -111,4 +111,29 @@ test('한국어·영어 대시보드는 같은 모듈을 쓰고 주행 탭 레�
     assert.ok(src.includes(`\${this.tripHistory(isTrip)}</div>\${isTrip?assistPanelHtml(this,'${lang}'):''}`));
     assert.ok(src.includes("if(this.tab==='trips'){animateAssist(this);ensureAssist(this);}"));
   }
+});
+
+for(const lang of ['ko','en']){
+ test(`${lang}: selected-day data opens the daily scope and daily chart; missing day falls back to all`,()=>{
+  const c=card(),a=assistState(c);a.all=ALL;
+  let html=assistPanelHtml(c,lang,NOW);
+  assert.equal(assistScope(c),'day');assert.match(html,/61\.9<small>/);
+  assert.match(html,/data-assist-chart="day" class="on"/);
+  c.tripDay='2026-11-08';html=assistPanelHtml(c,lang,NOW);
+  assert.equal(assistScope(c),'all');assert.match(html,/49\.1<small>/);
+  assert.match(html,/data-assist-chart="day" class="on"/);
+ });
+}
+test('0% is a measured day; explicit choices survive refresh until the selected date changes',()=>{
+ const c=card(),a=assistState(c);a.all={...ALL,days:[{date:c.tripDay,active:false,assist_m:0,manual_m:1000,ratio:0}]};
+ assert.equal(assistScope(c),'day');assert.match(assistPanelHtml(c),/0\.0<small>/);
+ a.scope='all';a.chart='month';assistPanelHtml(c);
+ assert.equal(assistScope(c),'all');assert.equal(a.chart,'month');
+ c.tripDay='2026-11-08';assistPanelHtml(c);c.tripDay='2026-11-09';
+ assert.equal(assistScope(c),'day');assert.equal(a.chart,'month');
+});
+test('missing-day default makes no detail request, including concurrent renders',async()=>{
+ const calls=[];const c=card({tripDay:'2026-11-08',_hass:{callWS:async m=>{calls.push(m.period);return ALL;}}});
+ await Promise.all([ensureAssist(c,1000),ensureAssist(c,1000)]);
+ assert.deepEqual(calls,['all']);assert.equal(assistScope(c),'all');
 });

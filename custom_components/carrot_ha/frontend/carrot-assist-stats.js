@@ -79,9 +79,9 @@ export const ASSIST_CSS = `
 .as-gauge{position:relative;width:100%;max-width:300px;aspect-ratio:200/172;container-type:inline-size}
 .as-gauge svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .as-gauge .track,.as-gauge .fill{fill:none;stroke-linecap:round}
-.as-gauge .track{stroke:var(--as-track);stroke-width:3}.as-gauge .fill{stroke:var(--as);stroke-width:5;transition:stroke-dasharray .55s cubic-bezier(.22,.8,.3,1)}
+.as-gauge .track{stroke:var(--as-track);stroke-width:8}.as-gauge .fill{stroke:var(--as);stroke-width:11;transition:stroke-dasharray .55s cubic-bezier(.22,.8,.3,1)}
 .as-center{position:absolute;left:50%;top:53.5%;transform:translate(-50%,-50%);text-align:center;white-space:nowrap;pointer-events:none}
-.as-center b{display:block;font-size:19cqw;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--as-white)}
+.as-center b{display:block;font-size:18cqw;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--as-white)}
 .as-center b small{font-size:.5em;font-weight:500;margin-left:.06em}
 .as-center span{display:block;margin-top:2.5cqw;font-size:max(12px,4.6cqw);color:var(--muted)}
 .as-ends{position:absolute;top:89%;font-size:10.5px;color:var(--muted);transform:translateX(-50%)}
@@ -101,6 +101,7 @@ export const ASSIST_CSS = `
 .as-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;justify-items:center}
 .as-chip{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;padding:0;font-size:11px;color:var(--muted);cursor:pointer}
 .as-chip i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:13px;line-height:1;color:#fff}
+.as-chip i svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
 .as-chip.on i{background:var(--as)}.as-chip.low i{background:var(--as-soft);color:var(--as)}
 .as-chip.none i,.as-chip.future i{background:none}
 .as-chip.none i::before,.as-chip.future i::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--as-dim)}
@@ -134,12 +135,40 @@ export const ASSIST_CSS = `
 .as-state{padding:0 26px 14px;font-size:11px;color:var(--muted)}
 @container(max-width:700px){
  .assist-body{grid-template-columns:1fr;padding:2px 16px 18px;gap:22px}
+ .as-left{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);column-gap:16px;align-items:center}
+ .as-scope{grid-column:1/-1;justify-self:center;margin-bottom:6px}
+ .as-gauge{grid-column:1;grid-row:2/4;align-self:center;max-width:260px}
+ .as-rows{grid-column:2;grid-row:2;margin-top:0;gap:10px;align-self:end}
+ .as-best{grid-column:2;grid-row:3;align-self:start;margin-top:10px}
+ .as-best small,.as-best p{overflow-wrap:anywhere}
  .as-plot{height:150px}.as-state{padding:0 16px 12px}
+}
+@container(max-width:480px){
+ .assist>.paneltitle{flex-wrap:wrap;gap:6px}
+ .assist>.paneltitle h2{font-size:16px;white-space:nowrap}
+ .as-left{column-gap:12px}
+ .as-row{flex-direction:column;align-items:flex-start;gap:3px}
+ .as-row b{font-size:14px}
+ .as-best>div{flex-direction:column;align-items:flex-start;gap:4px}
+ .as-best b{font-size:22px}
+ .as-best p{text-align:left}
 }`;
 
 // ---- 상태·데이터 ----
 export function assistState(card) {
-  return card._assist || (card._assist = {all: null, days: {}, at: 0, seq: 0, error: false, loading: false, scope: 'all', day: null, chart: 'month', tip: null, shown: null, target: null});
+  return card._assist || (card._assist = {all: null, days: {}, at: 0, seq: 0, error: false, loading: false, scope: 'auto', day: null, chart: 'day', tip: null, shown: null, target: null});
+}
+
+// Auto scope follows the selected trip date; explicit choices survive background refresh.
+export function assistScope(card) {
+  const a=assistState(card), sel=a.day||card.tripDay;
+  if(a.scopeDate!==sel){
+    if(a.scopeDate!==undefined)a.scope='auto';
+    a.scopeDate=sel;
+  }
+  if(!sel)return 'all';
+  if(a.scope==='day'||a.scope==='all')return a.scope;
+  return a.all?.days?.some(d=>d.date===sel)?'day':'all';
 }
 
 // 주행 탭이 보일 때만 호출된다. 60초 안의 재호출은 요청하지 않는다.
@@ -147,7 +176,7 @@ export async function ensureAssist(card, now = Date.now()) {
   const a = assistState(card), hass = card._hass, entry = card.device?.entry_id;
   if (!hass?.callWS || !entry || a.loading || now < (a.retryAt || 0)) return;
   const sel = a.day || card.tripDay;
-  const needDay = a.scope === 'day' && sel && !(a.days[sel] && now - a.days[sel].at < TTL_MS);
+  const needDay = assistScope(card) === 'day' && sel && !(a.days[sel] && now - a.days[sel].at < TTL_MS);
   const needAll = !a.all || now - a.at >= TTL_MS;
   if (!needAll && !needDay) return;
   a.loading = true;
@@ -157,6 +186,12 @@ export async function ensureAssist(card, now = Date.now()) {
     if (needAll) job.push(hass.callWS({type: 'carrot_ha/assist/summary', entry_id: entry, period: 'all'}).then(r => { if (seq === a.seq) { a.all = r; a.at = now; } }));
     if (needDay) job.push(hass.callWS({type: 'carrot_ha/assist/summary', entry_id: entry, period: 'day', date: sel}).then(r => { if (seq === a.seq) a.days[sel] = {...r, at: now}; }));
     await Promise.all(job);
+    // Once the summary arrives, fetch the selected day's detail only when it has data.
+    const selected=a.day||card.tripDay;
+    if(assistScope(card)==='day'&&selected&&!(a.days[selected]&&now-a.days[selected].at<TTL_MS)){
+      const detail=await hass.callWS({type:'carrot_ha/assist/summary',entry_id:entry,period:'day',date:selected});
+      if(seq===a.seq)a.days[selected]={...detail,at:now};
+    }
     a.error = false;a.retryAt = 0;
   } catch (e) {
     a.error = true;
@@ -210,7 +245,7 @@ export function assistPanelHtml(card, lang = 'ko', now = new Date()) {
     return `<style>${ASSIST_CSS}</style><section class="panel assist">${head(t.pending)}<div class="as-empty">${t.emptyBody}</div></section>`;
   }
   const sel = a.day || card.tripDay;
-  const scope = a.scope === 'day' && sel ? 'day' : 'all', mode = a.chart === 'day' ? 'day' : 'month';
+  const scope = assistScope(card), mode = a.chart === 'day' ? 'day' : 'month';
   const byDate = Object.fromEntries((all.days || []).map(d => [d.date, d]));
   const since = t.sinceDate(+all.since.slice(5, 7), +all.since.slice(8, 10)), today = dayKey(0, tz, now);
   const dayS = scope === 'day' ? a.days[sel] : null, dRow = sel ? byDate[sel] : null;
@@ -225,7 +260,7 @@ export function assistPanelHtml(card, lang = 'ko', now = new Date()) {
   const week = weekKeys(tz, now).map(k => {
     const d = byDate[k], fut = k > today, cls = fut ? 'future' : !d ? 'none' : d.active ? 'on' : 'low';
     const title = fut ? dayLabel(k, lang) : t.chipTitle(dayLabel(k, lang), d ? pct(d.ratio, L) + '%' : t.noRecord);
-    return `<button type="button" class="as-chip ${cls}${k === sel ? ' sel' : ''}"${fut ? ' disabled' : ` data-assist-day="${esc(k)}"`} title="${esc(title)}"><i>${d && d.active ? '✓' : d ? '·' : ''}</i>${wd[dow(k)]}</button>`;
+    return `<button type="button" class="as-chip ${cls}${k === sel ? ' sel' : ''}"${fut ? ' disabled' : ` data-assist-day="${esc(k)}"`} title="${esc(title)}"><i>${d && d.active ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg>' : d ? '·' : ''}</i>${wd[dow(k)]}</button>`;
   }).join('');
   let best;
   if (scope === 'all') {
@@ -285,7 +320,7 @@ export function bindAssist(card) {
     if (col && !col.dataset.assistDay) { card.render(); return; }
     const b = hit('[data-assist-day]');
     if (!b) return;
-    a.day = b.dataset.assistDay; a.scope = 'day';
+    a.day = b.dataset.assistDay; a.scopeDate=a.day; a.scope = 'day';
     const day = root.querySelector(`[data-trip-day="${b.dataset.assistDay}"]`);
     if (day) day.click(); else card.render(); // 최근 7일 밖의 날짜는 통계 패널만 해당 날짜로
     ensureAssist(card);
