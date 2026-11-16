@@ -7,8 +7,13 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    const page=await browser.newPage({viewport:{width:1100,height:700}});
    const requested=[];page.on('request',r=>requested.push(r.url()));
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.route('**/*',route=>{
+   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
+    if(url.pathname.endsWith('/vehicle-3d.js')){
+     const ready=await page.evaluate(()=>({soc:window.card?.v?.soc_percent,historyDone:window.card?._initialDataSettled}));
+     assert.equal(ready.soc,72,'engine request follows first live state render');
+     assert(!ready.historyDone,'engine must not wait for history completion');
+    }
     if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:'<style>#host{height:600px;overflow:auto}#spacer{height:180px}#bottom{height:1000px}</style><div id="host"><div id="spacer"></div><div id="card"></div><div id="bottom"></div></div>'});
     const file=path.resolve('custom_components/carrot_ha/frontend','.'+url.pathname);
     return fs.existsSync(file)?route.fulfill({path:file}):route.fulfill({status:404,body:'missing'});
@@ -32,7 +37,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
     window.loading=card.load();
    },lang);
    await page.waitForFunction(()=>card.v.soc_percent===72);
-   assert(!requested.some(url=>/carrot-camera-360|carrot-vehicle-3d|leaflet\.js/.test(url)),'optional assets must not compete with initial data: '+JSON.stringify(requested.filter(url=>/carrot-camera-360|carrot-vehicle-3d|leaflet\.js/.test(url))));
+   await page.waitForFunction(()=>card._v3d?.viewer);
+   assert(await page.evaluate(()=>card.busy&&!card._initialDataSettled),'3D must not wait for history');
+   assert(!requested.some(url=>/carrot-camera-360|leaflet\.js/.test(url)),'camera and map remain deferred');
    for(const tab of ['overview','trips','parking','charge','vehicle']){
     await page.evaluate(tab=>{card.tab=tab;card.render();},tab);
     assert(await page.evaluate(()=>!!card.shadowRoot.querySelector('ha-card')));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const frontend = new URL('../custom_components/carrot_ha/frontend/', import.meta.url);
 const read = name => fs.readFileSync(new URL(name, frontend), 'utf8');
-const {vehicleViewState, syncVehicle3d, loadModel, warmVehicle3d, headingBottom, openpilotEngaged, DEFAULT_MODEL_URL} = await import(new URL('carrot-vehicle-3d.js', frontend));
+const {vehicleViewState, syncVehicle3d, loadModel, warmVehicle3d, headingBottom, openpilotEngaged, DEFAULT_MODEL_URL, primeVehicle3d, MODEL_REVISION} = await import(new URL('carrot-vehicle-3d.js', frontend));
 
 test('vehicle state maps door, trunk, low beam, speed and driving from the values the card already has', () => {
   const state = vehicleViewState({door_driver_open: true, door_passenger_open: false, door_rear_driver_open: true,
@@ -78,7 +78,9 @@ test('3D can be switched off and the viewer is released when the container disap
 });
 
 test('default model ships with the frontend and embeds its texture images', () => {
-  assert.equal(DEFAULT_MODEL_URL, new URL('carrot-assets/models/vehicle.glb', frontend).href);
+  const expected = new URL('carrot-assets/models/vehicle.glb', frontend);
+  expected.searchParams.set('model', MODEL_REVISION);
+  assert.equal(DEFAULT_MODEL_URL, expected.href);
   const bytes = fs.readFileSync(new URL(DEFAULT_MODEL_URL));
   assert.equal(bytes.toString('ascii', 0, 4), 'glTF');
   assert.equal(bytes.readUInt32LE(4), 2);
@@ -146,7 +148,7 @@ for (const lang of ['ko', 'en']) {
     const disabled = source.indexOf('.hero .car-image{position:absolute;width:100%;height:100%;object-fit:cover;inset:0 0 auto;pointer-events:none}');
     const enabled = source.indexOf('.hero .vehicle3d,.hero .vehicle3d .v3d-stage{pointer-events:auto}');
     assert.ok(disabled >= 0 && enabled > disabled, 'the enabling rule must come after the rule that disables pointer events');
-    assert.match(source, /warmVehicle3d\(config\)/);
+    assert.match(source, /primeVehicle3d\(config\)/);
   });
 }
 
@@ -210,4 +212,20 @@ test('a driving car at 0 km/h stands still; only an unknown speed animates at a 
   assert.match(source, /Number\.isFinite\(state\.speedKph\) \? Math\.min\(MAX_EFFECT_KPH, Math\.max\(0, state\.speedKph\)\) : 40/);
   assert.match(source, /if \(shownKph > 0\) \{/);
   assert.match(source, /if \(visible && \(busy \|\| chargeFrames\)\) raf = requestAnimationFrame\(frame\);/);
+});
+
+// Persistent cache must survive unrelated UI versions, but invalidate on model changes.
+test('model revision matches the shipped bytes and ignores UI version', async () => {
+  const {createHash} = await import('node:crypto');
+  assert.equal(createHash('sha256').update(fs.readFileSync(new URL(DEFAULT_MODEL_URL))).digest('hex').slice(0,12), MODEL_REVISION);
+  const next = new URL('carrot-vehicle-3d.js?v=unrelated-ui-update', frontend);
+  assert.equal((await import(next)).DEFAULT_MODEL_URL, DEFAULT_MODEL_URL);
+});
+
+test('priming a local copy never downloads or imports the renderer', async () => {
+  let requests = 0;
+  globalThis.fetch = async () => { requests++; throw Error('must not download during priming'); };
+  primeVehicle3d({vehicle_3d_model:'/prime-only/model.glb'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests, 0);
 });

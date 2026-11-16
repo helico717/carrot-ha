@@ -16,7 +16,11 @@ const versioned = name => {
   return url.href;
 };
 
-export const DEFAULT_MODEL_URL = versioned('./carrot-assets/models/vehicle.glb');
+// Bump only when vehicle.glb changes (SHA-256 prefix); UI releases keep this cache.
+export const MODEL_REVISION = '61914d356a99';
+const defaultModelUrl = new URL('./carrot-assets/models/vehicle.glb', import.meta.url);
+defaultModelUrl.searchParams.set('model', MODEL_REVISION);
+export const DEFAULT_MODEL_URL = defaultModelUrl.href;
 
 let viewerModule = null;
 let webglBroken = false;
@@ -27,6 +31,11 @@ let webglBroken = false;
 // background with its ETag, so a changed model is picked up on the following visit.
 const DB_NAME = 'carrot-ha-vehicle-3d';
 const modelLoads = new Map();
+const modelReads = new Map();
+function readModel(url) {
+  if (!modelReads.has(url)) modelReads.set(url, storedModel(url).catch(() => null));
+  return modelReads.get(url);
+}
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -70,8 +79,7 @@ async function revalidate(url, cached) {
 export function loadModel(url) {
   if (!modelLoads.has(url)) {
     modelLoads.set(url, (async () => {
-      let cached = null;
-      try { cached = await storedModel(url); } catch (error) { /* private mode: no local copy */ }
+      const cached = await readModel(url);
       if (cached?.buffer) {
         revalidate(url, cached);
         return {buffer: cached.buffer, source: 'local'};
@@ -98,8 +106,13 @@ function modelUrlOf(config) {
   return config?.vehicle_3d_model || DEFAULT_MODEL_URL;
 }
 
-// Start the downloads as soon as the card is configured, in parallel with its own data requests,
-// so the model is usually ready by the time the overview renders.
+// Prime only the local read during data loading: no network, revalidation or viewer import.
+export function primeVehicle3d(config) {
+  if (config?.vehicle_3d === false || webglBroken) return;
+  readModel(modelUrlOf(config));
+}
+
+// Full warm-up for callers that have already displayed their initial data.
 export function warmVehicle3d(config) {
   if (config?.vehicle_3d === false || webglBroken) return;
   loadModel(modelUrlOf(config));

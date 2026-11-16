@@ -135,7 +135,7 @@ class CarrotDashboard extends HTMLElement {
       localStorage.setItem(this.cacheKey,JSON.stringify({v:this.v,trips:cachedTrips,charges:cachedCharges,saved_at:Date.now()}));
     }catch(e){console.warn('Carrot HA cache save failed',e);}
   }
-  setConfig(config){this.config=config;this.restoreViewState();this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.vehicleColor=null;try{this.vehicleColor=localStorage.getItem('carrot-vehicle-color-'+(config.device_id||'default'))||null;}catch{}if(this._colorControl)this.paintColorControl();this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
+  setConfig(config){this.config=config;if(config.vehicle_3d!==false)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.primeVehicle3d(config)).catch(()=>{});this.restoreViewState();this.themeMode=config.color_mode||'auto';try{this.themeMode=localStorage.getItem('carrot-theme-'+(config.device_id||'default'))||this.themeMode;}catch{}this.vehicleColor=null;try{this.vehicleColor=localStorage.getItem('carrot-vehicle-color-'+(config.device_id||'default'))||null;}catch{}if(this._colorControl)this.paintColorControl();this.applyTheme();if(!this.v||!Object.keys(this.v).length)this.loadCache();this.render();}
   applyTheme(){
     if(!['auto','light','dark'].includes(this.themeMode))this.themeMode='auto';
     const dark=this.themeMode==='auto'?(this._hass?.themes?.darkMode??window.matchMedia('(prefers-color-scheme: dark)').matches):this.themeMode==='dark';
@@ -190,9 +190,9 @@ class CarrotDashboard extends HTMLElement {
       // Timestamps are displayed to the minute; avoid rebuilding maps for
       // an unchanged sample merely because its age increased by 15 seconds.
       const signature=value=>JSON.stringify(value,(key,item)=>key==='measurement_age_s'?undefined:key==='live_checked_at'&&item?String(item).slice(0,16):item);
-      const changed=this.liveError||this.isFromCache||signature(next)!==signature(this.v);
+      const changed=!this._vehicleDataReady||this.liveError||this.isFromCache||signature(next)!==signature(this.v);
       this.liveError='';
-      this.v=next;this.isFromCache=false;
+      this.v=next;this.isFromCache=false;this._vehicleDataReady=true;
       if(changed){this.saveCache();this.render();}
     };
     try{
@@ -1537,9 +1537,15 @@ class CarrotDashboard extends HTMLElement {
   }
   // Interactive 3D vehicle: lazy-loaded, fed with the state this card already holds.
   syncVehicle3d(v,state){
-    if(!this._initialDataSettled)return;
+    if(!this._vehicleDataReady&&!this._initialDataSettled)return;
     if(!this.shadowRoot.querySelector('.vehicle3d')&&!this._v3d)return;
-    import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.syncVehicle3d(this,{v,status:state,dark:this.getAttribute('data-theme')==='dark'})).catch(()=>{});
+    this._vehicle3dNext={v,status:state,dark:this.getAttribute('data-theme')==='dark'};
+    const sync=()=>{if(this.isConnected)import(dependencyURL('./carrot-vehicle-3d.js')).then(m=>m.syncVehicle3d(this,this._vehicle3dNext)).catch(()=>{});};
+    if(this._v3d){sync();return;}
+    if(this._vehicle3dScheduled)return;
+    this._vehicle3dScheduled=true;
+    // Give the first state a paint before parsing the model or preparing WebGL.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{this._vehicle3dScheduled=false;sync();},0)));
   }
   auxBatteryView(v){
     const volt=v?.aux_voltage,known=typeof volt==='number'&&Number.isFinite(volt),key=this.vehicleStatus(v).key,age=v?.aux_age_s;
