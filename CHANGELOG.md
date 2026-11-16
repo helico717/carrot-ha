@@ -4,7 +4,7 @@
 - 초기 이력 응답마다 미니 지도와 타일을 제거하던 동작을 개선한다. `carrot-view-state.js`는 미니 지도 하위 DOM을 소유자에게 맡기고, 카드가 노드·좌표/경로 signature별 Leaflet 객체를 재사용한다. 변경된 지도만 교체하고 개요 이탈/연결 해제 때 정리한다. 지도 외관·새 로딩 인디케이터 변경 없음.
 - 관련 파일: frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js, carrot-view-state.js 및 지도/3D/첫 로딩 검사.
 - 검증: 관련 Node 52건 통과. 실제 Chromium ko/en에서 첫 상태 전 지도 요청 0, 지연된 Leaflet/타일과 무관한 데이터 표시, 주차→주행 지도 독립 준비, 이력 응답 후 두 프레임의 지도/타일/DOM/스크롤/줌 보존, 좌표/경로 변경 시 해당 지도만 교체, 탭 이탈 정리 확인. 기존 전체 탭·3D·부분 응답 검사도 ko/en 통과. 운영 외부 타일 서버 지연·개별 클라이언트 체감 속도 미측정.
-- 배포: 검증·커밋·푸시 후 백업/해시 확인하여 HA 직접 반영 예정. 릴리즈·버전 상승·HA/Comma 재시작 없음. 다른 작업의 지침·문서·변경 기록은 별도 보존.
+- 배포: 구현 5ee134e main 푸시·미푸시 0 확인. HA 기존 3개 파일이 직전 커밋과 일치함을 확인하고 `/config/carrot_ha/deployment-backups/mini-maps-5ee134ecc0ba`에 백업·manifest·rollback.sh 보존 후 직접 반영했다. 설치 및 내부 HTTP SHA-256 모두 일치(ko f08905d54f49, en 5aba2ba5af46, view-state b309329b1bb3). frontend-version 0.9.0-5d9b4930d9db 확인. 브라우저 새로고침으로 적용. 릴리즈·버전 상승·HA/Comma 재시작 없음. 사용자 기기의 실제 외부 지도 타일 응답/체감 개선은 미확인. 다른 작업의 지침·문서·변경 기록은 별도 보존.
 
 
 ## 2026-11-16 — 첫 상태 표시 우선 3D 병렬 준비·모델 캐시 분리
