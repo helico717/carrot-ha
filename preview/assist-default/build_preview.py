@@ -34,6 +34,26 @@ s=s.replace('.as-gauge .track{stroke:var(--as-track);stroke-width:3}.as-gauge .f
 s=s.replace('.as-chip.on i{background:', '.as-chip i svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}\n.as-chip.on i{background:')
 s=s.replace("${d && d.active ? '✓' : d ? '·' : ''}", '''${d && d.active ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg>' : d ? '·' : ''}''')
 s=s.replace('font-size:19cqw;', 'font-size:18cqw;')
+s=s.replace(' .as-plot{height:150px}', ''' .as-left{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);column-gap:16px;align-items:center}
+ .as-scope{grid-column:1/-1;justify-self:center;margin-bottom:6px}
+ .as-gauge{grid-column:1;grid-row:2/4;align-self:center;max-width:260px}
+ .as-rows{grid-column:2;grid-row:2;margin-top:0;gap:10px;align-self:end}
+ .as-best{grid-column:2;grid-row:3;align-self:start;margin-top:10px}
+ .as-best small,.as-best p{overflow-wrap:anywhere}
+ .as-plot{height:150px}''')
+s=s.replace('}`;\n\n// ---- 상태·데이터 ----', '''}
+@container(max-width:480px){
+ .assist>.paneltitle{flex-wrap:wrap;gap:6px}
+ .assist>.paneltitle h2{font-size:16px;white-space:nowrap}
+ .as-left{column-gap:12px}
+ .as-row{flex-direction:column;align-items:flex-start;gap:3px}
+ .as-row b{font-size:14px}
+ .as-best>div{flex-direction:column;align-items:flex-start;gap:4px}
+ .as-best b{font-size:22px}
+ .as-best p{text-align:left}
+}`;
+
+// ---- 상태·데이터 ----''')
 p.write_text(s)
 shutil.copy2(Path(__file__).with_name('index.html'),out/'index.html')
 print(out)
