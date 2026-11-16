@@ -39,7 +39,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
    await page.waitForFunction(()=>card.v.soc_percent===72);
    await page.waitForFunction(()=>card._v3d?.viewer);
    assert(await page.evaluate(()=>card.busy&&!card._initialDataSettled),'3D must not wait for history');
-   assert(!requested.some(url=>/carrot-camera-360|leaflet\.js/.test(url)),'camera and map remain deferred');
+   assert(!requested.some(url=>/carrot-camera-360|leaflet\.js/.test(url)),'camera stays deferred and maps without coordinates do not load Leaflet');
    for(const tab of ['overview','trips','parking','charge','vehicle']){
     await page.evaluate(tab=>{card.tab=tab;card.render();},tab);
     assert(await page.evaluate(()=>!!card.shadowRoot.querySelector('ha-card')));

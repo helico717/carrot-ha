@@ -153,7 +153,7 @@ for (const lang of ['ko', 'en']) {
 }
 
 test('view patching leaves the 3D container to its owner, like the Leaflet map', () => {
-  assert.match(read('carrot-view-state.js'), /\['map','vehicle3d'\]\.some\(/);
+  assert.match(read('carrot-view-state.js'), /\['map','vehicle3d','mini-map'\]\.some\(/);
 });
 
 

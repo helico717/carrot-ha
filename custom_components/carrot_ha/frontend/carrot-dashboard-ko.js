@@ -230,7 +230,7 @@ class CarrotDashboard extends HTMLElement {
         }),
         loadRecentTrips(this._hass.callApi.bind(this._hass),id).then(tripsRes=>{
           const selectedStart=this.selected!==null?this.trips[this.selected]?.data?.started_at:null;
-          this._rawTrips=tripsRes.events||[];
+          this._rawTrips=tripsRes.events||[];this._tripsLoaded=true;
           this._mergedTrips=mergeConsecutiveTrips(this._rawTrips,this._hass?.config?.time_zone,1800);
           this.trips=this._mergeTripsEnabled!==false?this._mergedTrips:this._rawTrips;
           if(selectedStart!=null){
@@ -254,10 +254,12 @@ class CarrotDashboard extends HTMLElement {
     }catch(e){this.error=e instanceof Error?e.message:'HA 조회 실패. 관리자 계정과 통합 업데이트를 확인하세요.';}
     finally{this._initialDataSettled=true;this.busy=false;if(this.removeAttribute)this.removeAttribute('data-loading');this.render();}
   }
-  clearMiniMaps(){
+  clearMiniMaps(dispose=true){
     if(this._mapResizeObserver){try{this._mapResizeObserver.disconnect();}catch(e){}}
     if(this._resizeRaf){cancelAnimationFrame(this._resizeRaf);this._resizeRaf=null;}
-    const maps=this.miniMaps||[];this.miniMaps=[];
+    if(!dispose)return;
+    const maps=new Set([...(this.miniMaps||[]),...Array.from(this._miniMapHolders?.values()||[],holder=>holder.map)]);
+    this._miniMapHolders?.clear();this.miniMaps=[];
     for(const map of maps){try{map.remove();}catch(e){console.warn("Carrot HA: map cleanup failed",e);}}
   }
   render(){const out=preserveView(this,()=>this.renderContent());bindAssist(this);if(this.tab==='trips'){animateAssist(this);ensureAssist(this);}return out;}
@@ -267,7 +269,7 @@ class CarrotDashboard extends HTMLElement {
     if(this.map&&this._mapContext===mapContext){this._mapView={center:this.map.getCenter(),zoom:this.map.getZoom()};}
     else if(this._mapContext!==mapContext){this._mapView=null;}
     this._mapContext=mapContext;
-    this.clearMiniMaps();
+    this.clearMiniMaps(this.tab!=='overview');
     // Keep the interactive map alive until drawMap decides whether its data changed.
     if(this.tab==='trips'){
       const days=tripDays(this.trips,this._hass?.config?.time_zone);
@@ -896,7 +898,7 @@ class CarrotDashboard extends HTMLElement {
         setTimeout(()=>{if(copyBtn.isConnected){copyBtn.classList.remove('copied');copyBtn.innerHTML=`${icon('content-copy')} <span>모두 복사</span>`;}},2000);
       }
     };
-    if(this._initialDataSettled&&this.tab==='overview')this.drawMiniMaps(v).catch(()=>{this.shadowRoot.querySelectorAll('.mini-map').forEach(node=>{node.textContent='지도를 불러오지 못했습니다';});});
+    if(this.tab==='overview')this.scheduleMiniMaps(v);
     if (typeof window !== 'undefined' && window.ResizeObserver) {
       this._mapResizeObserver = new ResizeObserver(() => {
         if (!this._resizeRaf) {
@@ -1601,26 +1603,55 @@ class CarrotDashboard extends HTMLElement {
       returnFocusElem:triggerBtn
     });
   }
+  scheduleMiniMaps(v){
+    if(!this._vehicleDataReady&&!this._initialDataSettled)return;
+    this._miniMapsNext=v;
+    if(this._miniMapsScheduled)return;
+    this._miniMapsScheduled=true;
+    // Start alongside 3D after the first live state has had a chance to paint.
+    requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{
+      this._miniMapsScheduled=false;
+      if(!this.isConnected||this.tab!=='overview')return;
+      this.drawMiniMaps(this._miniMapsNext).catch(()=>{
+        this.shadowRoot.querySelectorAll('.mini-map:not(.leaflet-container)').forEach(node=>{node.textContent='지도를 불러오지 못했습니다';});
+      });
+    },0)));
+  }
   async drawMiniMaps(v){
     const currentRenderId=this._renderId;
     const nodes=[this.shadowRoot.querySelector('.parking-mini'),this.shadowRoot.querySelector('.trip-mini')];
-    const L=await leaflet();
-    if(this._renderId!==currentRenderId)return;
+    const holders=this._miniMapHolders||=new Map();
+    for(const [node,holder] of holders){
+      if(!nodes.includes(node)||!node.isConnected){holder.map.remove();holders.delete(node);}
+    }
+    const route=(this.trips[0]?.data?.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude));
+    const parking=Number.isFinite(v.parking_latitude)&&Number.isFinite(v.parking_longitude)?[v.parking_latitude,v.parking_longitude]:null;
+    const data=[parking,route.length?route:null];
+    const signatures=data.map(item=>JSON.stringify(item));
+    // Do not load Leaflet or request tiles for a map whose coordinates have not arrived.
+    const needsMap=nodes.some((node,i)=>node?.isConnected&&data[i]&&holders.get(node)?.signature!==signatures[i]);
+    const L=needsMap?await leaflet():null;
+    if(this._renderId!==currentRenderId||!this.isConnected||this.tab!=='overview')return;
     nodes.forEach((node,i)=>{
       if(!node?.isConnected)return;
-      const map=L.map(node,{zoomControl:false,attributionControl:true,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false});
-      this.miniMaps.push(map);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
-      const route=(this.trips[0]?.data?.route||[]).filter(p=>Number.isFinite(p.latitude)&&Number.isFinite(p.longitude));
-      const dot=(p,c)=>L.circleMarker(p,{radius:5,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(map);
-      if(i&&route.length){const coords=route.map(p=>[p.latitude,p.longitude]);const max=Math.max(...route.map(p=>p.speedMps??p.speed_mps??0),1);for(let j=1;j<route.length;j++){let t=(route[j].speedMps??route[j].speed_mps??0)/max;L.polyline([coords[j-1],coords[j]],{color:`hsl(${18+118*t},95%,40%)`,weight:4,opacity:1}).addTo(map)}map.fitBounds(coords,{padding:[16,16],maxZoom:14});dot(coords[0],'#10b981');dot(coords.at(-1),'#f97316');}
-      else if(!i&&Number.isFinite(v.parking_latitude)){const p=[v.parking_latitude,v.parking_longitude];map.setView(p,14);dot(p,'#2563eb');}
-      else{this.miniMaps=this.miniMaps.filter(item=>item!==map);map.remove();node.textContent='위치 정보 없음';}
-    });
-    setTimeout(()=>{
-      if(this._renderId===currentRenderId){
-        this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
+      const previous=holders.get(node);
+      if(previous&&previous.signature===signatures[i])return;
+      if(previous){previous.map.remove();holders.delete(node);}
+      if(!data[i]){
+        if(!i||this._tripsLoaded||this._initialDataSettled)node.textContent='위치 정보 없음';
+        return;
       }
+      node.textContent='';
+      const map=L.map(node,{zoomControl:false,attributionControl:true,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false});
+      holders.set(node,{map,signature:signatures[i]});
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,referrerPolicy:'strict-origin-when-cross-origin',attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+      const dot=(p,c)=>L.circleMarker(p,{radius:5,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(map);
+      if(i){const coords=route.map(p=>[p.latitude,p.longitude]);const max=Math.max(...route.map(p=>p.speedMps??p.speed_mps??0),1);for(let j=1;j<route.length;j++){let t=(route[j].speedMps??route[j].speed_mps??0)/max;L.polyline([coords[j-1],coords[j]],{color:`hsl(${18+118*t},95%,40%)`,weight:4,opacity:1}).addTo(map)}map.fitBounds(coords,{padding:[16,16],maxZoom:14});dot(coords[0],'#10b981');dot(coords.at(-1),'#f97316');}
+      else{map.setView(parking,14);dot(parking,'#2563eb');}
+    });
+    this.miniMaps=nodes.map(node=>holders.get(node)?.map).filter(Boolean);
+    setTimeout(()=>{
+      if(this._renderId===currentRenderId)this.miniMaps?.forEach(m=>{try{m.invalidateSize();}catch(e){}});
     },100);
   }
 
