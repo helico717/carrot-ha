@@ -1,12 +1,10 @@
-## 2026-11-16 — 충전소 드롭다운 206210f HA 직접 배포·운영 확인
+## 2026-11-16 — 일별 배터리 잔량 15분 표시 반영
 
-- 구현 커밋 `206210f78e8c4c501e1fc3c640533441de604403` main 푸시 완료(확인 당시 미푸시 0). 다른 작업의 지침/문서/프리뷰와 공통 CHANGELOG 변경은 별도 보존했다.
-- 반영 전 두 HA 파일이 구현 커밋 부모의 파일 해시와 일치함을 확인하고 `/config/carrot_ha/deployment-backups/favorite-dropdown-206210f78e8c`에 원본·manifest.json·실제 개행을 사용하는 rollback.sh를 보존했다. DB·사진·설정·Comma는 변경하지 않았다.
-- 반영 후 설치 및 HA 내부 HTTP SHA-256 일치: carrot-vehicle-journal.js `f39c28a84590bee737142965a4736ec06358832cef088ee4a1e73a19bb62dfb1`, carrot-journal-design.js `e038b1f26fd6fd08d5c79b3346f0fc09ba55e08b218d679d67f0201c6bfab0a7`. frontend-version `0.9.0-bb2e3d050e7d`.
-- 운영 외부 주소의 기존 Chrome에서 차계부를 열고 충전 기록창의 즐겨찾기 접힘→펼침을 확인했다. 실제 렌더 호스트 `carrot-journal-screen-0-9-0-bb2e3d050e7d`, 제목 높이24.09375px·radius999px·배경 rgba(16,24,30,0.7)·글자 rgb(245,248,250)·지도 컨테이너 부모 확인. 검증용 기록창은 저장하지 않고 닫았다. 운영 모바일 WebView는 사용자 확인 대기(합성 Chromium390px 검증 통과).
-- 관련 검증은 이전 항목 참고. 기존 browser-check는 변경 전 HEAD도 첫 headline 대기 타임아웃이며 전체 회귀 통과로 주장하지 않는다.
-- 상태: 파일/HTTP 제공·운영 데스크톱 화면 적용 확인 완료. 사용자는 열린 차계부를 새로고침하면 된다. HA/Comma 재시작·HACS 재다운로드·버전 상승·새 태그/릴리즈 없음.
-
+- 사용자 승인: 10/15분 전체 카드 프리뷰 검토 후 15분으로 실제 반영 요청. 주간 요약·일별 사용량·기존 새로고침/공유 캐시/live 우선 표시 유지. 새로운 API·수신기 요청·DB 변경 없음.
+- 변경: HA 이력 버킷 96개 및 interval_minutes=15, 측정시각·세션 충전 중첩·마지막 확인값의 15분 처리, ko/en 범위 라벨과 승인된 막대 간격/모서리 반영. 기존 24개 이력/캐시는 1시간 범위로 호환 표시. 관련 파일: battery_history.py, frontend/carrot-dashboard-ko.js, carrot-dashboard-en.js 및 Python/Node/브라우저 검사 3개.
+- 검증: Python 75건·Node 9건 통과. 여러 상태 전환·자정 경계 충전·SOC 없는 충전 배경·미래 구간 제외·시간대·기존 일별 합계 일치 확인. 실제 Chrome ko/en × 데스크톱/390px 4조합에서 96개·범위 라벨·충전 그룹·라이트/다크·가로 넘침 없음·날짜/주 전환·비동기 갱신 후 두 프레임 DOM/스크롤/날짜 보존 통과. 운영 서버 성능·사용자 기기 체감은 미측정.
+- 배포: 구현 `48276b9ff9cc` main 푸시 완료. 기존 3개 HA 파일이 구현 부모 커밋과 일치함을 확인하고 `/config/carrot_ha/deployment-backups/battery-15min-48276b9ff9cc`에 원본·manifest·rollback.sh를 보존한 뒤 직접 반영. 설치 SHA-256 확인: Python `85775d44870b`, ko `d0378fe24517`, en `c18ed6e039e1`. 두 JS의 HA 내부 HTTP 해시도 일치. frontend-version `0.9.0-07568c224916` 확인.
+- 상태: 사용자 HA 재시작 후 브라우저 새로고침 필요. 실행 중 HA Python은 재시작 전 기존 1시간 집계를 유지한다. 운영 15분 API·실제 화면은 재시작 후 확인 대기. 에이전트 재시작·Comma 변경·버전 상승·새 태그/릴리즈 없음. 다른 미커밋 작업은 보존. 동시 작업 중 잘못 중복된 직전 충전소 배포 기록 1개는 이 기록 커밋에서 정리했다.
 
 ## 2026-11-16 — 충전소 드롭다운 206210f HA 직접 배포·운영 확인
 
