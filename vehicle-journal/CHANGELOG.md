@@ -1,3 +1,9 @@
+## 2026-11-18 — 충전 단가 569dc49 HA 직접 반영
+
+- GitHub main의 569dc49를 HA에 설치했다. 기존 10개 파일은 `/config/carrot_ha/deployment-backups/favorite-charge-rates-569dc49/before`에 보관했으며 새 파일을 포함한 11개 파일의 기준·설치 SHA-256은 같은 폴더의 `manifest.json`에 있다. 반영 전 `charge_costs.py`는 운영에 설치돼 있던 b9dfffaa의 해시, 나머지는 직전 원격 기준과 일치했다.
+- 설치 파일 11개 SHA-256이 커밋과 일치하고 HA HTTP의 화면 모듈 4개도 모두 끝까지 읽어 해시가 일치했다. Python 구문 확인과 모바일 Chromium 합성 HA 검증을 완료했다. 실제 HA에서 새 WebSocket 명령과 충전 자동 적용은 사용자 재시작 후 확인할 단계다.
+- 사용자 HA 재시작 및 브라우저·앱 새로고침 대기. 수신 앱·Comma 변경 및 새 태그·릴리즈 없음.
+
 ## 2026-11-18 — 차량별 기본·즐겨찾기 충전 단가
 
 - 커밋 제목: vehicle-journal: share saved charging tariffs with vehicle dashboard
