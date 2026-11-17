@@ -10,7 +10,8 @@ from ..archive_codec import loads
 
 # 4: re-run lookups that a truncated provider response wrongly parked for 24 hours.
 # 5: store a reason code, step results and evidence so failures can be explained in the ledger.
-LOOKUP_VERSION=5
+# 6: retry missing locations using a continuously observed favorite parking visit.
+LOOKUP_VERSION=6
 RETRY_DAY=86400
 RETRY_TRANSIENT=900
 # A charge-start fix this close to one learned on an earlier visit is the same parking spot.
@@ -189,6 +190,7 @@ def gps_diagnosis(archive,journal,started):
 
 def point_evidence(point,started):
     evidence={'basis':point.get('basis'),'latitude':round(point['latitude'],5),'longitude':round(point['longitude'],5)}
+    if point.get('parked_since'):evidence['parked_since']=point['parked_since']
     if finite(point.get('accuracy_m')):evidence['accuracy_m']=round(point['accuracy_m'])
     try:evidence['nearest_gap_s']=round((stamp(point['gps_measured_at'])-stamp(started)).total_seconds())
     except (KeyError,ValueError,TypeError):pass
@@ -297,13 +299,18 @@ async def enrich(hass,manager,archive,journal):
     favorites=await hass.async_add_executor_job(journal.favorites) if items else []
     for item in items:
         point=await hass.async_add_executor_job(position,archive,journal,item[3])
+        visit=None
+        if point is None and favorites:
+            from .favorite_visit import parking_favorite
+            visit=await hass.async_add_executor_job(parking_favorite,archive,journal,item[3],favorites)
+            if visit:point=visit[1]
         selected=None;candidates=None;address=None;transient=False;message='충전 시작 부근의 신선한 정차 GPS 또는 이동 없음이 확인된 주차 GPS가 없어 장소를 자동 선택하지 않았어요.'
         steps={'gps':'fail','station':'skip','address':'skip'};diagnostic={'steps':steps}
         if not electric_vehicle(manager,journal):return
         if point:
             steps['gps']='ok';diagnostic['evidence']=point_evidence(point,item[3]);code=None
             # Same parking spot as an earlier visit to a favorite: no provider lookup needed.
-            favorite=favorite_match(favorites,point,anchors_only=True)
+            favorite=visit[0] if visit else favorite_match(favorites,point,anchors_only=True)
             if not favorite:
                 try:
                     result=await manager.stations.nearby('charging',point['latitude'],point['longitude']);selected=result['selected'];message=result['message']
@@ -331,7 +338,7 @@ async def enrich(hass,manager,archive,journal):
                 selected={'location':favorite_location(favorite)};candidates=None;transient=False
                 steps['station']='ok';diagnostic['code']='favorite_selected';diagnostic.pop('address_reason',None);diagnostic.pop('station_code',None)
                 if code:diagnostic['station_code']=code
-                message='즐겨찾는 충전소로 기록했어요.'
+                message='주차 위치를 바탕으로 즐겨찾는 충전소를 추정했어요.' if visit else '즐겨찾는 충전소로 기록했어요.'
         else:
             code,evidence=await hass.async_add_executor_job(gps_diagnosis,archive,journal,item[3])
             diagnostic.update(code=code,evidence=evidence)
