@@ -12,9 +12,9 @@ const recordClock=(r,tz)=>{
 };
 // Local accounting day; started_at is UTC, so slicing it shows the previous day for early-morning KST.
 const recordDay=(r,tz)=>r?.accounting_date||(r?.started_at?new Date(r.started_at).toLocaleDateString('sv-SE',{timeZone:tz||'Asia/Seoul'}):'');
-// Display: "11월 10일" and "오후 7시 5분" (on the hour: "오후 7시").
+// Display: "11월 10일" and "오후 7:05" (on the hour: "오후 7:00").
 const dayLabel=v=>{const m=/^\d{4}-(\d{2})-(\d{2})/.exec(v||'');return m?`${Number(m[1])}월 ${Number(m[2])}일`:(v||'');};
-const clockLabel=v=>{const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return '';const h=Number(m[1]),min=Number(m[2]);return `${h<12?'오전':'오후'} ${h%12||12}시${min?` ${min}분`:''}`;};
+const clockLabel=v=>{const m=/^(\d{2}):(\d{2})$/.exec(v||'');if(!m)return '';const h=Number(m[1]),min=Number(m[2]);return `${h<12?'오전':'오후'} ${h%12||12}:${m[2]}`;};
 const {preserveView}=await import(journalModuleURL('./carrot-view-state.js'));
 const {parseFuelReceipt,runReceiptOcr,preloadReceiptOcr,onReceiptOcrLoad,matchStationFromReceipt}=await import(journalModuleURL('./carrot-receipt-ocr.js'));
 const assetBase=new URL('./carrot-assets/',import.meta.url).href;
@@ -865,28 +865,28 @@ export class VehicleJournal extends HTMLElement {
         // Charging rows: place name, its address, then charged energy · odometer.
         const imported=Number(String(r.import_source?.fields?.['충전량']??'').replaceAll(',',''));
         const kwh=[r.input?.billed_charge_kwh,r.billed_charge_kwh,imported,r.battery_charge_kwh].find(v=>Number.isFinite(v)&&v>0);
-        const meta=[r.subcategory?esc(r.subcategory):'',kwh!=null?`${kwh.toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1})}kWh`:'',r.odometer_km!=null?`${numeric(r.odometer_km,0)}km`:''].filter(Boolean).join(' · ');
+        const meta=[r.subcategory?esc(r.subcategory):'',kwh!=null?`${kwh.toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1})}kWh`:'',r.odometer_km!=null?`<span class="ledger-odometer">${numeric(r.odometer_km,0)}km</span>`:''].filter(Boolean).join(' · ');
         const address=r.location?.address?.trim()||'';
         mainIsPlace=chargePlace=!!placeName;subIsPlace=false;
         if(placeName){mainTitle=esc(placeName);if(address&&address!==placeName)addressLine=esc(address);subTitle=meta;}
-        else mainTitle=meta;
+        else{mainTitle='충전소 정보 없음';subTitle=meta;}
       }else if(r.subcategory){
         mainTitle=esc(r.subcategory);
         const subParts=[];
         if(placeName)subParts.push(esc(placeName));
-        if(r.odometer_km!=null&&r.kind!=='trip')subParts.push(`${numeric(r.odometer_km,0)}km`);
+        if(r.odometer_km!=null&&r.kind!=='trip')subParts.push(`<span class="ledger-odometer">${numeric(r.odometer_km,0)}km</span>`);
         subTitle=subParts.join(' · ');
       }else if(placeName){
         mainTitle=esc(placeName);
-        if(r.odometer_km!=null&&r.kind!=='trip')subTitle=`${numeric(r.odometer_km,0)}km`;
+        if(r.odometer_km!=null&&r.kind!=='trip')subTitle=`<span class="ledger-odometer">${numeric(r.odometer_km,0)}km</span>`;
       }else if(r.odometer_km!=null&&r.kind!=='trip'){
-        mainTitle=`${numeric(r.odometer_km,0)}km`;
+        mainTitle=`<span class="ledger-odometer">${numeric(r.odometer_km,0)}km</span>`;
       }
       const pillHtml=`<div class="ledger-pill-wrap"><span class="cat-highlight-pill" style="color:${this.categoryColor(this.recordCategory(r))};background:${this.categoryColor(this.recordCategory(r))}22;border:1px solid ${this.categoryColor(this.recordCategory(r))}66">${esc(categories[this.recordCategory(r)]||kindNames[r.kind])}</span></div>`;
       const memoHtml=`<div class="memo-cell-wrap"><div class="memo-text-col">${pillHtml}${mainTitle?`<span class="ledger-main-title ${mainIsPlace?'ledger-place-name':''}${chargePlace?' ledger-charge-place':''}">${mainTitle}</span>`:''}${addressLine?`<span class="ledger-place-address">${addressLine}</span>`:''}${subTitle?`<span class="ledger-sub-title ${subIsPlace?'ledger-place-name':''}">${subTitle}</span>`:''}${r.memo?`<small class="memo-desc">${esc(r.memo)}</small>`:''}${r.duplicate_candidates?.length?'<small class="error">같은 날 자동 기록이 있어요. 중복 여부를 확인해 주세요.</small>':''}</div>${hasPhotos?`<button class="memo-thumb-btn" type="button" data-record="${r.id}" data-action="photos" aria-label="사진 보기 (${r.attachments.length}장)"><div class="thumb-box" data-thumb-record="${r.id}"><span class="thumb-spinner">${jIcon('camera')}</span></div>${r.attachments.length>1?`<span class="thumb-badge">+${r.attachments.length}</span>`:''}</button>`:''}</div>`;
 
       const clock=clockLabel(recordClock(r,d.timezone));
-      return `<tr><td><b class="ledger-day">${esc(dayLabel(recordDay(r,d.timezone)))}</b>${clock?`<span class="ledger-time">${clock}</span>`:''}<small>${r.import_source?'마이클 이관':r.origin==='manual'?'직접 기록':'자동 기록'}${r.status==='deleted'?' · 삭제됨':r.status==='excluded'?' · 제외됨':''}</small></td><td>${memoHtml}</td><td class="ledger-amount-col">${r.kind==='trip'&&r.odometer_km!=null?`${numeric(r.odometer_km,1)}km · 누적`:money(r.actual_krw??r.estimated_krw)}${r.unit_price?`<small class="ledger-unit-price">${r.unit_price.approximate?'약 ':''}${numeric(r.unit_price.krw,0)}원/${esc(r.unit_price.unit)}</small>`:''}</td><td>${actionButtons}</td></tr>`;
+      return `<tr><td><b class="ledger-day">${esc(dayLabel(recordDay(r,d.timezone)))}</b>${clock?`<span class="ledger-time">${clock}</span>`:''}<small>${r.import_source?'마이클 이관':r.origin==='manual'?'직접 기록':'자동 기록'}${r.status==='deleted'?' · 삭제됨':r.status==='excluded'?' · 제외됨':''}</small></td><td>${memoHtml}</td><td class="ledger-amount-col">${r.kind==='trip'&&r.odometer_km!=null?`<span class="ledger-odometer">${numeric(r.odometer_km,1)}km · 누적</span>`:money(r.actual_krw??r.estimated_krw)}${r.unit_price?`<small class="ledger-unit-price">${r.unit_price.approximate?'약 ':''}${numeric(r.unit_price.krw,0)}원/${esc(r.unit_price.unit)}</small>`:''}</td><td>${actionButtons}</td></tr>`;
     }).join('')||'<tr><td colspan="4">이 기간의 기록이 없어요. 누락 기록을 직접 남겨 보세요.</td></tr>';
     this.$('previous').disabled=this.offset===0;this.$('next').disabled=!d.has_more;this.$('pageLabel').textContent=visibleRecords.length?`${this.offset+1}~${this.offset+visibleRecords.length}번째 기록`:'표시할 기록이 없어요.';
     if(!this.recordFiltersSupported)this.$('pageLabel').textContent+=' · 전체 기간 필터 적용을 위해 HA 재시작이 필요해요.';

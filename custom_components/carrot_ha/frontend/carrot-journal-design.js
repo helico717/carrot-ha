@@ -1734,7 +1734,7 @@ export const journalDesign = `:host {
 #recordDialog[data-mode] .fields #timeField{order:2}
 #recordDialog[data-mode=trip] .fields #odometerField{grid-column:1 / -1!important}
 .ledger-table td:nth-child(1) .ledger-day{display:block;font-weight:700;color:var(--j-ink)}
-.ledger-table td:nth-child(1) .ledger-time{display:block;margin-top:2px;color:var(--j-sub);font-weight:600}
+.ledger-table td:nth-child(1) .ledger-time{display:block;margin-top:2px;color:var(--j-sub);font-weight:400}
 @media (max-width:760px){.ledger-table td:nth-child(1) .ledger-day{font-size:13px}.ledger-table td:nth-child(1) .ledger-time{display:inline;margin:0}}
 .recent-date-sub b{color:var(--j-ink);font-weight:700}
 
@@ -2261,5 +2261,7 @@ export const journalDesign = `:host {
 #recordDialog .favorite-chip .favorite-chip-pick{flex:1;text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.4;padding:6px 9px!important;min-height:32px!important}
 #recordDialog .favorite-chip .favorite-chip-remove{flex:0 0 32px;padding:4px!important;min-height:32px!important;font-size:16px!important;color:var(--j-sub)!important}
 #recordDialog .favorite-chip button:focus-visible{outline:2px solid var(--j-accent);outline-offset:-3px}
+
+.ledger-table .ledger-odometer{font-weight:400}
 `;
 
