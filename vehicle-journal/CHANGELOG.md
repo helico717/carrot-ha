@@ -3183,3 +3183,9 @@ HA 배포 파일 해시 일치는 확인했다. 유가 최신 API의 재시작·
 - 관련 파일: custom_components/carrot_ha/frontend/{carrot-vehicle-journal.js,carrot-journal-design.js}. 운영 최신 main에 승인된 프리뷰와 같은 변환을 적용해 다른 개발자의 최근 변경을 보존했다.
 - 검증: 두 모듈 node --check 및 diff --check 통과. 실제 Custom Element 기반 Chromium 프리뷰에서 충전 장소 누락/존재/주소만 존재, 시각 없음/자정/정오/한 자리 분 표시 확인. 시간·누적거리 27개 요소가 font-weight 400, 샘플 충전 메모 없음 확인. 데스크톱/모바일과 테마 전환은 사전 프리뷰에서 검증했다.
 - 배포 준비: HA 두 파일의 기존 SHA-256이 원격 main과 일치함을 읽기 전용 확인. 커밋·푸시 후 백업·직접 반영 및 HTTP 제공 검증 예정. 운영 DB·메모·설정·Python 변경 없음. 새 태그/릴리즈 없음. 기존 미커밋 작업·사용자 인덱스·로컬 main 보존.
+
+## 2026-11-18 — 기록 표시 d65d6a1 HA 직접 반영 완료
+
+- 수정 커밋 d65d6a1c42e3cc718c726fe513e6cd58875b5421 main 푸시 확인. 배포 전 HA 두 파일이 직전 main과 일치함을 확인하고 /config/carrot_ha/deployment-backups/record-display-d65d6a1/before 에 백업했다(SHA256SUMS.before.json 포함).
+- 설치·커밋·HA HTTP 응답 SHA-256 일치: carrot-vehicle-journal.js b558624918e97f7c5c62f068534de563ea550b6e147318d06ce357562f689e39, carrot-journal-design.js 654bf9c058f8599923758c96ce0bd231b65d192b03f0a469104587bc81866c20. frontend-version 응답은 0.9.0-5f85ab421c8d.
+- 예시 충전 메모를 배포 payload에서 제외한 것을 검사했다. 운영 DB·사용자 메모·설정·Python 변경 없음. 새로고침으로 새 화면 모듈을 로드하며 HA 재시작 불필요. 실제 운영 로그인 화면의 최상위/하위 모듈 로딩과 사용자 앱 표시 확인은 사용자 새로고침 후 대기다. 예시 데이터 기반 브라우저 검증과 운영 파일·HTTP 제공 검증을 구분한다. 새 태그/릴리즈 없음.
