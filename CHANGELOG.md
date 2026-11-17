@@ -1643,3 +1643,11 @@
 - 검증: 신규 14개 포함 즐겨찾기/자동 위치 53개 통과. 기존 Windows SQLite 정리 오류는 gc.collect 후 teardown하는 실행 하네스로 해결(제품 코드 변경 없음). 스키마 9개 통과, diff 공백 검사 통과. 운영 DB mode=ro로 새 함수를 메모리 실행한 재현에서 대상 기록의 즐겨찾기 일치 확인(운영 DB 쓰기 없음).
 - 배포: 검증·푸시 후 기존 설치 해시 확인 및 백업을 거쳐 HA Python 두 파일 직접 반영 예정. 사용자 HA 재시작과 이후 자동 재처리·신규 실차 기록은 대기. 태그/릴리즈 없음.
 - 저장소 기존 changelog 미커밋 작업을 보존한다. 원격 main 기준 별도 임시 인덱스에 이번 코드와 이 기록만 구성해 커밋하며, 사용자 인덱스/스태시/로컬 브랜치 및 무관한 작업은 변경하지 않는다.
+
+## 2026-11-18 — 연속 주차 즐겨찾기 5ab573d HA 직접 반영 (재시작 대기)
+
+- 수정 커밋 5ab573dfa97790840c570e4c98c6ea5758c8e5cc main 푸시 및 원격 일치 확인. 신규 14개 포함 회귀 53개와 스키마 9개 통과.
+- 반영 전 automatic_locations.py가 직전 즐겨찾기 배포 95b593584555와 일치하고 favorite_visit.py는 없음 확인. 백업: /config/carrot_ha/deployment-backups/favorite-visit-5ab573d/before (SHA256SUMS.before.json 포함).
+- 커밋에서 추출한 두 Python 파일을 구문 검사하고 임시 파일 해시 검사 후 교체. 설치 SHA-256: favorite_visit.py fd21ee4f74084eaffa1e1e39352f6b2e1e0387d436483f1b7ececb9447eb1a43, automatic_locations.py c7e0acc1581d6a88e78572c46519765fceef4d050f2562dba28736a74dee101d. 커밋 파일과 일치.
+- 운영 DB·설정은 수정하지 않았다. 사용자 HA 재시작 후 새 로직 적용 및 위치 없는 과거 충전의 자동 재평가가 진행된다. 실제 재처리·신규 실차 충전·화면 표시 검증은 대기. 새 태그/릴리즈 없음.
+- 기존 사용자 미커밋 변경·스테이징·스태시·로컬 main은 보존했다. 원격 최신 main 기반 임시 인덱스로 이번 변경만 푸시해, 기존 작업 때문에 로컬 main의 fast-forward가 보류된 상태도 유지한다.
