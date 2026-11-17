@@ -2,6 +2,7 @@ from .battery import DEFAULT_REFERENCE_EFFICIENCY_KPL, DEFAULT_SOC_CAPACITY_KWH,
 from datetime import datetime, timezone, timedelta
 from .battery import calibrated_soc, estimate_charging_times
 from .charging_power import charging_power
+from .charge_costs import DEFAULT_CHARGE_RATES
 from .telemetry import combined_lock_state
 import math
 from .location import location_values
@@ -110,7 +111,10 @@ def values(runtime):
         session_kwh = max(0.0, round((battery_wh - session_start_wh) / 1000.0, 2))
         runtime['charge_session_fast'] = data.get('charge_mode') == 'dc_charging'
         is_fast_charge = bool(runtime.get('charge_session_fast', False))
-        unit_price = 320 if is_fast_charge else 280
+        archive = runtime.get('archive')
+        rates = (archive.current_charge_rates(runtime['entry'].data.get('device_id'))
+                 if hasattr(archive, 'current_charge_rates') else DEFAULT_CHARGE_RATES)
+        unit_price = rates['fast' if is_fast_charge else 'slow']
         active = data.get('charge_active_session') or {}
         if active.get('source') in ('can_request', 'can_actual'):
             session_kwh = active.get('energy_kwh', session_kwh)

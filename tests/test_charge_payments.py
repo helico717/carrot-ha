@@ -39,6 +39,47 @@ class ChargePaymentsTest(unittest.TestCase):
     def data(self, device='car'):
         return self.archive.charge_history(device)[0]['data']
 
+    def test_configured_rates_are_vehicle_scoped_and_effective_for_new_charges(self):
+        self.charge('old', can_mode=6)
+        now = datetime.now(timezone.utc)
+        self.archive.set_charge_rates('car', {'fast': 360, 'slow': 250})
+        self.charge('new', start=now.isoformat(), can_mode=6, unit_price_krw=320, cost_krw=3200)
+        self.charge('other', device='other', start=now.isoformat(), can_mode=6)
+        self.assertEqual(self.data()['configured_unit_price'], 360)
+        self.assertEqual(self.data()['estimated_cost_krw'], 3600)
+        self.assertEqual(self.data('other')['estimated_cost_krw'], 3200)
+        self.write(self.data(), 0)
+        self.archive.set_charge_rates('car', {'fast': 400, 'slow': 0})
+        self.archive = Archive(self.path)
+        self.assertEqual(self.archive.current_charge_rates('car'), {'fast': 400, 'slow': 0})
+        by_event = {row['data']['source_event_ids'][0]: row['data'] for row in self.archive.charge_history('car')}
+        self.assertEqual(by_event['old']['estimated_cost_krw'], 3200)
+        self.assertEqual(by_event['new']['configured_unit_price'], 360)
+        self.assertEqual(by_event['new']['effective_cost_krw'], 0)
+        self.charge('free', start=(now+timedelta(hours=2)).isoformat(), can_mode=4)
+        self.assertEqual(self.data()['configured_unit_price'], 0)
+        with self.assertRaises(ValueError):
+            self.archive.set_charge_rates('car', {'fast': True, 'slow': 280})
+
+    def test_favorite_uses_rate_at_session_end_and_preserves_payment_and_price_snapshot(self):
+        now = datetime.now(timezone.utc)
+        self.charge('old-favorite', can_mode=6)
+        self.archive.set_favorite_charge_rate('car', 'home', 331)
+        self.charge('favorite', start=now.isoformat(), can_mode=6)
+        self.write(self.data(), 0)
+        self.assertTrue(self.archive.apply_favorite_charge_rates('car', [('old-favorite','home'),('favorite','home')]))
+        self.assertEqual(self.data()['unit_price_krw'], 331)
+        self.assertEqual(self.data()['estimated_cost_krw'], 3310)
+        self.assertEqual(self.data()['effective_cost_krw'], 0)
+        with self.archive.connect() as db:
+            db.execute('INSERT INTO charge_rate_versions VALUES (?,?,?,NULL)',
+                       ('car','favorite:home',(now+timedelta(hours=1,minutes=15)).isoformat()))
+        self.archive = Archive(self.path)
+        self.assertEqual(self.data()['unit_price_krw'], 331)
+        self.charge('after-removal', start=(now+timedelta(hours=2)).isoformat(), can_mode=6)
+        self.assertFalse(self.archive.apply_favorite_charge_rates('car', [('after-removal','home'),('favorite','home')]))
+        self.assertEqual(self.data()['estimated_cost_krw'], 3200)
+
     def test_create_modify_zero_delete_and_raw_preservation(self):
         event = self.charge()
         data = self.data()

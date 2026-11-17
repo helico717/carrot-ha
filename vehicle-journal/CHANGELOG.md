@@ -1,3 +1,11 @@
+## 2026-11-18 — 차량별 기본·즐겨찾기 충전 단가
+
+- 커밋 제목: vehicle-journal: share saved charging tariffs with vehicle dashboard
+- 차계부 설정에서 급속·완속 기본값과 즐겨찾기별 단가를 설정한다. 기본값은 급속 320원/kWh, 완속 280원/kWh다. HA archive가 세션 종료 시점의 유효 단가를 사용해 추정금액을 계산하고, 이름이 확정된 즐겨찾기 장소는 당시 장소별 값으로 우선 적용한다. 과거 기록에 설정을 소급하지 않고 실결제 및 충전량을 보존한다. 내 차의 진행 중 추정과 한국어·영어 충전 기록이 같은 HA 금액 데이터를 사용한다. 원장에는 단가와 단위만 표시한다.
+- 관련 파일: charge_costs.py, vehicle.py, vehicle_journal/{api,automatic_locations,runtime,station_stats,store}.py, frontend/{carrot-charge-tariffs,carrot-vehicle-journal,carrot-dashboard-ko,carrot-dashboard-en}.js 및 충전 가격·차계부 회귀 테스트.
+- 검증: 충전 결제·세션 단가 14건, 즐겨찾기→차계부 1건, 스케줄 1건, JS 11건과 충전 기록 표시 검증 통과. 배포용 차계부·한국어 대시보드 모듈로 390px Chromium에서 새 단가 저장과 실시간 급속·완속 금액을 확인했다.
+- 배포: 사용자 승인 후 GitHub main과 HA 직접 반영. HA 파일 교체 및 재시작 상태는 별도 기록한다.
+
 ## 2026-11-16 — 충전소 드롭다운 206210f HA 직접 배포·운영 확인
 
 - 구현 커밋 `206210f78e8c4c501e1fc3c640533441de604403` main 푸시 완료(확인 당시 미푸시 0). 다른 작업의 지침/문서/프리뷰와 공통 CHANGELOG 변경은 별도 보존했다.

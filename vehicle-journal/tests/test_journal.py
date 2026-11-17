@@ -23,6 +23,34 @@ class JournalTests(unittest.TestCase):
         self.archive=Archive(Path(self.tmp.name)/'archive.sqlite3')
         self.journal=Journal(Path(self.tmp.name)/'journal.sqlite3','entry','car','Asia/Seoul')
 
+    def test_resolved_favorite_rate_reaches_ledger_without_overwriting_zero_paid(self):
+        import gc
+        from custom_components.carrot_ha.vehicle_journal.automatic_locations import apply_resolved_tariffs
+        location={'name':'Example EV','provider':'kakao','station_id':'test-1','latitude':37.5,'longitude':127.0}
+        favorite=self.journal.save_favorite(location)['id']
+        with self.archive.connect() as db:
+            db.execute('INSERT INTO charge_rate_versions VALUES (?,?,?,?)',
+                       ('car','favorite:'+favorite,'2026-01-01T00:00:00+00:00',331))
+        event=dict(schema=1,device_id='car',event_id='charge-test',kind='charge',observed_at='2026-01-02T01:00:00Z',
+                   data=dict(started_at='2026-01-02T00:00:00Z',ended_at='2026-01-02T01:00:00Z',duration_s=3600,
+                             energy_kwh=15,can_mode=6,source='can_actual'))
+        self.archive.put(event)
+        group=self.archive.charge_history('car')[0]['data']
+        self.archive.set_charge_payment('car',group['payment_id'],group['source_event_ids'],group['payment_version'],0)
+        sync(self.archive,self.journal)
+        key=self.journal.identity('charge','charge-test')
+        with self.journal.connect() as db:
+            db.execute("UPDATE records SET extra_json=? WHERE id=?", (json.dumps({'location':location}),key))
+        self.assertTrue(apply_resolved_tariffs(self.archive,self.journal))
+        self.assertFalse(apply_resolved_tariffs(self.archive,self.journal))
+        sync(self.archive,self.journal)
+        rows=self.journal.query('2026-01-02','2026-01-02')['records']
+        expense=next(row for row in rows if row['kind']=='expense')
+        self.assertEqual(expense['actual_krw'],0)
+        self.assertEqual(expense['estimated_krw'],4965)
+        self.assertEqual(expense['unit_price'],{'krw':331,'unit':'kWh','approximate':False})
+        gc.collect()  # Release SQLite resources before Windows removes the temporary directory.
+
     def test_manual_odometer_record_reloads_in_linked_vehicle_ledger_and_limits_photos(self):
         key=str(uuid4());self.journal.save_manual(key,0,{'kind':'trip','date':'2026-01-01','odometer_km':123456.7})
         result=self.journal.query('2026-01-01','2026-01-31',include_trips=False,expenses_only=True,manual_records=True)

@@ -16,6 +16,9 @@ def unit_price(db,vehicle,record):
     manual_price=data.get('unit_price_krw')
     if category=='charging' and type(manual_price) in (int,float) and manual_price>0:
         return {'krw':int(manual_price+0.5),'unit':'kWh','approximate':False}
+    configured=record.get('configured_unit_price')
+    if category=='charging' and type(configured) in (int,float) and configured>=0:
+        return {'krw':int(configured+0.5),'unit':'kWh','approximate':False}
     if category=='refueling':
         qty=value(data,fields,'fuel_liters','주유량');unit='L'
     else:

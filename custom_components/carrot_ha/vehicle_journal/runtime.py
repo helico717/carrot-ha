@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 from .store import Journal
 from .source import sync
+from ..charge_costs import refresh_runtime_costs
 
 _LOGGER=logging.getLogger(__name__)
 
@@ -31,6 +32,11 @@ async def setup(hass, entry, runtime):
             from .automatic_locations import enrich
             try:await enrich(hass,manager(hass),runtime['archive'],journal)
             except Exception:runtime['journal_location_error']='충전소 위치 조회를 다시 시도하고 있어요.'
+            from .automatic_locations import apply_resolved_tariffs
+            priced=await hass.async_add_executor_job(apply_resolved_tariffs,runtime['archive'],journal)
+            if priced:
+                await hass.async_add_executor_job(sync,runtime['archive'],journal)
+                await refresh_runtime_costs(hass,runtime)
         except Exception:
             runtime['journal_error']='차계부 동기화를 다시 시도하고 있어요.'
             _LOGGER.exception('Local vehicle journal synchronization failed')

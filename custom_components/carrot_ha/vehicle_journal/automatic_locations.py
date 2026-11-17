@@ -224,6 +224,32 @@ def identity(place):
     if place.get('selection_source')=='favorite' and place.get('name'):return ('favorite',place['name'],place.get('address'),place.get('latitude'),place.get('longitude'))
 
 
+def apply_resolved_tariffs(archive,journal):
+    """Use settled charger identities only, without issuing new location requests."""
+    earliest=archive.favorite_charge_rate_start(journal.device)
+    if earliest is None:
+        return False
+    favorites={}
+    for favorite in journal.favorites():
+        key=identity(favorite_location(favorite))
+        if key is not None:
+            favorites.setdefault(key,[]).append(favorite['id'])
+    if not favorites:
+        return False
+    matches=[]
+    with journal.lock,journal.connect() as db:
+        for source,text in db.execute("""SELECT r.source_id,r.extra_json FROM mobility m
+            JOIN records r ON r.vehicle_id=m.vehicle_id AND r.id=m.record_id
+            WHERE m.vehicle_id=? AND r.kind='charge' AND r.origin='automatic' AND r.status='active'
+              AND m.ended_at>=?""",(journal.vehicle,earliest)):
+            location=json.loads(text).get('location')
+            if location:
+                ids=favorites.get(identity(location),[])
+                if len(ids)==1:
+                    matches.append((source,ids[0]))
+    return archive.apply_favorite_charge_rates(journal.device,matches)
+
+
 def propagate(journal):
     with journal.lock,journal.connect() as db:
         for expense, in db.execute("SELECT DISTINCT x.expense_id FROM expense_members x JOIN records r ON r.vehicle_id=x.vehicle_id AND r.id=x.expense_id WHERE x.vehicle_id=? AND r.status='active'",(journal.vehicle,)).fetchall():

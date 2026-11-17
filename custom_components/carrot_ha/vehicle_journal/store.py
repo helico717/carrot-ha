@@ -260,6 +260,10 @@ class Journal:
                     self._record(db,key,'expense','automatic',value,source,
                                  override[1] if override and extra.get('journal_override') and override[1]=='deleted' else ('excluded' if data.get('excluded') else 'active'),{'origin':'automatic','cost_source':data['cost_source']})
                     extra.update(payment_linked=True,payment_source_ids=data['source_event_ids'])
+                    if 'configured_unit_price' in data:
+                        extra['configured_unit_price'] = data['configured_unit_price']
+                    else:
+                        extra.pop('configured_unit_price', None)
                     db.execute('UPDATE records SET extra_json=? WHERE vehicle_id=? AND id=?',(encode(extra),self.vehicle,key))
                     self._expense(db,key,value,'ha_charge_payment',source,data['payment_version'])
                     db.execute('DELETE FROM expense_members WHERE vehicle_id=? AND expense_id=?',(self.vehicle,key))
@@ -436,6 +440,7 @@ class Journal:
             # Real time of day only: entered time, manual start time, or measured automatic start. Never a date-only placeholder.
             manual_start=(extra.get('input') or {}).get('started_at') if row['origin']=='manual' else None
             row['occurred_at']=extra.get('occurred_at') or manual_start or (row.get('started_at') or session if row['origin']=='automatic' else None)
+            row['configured_unit_price'] = extra.get('configured_unit_price')
             row['input']=extra.get('input');row['odometer_km']=(row['input'] or {}).get('odometer_km',row.get('odometer_km'));row['location']=extra['location'] if 'location' in extra else (row['input'] or {}).get('location');row['import_source']=extra.get('import_source');row['quality']=json.loads(row.pop('quality_json'));row['memo']=row.pop('expense_memo') or row.get('mobility_memo') or '';row.pop('mobility_memo',None)
         with self.lock,self.connect() as db:
             from .charge_edit import project_charge_inputs

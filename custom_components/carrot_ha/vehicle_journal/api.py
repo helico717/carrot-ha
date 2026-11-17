@@ -257,7 +257,52 @@ async def record_location(hass,connection,msg):
 @websocket_api.async_response
 async def favorite_list(hass,connection,msg):
     r=runtime(hass,connection,msg)
-    if r:await execute(hass,connection,msg,r['journal'].favorites)
+    if not r:return
+    def list_with_rates():
+        journal=r['journal']
+        archive=r.get('archive')
+        prices=archive.favorite_charge_rates(journal.device) if archive else {}
+        return [{**favorite,'unit_price_krw':prices.get(favorite['id'])} for favorite in journal.favorites()]
+    await execute(hass,connection,msg,list_with_rates)
+
+
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/charge/rates',vol.Required('entry_id'):str,
+    vol.Optional('rates'):{vol.Required('fast'):int,vol.Required('slow'):int}})
+@websocket_api.async_response
+async def charge_rates(hass,connection,msg):
+    r=runtime(hass,connection,msg)
+    if not r:return
+    from .automatic_locations import electric_vehicle
+    archive=r.get('archive')
+    if not archive or not electric_vehicle(hass.data['carrot_ha_journal_manager'],r['journal']):
+        if 'rates' in msg:
+            connection.send_error(msg['id'],'unsupported','연결된 전기차에서 기본 충전 단가를 설정할 수 있어요.')
+        else:
+            connection.send_result(msg['id'],None)
+        return
+    device=r['journal'].device
+    if 'rates' in msg:
+        await execute(hass,connection,msg,archive.set_charge_rates,device,msg['rates'])
+    else:
+        connection.send_result(msg['id'],archive.current_charge_rates(device))
+
+
+@websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/favorite/rate',vol.Required('entry_id'):str,
+    vol.Required('favorite_id'):str,vol.Required('unit_price_krw'):vol.Any(int,None)})
+@websocket_api.async_response
+async def favorite_rate(hass,connection,msg):
+    r=runtime(hass,connection,msg)
+    if not r:return
+    journal=r['journal']
+    def save_rate():
+        archive=r.get('archive')
+        if not archive:raise ValueError('연결된 전기차에서 즐겨찾기 단가를 설정할 수 있어요.')
+        favorite=next((item for item in journal.favorites() if item['id']==msg['favorite_id']),None)
+        if not favorite:raise Conflict('이미 삭제된 즐겨찾기예요.')
+        price=msg['unit_price_krw']
+        archive.set_favorite_charge_rate(journal.device,favorite['id'],price)
+        return {**favorite,'unit_price_krw':price}
+    await execute(hass,connection,msg,save_rate)
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/favorite/save',vol.Required('entry_id'):str,vol.Required('location'):dict,vol.Optional('record_id'):str,vol.Optional('apply_past',default=False):bool})
@@ -353,7 +398,7 @@ async def location_search(hass,connection,msg):
 
 
 def register(hass):
-    for method in (entries,query,save,status,purge,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,favorite_list,favorite_save,favorite_delete,settings,location_search,station_lookup,nas_config,nas_action,user_default_set):websocket_api.async_register_command(hass,method)
+    for method in (entries,query,save,status,purge,comparison_save,vehicle_create,vehicle_update,vehicle_delete,map_config,record_location,favorite_list,favorite_save,favorite_delete,favorite_rate,charge_rates,settings,location_search,station_lookup,nas_config,nas_action,user_default_set):websocket_api.async_register_command(hass,method)
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/stations/lookup',vol.Required('kind'):vol.In(['charging','refueling']),vol.Required('latitude'):vol.Coerce(float),vol.Required('longitude'):vol.Coerce(float),vol.Required('date'):str,vol.Optional('fuel',default='gasoline'):str,vol.Optional('price_only',default=False):bool})

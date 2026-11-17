@@ -3,6 +3,7 @@ import copy
 import json
 import math
 from datetime import datetime, timedelta, timezone
+from threading import Lock
 from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo
 
@@ -29,6 +30,15 @@ def identity(device, ids):
     return str(uuid5(NAMESPACE_URL, json.dumps([device, sorted(ids)])))
 
 
+DEFAULT_CHARGE_RATES = {'fast': 320, 'slow': 280}
+
+
+def checked_charge_rate(value):
+    if type(value) is not int or not 0 <= value <= 1_000_000:
+        raise ValueError('충전 단가는 0~1,000,000원/kWh 범위의 정수로 입력해 주세요.')
+    return value
+
+
 class ChargeCosts:
     def init_charge_costs(self, db):
         self._charge_revision = 0
@@ -50,8 +60,90 @@ class ChargeCosts:
         db.execute('''CREATE TABLE IF NOT EXISTS charge_deletions (
             device TEXT, event_id TEXT, correction TEXT NOT NULL, deleted TEXT NOT NULL,
             PRIMARY KEY(device,event_id))''')
+        db.execute("""CREATE TABLE IF NOT EXISTS charge_rate_versions (
+            device TEXT NOT NULL, rate_key TEXT NOT NULL, effective TEXT NOT NULL, price INTEGER,
+            PRIMARY KEY(device,rate_key,effective))""")
+        db.execute("""INSERT INTO charge_rate_versions
+            SELECT '', 'activation', ?, NULL WHERE NOT EXISTS
+            (SELECT 1 FROM charge_rate_versions WHERE device='' AND rate_key='activation')""", (datetime.now(timezone.utc).isoformat(),))
+        self._charge_rates_since = db.execute(
+            "SELECT effective FROM charge_rate_versions WHERE device='' AND rate_key='activation'").fetchone()[0]
+        self._charge_rate_lock = Lock()
+        self._live_charge_rates = {}
+        for device, key, price in db.execute(
+                "SELECT device,rate_key,price FROM charge_rate_versions WHERE rate_key IN ('fast','slow') ORDER BY effective"):
+            self._live_charge_rates.setdefault(device, dict(DEFAULT_CHARGE_RATES))[key] = price
         for (body,) in db.execute("SELECT body FROM events WHERE kind='charge'").fetchall():
             self.capture_charge(db, json.loads(body))
+
+    def current_charge_rates(self, device):
+        return dict(self._live_charge_rates.get(device, DEFAULT_CHARGE_RATES))
+
+    def set_charge_rates(self, device, rates):
+        validated = {mode: checked_charge_rate(rates[mode]) for mode in DEFAULT_CHARGE_RATES}
+        with self._charge_rate_lock:
+            # Store both values with the same effective time. The active session reads only the last committed pair.
+            if validated != self.current_charge_rates(device):
+                with self.connect() as db:
+                    at = datetime.now(timezone.utc).isoformat()
+                    db.executemany('INSERT INTO charge_rate_versions VALUES (?,?,?,?)',
+                                   [(device, mode, at, price) for mode, price in validated.items()])
+                self._live_charge_rates[device] = validated
+        return self.current_charge_rates(device)
+
+    @staticmethod
+    def _rate_at(db, device, key, at):
+        row = db.execute("""SELECT price FROM charge_rate_versions WHERE device=? AND rate_key=?
+            AND effective<=? ORDER BY effective DESC LIMIT 1""", (device, key, at)).fetchone()
+        return row[0] if row else None
+
+    def favorite_charge_rates(self, device):
+        with self.connect() as db:
+            return {key.removeprefix('favorite:'): price for key, price in db.execute(
+                "SELECT rate_key,price FROM charge_rate_versions WHERE device=? AND rate_key LIKE 'favorite:%' ORDER BY effective",
+                (device,))}
+
+    def set_favorite_charge_rate(self, device, favorite_id, price):
+        if price is not None:
+            checked_charge_rate(price)
+        with self._charge_rate_lock, self.connect() as db:
+            at = datetime.now(timezone.utc).isoformat()
+            key = 'favorite:' + favorite_id
+            if price != self._rate_at(db, device, key, at):
+                db.execute('INSERT INTO charge_rate_versions VALUES (?,?,?,?)', (device, key, at, price))
+
+    def favorite_charge_rate_start(self, device):
+        with self.connect() as db:
+            return db.execute("""SELECT min(effective) FROM charge_rate_versions
+                WHERE device=? AND rate_key LIKE 'favorite:%' AND price IS NOT NULL""", (device,)).fetchone()[0]
+
+    def apply_favorite_charge_rates(self, device, matches):
+        changed = False
+        if not matches:
+            return changed
+        with self.connect() as db:
+            # Acquire the write lock before reading summaries that can be updated by the receiver.
+            db.execute('BEGIN IMMEDIATE')
+            for event_id, favorite_id in matches:
+                row = db.execute('SELECT ended,body FROM charge_summaries WHERE device=? AND id=?',
+                                 (device, event_id)).fetchone()
+                if not row:
+                    continue
+                end, body = row
+                data = json.loads(body)
+                if data.get('favorite_rate_id'):
+                    continue
+                rate = self._rate_at(db, device, 'favorite:' + favorite_id, end)
+                if rate is None:
+                    continue
+                data.update(favorite_rate_id=favorite_id, configured_unit_price=rate,
+                            unit_price_krw=rate, cost_krw=round(data['energy_kwh'] * rate))
+                db.execute('UPDATE charge_summaries SET body=?,updated=? WHERE device=? AND id=?',
+                           (json.dumps(data,sort_keys=True), datetime.now(timezone.utc).isoformat(), device, event_id))
+                changed = True
+        if changed:
+            self.invalidate_charge_costs()
+        return changed
 
     def is_charge_deleted(self, db, event):
         return event['kind'] == 'charge' and db.execute(
@@ -102,8 +194,21 @@ class ChargeCosts:
         fast = is_fast_charge(data)
         cost = data.get('cost_krw')
         unit = data.get('unit_price_krw')
+        device = event['device_id']
+        old_row = db.execute('SELECT body FROM charge_summaries WHERE device=? AND id=?',
+                             (device, event['event_id'])).fetchone()
+        old = json.loads(old_row[0]) if old_row else {}
+        stored_rate = old.get('configured_unit_price')
+        mode = 'fast' if fast else 'slow'
+        if stored_rate is None and not old_row:
+            at = end.isoformat()
+            stored_rate = self._rate_at(db, device, mode, at)
+            if stored_rate is None and at >= self._charge_rates_since:
+                stored_rate = DEFAULT_CHARGE_RATES[mode]
+        if stored_rate is not None:
+            unit, cost = stored_rate, energy * stored_rate
         if type(unit) not in (int, float) or not math.isfinite(unit) or unit < 0:
-            unit = 320 if fast else 280
+            unit = DEFAULT_CHARGE_RATES[mode]
         if type(cost) not in (int, float) or not math.isfinite(cost) or cost < 0:
             cost = energy * unit
         summary = {key: data[key] for key in (
@@ -112,6 +217,10 @@ class ChargeCosts:
             'confirmed_duration_s', 'unknown_duration_s', 'gap_corrected', 'gap_count', 'corrected_energy_kwh', 'signal_gaps') if key in data}
         summary.update(started_at=start.isoformat(), ended_at=end.isoformat(),
                        cost_krw=round(cost), unit_price_krw=unit, accounting_timezone=self.charge_timezone)
+        if stored_rate is not None:
+            summary['configured_unit_price'] = stored_rate
+        if old.get('favorite_rate_id'):
+            summary['favorite_rate_id'] = old['favorite_rate_id']
         day = start.astimezone(ZoneInfo(self.charge_timezone)).date().isoformat()
         body = json.dumps(summary, sort_keys=True)
         now = datetime.now(timezone.utc).isoformat()
@@ -162,6 +271,9 @@ class ChargeCosts:
                         cost_krw=estimated, merged=len(members) > 1, merge_count=len(members),
                         merge_parts=[dict(m['data'], event_id=m['event_id']) for m in members])
             if len(members) > 1:
+                data.pop('configured_unit_price', None)
+                if data['energy_kwh'] > 0 and any('configured_unit_price' in member['data'] for member in members):
+                    data['configured_unit_price'] = estimated / data['energy_kwh']
                 if data['energy_kwh'] > 0:
                     data['unit_price_krw'] = estimated / data['energy_kwh']
                 last = members[-1]['data']
