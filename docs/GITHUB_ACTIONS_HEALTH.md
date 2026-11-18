@@ -3,6 +3,29 @@
 2026-11-18 구현. 대상은 `helico717/openpilot:carrot-wip-model_selector-ha`와
 `ajouatom/openpilot:happymaj11r/carrot-wip-model_selector`다.
 
+## 현재 배포 상태 — 2026-11-18
+
+- 구현 `7923235b696249cead464f08e2a92c6cae7e8ca0` main 푸시 완료.
+- 사용자 승인 화면과 Python 관측기를 HA에 직접 반영했다. 설치 전 기준 해시를 다시
+  검사하고 `/config/carrot_ha/deployment-backups/github-actions-7923235b6962`에 기존
+  3파일·manifest·deployment.json·rollback.sh를 보존했다. 최초 일반 사용자 쓰기는
+  root 소유 백업 경로에서 거부돼 설치 전 중단됐고, 기존 sudo 권한으로 동일 범위만 반영했다.
+- 설치5파일의SHA-256이 커밋 payload와 모두 일치한다. 기존3파일 백업 해시,
+  Python AST, rollback 개행7개와sh -n도 확인했다. 코드/백업 외 운영 DB·설정·서비스는 수정하지 않았다.
+- CI [44216700326](https://github.com/helico717/carrot-ha/actions/runs/44216700326)의
+  신규12개 검사는 통과했다. radar-ha-python job도 성공했다. 전체regression job은
+  `test_state_projection.StateProjectionTests.test_covering_projection_never_reads_table_body`
+  1건 실패로 종료됐다. 이전 구현 전[44205172328](https://github.com/helico717/carrot-ha/actions/runs/44205172328)과
+  같은 실패·동일한SQLite프로그램이며, 해당 검사/투영 소스에 이번 변경은 없다.
+  따라서 전체CI성공으로 보고하지 않는다. 이후 Comma/대시보드 단계는skip이며
+  이번 카드 관련 로컬Node7개 결과와 구분한다.
+- 사용자에게 HA Core 재시작을 안내했고 **“나중에 재시작”** 응답을 받았다.
+  사용자 재시작 원칙에 따라 재시작·통합 reload를 대신 실행하지 않았다.
+- 현재는 **파일 반영 완료 / 실행 중 적용·운영 백그라운드 검증은 사용자 재시작 대기**다.
+  재시작 후 `.storage/carrot_ha.github_actions_health`의 실제 관측 생성/시각·상태를
+  확인하고, 브라우저 강력 새로고침 후 승인된 카드 표시를 확인해야 한다.
+  새schedule 실행까지 자동 발생했다고 주장하지 않는다. Comma/수신 앱 업데이트·재시작은 필요 없다.
+
 ## 표시와 동작
 
 원격 터미널 카드의 기존 기기 커밋 비교 아래에 원본 자동 동기화를 표시한다.
@@ -58,8 +81,8 @@ textContent로 넣고 실행 링크도 고정 GitHub 저장소와 숫자ID로 �
   미반영0, 최신 수동 실행, 마지막 예약11월6일08:19 KST →overdue. 저장/설정 변경 없는
   읽기 전용 검증이며 정식 HA 백그라운드 실행 검증과 구분한다.
 - 설치 전 기존3파일의 운영 SHA-256이 작업 기준HEAD와 일치하고 신규2모듈은 없음을 확인.
-  검증·커밋·푸시 후 기존 파일 백업·새5파일 직접 반영·해시/문법 검증 예정.
+  검증·커밋·푸시 후 기존 파일 백업·새5파일 직접 반영·해시/문법 검증 완료(상단 배포 상태 참조).
 - HA Core 재시작은 사용자가 수행한다. 새 Python 코드가 실제 실행된 증거는
-  재시작 후 Store 생성·관측 시각·응답으로 확인한다. 이 문서 작성 시 아직 설치/재시작 전이다.
+  재시작 후 Store 생성·관측 시각·응답으로 확인한다. 파일은 설치됐으며 사용자 재시작 대기다.
 - Comma·수신 앱·차계부·주행 로그 실행 코드·버전/태그/릴리즈·알림 발송은 변경하지 않는다.
   휴대폰 푸시나 Codex 예약 자동화를 별도 생성하지 않는다.

@@ -1,3 +1,10 @@
+## 2026-11-18 — GitHub Actions 상태 기능 HA 직접 반영·사용자 재시작 대기
+
+- 구현7923235 main 푸시 후 HA 기존3파일해시 재확인, /config/carrot_ha/deployment-backups/github-actions-7923235b6962에 원본3파일·manifest·deployment.json·복구script 보존. 일반 SSH 쓰기는 root소유 backup디렉터리에서 설치 전 거부돼 기존sudo권한으로 동일 범위만 반영. Python4+terminalJS1 파일 설치해시가 커밋payload와 일치, Python AST·기존백업해시·rollback개행7개/sh-n 검증.
+- CI44216700326에서 신규12개·radar-ha-python 통과. 전체regression은 이전44205172328과 같은 test_covering_projection_never_reads_table_body 1건 실패, 관련 투영/검사는 이번diff없음. 이후 단계skip으로 전체CI통과로 보고하지 않는다. 로컬 기존GitStatus3개·카드7개 통과와 구분.
+- 사용자에게 HA Core재시작을 안내했고 “나중에 재시작” 응답. 상태는 파일반영 완료/실행중적용·실제 background Store·운영카드 확인 대기. 에이전트재시작·reload 미실행. 재시작 후 Store관측과 브라우저강력새로고침 확인 예정. docs/GITHUB_ACTIONS_HEALTH.md에 배포/한계 기록.
+- 새태그/릴리즈/manifest변경·Comma/수신기설치·DB/설정변경·푸시알림/Codex자동화 없음. 사용자기존미커밋 작업 보존, 배포기록만 분리커밋·푸시.
+
 ## 2026-11-18 — 원격 터미널 GitHub Actions 상태 점검 구현
 
 - 요청: 맥북 상시 가동 없이 HA에서6시간마다 예약/수동 실행·성공 여부·원본 미반영을 확인하고, 실패/12시간 예약 공백을 현재 원격 터미널 카드에 표시.
