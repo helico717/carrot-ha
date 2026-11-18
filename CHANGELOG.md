@@ -1,3 +1,11 @@
+## 2026-11-18 — 비활성 ACC 내비 제한속도 수정의 동기화 영향 검토
+
+- 요청: 외부 내비 제한속도 표시 수정이 GitHub 비활성화 원인이었는지, 재활성화 후 동기화를 막는지 검토.
+- 이력/증거: cd5bfae1a(11월3일)는 sync에 HUD 검사6개를 추가했지만 이후 실제42041768080/job127294105034에서6개 OK 후dbfaa535 원격 push 성공. 2f71f8b0d(11월7일)는 도로/단속 분리와 추가11개 검사를 도입. cron·대상·권한 변경이나 Actions disable API 호출 없음. 검사는 job 내부 merge abort 조건으로, 저장소 전체 실행 차단과 구분한다.
+- 재현: 깨끗한 원본 checkout을 수정하지 않고 /private/tmp 공유 복제본에 최신 원본9f954291e를 fetch. 운영 스크립트 SYNC_WORKFLOWS=false/SYNC_PUSH=false로fdd8294b8과 병합. workflow3파일 충돌은 기존 fork workflow 복원으로 해결, 소스 충돌 없음, HUD6+도로/단속11 통과·exit0. 임시 merge e0c69217f에서 양쪽 HEAD 조상·workflow/HA daemon/검사/분류기 보존·clean 확인. 원격 merge push는 하지 않았다.
+- 관련/한계: docs/UPSTREAM_SYNC_AUDIT_2026-11-18.md에 상세 근거 추가. 해당 기능이 GitHub 차단을 유발했다는 증거 없고 현재 원본 병합 검사도 통과. GitHub 내부 판정 로그·새 Actions 실행·native CI·전체 HA/실차 동작은 미검증. 다른 원본/토큰 조건까지 보장하지 않는다.
+- 상태: 검토 및 임시 로컬 병합 재현 완료. 실행 코드·재활성화·원격 openpilot·HA/Comma 배포·재시작·태그/릴리즈 변경 없음. 이번 문서·기록만 분리 커밋하며 기존 작업 보존.
+
 ## 2026-11-18 — 자동 동기화 중단 원인 정정: 포크 전체 Actions 비활성화
 
 - 사용자 지적 후 원인 조사를 계속했다. 초기 조사는 개별 workflow API active·실행 이력만 확인해 저장소 전체 차단을 놓쳤으며 원인 조사 완료로 보기 부족했다.

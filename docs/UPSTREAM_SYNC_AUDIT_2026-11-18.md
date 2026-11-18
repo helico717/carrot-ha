@@ -30,6 +30,58 @@ SYNC_PAT 만료로 job이 실패한 상황과 구분한다.
 실제 병합·검사·push 결과 및 후속 예약 실행까지 확인해야 한다. 재활성화만으로
 누적140개 변경이 모두 충돌 없이 통합된다고 단정하지 않는다.
 
+## 외부 내비 제한속도 수정과 동기화 영향 검토 — 2026-11-18
+
+사용자가 최근 ACC/openpilot 비활성 중 외부 내비 도로 제한속도 표시 수정이
+비활성화 원인이었는지, 이후 동기화에 영향을 주는지 추가 검토를 요청했다.
+
+### 변경 이력과 원인 구분
+
+- `cd5bfae1aa068bdf5d39dae34d7a7e14df4b1385`(11월3일18:49 KST):
+  ACC 비활성 중 단속 안내 표시와 함께 동기화 스크립트에
+  `tools/test_id4_navigation_hud.py` 검사를 추가했다.
+- 그 이후 실제 자동 병합 [42041768080](https://github.com/helico717/openpilot/actions/runs/42041768080)의
+  job127294105034 로그에서6개 검사 OK 후dbfaa535 생성 및 원격 push를 확인했다.
+  따라서 이 검사 도입으로 동기화가 즉시 중단된 것은 아니다.
+- `2f71f8b0d65b18421ea7e96ad22f11d0479dd200`(11월7일18:11 KST):
+  일반 도로 제한속도와 단속 표시를 분리하고 `test_id4_speed_notices.py`도 동기화
+  통과 조건으로 추가했다. 별도 `id4-navigation-display.yml`은 관련 경로 push와
+  수동 실행에 반응하며 cron이 없다.
+- 해당 수정들은 동기화 cron·대상·권한을 바꾸지 않았다. 현재 sync workflow와
+  11월3일 커밋의 workflow SHA-256도 동일했다. 검사 코드는 GitHub의 Actions
+  비활성화 API를 호출하지 않고 로컬 생산 코드의 표시/입력/상태 보존을 검사한다.
+- 검사가 실패할 경우 이미 생성된 Actions job에서 exit1·merge abort가 발생한다.
+  저장소 전체 Actions 비활성화 및 새 run 미생성과 다른 단계다. 기능 수정이
+  GitHub의 차단을 유발했다는 증거는 없으며 GitHub 내부 판정 내역은 여전히 공개되지 않았다.
+
+### 최신 원본과 실제 병합 재현
+
+기존 openpilot checkout은 깨끗했고 수정하지 않았다. `/private/tmp`의 공유 임시
+복제본에 최신 원본을 fetch한 뒤 현재 운영 스크립트를 그대로 실행했다.
+`UPSTREAM_REF`만 임시 원본 ref로 지정하고, 마지막 운영 로그와 같은
+`SYNC_WORKFLOWS=false`, 원격 전송 방지용 `SYNC_PUSH=false`를 사용했다.
+
+- fork 기준: `fdd8294b840ab6ba4d2423c5bbbe22f9128a1ccc`.
+- 원본: `9f954291e2d4c72c24f7c2a930d04cc49ccacf49`(추가 fetch로 확인).
+- 원본 전용140/fork 전용128커밋 상태를 재현했다.
+- `.github/workflows/mdm-model.yaml`·`signal-checks.yaml` modify/delete 및
+  `tests.yaml` content 충돌이 발생했지만, 기존 스크립트가 fork workflow 트리를
+  복원해 해결했다. 남은 소스 충돌은 없었다.
+- 병합 후 navigation HUD6개+speed notices11개 모두 통과, sync exit0.
+- 임시 병합 커밋 `e0c69217ffb425af907b802908cf27df086107a9` 생성.
+  원본 HEAD와 기존 fork HEAD 양쪽이 그 조상임을 확인했다.
+- 기존 fork 대비 `.github/workflows/`, `openpilot/selfdrive/carrot/ha/`, 두 회귀 검사,
+  `navigation_hud.py`의 내용이 그대로 보존됐고 임시 checkout은 clean이었다.
+
+결론: 이 기능은 동기화 스크립트의 통과 조건에는 영향을 준다. 원본이 표시 동작을
+깨뜨리면 병합 푸시를 막도록 의도된 보호 검사다. 그러나 이번 최신 원본으로는 통과했으므로
+현재 동기화를 막는 요인이 아니다. 확인된 저장소 전체 비활성화와는 구분한다.
+
+실행은 로컬 표준 라이브러리 기반 생산 AST/분류기 검사다. 새 GitHub 실행,
+별도 native schema/DBC CI, HA 전체 회귀 및 실차 표시/주행 검증은 수행하지 않았다.
+향후 원본 변경·SYNC_PAT 도입 등 조건 변경까지 보장하지 않는다. 재활성화 버튼,
+원격 openpilot 브랜치, 원격 병합, 기기 소스·설정·재시작은 변경하지 않았다.
+
 ## 초기 API·코드 조사 기록
 
 아래는 로그인 화면 확인 전 수행한 조사 기록이다. 원격 커밋 비교와 표시 계산
