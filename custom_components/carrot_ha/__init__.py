@@ -220,6 +220,9 @@ async def async_setup_entry(hass, entry):
         hass, lambda _: hass.async_create_task(refresh_after_midnight()), hour=0, minute=0, second=30))
     hass.async_create_task(run_daily_purge())
 
+    from .github_actions_runtime import setup as setup_github_actions
+    await setup_github_actions(hass, entry, runtime)
+
     return True
 
 async def _options_updated(hass, entry):
@@ -247,6 +250,8 @@ async def _options_updated(hass, entry):
 
 async def async_unload_entry(hass, entry):
     if await hass.config_entries.async_unload_platforms(entry, ['sensor','binary_sensor','device_tracker','switch']):
+        from .github_actions_runtime import unload as unload_github_actions
+        await unload_github_actions(hass.data[DOMAIN][entry.entry_id])
         if task := hass.data[DOMAIN][entry.entry_id].get('driving_local_task'):
             task.cancel()
             await asyncio.gather(task,return_exceptions=True)

@@ -120,4 +120,7 @@ async def git_status(hass, connection, msg):
             response.raise_for_status()
             return await response.json()
     data = (runtime.get('latest') or {}).get('data') or {}
-    connection.send_result(msg['id'], await checker.get(data, fetch))
+    result = await checker.get(data, fetch)
+    if monitor := runtime.get('github_actions_monitor'):
+        result['actions_sync'] = monitor.snapshot()
+    connection.send_result(msg['id'], result)

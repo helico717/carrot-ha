@@ -1,3 +1,11 @@
+## 2026-11-18 — 원격 터미널 GitHub Actions 상태 점검 구현
+
+- 요청: 맥북 상시 가동 없이 HA에서6시간마다 예약/수동 실행·성공 여부·원본 미반영을 확인하고, 실패/12시간 예약 공백을 현재 원격 터미널 카드에 표시.
+- 구현: github_actions.py의 독립 읽기 전용 관측과 github_actions_runtime.py의 HA Store·공유 백그라운드 task. 다중 엔트리/화면 공유, 성공/실패6시간 제한, 재시작 결과 보존, 부분 실패 시 항목별 과거 관측 보존, 시간 경과 경고·미확인 구분. __init__.py lifecycle 연결·terminal_ws.py 기존 관리자 전용 응답에 snapshot 추가, 승인 후 실제 terminal card에 표시. 기기 업데이트 수와 원본 미반영 수 분리, 숫자locale·textContent·고정URL 유지.
+- UI 승인: 전체 운영 카드·실제xterm·mockHass 프리뷰를 시연했고 사용자가 “이 화면으로 적용” 승인.8개 상태·다크/라이트·모바일overflow·Comma오프라인·합성 터미널 연결/업데이트 버튼 확인. preview/github-actions 및 docs/GITHUB_ACTIONS_HEALTH.md에 구조/검증/한계 기록.
+- 검증: 신규Python12개·기존GitStatus3개·카드7개 통과, Python AST·JS syntax·diff 통과. 기존 relay1개는 로컬aiohttp부재skip으로 별도 표시. HA서버에서 새 핵심 코드로 공개API4경로HTTP200·원본미반영0·수동최근성공/예약12시간초과 판정 확인(설치 전 읽기 전용). 기존 운영3파일해시가 기준HEAD와 일치, 신규2모듈부재 확인.
+- 상태: 구현 검증 완료, 관련 파일만 커밋·푸시 후 HA 기존파일백업/5파일직접반영·해시검증 예정. 실제 HA 백그라운드 적용은 사용자Core재시작 필요하며 아직 운영실행 증거 없음. 새 릴리즈/태그/manifest·Comma·수신기·차계부/주행로그 실행 코드·푸시알림/Codex자동화 변경 없음. 기존 사용자 지침/기록/프리뷰 보존.
+
 ## 2026-11-18 — 사용자 수동 동기화 후 실제 원격 반영 확인
 
 - 사용자 수동 실행44213400177(10:07:53 KST, workflow_dispatch) success 확인. job134497118805 로그에서 HUD6+도로/단속11 OK, merge176b980f 생성 및10:09:09 KST fdd8294b→176b980f 원격 push 확인. GitHub compare상 원본 미반영0/fork 전용129커밋으로 기존140개 미반영 해소.

@@ -4,7 +4,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 function fixture() {
-  const nodes = Object.fromEntries(['git-status','git-message','git-info'].map(id=>[id,{textContent:'',title:''}]));
+  const ids = ['git-status','git-message','git-info','actions-state','actions-latest','actions-scheduled',
+    'actions-pending','actions-checked','actions-note','actions-run-link'];
+  const nodes = Object.fromEntries(ids.map(id=>[id,{textContent:'',title:''}]));
+  nodes['actions-sync']={dataset:{},querySelector:id=>nodes[id.slice(1)]};
   let Card;
   const document={hidden:false,addEventListener(){},removeEventListener(){}};
   const context={HTMLElement:class { attachShadow(){this.shadowRoot={getElementById:id=>nodes[id]};} },
@@ -50,4 +53,44 @@ test('commit row lies below workflow buttons and above terminal keys',()=>{
   const source=fs.readFileSync('custom_components/carrot_ha/frontend/carrot-terminal-card.js','utf8');
   assert.ok(source.indexOf('<div id="git-info"')>source.indexOf('<button id="btn-reboot"'));
   assert.ok(source.indexOf('<div id="git-info"')<source.indexOf('<!-- Navigation & Helper Keys -->'));
+});
+
+test('Actions health remains visible without a terminal or device commit',()=>{
+  const {card,nodes}=fixture();
+  card._gitStatus={actions_sync:{state:'overdue',latest_run:{id:123,event:'workflow_dispatch',
+    status:'completed',conclusion:'success',created_at:'2026-11-18T01:00:00Z'},
+    scheduled_run:{event:'schedule',status:'completed',conclusion:'success',created_at:'2026-11-16T01:00:00Z'},
+    comparison:{upstream_pending:0},last_attempt_at:'2026-11-18T01:00:00Z'}};
+  card._paintGitStatus();
+  assert.equal(nodes['actions-state'].textContent,'예약 실행 12시간 초과');
+  assert.match(nodes['actions-latest'].textContent,/수동 · 성공/);
+  assert.match(nodes['actions-scheduled'].textContent,/예약 · 성공/);
+  assert.match(nodes['actions-note'].textContent,/수동 실행과 별개/);
+  assert.equal(nodes['actions-pending'].textContent,'0개 · 최신 반영');
+  assert.equal(nodes['actions-run-link'].href,'https://github.com/helico717/openpilot/actions/runs/123');
+});
+
+test('stale observations and lost HA connection are not painted as fresh success',()=>{
+  const {card,nodes}=fixture();
+  card._gitStatus={actions_sync:{state:'unavailable',comparison:{upstream_pending:140},
+    last_success_at:'2026-11-17T01:00:00Z',last_attempt_at:'2026-11-18T01:00:00Z'}};
+  card._paintActionsSync();
+  assert.equal(nodes['actions-state'].textContent,'GitHub 확인 불가');
+  assert.match(nodes['actions-note'].textContent,/이전 결과 표시/);
+  assert.match(nodes['actions-pending'].textContent,/140개/);
+  card._gitStatus.error='ha_unavailable';
+  card._gitStatus.actions_sync.state='healthy';
+  card._paintActionsSync();
+  assert.equal(nodes['actions-state'].textContent,'HA 연결 확인 불가');
+  assert.equal(nodes['actions-sync'].dataset.state,'unavailable');
+});
+
+test('untrusted API event fields cannot create links or inject HTML',()=>{
+  const {card,nodes}=fixture();
+  card._gitStatus={actions_sync:{state:'failed',latest_run:{id:'javascript:alert(1)',
+    event:'<img src=x>',status:'completed',conclusion:'<script>',created_at:'bad'},comparison:null}};
+  card._paintActionsSync();
+  assert.match(nodes['actions-run-link'].href,/^https:\/\/github.com\/helico717\/openpilot\/actions\/workflows\//);
+  assert.equal(nodes['actions-latest'].textContent,'기타 · 확인 필요 · 미확인');
+  assert.equal(nodes['actions-pending'].textContent,'확인 불가');
 });
