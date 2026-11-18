@@ -2,7 +2,6 @@ const format = new Intl.NumberFormat('ko-KR');
 
 const styles = `
   #settingsNav button[data-settings-nav="tariffs"].active{color:var(--j-accent);border-color:var(--j-accent)}
-  @media(max-width:600px){#settingsNav{grid-template-columns:repeat(3,minmax(0,1fr))}}
   #favoriteTariffPane{--tariff-tint:color-mix(in srgb,var(--j-accent) 9%,var(--j-surface));--tariff-line:color-mix(in srgb,var(--j-accent) 27%,var(--j-border))}
   .tariff-heading{padding:17px 20px 19px;border:1px solid var(--tariff-line);border-radius:18px;overflow:hidden;
     background:radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--j-accent) 13%,transparent),transparent 70%),var(--j-surface)}
@@ -102,7 +101,8 @@ function readRate(input) {
 export function installChargeTariffs(card) {
   const style = element('style', '', styles);
   card.shadowRoot.append(style);
-  const nav = button('충전 단가');
+  const nav = button('');
+  nav.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>충전 단가</span>';
   nav.dataset.settingsNav = 'tariffs';
   card.$('settingsNav').children[0].after(nav);
 
@@ -118,6 +118,26 @@ export function installChargeTariffs(card) {
     element('h3', '', '충전 단가 설정'),
     element('p', 'note', '차계부와 내 차 대시보드가 같은 단가로 충전금액을 추정해요. 장소별 단가가 있으면 먼저 적용해요.'),
   );
+  const autoLocCard = element('label', 'j-switch-card');
+  autoLocCard.innerHTML = '<div><div style="font-weight:750;font-size:14px;color:var(--j-ink)">충전 · 주유 장소 자동 선택</div><div style="font-size:12px;color:var(--j-sub);margin-top:2px">자주 가는 충전소·주유소 반경 내 기록 시 장소 이름을 자동으로 연결해요.</div></div><span class="j-switch"><input id="automaticLocations" type="checkbox" checked><span class="j-slider"></span></span>';
+  const autoLocInput = autoLocCard.querySelector('#automaticLocations');
+  autoLocInput.onchange = async () => {
+    const enabled = Boolean(card.$('nasEnabled')?.checked);
+    const path = card.$('nasPath')?.value?.trim() || '/share/CarrotJournalBackup/vehicle-journal';
+    autoLocInput.disabled = true;
+    try {
+      await card.call('nas/config', {enabled, path, automatic_locations: autoLocInput.checked});
+      card.automaticLocations = autoLocInput.checked;
+      card.$('vehicleManageError').textContent = autoLocInput.checked
+        ? '충전 · 주유 장소 자동 선택을 켰어요.'
+        : '충전 · 주유 장소 자동 선택을 껐어요.';
+    } catch (error) {
+      autoLocInput.checked = !autoLocInput.checked;
+      card.$('vehicleManageError').textContent = error.message || '장소 자동 선택 설정을 저장하지 못했어요.';
+    } finally {
+      autoLocInput.disabled = false;
+    }
+  };
   const defaultsTitle = element('h4', 'tariff-section-title', '기본 충전 단가');
   const defaults = element('form', 'tariff-default-form');
   defaultsTitle.hidden = defaults.hidden = true;
@@ -170,7 +190,7 @@ export function installChargeTariffs(card) {
       saveDefaults.disabled = false;
     }
   };
-  pane.append(heading, defaultsTitle, defaults, element('h4', 'tariff-section-title', '즐겨찾기 충전 단가'), list, status);
+  pane.append(heading, autoLocCard, defaultsTitle, defaults, element('h4', 'tariff-section-title', '즐겨찾기 충전 단가'), list, status);
   card.$('vehicleManageDialog').querySelector('.settings-content').append(pane);
 
   async function render(message = '') {

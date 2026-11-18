@@ -1,3 +1,14 @@
+## 2026-11-18 — 차계부 설정 메뉴 3개 탭 UI 개선 및 HA 직접 반영
+
+- 제목: `vehicle-journal: redesign settings vehicles, backup, and api tabs`.
+- 요청: 차계부 설정 메뉴 중 `차량 관리`, `백업 · 복구`, `API 연결` 3개 탭 UI 개선 및 `충전 · 주유 장소 자동 선택` 옵션의 `충전 단가` 탭 이동(사전 인터랙티브 프리뷰 `vehicle-journal/review-settings-ui.html` 검증 후 HA 반영).
+- 변경:
+  - `carrot-journal-design.js`: 모바일 설정 메뉴(`@media(max-width:600px)`)를 유동적 `flex-wrap` 그리드로 변경(향후 메뉴 추가 대응), 2열 차량 카드(`.v-grid-2`, `.v-card-new`), 커스텀 `<select>` 드롭다운 화살표, 토글 스위치(`.j-switch`), 카드형 백업/API UI(`.j-card`, `.j-key-box`, `.j-pill`, `.j-status-banner`, `.j-nas-scroll`) 스타일 추가.
+  - `carrot-vehicle-journal.js`: 사이드바 SVG 아이콘 추가, `차량 관리` 2열 컴팩트 카드(유종 아이콘 배지, `기기 연결`/`수동 기록` 배지 제거, 인라인 이름·유종 수정 드로어, 기본 차량 지정), `백업 · 복구` 카드화 및 포맷된 복원 검증 배너·차량 필터링 가능한 NAS `백업 목록` 드로어 구현, `API 연결` 상태 배지 및 인라인 눈 아이콘 토글 적용. 기존 `백업 상태` 탭은 유지.
+  - `carrot-charge-tariffs.js`: 기존 `기본 충전 단가`·`즐겨찾기 충전 단가` UI를 유지한 채 상단에 `충전 · 주유 장소 자동 선택`(`#automaticLocations`) 스위치 카드를 배치하고 `nas/config` 저장과 연동.
+- 검증: `node --check` 3개 JS 파일 구문 통과, `vehicle-journal/review-settings-ui.html`에서 `mockHass` 기반 데스크톱/모바일(`390px` iframe) 동작 확인. Mac Python 3.9 환경(`PIL`/Python 3.10 `tempfile` 옵션 미지원) 및 Playwright 미설치로 `unittest`(144건 중 14건 환경 오류)와 `vehicle-management.cjs`는 로컬 미완료.
+- 배포: `main` 커밋·푸시 후 HA `hassio@192.168.0.140` 기존 3개 JS 파일 SHA-256 일치 확인 및 `/config/carrot_ha/deployment-backups/` 백업 후 직접 반영 예정.
+
 ## 2026-11-18 — 저장 성능 개선 09cbae4 HA 직접 반영
 
 - 구현 `09cbae4266418a62125f85e015087fa8701fbc73` main 푸시 완료, 확인 당시 origin/main 대비 미푸시0. 다른 작업의 AGENTS·기록·프리뷰는 별도로 보존했다.
@@ -21,6 +32,14 @@
 - 사용자 요청: 저장 단계별 시간 측정으로 병목을 확인하고 개선 전후 비교. 운영 원본 DB를 시험 수정하지 않고 서버 임시 SQLite 백업에서 저장 전/후 동기화·스냅샷·투영·집계·합계·조회 시간을 측정한다. 개인 기록/식별자/금액은 출력하지 않는다.
 - 시작 점검: 기존 로컬 지침·문서·프리뷰 변경을 보존. 원격 main 004dfd7까지의 최신 변경을 fast-forward하고 문서 로컬 변경을 복원했다. 원본·병합본은 /private/tmp/carrot-save-preserve-0sv2bz_0에 보존. 사용자 스태시/스테이징 변경 없음.
 - 관련: scripts/profile_journal_save.py 및 저장 경로. 현재 측정 진행 중이며 실행 코드 수정·운영 배포·재시작·새 릴리즈 없음. 결과·개선 범위·검증은 후속 기록한다.
+
+## 2026-11-18 — 충전 단가 설정 Unknown command 조사
+
+- 요청: 충전 단가 설정 화면의 `Unknown command.` 원인 조사. 운영 Chrome의 열린 차계부 설정에서도 같은 문구와 기본 단가 입력 미표시를 확인했다. 설정/DB/실행 코드 수정 없이 읽기 전용으로 조사했다.
+- 호출 경로: 새 `frontend/carrot-charge-tariffs.js`의 render는 favorite/list와 charge/rates를 Promise.all로 조회한다. charge/rates가 미등록이면 전체 렌더가 catch로 넘어가 기본 단가 입력과 즐겨찾기를 모두 표시하지 못하고 HA 오류 message를 그대로 출력한다. favorite/rate는 저장 시 호출하므로 이번 조회 실패와 구분한다.
+- 설치 검증: HA의 vehicle_journal/api.py SHA-256 `947cc59c2cb08043306d0fb52f3e15c104520849636502364b33681fdea40870`, carrot-charge-tariffs.js `9e58a87f46bec91e174793426834de0b58a14aaa90ed64a5c4b3e865625b0275`는 origin/main 및 569dc49 배포 코드와 일치한다. 서버 api.py에 charge/rates, favorite/rate와 register 목록이 존재한다. api.py 파일 수정 시각은 2026-11-18 05:38:24 KST다.
+- 판단: 최신 화면이 호출하는 새 WebSocket 명령이 실행 중 HA에 등록되지 않은 상태다. 명령 철자/등록 목록 누락이나 설치 파일 누락의 증거는 없다. 등록은 통합 async_setup에서 실행되고 기존 배포 기록도 사용자 HA 재시작 대기이므로, Python 배포 후 이전 백엔드가 계속 실행 중인 것이 유력하다. Docker 시작 시각 조회는 SSH 앱 보호 모드로 불가했고 로그에서 시작 시각을 확보하지 못했으므로 재시작 미실행 자체를 확정하지 않는다. 보호 설정은 변경하지 않았다.
+- 상태/후속: 사용자가 HA Core 재시작 후 브라우저/앱 새로고침하여 새 명령과 입력 UI를 확인할 단계. 에이전트 재시작·새 배포·릴리즈 없음. 로컬 main이 origin/main보다 8커밋 뒤이고 AGENTS/공통·차계부 changelog 등 기존 변경이 있어 pull/병합/임의 stash 없이 원격 추적 코드와 운영 파일을 비교했다. 조사 기록만 두 changelog에 추가하고 기존 작업을 보존했다.
 
 ## 2026-11-18 — 상세기록 실제 결제금액 저장 간헐 지연 조사
 
