@@ -126,29 +126,31 @@ async def save(hass,connection,msg):
     if 'archive' not in r:
         await execute(hass,connection,msg,r['journal'].save_manual,msg['record_id'],msg['expected_version'],msg['payload'])
         return
-    from .source import sync
+    from .save import SaveTimings, save_linked
+    from time import perf_counter
     from ..charge_costs import refresh_runtime_costs,PaymentConflict
     from homeassistant.helpers.dispatcher import async_dispatcher_send
-    def write():
-        with r['journal'].lock:
-            sync(r['archive'],r['journal'],True)
-            r['journal'].save_manual(msg['record_id'],msg['expected_version'],msg['payload'])
-            sync(r['archive'],r['journal'],True)
-            with r['journal'].connect() as db:
-                version=db.execute('SELECT version FROM records WHERE vehicle_id=? AND id=?',(r['journal'].vehicle,msg['record_id'])).fetchone()[0]
-            return {'id':msg['record_id'],'version':version}
+    timings = SaveTimings()
+    outcome = 'error'
     try:
+        waiting = perf_counter()
         async with r['lock']:
-            result=await hass.async_add_executor_job(write)
-            await refresh_runtime_costs(hass,r)
+            timings.since('runtime_lock_wait', waiting)
+            result=await hass.async_add_executor_job(save_linked, r['archive'], r['journal'],
+                msg['record_id'], msg['expected_version'], msg['payload'], timings, perf_counter())
+            with timings.measure('charge_totals'):
+                await refresh_runtime_costs(hass,r)
         async_dispatcher_send(hass,'carrot_ha'+r['entry'].entry_id)
         connection.send_result(msg['id'],result)
+        outcome = 'ok'
     except (Conflict,PaymentConflict) as error:
         connection.send_error(msg['id'],'conflict',str(error))
     except (ValueError,KeyError,TypeError,OverflowError) as error:
         connection.send_error(msg['id'],'invalid_input',input_error(error,'입력한 날짜·금액·측정값을 확인해 주세요.'))
     except Exception:
         connection.send_error(msg['id'],'storage_failed','동기화를 완료하지 못했어요. 저장된 변경은 재시도돼요.')
+    finally:
+        timings.log(outcome)
 
 
 @websocket_api.websocket_command({vol.Required('type'):'carrot_ha/journal/record/status',vol.Required('entry_id'):str,

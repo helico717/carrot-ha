@@ -1,3 +1,30 @@
+## 2026-11-18 — 저장 지연 실측·불필요한 강제 동기화 제거
+
+- 제목: `vehicle-journal: measure save latency and skip unchanged archive projection`.
+- 사용자 요청에 따라 운영 서버에서 원본 SQLite를 읽기 전용 backup으로 임시 복사한 뒤 저장을 측정했다. 운영 금액/DB/사진/설정은 시험 수정하지 않았으며 임시 복사본은 측정 종료 시 제거했다. 개인정보는 출력하지 않는다.
+- 병목: 금액 쓰기는 약0.03초이고 저장 전후 강제 전체 동기화가 대부분을 차지했다. 최종 개선 함수로 같은 복사본에서 각3회 교대 실행한 저장 중앙값은 기존4.5591초→개선2.4982초(약45% 감소), 저장 전 동기화2.2516초→0.0355초. 저장 후 결제 투영은 유지했다. 초기사전준비16.50초는 저장시간에서 제외했으며 실제 간헐15~20초 요청 재현/원인 확정으로 해석하지 않는다.
+- 변경: api.py에서 새 save.py의 계측 가능한 저장 함수를 실행. sync(force=True)를 기존 cursor/설정 검사를 사용하는 sync()로 바꿔 미변경 원본 투영을 생략한다. 실제 결제 변경/new archive/SOC 기준 변경은 여전히 전체 투영을 마쳐야 성공한다. durable 결제 큐·버전 충돌·실패 복구 유지. 대상 결제만 투영하는 새 구조는 도입하지 않는다.
+- 진단: 실제 요청의 runtime lock·executor queue·journal lock 대기, 저장 전후 sync·save_manual·version·charge_totals 시간을 기록한다. 전체2초 이상 WARNING/그 외 DEBUG. 기록/차량 식별자·금액·payload·위치·토큰을 로그에 넣지 않는다.
+- 파일: vehicle_journal/{api,save}.py, scripts/profile_journal_save.py, vehicle-journal/tests/test_save_latency.py, vehicle-journal/SAVE_LATENCY_2026-11-18.md 및 공통/전용 changelog.
+- 검증: 격리 Python3.14+Pillow에서 기존 포함 차계부143건, 이후 추가 진단 검사 포함 신규 저장7건, 기존 충전결제14건·스키마9건 통과. Mac Python3.9 전체 검사14오류는 기존 tempfile 옵션/Pillow 환경 문제로 서버 격리 환경에서 재검증했다. syntax/diff 검사 통과. 운영 HA 프로세스/네트워크/브라우저/사진·즐겨찾기 전체시간 및 실제 잠금 경합은 미측정이며 상세 한계/실측은 위 보고서에 기록.
+- 상태: 검증 후 관련 파일만 커밋·main 푸시·기존 운영 api.py 해시 확인/백업 후 Python2파일 직접 반영 예정. 실제 실행 반영은 사용자 HA 재시작 필요. UI/Comma/수신기/버전/태그/릴리즈 변경 없음. 다른 작업의 지침·기록·프리뷰는 커밋에 섞지 않는다.
+
+## 2026-11-18 — 상세기록 저장 단계별 측정·개선 착수
+
+- 사용자 요청: 저장 단계별 시간 측정으로 병목을 확인하고 개선 전후 비교. 운영 원본 DB를 시험 수정하지 않고 서버 임시 SQLite 백업에서 저장 전/후 동기화·스냅샷·투영·집계·합계·조회 시간을 측정한다. 개인 기록/식별자/금액은 출력하지 않는다.
+- 시작 점검: 기존 로컬 지침·문서·프리뷰 변경을 보존. 원격 main 004dfd7까지의 최신 변경을 fast-forward하고 문서 로컬 변경을 복원했다. 원본·병합본은 /private/tmp/carrot-save-preserve-0sv2bz_0에 보존. 사용자 스태시/스테이징 변경 없음.
+- 관련: scripts/profile_journal_save.py 및 저장 경로. 현재 측정 진행 중이며 실행 코드 수정·운영 배포·재시작·새 릴리즈 없음. 결과·개선 범위·검증은 후속 기록한다.
+
+## 2026-11-18 — 상세기록 실제 결제금액 저장 간헐 지연 조사
+
+- 요청: 금액 수정 저장이 간헐적으로 15~20초 걸리는 이유 조사. 실행 코드·UI·운영 DB 수정 없이 저장 경로를 추적했다. 기존 미커밋 작업은 보존했다.
+- 확인: 기기 연결 차량의 journal/record/save는 runtime lock 및 journal RLock 획득 후 source.sync(force=True) → save_manual → source.sync(force=True) → charge_totals 갱신을 마쳐야 성공 응답한다. 강제 동기화는 generation 동일 시 생략 조건을 우회하며 HA archive에 보존된 해당 차량 전체 주행·충전 스냅샷과 결제 그룹을 읽고 투영한다. import_snapshot은 모든 결제 그룹을 다시 반영하고 관련 날짜 집계도 실행한다. 수동 등록 차량은 이 API 전체 동기화 분기를 거치지 않는다.
+- 간헐성 후보: 60초 차계부 백그라운드 동기화의 journal lock, 수신 기록 저장/충전 합계 갱신의 runtime lock, 공유 executor 및 DB/디스크 부하. SQLite 연결 timeout=15는 잠금 대기 상한이며 실제 15초 지연의 증거로 해석하지 않는다.
+- 프론트엔드: record/save 성공 뒤 선택 사진 업로드·조건부 즐겨찾기 저장을 추가로 기다린다. 완료 300ms 후 창을 닫고 현재/이전 기간을 재조회한다. 금액만 수정하고 새 사진이 없으면 사진 압축/업로드 루프는 실행하지 않는다.
+- 관련: vehicle_journal/{api,source,store,runtime,payment_sync}.py, frontend/carrot-vehicle-journal.js, charge_costs.py, cloud.py, __init__.py. 운영 HA SSH로 api.py save 및 JS saveRecord를 읽어 로컬과 해당 함수 동작이 같음을 확인했다. source.py SHA-256은 운영/로컬 일치. api.py/JS 전체 파일 해시는 달라 전체 배포 일치로 주장하지 않는다.
+- 검증/제한: 정적 추적과 운영 소스 읽기만 수행. 운영 기록을 시험 수정하거나 지연을 재현하지 않았고 단계별 실측은 없다. 전체 동기화/잠금 대기가 유력한 구조적 원인이지만 특정 느린 요청의 병목은 미확정. 확정하려면 lock 대기·전후 sync·save·합계·favorite/query 단계별 시간을 기록해야 한다.
+- 상태: 조사 기록만 로컬 추가. 실행 코드 변경·배포·릴리즈·HA/Comma 재시작 없음. 다른 작업이 있는 공통 CHANGELOG를 포함한 기존 변경 보존.
+
 ## 2026-11-18 — 기본 충전 단가 선택을 위한 최근 기록 조사
 
 - HA archive와 차계부를 읽기 전용으로 조회해 최근 한 달 및 이번 달 유상 결제의 배터리량 기준 추정과, 이전에 사용자가 제공한 공급량을 대조한 실제 정산 기준을 분리했다. 관련 경로는 `charge_costs.py`, `vehicle_journal/station_stats.py`다.
