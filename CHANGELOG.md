@@ -1,3 +1,10 @@
+## 2026-11-18 — 저장 성능 개선 09cbae4 HA 직접 반영
+
+- 구현 `09cbae4266418a62125f85e015087fa8701fbc73` main 푸시 완료, 확인 당시 origin/main 대비 미푸시0. 다른 작업의 AGENTS·기록·프리뷰는 별도로 보존했다.
+- 반영 전 운영 vehicle_journal/api.py SHA-256이 구현 부모 커밋과 일치함을 확인했다. 신규 save.py 부재도 확인한 뒤 `/config/carrot_ha/deployment-backups/journal-save-09cbae426641`에 기존 api.py·manifest.json·rollback.sh를 보존하고 커밋 소스2파일만 직접 반영했다. DB/사진/설정/UI/Comma/수신기는 수정하지 않았다.
+- 설치 SHA-256: api.py `3a413c317497c914bfa42bcbf782237d1c18a724016b7daf0243e9249859190c`, save.py `937d86bdc8a758edeeec9ec576dfc35601d786f4af9ce22c40870785795d1921`. 배포 payload/설치 파일 일치, 운영 Python AST 파싱 통과. 백업 API 해시가 기존947cc59c와 일치하고 rollback 개행4개 및 sh -n 통과.
+- 상태: 파일 반영 완료, 실행 중 적용은 사용자 HA Core 재시작 대기. 에이전트가 재시작하거나 실제 기록을 시험 수정하지 않았다. 브라우저에서의 전후 비교나 실제15~20초 요청 분석은 아직 수행하지 않았으며 복사본 서버 실측45% 감소와 구분한다. 새 버전/태그/릴리즈 없음. 자세한 검증/한계는 SAVE_LATENCY_2026-11-18.md 참고.
+
 ## 2026-11-18 — 저장 지연 실측·불필요한 강제 동기화 제거
 
 - 제목: `vehicle-journal: measure save latency and skip unchanged archive projection`.

@@ -83,3 +83,11 @@ SOC 표시 버전·충전 편집 버전 검사를 사용한다.
 - Mac 기본 Python 3.9의 전체 검사는 Pillow 미설치와 기존 tempfile 옵션 미지원으로
   14건 오류가 발생했다. 운영 서버의 격리된 Python 3.14 환경에서 전체를 다시 검증했다.
 - 운영 파일 반영과 실행 중 적용은 별개다. Python 변경 적용을 위한 HA 재시작은 사용자가 수행한다.
+
+## 배포 상태
+
+구현 `09cbae4266418a62125f85e015087fa8701fbc73`을 main에 푸시했다. HA의 기존 API가
+부모 커밋과 해시 일치함을 확인하고 기존 API·manifest·rollback을 백업한 뒤
+`vehicle_journal/api.py`, `vehicle_journal/save.py` 두 파일만 반영했다. 설치 해시·
+Python 문법·롤백 문법 검증 완료. 사용자 HA Core 재시작 및 실제 느린 요청의
+단계별 로그 관측은 대기 중이다. 새 버전/태그/릴리즈는 발행하지 않았다.
