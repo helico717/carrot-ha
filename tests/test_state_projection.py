@@ -44,10 +44,11 @@ class StateProjectionTests(unittest.TestCase):
             self.assertEqual(projected,original)
     def test_covering_projection_never_reads_table_body(self):
         with self.archive.connect() as db:
-            sql=f"SELECT observed,{state_projection.EXPRESSION} FROM events INDEXED BY {state_projection.INDEX} WHERE device=? AND kind='state' AND observed>=? ORDER BY observed"
-            program=db.execute('EXPLAIN '+sql,('car','2026')).fetchall()
+            sql, args = state_projection.build_query('car', '2026')
+            program=db.execute('EXPLAIN '+sql, args).fetchall()
             table_root=db.execute("SELECT rootpage FROM sqlite_master WHERE name='events'").fetchone()[0]
             table_cursors={op[2] for op in program if op[1]=='OpenRead' and op[3]==table_root}
+            self.assertFalse(table_cursors, program)
             self.assertFalse(any(op[1]=='Column' and op[2] in table_cursors for op in program),program)
     def test_index_tracks_updates_and_rollbacks(self):
         self.populate()
@@ -63,7 +64,7 @@ class StateProjectionTests(unittest.TestCase):
         self.populate()
         with self.archive.connect() as db:
             before=db.execute('SELECT device,id,observed,kind,body FROM events ORDER BY id').fetchall()
-            db.execute(f'DROP INDEX {state_projection.INDEX}')
+            db.execute(f'DROP TABLE {state_projection.TABLE}')
         reopened=fixtures.Archive(self.archive.path)
         with reopened.connect() as db:
             self.assertEqual(db.execute('SELECT device,id,observed,kind,body FROM events ORDER BY id').fetchall(),before)

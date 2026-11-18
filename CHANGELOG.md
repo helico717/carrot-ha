@@ -1,3 +1,10 @@
+## 2026-11-18 — state_projection SQLite 3.45.1 covering read 호환성 수정
+
+- 원인: `custom_components/carrot_ha/state_projection.py`의 `json_array(json_extract(...), json_type(...))` 식 인덱스(`events_state_calculation_v1`)가 로컬 Windows SQLite 3.50.4에서는 covering index로 동작했으나, GitHub Actions `ubuntu-latest`(SQLite 3.45.1)에서는 `events.body`를 다시 읽는 실행 계획(`DeferredSeek` + `Column`)을 세워 `test_covering_projection_never_reads_table_body`가 실패함.
+- 수정: `events`의 `INSERT`/`UPDATE`/`DELETE` 트리거로 동기화되는 경량 프로젝션 테이블 `events_state_projection`(인덱스 `events_state_projection_observed`)으로 전환하고, 기존 `events_state_calculation_v1` 식 인덱스는 초기화 시 제거하도록 변경(`custom_components/carrot_ha/state_projection.py`, `tests/test_state_projection.py`).
+- 검증: Windows(SQLite 3.50.4) 및 WSL Ubuntu(SQLite 3.45.1)에서 `test_state_projection.py`(4건), `test_history_cache.py`(1건), `test_battery_history_intervals.py`(4건), `test_charge_soc_enrichment.py`(6건), `test_archive_performance.py`(2건), `test_storage_purge.py`(3건) 모두 통과. `main` 푸시 후 GitHub Actions `Direct receiver validation` 실행 결과 확인 예정.
+- 범위: HA 직접 반영·태그/릴리즈 발행·수신기/Comma 변경 없음. 기존 로컬 `driving-logs/CHANGELOG.md` 미커밋 항목 및 미추적 파일은 분리 보존.
+
 ## 2026-11-18 — GitHub Actions 상태 기능 HA 직접 반영·사용자 재시작 대기
 
 - 구현7923235 main 푸시 후 HA 기존3파일해시 재확인, /config/carrot_ha/deployment-backups/github-actions-7923235b6962에 원본3파일·manifest·deployment.json·복구script 보존. 일반 SSH 쓰기는 root소유 backup디렉터리에서 설치 전 거부돼 기존sudo권한으로 동일 범위만 반영. Python4+terminalJS1 파일 설치해시가 커밋payload와 일치, Python AST·기존백업해시·rollback개행7개/sh-n 검증.
