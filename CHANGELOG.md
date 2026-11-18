@@ -1,3 +1,11 @@
+## 2026-11-18 — model selector 자동 동기화·뒤처짐 표시 조사
+
+- 사용자 요청: 원본 model selector 최신 변경과 HA·추가 기능을 유지하는 자동 병합이 정상인지, HA·당근웹의1개 뒤처짐이 왜 유지되는지 조사.
+- 확인: 원본9f954291e 대비 사용자 배포fdd8294b8에는 원본 전용140커밋이 미병합, fork 전용128커밋. 마지막 실제 병합dbfaa535e(11월5일23:06 KST), 마지막 예약 실행42128792825(11월6일08:19 KST)는 당시 Already up-to-date 성공. 11월18일 재조회에도 이후 실행 없음. workflow는active이며 예약 이벤트 중단의 내부 이유는 공개 API·로그만으로 미확정.
+- 표시: HA는 수집된 기기 SHA와 사용자 배포 브랜치, 당근웹은HEAD와 추적 브랜치를 비교한다. 양쪽 모두 원본 미병합량을 세지 않는다. 7ff2acd2c→fdd8294b8은 정확히1개지만 실차HEAD는 직접 확인하지 않았다.
+- 관련/검증: docs/UPSTREAM_SYNC_AUDIT_2026-11-18.md, HA git_status.py·terminal card, openpilot server/services/git_status.py·web tools runtime, 기본/HA branch sync workflow·script, GitHub 비교API·job127599761331 로그·직접 공개 API 실행/활성 상태 재확인. 기능140개 누락이나 모든 커스텀 기능 보존을 확정하지 않는다.
+- 상태: 조사 문서만 작성. 실행 코드·원본 병합·workflow 변경/실행·HA/Comma 배포·재시작·태그/릴리즈 없음. 기존 미커밋 작업 보존, 이번 기록만 분리 커밋·푸시 예정. 상세 근거와 복구 검증 항목은 위 문서 참고.
+
 ## 2026-11-18 — 저장 성능 개선 09cbae4 HA 직접 반영
 
 - 구현 `09cbae4266418a62125f85e015087fa8701fbc73` main 푸시 완료, 확인 당시 origin/main 대비 미푸시0. 다른 작업의 AGENTS·기록·프리뷰는 별도로 보존했다.
