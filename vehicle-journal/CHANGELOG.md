@@ -2,6 +2,7 @@
 
 - 검색어를 지운 뒤에도 결과가 지도를 덮는 문제를 수정했다. `carrot-vehicle-journal.js`에서 검색어 편집과 검색 영역의 Esc가 목록을 지우며 진행 중인 요청의 표시 권한을 무효화한다. 같은 검색어 재입력, 지도 핀·기록 전환에도 이전 응답은 반영하지 않는다.
 - 검증: Chrome 데스크톱·모바일에서 검색어 삭제와 Esc, 응답 지연 및 동일 검색어 재입력, 일반·주변 검색과 후보 선택, 기존 GPS 핀 유지 통과. JS 구문과 diff 검사 통과. 기존 화면 요소와 레이아웃을 사용한다.
+- 배포: `6176afca9bc3` main 푸시 확인 후 기존 부모 파일의 해시를 검증하고 `/config/carrot_ha/deployment-backups/place-search-6176afca9bc3`에 백업했다. 운영 설치·HA HTTP 해시 `42bb21f2bf65f24af34f6d8b2db95fc8b386a3ab4e1d8ad3ce74b71e3fbcc9fa` 일치와 프런트엔드 버전 `0.9.0-61cbff7298ca` 제공을 확인했다. 사용자 브라우저 새로고침 및 실사용 확인 대기. HA 재시작·릴리즈 없음.
 
 ## 2026-11-20 — vehicle-journal: preview the last GPS and address when editing a charge
 
