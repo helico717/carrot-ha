@@ -1,3 +1,8 @@
+## 2026-11-20 — vehicle-journal: dismiss stale results when editing the place query
+
+- 검색어를 지운 뒤에도 결과가 지도를 덮는 문제를 수정했다. `carrot-vehicle-journal.js`에서 검색어 편집과 검색 영역의 Esc가 목록을 지우며 진행 중인 요청의 표시 권한을 무효화한다. 같은 검색어 재입력, 지도 핀·기록 전환에도 이전 응답은 반영하지 않는다.
+- 검증: Chrome 데스크톱·모바일에서 검색어 삭제와 Esc, 응답 지연 및 동일 검색어 재입력, 일반·주변 검색과 후보 선택, 기존 GPS 핀 유지 통과. JS 구문과 diff 검사 통과. 기존 화면 요소와 레이아웃을 사용한다.
+
 ## 2026-11-20 — vehicle-journal: preview the last GPS and address when editing a charge
 
 - 기존 수정 창은 저장된 위치가 있으면 주소와 핀을 복원한다. 위치가 비어 있는 자동 충전을 열었을 때 마지막 GPS 핀과 조회된 주소를 제안하는 방식을 `preview/charge-location-prefill/index.html`에 검토용으로 구성했다. 실제 차계부 모듈에 합성 HA·지도 응답을 연결했다.

@@ -370,12 +370,26 @@ export class VehicleJournal extends HTMLElement {
     this.$('favoritePlace').onchange=()=>{this.favoriteTouched=true;this.setDraftDirty(true);this.renderFavorite();};this.$('favoritePast').onchange=()=>this.setDraftDirty(true);this.$('favoritePlaces').onclick=e=>this.pickFavorite(e);
     this.$('recordDialog').addEventListener('click',e=>{if(!e.composedPath().includes(this.$('favoritePlaces')))this.closeFavoriteDropdown();});
     this.$('recordDialog').addEventListener('keydown',e=>{if(e.key==='Escape'&&this.$('favoritePlaces').querySelector('details[open]')){e.preventDefault();e.stopPropagation();this.closeFavoriteDropdown();this.$('favoritePlaces').querySelector('summary').focus();}},true);
-    this.$('recordDialog').addEventListener('close',()=>this.closeFavoriteDropdown());
+    this.$('recordDialog').addEventListener('close',()=>{
+      this.closeFavoriteDropdown();
+      this.clearPlaceSearchResults();
+    });
     this.$('removeLocation').onclick=()=>{this.locationGeneration=(this.locationGeneration||0)+1;this.draftLocation=null;this.setDraftDirty(true);this.$('recordDialog').classList.remove('loc-sheet-open');if(!compactRecord()&&this.recordMode!=='trip')this.draftLocation=emptyLocation();this.renderLocation();};
     this.$('locationName').oninput=()=>{if(this.draftLocation){this.draftLocation.name=this.$('locationName').value;this.setDraftDirty(true);}this.updateNameState();};
     this.$('placeSearch').onclick=()=>this.searchLocation();
     this.$('useGpsSuggestion').onclick=()=>this.useChargeEditHint();
-    this.$('placeQuery').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();this.searchLocation();}};
+    this.$('placeQuery').oninput=()=>this.clearPlaceSearchResults();
+    this.$('placeQuery').onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();this.searchLocation();}
+    };
+    this.$('locSearchPanel').addEventListener('keydown',e=>{
+      if(e.key!=='Escape'||(!this.$('placeQuery').value&&!this.$('placeResults').childElementCount))return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.$('placeQuery').value='';
+      this.clearPlaceSearchResults();
+      this.$('placeQuery').focus();
+    });
     if(this.$('entry'))this.$('entry').onchange=()=>{const key=this.$('entry').value;if(key==='__add__'||key==='__manage__'){this.$('entry').value=this.entry||'';key==='__add__'?this.openVehicle():this.openVehicleManagement();return;}this.entry=key;this.offset=0;this.placeFilter=null;this.updateDefaultVehicleButton();this.load(true);};
     if(this.$('pinDefault'))this.$('pinDefault').onclick=()=>{if(!this.entry||this.entry==='__add__'||this.entry==='__manage__')return;const cur=this.getFavoriteVehicle();if(cur===this.entry){this.setFavoriteVehicle(null);}else{this.setFavoriteVehicle(this.entry);}this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry;this.updateDefaultVehicleButton();this._hass?.callWS({type:'carrot_ha/journal/user_default/set',entry_id:this.entry}).catch(()=>{});};
     if(this.$('trendsMapReset'))this.$('trendsMapReset').onclick=()=>this.resetTrendsMap();
@@ -1525,24 +1539,22 @@ export class VehicleJournal extends HTMLElement {
     const name=this.$('locationName').value.trim()||address||'직접 지정한 위치';
     this.setLocation({name,address,latitude,longitude});
   }
-  async searchNearbyChargers(query){
-    const searchButton=this.$('placeSearch');
-    if(searchButton.disabled)return;
+  clearPlaceSearchResults(){
+    this.placeSearchRequest=(this.placeSearchRequest||0)+1;
+    this.$('placeResults').replaceChildren();
+    this.$('placeSearch').disabled=false;
+  }
+  async searchNearbyChargers(current){
     const {latitude,longitude}=this.draftLocation;
-    const generation=this.locationGeneration;
-    const entry=this.entry;
     const results=this.$('placeResults');
-    const current=()=>this.$('recordDialog').open&&entry===this.entry&&generation===this.locationGeneration&&
-      this.$('placeQuery').value.trim()===query;
     const status=document.createElement('small');
     status.className='place-result-addr';
     status.style.cssText='display:block;padding:10px 12px';
     status.setAttribute('role','status');
     status.textContent='핀 주변 충전소를 찾고 있어요.';
     results.replaceChildren(status);
-    searchButton.disabled=true;
     try{
-      const {candidates=[]}=await this.call('stations/nearby',{entry_id:entry,latitude,longitude});
+      const {candidates=[]}=await this.call('stations/nearby',{entry_id:this.entry,latitude,longitude});
       if(!current())return;
       if(!candidates.length){
         status.textContent='핀 주변 2km에서 충전소를 찾지 못했어요.';
@@ -1566,15 +1578,11 @@ export class VehicleJournal extends HTMLElement {
           try{maps=await this.kakaoMaps();}catch{}
           if(!current())return;
           this.setLocation(location,maps);
-          results.replaceChildren();
         };
         results.append(button);
       }
     }catch{
       if(current())status.textContent='주변 충전소를 불러오지 못했어요. 다시 검색해 주세요.';
-    }finally{
-      searchButton.disabled=false;
-      if(!current())status.remove();
     }
   }
   renderLocationSummary(name=this.$('locationName').value.trim()||this.draftLocation?.name||''){const d=this.draftLocation,text=[name,d?.address].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')||(d?.latitude!=null?'지도에서 직접 지정한 위치':'');this.$('locationSummary').textContent=text;this.$('locationSummary').hidden=!text;const placed=hasPlace(d);this.$('removeLocation').hidden=!placed;this.$('locEdit').hidden=!placed;}
@@ -1623,15 +1631,80 @@ export class VehicleJournal extends HTMLElement {
       else if(!wanted&&existing&&this.favoriteTouched)await this.call('favorite/delete',{entry_id:this.entry,favorite_id:existing.id});
     }catch(e){throw new Error('기록은 저장했지만 즐겨찾기를 반영하지 못했어요. '+(e.message||''));}
   }
-  renderLocation(){this.locationGeneration=(this.locationGeneration||0)+1;const hasLoc=!!this.draftLocation;this.$('addLocation').hidden=hasLoc;this.$('locationEditor').hidden=!hasLoc;this.$('placeResults').replaceChildren();const addr=this.draftLocation?.address||'',name=this.draftLocation?.name||'';this.renderLocationSummary(name);if(this.$('selectedLocAddress')){if(addr){this.$('selectedLocAddress').textContent=addr;this.$('selectedLocAddress').classList.remove('empty');}else if(this.draftLocation?.latitude!=null){this.$('selectedLocAddress').textContent='지도에서 직접 지정한 위치';this.$('selectedLocAddress').classList.remove('empty');}else{this.$('selectedLocAddress').textContent='아직 고른 위치가 없어요. 위에서 장소를 찾거나 지도를 눌러 주세요.';this.$('selectedLocAddress').classList.add('empty');}}if(!this.draftLocation){this.locationMap=null;this.locationMarker=null;this.locNameSuggested='';this.$('locationMap').replaceChildren();this.syncLocState();return;}this.locNameSuggested=name;this.$('locationName').value=name;if(!this.$('placeQuery').value.trim()){this.$('placeQuery').value=name;}this.syncLocState();this.showLocationMap();}
+  renderLocation(){this.locationGeneration=(this.locationGeneration||0)+1;const hasLoc=!!this.draftLocation;this.$('addLocation').hidden=hasLoc;this.$('locationEditor').hidden=!hasLoc;this.clearPlaceSearchResults();const addr=this.draftLocation?.address||'',name=this.draftLocation?.name||'';this.renderLocationSummary(name);if(this.$('selectedLocAddress')){if(addr){this.$('selectedLocAddress').textContent=addr;this.$('selectedLocAddress').classList.remove('empty');}else if(this.draftLocation?.latitude!=null){this.$('selectedLocAddress').textContent='지도에서 직접 지정한 위치';this.$('selectedLocAddress').classList.remove('empty');}else{this.$('selectedLocAddress').textContent='아직 고른 위치가 없어요. 위에서 장소를 찾거나 지도를 눌러 주세요.';this.$('selectedLocAddress').classList.add('empty');}}if(!this.draftLocation){this.locationMap=null;this.locationMarker=null;this.locNameSuggested='';this.$('locationMap').replaceChildren();this.syncLocState();return;}this.locNameSuggested=name;this.$('locationName').value=name;if(!this.$('placeQuery').value.trim()){this.$('placeQuery').value=name;}this.syncLocState();this.showLocationMap();}
   async showLocationMap(){const generation=this.locationGeneration;try{const maps=await this.kakaoMaps();if(generation!==this.locationGeneration||!this.draftLocation||!this.$('recordDialog').open)return;const here=this.recentDevicePosition(),lat=this.draftLocation.latitude??here?.latitude??37.5665,lon=this.draftLocation.longitude??here?.longitude??126.978;this.$('locationMap').replaceChildren();this.$('locationMap').style.display='block';this.locationMap=new maps.Map(this.$('locationMap'),{center:new maps.LatLng(lat,lon),level:4});this.locationMarker=new maps.Marker({position:new maps.LatLng(lat,lon)});if(this.draftLocation.latitude!=null)this.locationMarker.setMap(this.locationMap);maps.event.addListener(this.locationMap,'click',e=>{if(!this.draftLocation)return;this.setLocation({name:this.$('locationName').value||'직접 지정한 위치',address:'',latitude:e.latLng.getLat(),longitude:e.latLng.getLng()},maps);});const d=this.draftLocation;this.$('locationHint').textContent=d.latitude!=null?'핀 위치가 다르면 지도를 눌러 옮길 수 있어요.':d.name||d.address?'장소명만 보존된 기록이에요. 검색해서 맞는 장소를 고르면 핀이 기록돼요.':'검색하거나 지도를 눌러 핀을 꽂아요.';if(d.latitude==null&&!here)this.centerOnDevice(maps,generation);this.syncChargeEditHint();}catch(e){this.$('locationMap').replaceChildren();this.$('locationMap').style.display='none';this.$('locationHint').textContent=e.message;}}
-  setLocation(place,maps){this.editLocationHint=null;this.locationGeneration=(this.locationGeneration||0)+1;this.draftLocation={...place,selection_source:'manual'};this.setDraftDirty(true);if(!place.address||!this.locNameKeep)this.locNameSuggested=place.name;this.$('locationName').value=place.name;if(place.latitude!=null)this.$('locationHint').textContent='핀 위치가 다르면 지도를 눌러 옮길 수 있어요.';this.renderLocationSummary(place.name);if(this.$('selectedLocAddress')){if(place.address){this.$('selectedLocAddress').textContent=place.address;this.$('selectedLocAddress').classList.remove('empty');}else if(place.latitude!=null){this.$('selectedLocAddress').textContent='지도에서 직접 지정한 위치';this.$('selectedLocAddress').classList.remove('empty');}else{this.$('selectedLocAddress').textContent='아직 고른 위치가 없어요. 위에서 장소를 찾거나 지도를 눌러 주세요.';this.$('selectedLocAddress').classList.add('empty');}}if(this.locationMap&&this.locationMarker&&maps&&place.latitude!=null&&place.longitude!=null){const pos=new maps.LatLng(place.latitude,place.longitude);this.locationMarker.setPosition(pos);this.locationMarker.setMap(this.locationMap);this.locationMap.setCenter(pos);}this.syncLocState();this.refreshStationPrice();}
+  setLocation(place,maps){this.clearPlaceSearchResults();this.editLocationHint=null;this.locationGeneration=(this.locationGeneration||0)+1;this.draftLocation={...place,selection_source:'manual'};this.setDraftDirty(true);if(!place.address||!this.locNameKeep)this.locNameSuggested=place.name;this.$('locationName').value=place.name;if(place.latitude!=null)this.$('locationHint').textContent='핀 위치가 다르면 지도를 눌러 옮길 수 있어요.';this.renderLocationSummary(place.name);if(this.$('selectedLocAddress')){if(place.address){this.$('selectedLocAddress').textContent=place.address;this.$('selectedLocAddress').classList.remove('empty');}else if(place.latitude!=null){this.$('selectedLocAddress').textContent='지도에서 직접 지정한 위치';this.$('selectedLocAddress').classList.remove('empty');}else{this.$('selectedLocAddress').textContent='아직 고른 위치가 없어요. 위에서 장소를 찾거나 지도를 눌러 주세요.';this.$('selectedLocAddress').classList.add('empty');}}if(this.locationMap&&this.locationMarker&&maps&&place.latitude!=null&&place.longitude!=null){const pos=new maps.LatLng(place.latitude,place.longitude);this.locationMarker.setPosition(pos);this.locationMarker.setMap(this.locationMap);this.locationMap.setCenter(pos);}this.syncLocState();this.refreshStationPrice();}
   async openLocationPicker(){try{const maps=await this.kakaoMaps();if(!this.draftLocation||!this.$('recordDialog').open)return;this.$('locationMap').style.display='block';if(!this.locationMap){this.locationMap=new maps.Map(this.$('locationMap'),{center:new maps.LatLng(37.5665,126.978),level:4});this.locationMarker=new maps.Marker({position:new maps.LatLng(37.5665,126.978)});maps.event.addListener(this.locationMap,'click',e=>this.setLocation({name:this.$('locationName').value||'직접 지정한 위치',address:'',latitude:e.latLng.getLat(),longitude:e.latLng.getLng()},maps));}this.$('locationHint').textContent='지도를 눌러 핀을 꽂아 주세요. 다시 누르면 옮겨져요.';}catch(e){this.$('locationHint').textContent=e.message;}}
-  async searchLocation(){const query=this.$('placeQuery').value.trim();if(!query)return;
-    if(this.editing&&this.recordMode==='charging'&&this.hasPinnedLocation()&&/^(?:주변|근처)?(?:전기차|전기자동차)?충전소$/.test(query.replace(/\s+/g,''))){
-      return this.searchNearbyChargers(query);
+  async searchLocation(){
+    const input=this.$('placeQuery');
+    const query=input.value.trim();
+    if(!query){this.clearPlaceSearchResults();return;}
+    const searchButton=this.$('placeSearch');
+    if(searchButton.disabled)return;
+    this.clearPlaceSearchResults();
+    const request=this.placeSearchRequest;
+    const generation=this.locationGeneration;
+    const entry=this.entry;
+    const current=()=>request===this.placeSearchRequest&&this.$('recordDialog').open&&
+      generation===this.locationGeneration&&entry===this.entry&&input.value.trim()===query;
+    searchButton.disabled=true;
+    try{
+      if(this.editing&&this.recordMode==='charging'&&this.hasPinnedLocation()&&
+        /^(?:주변|근처)?(?:전기차|전기자동차)?충전소$/.test(query.replace(/\s+/g,''))){
+        await this.searchNearbyChargers(current);
+        return;
+      }
+      const maps=await this.kakaoMaps();
+      if(!current())return;
+      if(!this.locationMap){
+        this.$('locationMap').style.display='block';
+        const position=new maps.LatLng(37.5665,126.978);
+        this.locationMap=new maps.Map(this.$('locationMap'),{center:position,level:4});
+        this.locationMarker=new maps.Marker({position});
+        maps.event.addListener(this.locationMap,'click',e=>this.setLocation({
+          name:this.$('locationName').value||'직접 지정한 위치',address:'',
+          latitude:e.latLng.getLat(),longitude:e.latLng.getLng()
+        },maps));
+      }
+      let places;
+      if(this.kakaoRestConfigured){
+        places=await this.call('location/search',{query});
+        if(current()&&!places.length)this.$('locationHint').textContent='검색 결과가 없어요.';
+      }else{
+        const [data,status]=await new Promise(resolve=>new maps.services.Places().keywordSearch(query,(data,status)=>resolve([data,status])));
+        if(!current())return;
+        if(status!==maps.services.Status.OK){
+          this.$('locationHint').textContent='검색 결과가 없거나 요청이 제한됐어요.';
+          return;
+        }
+        places=data.slice(0,10).map(place=>({
+          name:place.place_name,address:place.road_address_name||place.address_name,
+          latitude:Number(place.y),longitude:Number(place.x)
+        }));
+      }
+      if(!current())return;
+      const results=this.$('placeResults');
+      for(const place of places){
+        const button=document.createElement('button');
+        button.type='button';
+        button.className='place-result-item';
+        const name=document.createElement('span');
+        name.className='place-result-name';name.textContent=place.name;
+        const address=document.createElement('span');
+        address.className='place-result-addr';address.textContent=place.address;
+        button.append(name,address);
+        button.onclick=()=>{if(current())this.setLocation(place,maps);};
+        results.append(button);
+      }
+    }catch(e){
+      if(current())this.$('locationHint').textContent=e.message;
+    }finally{
+      if(request===this.placeSearchRequest){
+        searchButton.disabled=false;
+        if(!current())this.$('placeResults').replaceChildren();
+      }
     }
-    const generation=this.locationGeneration;this.$('placeSearch').disabled=true;try{const maps=await this.kakaoMaps();if(generation!==this.locationGeneration)return;if(!this.locationMap){this.$('locationMap').style.display='block';this.locationMap=new maps.Map(this.$('locationMap'),{center:new maps.LatLng(37.5665,126.978),level:4});this.locationMarker=new maps.Marker({position:new maps.LatLng(37.5665,126.978)});maps.event.addListener(this.locationMap,'click',e=>this.setLocation({name:this.$('locationName').value||'직접 지정한 위치',address:'',latitude:e.latLng.getLat(),longitude:e.latLng.getLng()},maps));}if(this.kakaoRestConfigured){const places=await this.call('location/search',{query});if(generation!==this.locationGeneration||!this.$('recordDialog').open)return;this.$('placeResults').replaceChildren();for(const place of places){const button=document.createElement('button');button.type='button';button.className='place-result-item';const nameSpan=document.createElement('span');nameSpan.className='place-result-name';nameSpan.textContent=place.name;const addrSpan=document.createElement('span');addrSpan.className='place-result-addr';addrSpan.textContent=place.address;button.append(nameSpan,addrSpan);button.onclick=()=>{this.setLocation(place,maps);this.$('placeResults').replaceChildren();};this.$('placeResults').append(button);}if(!places.length)this.$('locationHint').textContent='검색 결과가 없어요.';return;}await new Promise(resolve=>new maps.services.Places().keywordSearch(query,(data,status)=>{if(generation===this.locationGeneration&&this.$('recordDialog').open){this.$('placeResults').replaceChildren();if(status!==maps.services.Status.OK){this.$('locationHint').textContent='검색 결과가 없거나 요청이 제한됐어요.';}else{for(const place of data.slice(0,10)){const b=document.createElement('button');b.type='button';b.className='place-result-item';const nameSpan=document.createElement('span');nameSpan.className='place-result-name';nameSpan.textContent=place.place_name;const addrSpan=document.createElement('span');addrSpan.className='place-result-addr';addrSpan.textContent=place.road_address_name||place.address_name;b.append(nameSpan,addrSpan);b.onclick=()=>{this.setLocation({name:place.place_name,address:place.road_address_name||place.address_name,latitude:Number(place.y),longitude:Number(place.x)},maps);this.$('placeResults').replaceChildren();};this.$('placeResults').append(b);}}}resolve();}));}catch(e){this.$('locationHint').textContent=e.message;}finally{this.$('placeSearch').disabled=false;}}
+  }
   setDraftDirty(dirty){
     this.draftDirty=dirty;
     this.updateSaveButtonVisibility();
