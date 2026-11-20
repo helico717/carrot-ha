@@ -1,3 +1,10 @@
+## 2026-11-20 — vehicle-journal: tolerate brief unknown states in charging visits
+
+- 자동 충전 시작을 기준으로 기존 주차 구간을 검토한다. 명시적 주차 관측 사이에 `onroad`가 잠시 비어도 마지막 주차 확인 이후 90초 이내이고 주행 신호가 없으면 연속성을 인정한다. 충전 시작 부근에 주차 확인이 필요하며 기존 GPS 정확도·단일 즐겨찾기 50m·관측 간격 제한을 유지한다.
+- 관련 파일: `custom_components/carrot_ha/vehicle_journal/{favorite_visit,automatic_locations}.py`, `vehicle-journal/tests/test_favorite_visit.py`. 조회 버전 7로 기존 미확정 실패 기록을 재평가한다. 확정 장소와 수동 수정은 보존한다.
+- 검증: 즐겨찾기·자동 위치 회귀 49건 통과. HA 운영 입력을 읽기 전용으로 재현해 기존 판정의 실패, 수정 판정의 단일 즐겨찾기 선택, 해당 기록이 재평가 대기 목록에 들어가는 것을 확인했다.
+- 배포: 커밋을 푸시한 뒤 HA 파일 해시를 대조하고 기존 파일을 백업해 직접 반영한다. 사용자 HA 재시작 및 운영 기록 재처리는 반영 상태에 별도로 기록한다.
+
 ## 2026-11-20 — vehicle-journal: 지하 충전소 자동 선택 누락 조사
 
 - 운영 차계부·차량 기록을 읽기 전용으로 조회했다. 해당 충전은 조회 버전 6으로 처리됐으며, 설치된 `favorite_visit.py`를 운영 입력에 다시 실행했다.

@@ -11,7 +11,7 @@ from ..archive_codec import loads
 # 4: re-run lookups that a truncated provider response wrongly parked for 24 hours.
 # 5: store a reason code, step results and evidence so failures can be explained in the ledger.
 # 6: retry missing locations using a continuously observed favorite parking visit.
-LOOKUP_VERSION=6
+LOOKUP_VERSION=7
 RETRY_DAY=86400
 RETRY_TRANSIENT=900
 # A charge-start fix this close to one learned on an earlier visit is the same parking spot.

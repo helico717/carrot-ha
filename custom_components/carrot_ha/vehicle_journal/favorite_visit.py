@@ -31,7 +31,7 @@ def valid_fix(data, observed):
 
 
 def select_visit(samples, start, fix, favorites):
-    """The entrance fix may be moving; after parking, every sample must stay parked."""
+    """Allow brief unknown onroad samples within an otherwise observed parking visit."""
     measured, gps = fix
     matches = [f for f in favorites if any(
         distance_m(gps['latitude'], gps['longitude'], a['latitude'], a['longitude']) <= ANCHOR_M
@@ -39,19 +39,24 @@ def select_visit(samples, start, fix, favorites):
     if len(matches) != 1:
         return None
     parked_at = None
+    last_parked = None
     for observed, data in reversed(samples):
         if observed < measured:
             continue
         wheel = (data.get('vehicle') or {}).get('wheel_speed_mps')
         if wheel is not None and (type(wheel) not in (int, float) or not math.isfinite(wheel) or wheel < 0):
             return None
-        stopped = data.get('onroad') is False and (wheel is None or wheel <= 1)
-        if parked_at is None:
-            if stopped:
-                parked_at = observed
-        elif not stopped:
+        onroad = data.get('onroad')
+        moving = onroad is True or data.get('driving') is True or (wheel is not None and wheel > 1)
+        if last_parked is not None and (
+            moving or (observed - last_parked).total_seconds() > MAX_GAP_S
+        ):
             return None
-    if parked_at is None or parked_at > start:
+        if onroad is False and not moving:
+            if parked_at is None:
+                parked_at = observed
+            last_parked = observed
+    if parked_at is None or parked_at > start or (start - last_parked).total_seconds() > MAX_GAP_S:
         return None
     # A newly measured moving fix while already parked contradicts continuity.
     if gps['speedMps'] > 1 and measured >= parked_at:

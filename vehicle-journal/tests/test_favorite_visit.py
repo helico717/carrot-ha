@@ -96,6 +96,17 @@ class VisitTests(unittest.TestCase):
         self.state(-10, -10, gps={'latitude': 37.51, 'speedMps': 0})
         self.assertIsNone(self.result())
 
+    def test_brief_unknown_samples_do_not_break_confirmed_parking(self):
+        self.parked()
+        self.state(-115, onroad=None)
+        self.state(-56, onroad=None)
+        self.assertIsNotNone(self.result())
+
+    def test_explicit_driving_breaks_visit_even_with_unknown_onroad(self):
+        self.parked()
+        self.state(-115, onroad=None, driving=True)
+        self.assertIsNone(self.result())
+
     def test_new_moving_fix_while_parked_is_rejected(self):
         self.parked(600)
         self.state(-10, -10)
