@@ -1,3 +1,9 @@
+## 2026-11-20 — vehicle-journal: 지하 충전소 자동 선택 누락 조사
+
+- 운영 차계부·차량 기록을 읽기 전용으로 조회했다. 해당 충전은 조회 버전 6으로 처리됐으며, 설치된 `favorite_visit.py`를 운영 입력에 다시 실행했다.
+- 마지막 유효 GPS는 즐겨찾기 한 곳과 기준 반경 안에서 일치했다. `favorite_visit.py`의 연속 주차 판정은 P단이고 휠 속도가 사실상 0인 표본의 `onroad: null`을 만나 중단했다. 이 판정의 휠 속도 읽기는 중첩 필드를 참조하지만, 해당 운영 표본의 휠 속도는 상태 최상위에 있었다.
+- 관련 파일은 `automatic_locations.py`와 `favorite_visit.py`다. 조사만 수행했으며 실행 코드·운영 데이터·배포 상태 변경은 없다.
+
 ## 2026-11-18 — 차계부 설정 메뉴 3개 탭 UI 개선 및 HA 직접 반영
 
 - 제목: `vehicle-journal: redesign settings vehicles, backup, and api tabs`.

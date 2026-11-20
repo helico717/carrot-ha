@@ -1,3 +1,7 @@
+## 2026-11-20 — 지하 충전소 자동 선택 누락 조사
+
+- HA에서 조회 버전 6이 적용된 충전을 읽기 전용으로 재현했다. 즐겨찾기 한 곳이 일치했으나 P단 정차 표본의 `onroad: null` 때문에 연속 주차 판정이 중단됐다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록했다. 실행 코드·운영 데이터·배포 상태 변경은 없다.
+
 ## 2026-11-18 — state_projection SQLite 3.45.1 covering read 호환성 수정
 
 - 원인: `custom_components/carrot_ha/state_projection.py`의 `json_array(json_extract(...), json_type(...))` 식 인덱스(`events_state_calculation_v1`)가 로컬 Windows SQLite 3.50.4에서는 covering index로 동작했으나, GitHub Actions `ubuntu-latest`(SQLite 3.45.1)에서는 `events.body`를 다시 읽는 실행 계획(`DeferredSeek` + `Column`)을 세워 `test_covering_projection_never_reads_table_body`가 실패함.
