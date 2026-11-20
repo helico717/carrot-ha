@@ -57,8 +57,11 @@ class FuelUnitsTests(unittest.TestCase):
 class NewWriteAuthorizationTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_apis_reject_before_imports_or_access(self):
         tree=ast.parse(Path('custom_components/carrot_ha/vehicle_journal/api.py').read_text())
-        methods={'purge','vehicle_delete','vehicle_create','vehicle_update','settings','map_config','record_location','location_search','station_lookup','nas_config','nas_action'}
-        functions=[n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name in methods]
+        runtime_methods={'record_location','purge','location_edit_hint','nearby_chargers'}
+        methods=runtime_methods|{'vehicle_delete','vehicle_create','vehicle_update','settings','map_config','location_search','station_lookup','nas_config','nas_action'}
+        functions=[n for n in tree.body if (
+            isinstance(n,ast.AsyncFunctionDef) and n.name in methods
+        ) or (isinstance(n,ast.FunctionDef) and n.name=='runtime')]
         for function in functions:function.decorator_list=[]
         namespace={}
         exec(compile(ast.Module(body=functions,type_ignores=[]),'api.py','exec'),namespace)
@@ -66,6 +69,5 @@ class NewWriteAuthorizationTests(unittest.IsolatedAsyncioTestCase):
             errors=[]
             for user in (None,SimpleNamespace(is_admin=False)):
                 connection=SimpleNamespace(user=user,send_error=lambda *args:errors.append(args))
-                if name in ('record_location','purge'):namespace['runtime']=lambda *args:None
                 await namespace[name](SimpleNamespace(),connection,{'id':1})
-                if name not in ('record_location','purge'):self.assertEqual(errors[-1][1],'unauthorized')
+                self.assertEqual(errors[-1][1],'unauthorized')

@@ -1,5 +1,6 @@
 """Infer a favorite from one continuously observed parking visit, not GPS age."""
 from datetime import timedelta
+import json
 import math
 
 from ..archive_codec import loads
@@ -28,6 +29,60 @@ def valid_fix(data, observed):
     except (ValueError, TypeError, AttributeError):
         return None
     return measured, gps
+
+
+def charge_edit_position(archive, journal, record_id):
+    """Return the last valid fix as an editor hint for one automatic charge."""
+    with journal.connect() as db:
+        record = db.execute(
+            "SELECT kind,extra_json FROM records WHERE vehicle_id=? AND id=? "
+            "AND origin='automatic' AND status='active' AND kind IN ('charge','expense')",
+            (journal.vehicle, record_id),
+        ).fetchone()
+        if not record:
+            return None
+        kind, raw = record
+        if json.loads(raw).get('location'):
+            return None
+        if kind == 'expense':
+            rows = db.execute("""
+                SELECT m.started_at FROM expenses e
+                JOIN expense_members x ON x.vehicle_id=e.vehicle_id AND x.expense_id=e.record_id
+                JOIN records r ON r.vehicle_id=x.vehicle_id AND r.id=x.charge_id
+                JOIN mobility m ON m.vehicle_id=r.vehicle_id AND m.record_id=r.id
+                WHERE e.vehicle_id=? AND e.record_id=? AND e.category='charging'
+                  AND e.payment_owner='ha_charge_payment' AND r.kind='charge'
+                  AND r.origin='automatic' AND r.status='active'
+                  AND (SELECT count(*) FROM expense_members
+                       WHERE vehicle_id=e.vehicle_id AND expense_id=e.record_id)=1
+            """, (journal.vehicle, record_id)).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT started_at FROM mobility WHERE vehicle_id=? AND record_id=?",
+                (journal.vehicle, record_id),
+            ).fetchall()
+    if len(rows) != 1:
+        return None
+
+    start = stamp(rows[0][0])
+    low = start - timedelta(minutes=10)
+    best = None
+    with archive.connect() as db:
+        for observed, body in db.execute(
+            "SELECT observed,body FROM events WHERE device=? AND kind='state' "
+            "AND observed BETWEEN ? AND ? ORDER BY observed DESC LIMIT 2000",
+            (journal.device, low.isoformat(), start.isoformat()),
+        ):
+            observed = stamp(observed)
+            if best and observed <= best[0]:
+                break
+            fix = valid_fix(loads(body).get('data', {}), observed)
+            if fix and low <= fix[0] <= start and (best is None or fix[0] > best[0]):
+                best = fix
+    if best is None:
+        return None
+    measured, gps = best
+    return {'latitude': gps['latitude'], 'longitude': gps['longitude'], 'measured_at': measured.isoformat()}
 
 
 def select_visit(samples, start, fix, favorites):

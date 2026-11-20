@@ -73,6 +73,34 @@ class ParkingTests(unittest.TestCase):
         self.assertIsNone(self.position(),'diagnosis never relaxes the position rule')
     def test_other_device_not_used(self):
         self.state(0,device='other');self.assertIsNone(self.position())
+    def test_charge_edit_hint_uses_last_valid_fix_from_its_own_session(self):
+        from custom_components.carrot_ha.vehicle_journal.favorite_visit import charge_edit_position
+
+        start=self.start.isoformat()
+        with self.j.connect() as db:
+            for key,kind in (('charge','charge'),('second','charge'),('expense','expense')):
+                db.execute("""
+                    INSERT INTO records(vehicle_id,id,kind,origin,source_kind,source_id,source_fingerprint,created_at,updated_at)
+                    VALUES (?,?,?,'automatic','test',?,?,?,?)
+                """,(self.j.vehicle,key,kind,key,key,start,start))
+            db.executemany('INSERT INTO mobility(vehicle_id,record_id,started_at,ended_at) VALUES (?,?,?,?)',
+                           [(self.j.vehicle,key,start,start) for key in ('charge','second')])
+            db.execute("""
+                INSERT INTO expenses(vehicle_id,record_id,accounting_date,category,actual_krw,payment_owner,payment_id,payment_version)
+                VALUES (?,'expense','2026-01-01','charging',1000,'ha_charge_payment','payment',1)
+            """,(self.j.vehicle,))
+            db.execute("INSERT INTO expense_members VALUES (?,'expense','charge')",(self.j.vehicle,))
+        self.state(-265,onroad=True,gps={'speedMps':2})
+        self.state(-3,measured=-265)
+        self.state(-2,device='other',gps={'latitude':38})
+        self.state(-1,gps={'accuracyM':70})
+        self.state(1,gps={'latitude':39})
+        self.assertEqual(charge_edit_position(self.a,self.j,'expense'),{
+            'latitude':37.5,'longitude':127,'measured_at':(self.start-timedelta(seconds=265)).isoformat(),
+        })
+        with self.j.connect() as db:
+            db.execute("INSERT INTO expense_members VALUES (?,'expense','second')",(self.j.vehicle,))
+        self.assertIsNone(charge_edit_position(self.a,self.j,'expense'))
     def test_failure_version_retries_once_and_override_preserved(self):
         self.a.put({'schema':1,'device_id':'car','event_id':'charge','kind':'charge','observed_at':(self.start+timedelta(hours=1)).isoformat(),'data':{'started_at':self.start.isoformat(),'ended_at':(self.start+timedelta(hours=1)).isoformat(),'energy_kwh':10,'duration_s':3600}})
         sync(self.a,self.j);item=auto.pending(self.j)[0]
