@@ -26,7 +26,7 @@ spec_vehicle.loader.exec_module(mod_vehicle)
 
 estimate_charging_times = mod_battery.estimate_charging_times
 ID4_CHARGING_CURVE_KW = mod_battery.ID4_CHARGING_CURVE_KW
-def values(runtime):
+def values(runtime, *, soc_stamp=None):
     data = runtime['latest']['data']
     if 'charging' in data:
         data['charge_can_bms_request_bus1'] = 6 if data['charging'] is True else 1 if data['charging'] is False else 7
@@ -36,6 +36,8 @@ def values(runtime):
                 bms_power_w_bus1=data.get('charge_power_w'), bms_voltage_v_bus1=350)
     for key in ('bms_actual_mode_bus1', 'bms_power_w_bus1', 'bms_voltage_v_bus1'):
         data.setdefault('field_measured_at', {})[key] = stamp
+    if 'display_soc_candidate_percent' in data:
+        data['field_measured_at']['display_soc_candidate_percent'] = soc_stamp or stamp
     return mod_vehicle.values(runtime)
 
 class MockDateTime(datetime):
@@ -126,6 +128,7 @@ class TestChargingSmoothing(unittest.TestCase):
                     'charging': True,
                     'charge_power_w': 7000,
                     'battery_wh': 39000,  # 50%
+                    'display_soc_candidate_percent': 50,
                     'measured_at': self.base_time.isoformat(),
                     'stale': False
                 },
@@ -159,11 +162,12 @@ class TestChargingSmoothing(unittest.TestCase):
 
 class TestChargingRegression(unittest.TestCase):
     setUp = TestChargingSmoothing.setUp
-    def runtime(self, wh=60650, measured_capacity=72157):
+    def runtime(self, wh=60650, measured_capacity=72157, soc=77.5):
         return {
             'entry': type('Entry', (), {'options': {'soc_capacity_kwh': 78.0}}),
             'latest': {'observed_at': self.base_time.isoformat(), 'data': {
                 'battery_wh': wh, 'measured_capacity_wh': measured_capacity,
+                'display_soc_candidate_percent': soc,
                 'charging': True, 'charge_power_w': 27987,
                 'measured_at': self.base_time.isoformat(), 'stale': False}},
             'summary': {}}
@@ -265,8 +269,54 @@ class TestChargingRegression(unittest.TestCase):
             self.assertIsNone(estimate_charging_times(39, 78, power)['time_to_100_s'])
 
     def test_energy_not_rounded_to_target(self):
-        result = values(self.runtime(wh=62375))
+        result = values(self.runtime(wh=62375, soc=79.5))
         self.assertGreater(result['time_to_80_s'], 0)
+
+    def test_dashboard_eta_uses_can_soc_when_energy_already_exceeds_80_percent(self):
+        runtime = self.runtime(wh=64520, soc=77)
+        data = runtime['latest']['data']
+        data['charge_power_w'] = 6100
+        first = values(runtime)
+        self.assertEqual(first['time_to_80_s'], 1381)
+        self.assertEqual(first['time_to_100_s'], 10588)
+        data['display_soc_candidate_percent'] = 77.5
+        second = values(runtime)
+        self.assertEqual(second['time_to_80_s'], 1151)
+        self.assertEqual(len(runtime['charging_smooth_state']['history']), 1)
+
+    def test_target_completion_uses_fresh_can_even_when_power_is_missing(self):
+        runtime = self.runtime(wh=61000, soc=80)
+        data = runtime['latest']['data']
+        data['charge_power_w'] = 0
+        result = values(runtime)
+        self.assertEqual(result['time_to_80_s'], 0)
+        self.assertIsNone(result['time_to_100_s'])
+        data['display_soc_candidate_percent'] = 100
+        self.assertEqual(values(runtime)['time_to_100_s'], 0)
+
+    def test_missing_or_stale_can_does_not_report_energy_based_completion(self):
+        runtime = self.runtime(wh=64520, soc=80)
+        self.assertEqual(values(runtime)['time_to_80_s'], 0)
+        result = values(runtime, soc_stamp=(self.base_time - timedelta(seconds=181)).isoformat())
+        self.assertIsNone(result['time_to_80_s'])
+        del runtime['latest']['data']['display_soc_candidate_percent']
+        result = values(runtime)
+        self.assertIsNone(result['time_to_80_s'])
+        self.assertIsNone(result['time_to_100_s'])
+
+    def test_eta_expiry_does_not_report_completion_or_pin_to_one_second(self):
+        runtime = self.runtime(wh=64520, soc=79.5)
+        first = values(runtime)
+        self.assertGreater(first['time_to_80_s'], 1)
+        MockDateTime.current_time += timedelta(seconds=first['time_to_80_s'] + 1)
+        self.assertEqual(values(runtime)['time_to_80_s'], first['time_to_80_s'])
+
+    def test_can_eta_remains_available_above_configured_energy_capacity(self):
+        runtime = self.runtime(wh=64520, soc=90)
+        runtime['entry'].options['soc_capacity_kwh'] = 64
+        result = values(runtime)
+        self.assertEqual(result['time_to_80_s'], 0)
+        self.assertGreater(result['time_to_100_s'], 0)
 
     def test_near_target_never_false_zero(self):
         first = estimate_charging_times(77.99, 78, 7000, base_time=self.base_time)
@@ -347,6 +397,7 @@ class TestEtaHoldBoundaries(TestChargingRegression):
         r['latest']['data']['measured_at']=MockDateTime.current_time.isoformat()
         self.assertIsNone(values(r)['eta_100'])
         r['latest']['data']['battery_wh']=62400
+        r['latest']['data']['display_soc_candidate_percent']=80
         self.assertEqual(values(r)['time_to_80_s'],0)
 
 class InvalidBatteryTests(unittest.TestCase):

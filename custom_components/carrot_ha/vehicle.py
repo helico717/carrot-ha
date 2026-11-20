@@ -1,6 +1,8 @@
-from .battery import DEFAULT_REFERENCE_EFFICIENCY_KPL, DEFAULT_SOC_CAPACITY_KWH, MEB_INVALID_ENERGY_WH
+from .battery import (
+    DEFAULT_REFERENCE_EFFICIENCY_KPL, DEFAULT_SOC_CAPACITY_KWH,
+    MAX_SOC_CAPACITY_KWH, MEB_INVALID_ENERGY_WH, estimate_charging_times,
+)
 from datetime import datetime, timezone, timedelta
-from .battery import calibrated_soc, estimate_charging_times
 from .charging_power import charging_power
 from .charge_costs import DEFAULT_CHARGE_RATES
 from .telemetry import combined_lock_state
@@ -24,7 +26,8 @@ def values(runtime):
     for source, target in [('measured_capacity_wh','measured_capacity_kwh'),('capacity_wh','capacity_kwh')]:
         if isinstance(data.get(source), (int,float)): data[target] = round(data[source] / 1000, 1)
     data['soc_capacity_kwh'] = round(capacity, 1)
-    display_soc.live(data, datetime.now(timezone.utc))
+    soc_point = display_soc.live(data, datetime.now(timezone.utc))
+    charging_soc = soc_point['value'] if soc_point and not data['soc_stale'] else None
     power_w = data.get('charge_power_w')
     if isinstance(power_w, (int, float)):
         data['charge_power_kw'] = round(power_w / 1000, 1)
@@ -150,7 +153,8 @@ def values(runtime):
         measured_time = now_utc
         estimate_valid = False
     session = (capacity, runtime.get('charge_session_start_wh'))
-    active_estimate = data.get('charging') is True and not data.get('onroad') and estimate_valid
+    active_charge = data.get('charging') is True and not data.get('onroad') and not is_stale
+    active_estimate = active_charge and estimate_valid and charging_soc is not None
     held = runtime.get('charging_eta_hold')
     if held and (not active_estimate or held['session'] != session):
         held = None
@@ -159,7 +163,8 @@ def values(runtime):
     charging_est = estimate_charging_times(
         battery_wh / 1000 if type(battery_wh) in (int, float) else None,
         capacity, raw_power, base_time=measured_time,
-        smooth_state=previous_model, is_charging=active_estimate
+        smooth_state=previous_model, is_charging=active_estimate,
+        display_soc_percent=charging_soc
     )
     # Missing/quantized zero power is a display interruption, not training data.
     # A model rejection with otherwise valid power is an anomaly, never held.
@@ -178,7 +183,7 @@ def values(runtime):
     hold_age = now_utc.timestamp()-held['measured'] if held else None
     elapsed = measured_time.timestamp()-held['measured'] if held else 0
     anomaly = bool(held and type(battery_wh) in (int,float) and (
-        not math.isfinite(battery_wh) or battery_wh < 0 or battery_wh > capacity*1000
+        not math.isfinite(battery_wh) or not 0 <= battery_wh <= MAX_SOC_CAPACITY_KWH*1000
         or (elapsed > 0 and ((battery_wh-held['battery_wh']) < -50
             or (battery_wh-held['battery_wh'])*3600/elapsed > 250000))))
     holding = bool(not valid_result and active_estimate and temporary_gap and not anomaly and held
@@ -190,16 +195,23 @@ def values(runtime):
     for target in (80, 100):
         seconds_key, eta_key = f'time_to_{target}_s', f'eta_{target}'
         seconds, eta = charging_est[seconds_key], charging_est[eta_key]
-        if holding:
+        # Only fresh CAN SOC can confirm a target, even during a power gap.
+        if active_charge and charging_soc is not None and charging_soc >= target:
+            seconds, eta = 0, soc_point['at']
+        elif holding:
             eta = held[eta_key]
             seconds = round((datetime.fromisoformat(eta)-now_utc).total_seconds()) if eta else None
             if seconds is not None and seconds <= 0:
                 seconds, eta = None, None
-        elif seconds is not None and seconds > 0:
-            seconds = max(1, round((datetime.fromisoformat(eta)-now_utc).total_seconds()))
-        # Reaching a target requires a fresh current measurement, not expiry of ETA.
-        if active_estimate and not anomaly and type(battery_wh) in (int,float) and math.isfinite(battery_wh) and battery_wh <= capacity*1000 and battery_wh >= capacity*1000*target/100:
-            seconds, eta = 0, now_utc.isoformat()
+        elif seconds is not None:
+            if seconds == 0:
+                # An out-of-order energy sample can return the previous model.
+                seconds, eta = None, None
+            else:
+                seconds = round((datetime.fromisoformat(eta)-now_utc).total_seconds())
+                if seconds <= 0:
+                    seconds = charging_est['smooth_state']['raw_durations'][target]
+                    eta = (now_utc + timedelta(seconds=seconds)).isoformat()
         data[seconds_key], data[eta_key] = seconds, eta
     try:
         from zoneinfo import ZoneInfo

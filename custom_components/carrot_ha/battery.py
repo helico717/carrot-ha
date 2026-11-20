@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 MEB_INVALID_ENERGY_WH = {102250, 102300, 102350, 102375}
 
 DEFAULT_SOC_CAPACITY_KWH = 64.0
+MAX_SOC_CAPACITY_KWH = 150.0
 # Used for the range only while this car has no driving record at all; editable in options.
 DEFAULT_REFERENCE_EFFICIENCY_KPL = 5.0
 NET_CAPACITY_KWH = 78.0
@@ -42,49 +43,59 @@ def _finite(value):
 
 
 def estimate_charging_times(battery_kwh, measured_capacity_kwh, charge_power_w,
-                            base_time=None, smooth_state=None, is_charging=True):
+                            base_time=None, smooth_state=None, is_charging=True,
+                            *, display_soc_percent=None):
     """Estimate from unique measurement times and net battery energy.
 
-    measured_capacity_kwh is retained as an API name for compatibility; callers
-    must pass the same configured capacity used by displayed SOC, never Ah * V.
-    State is immutable to callers. Re-reading a measurement cannot train it.
+    Use configured capacity and actual energy for the power model. When supplied,
+    CAN display SOC is the starting point for the charging targets. Energy-only
+    replays can omit it. Re-reading a measurement cannot train the power model.
     """
     empty = dict(time_to_80_s=None, eta_80=None, time_to_100_s=None,
                  eta_100=None, smooth_state=None)
     capacity = measured_capacity_kwh
+    # The configured conversion capacity need not equal the CAN energy scale.
+    energy_limit = capacity if display_soc_percent is None else MAX_SOC_CAPACITY_KWH
     if (not is_charging or not all(_finite(x) for x in
             (battery_kwh, capacity, charge_power_w)) or
-            not 20 <= capacity <= 150 or not 0 <= battery_kwh <= capacity or
+            not 20 <= capacity <= MAX_SOC_CAPACITY_KWH or not 0 <= battery_kwh <= energy_limit or
             charge_power_w < 300):
         return empty
     now = base_time or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     t = now.timestamp()
-    soc = battery_kwh / capacity * 100
+    if display_soc_percent is not None and (
+            not _finite(display_soc_percent) or not 0 <= display_soc_percent <= 100):
+        return empty
+    soc = battery_kwh / capacity * 100 if display_soc_percent is None else display_soc_percent
     power = charge_power_w / 1000
     previous = smooth_state
     if previous and previous.get('capacity') != capacity:
         previous = None
     if previous:
         dt = t - previous['last_calc_ts']
-        if dt <= 0:
+        if dt < 0 or (dt == 0 and previous['target_soc'] == soc):
             return dict(previous['result'], smooth_state=previous)
         if dt > 600:
             previous = None
-    if previous:
-        dt = t - previous['last_calc_ts']
+    dt = t - previous['last_calc_ts'] if previous else 0
+    if previous and dt > 0:
         delta = battery_kwh - previous['energy']
         # Reject implausible steps, including CAN sentinel/reinitialization jumps.
         if delta < -0.05 or delta * 3600 / dt > 250:
             return empty
         if abs(power - previous['last_power']) > 25:
             previous = None
+            dt = 0
 
-    dt = t - previous['last_calc_ts'] if previous else 0
     history = list(previous['history']) if previous else []
-    history = [x for x in history if t - x[0] <= HISTORY_S]
-    history.append((t, battery_kwh, power))
+    if previous and dt == 0:
+        # CAN SOC may advance before the next independent energy measurement.
+        _, battery_kwh, power = history[-1]
+    else:
+        history = [x for x in history if t - x[0] <= HISTORY_S]
+        history.append((t, battery_kwh, power))
     # Prefer an actual multi-minute net energy slope to another filter stacked
     # on top of the collector's 90-240 second power estimate.
     span = t - history[0][0]
@@ -133,7 +144,7 @@ def estimate_charging_times(battery_kwh, measured_capacity_kwh, charge_power_w,
         raw = duration(target)
         raw_durations[target] = raw
         eta = t + raw
-        if raw and previous:
+        if raw and previous and dt > 0 and previous['raw_durations'][target] > 0:
             old_eta = previous['eta_' + str(target) + '_ts']
             shift = eta - old_eta
             # Bounded in elapsed time, never in number of UI reads. Near the
@@ -144,10 +155,11 @@ def estimate_charging_times(battery_kwh, measured_capacity_kwh, charge_power_w,
                 else:
                     limit = 3 * dt
                     eta = old_eta + max(-limit, min(limit, shift))
-            eta = max(t + 1, eta)
+            if eta <= t:
+                eta = t + raw
         result['time_to_' + str(target) + '_s'] = max(1, round(eta - t)) if raw else 0
         result['eta_' + str(target)] = datetime.fromtimestamp(eta, timezone.utc).isoformat()
-    state = dict(capacity=capacity, energy=battery_kwh, last_calc_ts=t,
+    state = dict(capacity=capacity, energy=battery_kwh, last_calc_ts=t, target_soc=soc,
                  last_power=power, power_smooth=effective, history=history,
                  eta_80_ts=datetime.fromisoformat(result['eta_80']).timestamp(),
                  eta_100_ts=datetime.fromisoformat(result['eta_100']).timestamp(),
