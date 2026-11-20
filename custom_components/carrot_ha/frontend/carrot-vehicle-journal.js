@@ -1544,54 +1544,13 @@ export class VehicleJournal extends HTMLElement {
     this.$('placeResults').replaceChildren();
     this.$('placeSearch').disabled=false;
   }
-  async searchNearbyChargers(current){
-    const {latitude,longitude}=this.draftLocation;
-    const results=this.$('placeResults');
-    const status=document.createElement('small');
-    status.className='place-result-addr';
-    status.style.cssText='display:block;padding:10px 12px';
-    status.setAttribute('role','status');
-    status.textContent='핀 주변 충전소를 찾고 있어요.';
-    results.replaceChildren(status);
-    try{
-      const {candidates=[]}=await this.call('stations/nearby',{entry_id:this.entry,latitude,longitude});
-      if(!current())return;
-      if(!candidates.length){
-        status.textContent='핀 주변 2km에서 충전소를 찾지 못했어요.';
-        return;
-      }
-      results.replaceChildren();
-      for(const {location,distance_m} of candidates){
-        const button=document.createElement('button');
-        button.type='button';
-        button.className='place-result-item';
-        const name=document.createElement('span');
-        name.className='place-result-name';
-        name.textContent=location.name;
-        const details=document.createElement('span');
-        details.className='place-result-addr';
-        const distance=distance_m<1000?`${distance_m.toLocaleString('ko-KR')}m`:`${(distance_m/1000).toFixed(1)}km`;
-        details.textContent=[distance,location.address].filter(Boolean).join(' · ');
-        button.append(name,details);
-        button.onclick=async()=>{
-          let maps=null;
-          try{maps=await this.kakaoMaps();}catch{}
-          if(!current())return;
-          this.setLocation(location,maps);
-        };
-        results.append(button);
-      }
-    }catch{
-      if(current())status.textContent='주변 충전소를 불러오지 못했어요. 다시 검색해 주세요.';
-    }
-  }
   renderLocationSummary(name=this.$('locationName').value.trim()||this.draftLocation?.name||''){const d=this.draftLocation,text=[name,d?.address].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' · ')||(d?.latitude!=null?'지도에서 직접 지정한 위치':'');this.$('locationSummary').textContent=text;this.$('locationSummary').hidden=!text;const placed=hasPlace(d);this.$('removeLocation').hidden=!placed;this.$('locEdit').hidden=!placed;}
   // The entering device's location is only a map starting point; it never becomes the record's pin by itself.
   recentDevicePosition(){const p=this.devicePosition;return p&&Date.now()-p.at<300000?p:null;}
   rememberDevicePosition(point){this.devicePosition={latitude:point.coords.latitude,longitude:point.coords.longitude,at:Date.now()};return this.devicePosition;}
   centerOnDevice(maps,generation){if(this.locatingDevice||!navigator.geolocation)return;this.locatingDevice=true;navigator.geolocation.getCurrentPosition(point=>{this.locatingDevice=false;const p=this.rememberDevicePosition(point);if(generation===this.locationGeneration&&this.locationMap&&this.draftLocation&&this.draftLocation.latitude==null&&this.$('recordDialog').open)this.locationMap.setCenter(new maps.LatLng(p.latitude,p.longitude));},()=>{this.locatingDevice=false;},{enableHighAccuracy:false,maximumAge:300000,timeout:8000});}
   openLocationSheet(){if(!this.draftLocation){this.draftLocation=emptyLocation();this.renderLocation();}this.sheetScroll=this.$('recordDialog').querySelector('.modal-scroll-body').scrollTop;this.$('recordDialog').classList.add('loc-sheet-open');this.showLocationMap();setTimeout(()=>this.$('placeQuery').focus(),50);}
-  closeLocationSheet(){this.$('recordDialog').classList.remove('loc-sheet-open');this.$('recordDialog').querySelector('.modal-scroll-body').scrollTop=this.sheetScroll||0;if(!hasPlace(this.draftLocation)){this.locationGeneration=(this.locationGeneration||0)+1;this.draftLocation=null;this.renderLocation();}else this.renderLocationSummary();}
+  closeLocationSheet(){this.clearPlaceSearchResults();this.$('recordDialog').classList.remove('loc-sheet-open');this.$('recordDialog').querySelector('.modal-scroll-body').scrollTop=this.sheetScroll||0;if(!hasPlace(this.draftLocation)){this.locationGeneration=(this.locationGeneration||0)+1;this.draftLocation=null;this.renderLocation();}else this.renderLocationSummary();}
   syncTimeClear(){const input=this.$('recordForm')?.elements.time,button=this.$('clearTime');if(input&&button)button.hidden=!input.value;}
   syncLocState(){const sec=this.$('selectedLocSection');if(sec)sec.classList.toggle('has-loc',!!(this.draftLocation&&(this.draftLocation.address||this.draftLocation.latitude!=null)));this.updateNameState();this.renderFavorite();this.syncChargeEditHint();}
   // Favorite chargers (EV only): the charger the user usually uses at a spot names later automatic charges there.
@@ -1639,71 +1598,137 @@ export class VehicleJournal extends HTMLElement {
     const input=this.$('placeQuery');
     const query=input.value.trim();
     if(!query){this.clearPlaceSearchResults();return;}
-    const searchButton=this.$('placeSearch');
-    if(searchButton.disabled)return;
+    const search=this.$('placeSearch');
+    if(search.disabled)return;
     this.clearPlaceSearchResults();
     const request=this.placeSearchRequest;
     const generation=this.locationGeneration;
     const entry=this.entry;
     const current=()=>request===this.placeSearchRequest&&this.$('recordDialog').open&&
       generation===this.locationGeneration&&entry===this.entry&&input.value.trim()===query;
-    searchButton.disabled=true;
+    const results=this.$('placeResults');
+    const header=document.createElement('div');
+    header.className='viewport-results-header';
+    const count=document.createElement('span');
+    count.setAttribute('role','status');
+    count.textContent='지도 범위에서 검색 중';
+    const close=document.createElement('button');
+    close.type='button';close.className='viewport-results-close';close.textContent='닫기';
+    close.onclick=()=>{this.clearPlaceSearchResults();input.focus();};
+    header.append(count,close);
+    const items=document.createElement('div');
+    items.className='viewport-results-items';items.tabIndex=0;
+    items.setAttribute('aria-label','장소 검색 결과');
+    const more=document.createElement('button');
+    more.type='button';more.className='viewport-results-more';more.textContent='더 보기';more.hidden=true;
+    results.append(header,items,more);
+    const showMessage=text=>{
+      const notice=document.createElement('span');
+      notice.className='viewport-results-message';notice.textContent=text;
+      items.replaceChildren(notice);
+    };
+    search.disabled=true;
     try{
-      if(this.editing&&this.recordMode==='charging'&&this.hasPinnedLocation()&&
-        /^(?:주변|근처)?(?:전기차|전기자동차)?충전소$/.test(query.replace(/\s+/g,''))){
-        await this.searchNearbyChargers(current);
-        return;
-      }
       const maps=await this.kakaoMaps();
       if(!current())return;
-      if(!this.locationMap){
-        this.$('locationMap').style.display='block';
-        const position=new maps.LatLng(37.5665,126.978);
-        this.locationMap=new maps.Map(this.$('locationMap'),{center:position,level:4});
-        this.locationMarker=new maps.Marker({position});
-        maps.event.addListener(this.locationMap,'click',e=>this.setLocation({
-          name:this.$('locationName').value||'직접 지정한 위치',address:'',
-          latitude:e.latLng.getLat(),longitude:e.latLng.getLng()
-        },maps));
-      }
-      let places;
-      if(this.kakaoRestConfigured){
-        places=await this.call('location/search',{query});
-        if(current()&&!places.length)this.$('locationHint').textContent='검색 결과가 없어요.';
-      }else{
-        const [data,status]=await new Promise(resolve=>new maps.services.Places().keywordSearch(query,(data,status)=>resolve([data,status])));
-        if(!current())return;
-        if(status!==maps.services.Status.OK){
-          this.$('locationHint').textContent='검색 결과가 없거나 요청이 제한됐어요.';
-          return;
-        }
-        places=data.slice(0,10).map(place=>({
-          name:place.place_name,address:place.road_address_name||place.address_name,
-          latitude:Number(place.y),longitude:Number(place.x)
-        }));
-      }
+      if(!this.locationMap)await this.showLocationMap();
       if(!current())return;
-      const results=this.$('placeResults');
-      for(const place of places){
-        const button=document.createElement('button');
-        button.type='button';
-        button.className='place-result-item';
-        const name=document.createElement('span');
-        name.className='place-result-name';name.textContent=place.name;
-        const address=document.createElement('span');
-        address.className='place-result-addr';address.textContent=place.address;
-        button.append(name,address);
-        button.onclick=()=>{if(current())this.setLocation(place,maps);};
-        results.append(button);
+      const map=this.locationMap;
+      if(!map?.getBounds)throw new Error('지도 범위를 확인하지 못했어요.');
+      const bounds=map.getBounds(),sw=bounds.getSouthWest(),ne=bounds.getNorthEast();
+      const within=(lat,lon)=>lat>=sw.getLat()&&lat<=ne.getLat()&&lon>=sw.getLng()&&lon<=ne.getLng();
+      const pin=this.draftLocation;
+      const origin=this.hasPinnedLocation()&&within(pin.latitude,pin.longitude)
+        ?new maps.LatLng(pin.latitude,pin.longitude):map.getCenter();
+      if(this.placeSearchMap!==map){
+        this.placeSearchMap=map;
+        maps.event.addListener(map,'bounds_changed',()=>{
+          if(this.locationMap===map&&results.childElementCount)this.clearPlaceSearchResults();
+        });
       }
+      const chargersOnly=this.recordMode==='charging'&&
+        /^(?:주변|근처)?(?:전기차|전기자동차|충전소|전기차충전소|전기자동차충전소)$/.test(query.replace(/\s+/g,''));
+      const {candidates,truncated}=await this.mapPlaceCandidates(maps,bounds,origin,within,query,chargersOnly,current);
+      if(!current())return;
+      count.textContent=`이 지도 영역 · ${candidates.length.toLocaleString('ko-KR')}곳${truncated?' 표시':''}`;
+      if(!candidates.length){
+        showMessage('현재 지도 범위에 결과가 없어요. 지도를 이동하거나 검색어를 바꿔 보세요.');
+        return;
+      }
+      let shown=0;
+      more.onclick=()=>{
+        if(!current())return;
+        const next=candidates.slice(shown,shown+8);
+        const firstNewItem=items.children.length;
+        for(const {place,distance} of next){
+          const button=document.createElement('button');
+          button.type='button';button.className='place-result-item';
+          const name=document.createElement('span');
+          name.className='place-result-name';name.textContent=place.name;
+          const detail=document.createElement('span');
+          detail.className='place-result-addr';
+          const formatted=distance<1000?`${Math.round(distance).toLocaleString('ko-KR')}m`:`${(distance/1000).toFixed(1)}km`;
+          detail.textContent=[formatted,place.address].filter(Boolean).join(' · ');
+          button.append(name,detail);
+          button.onclick=()=>{if(current())this.setLocation(place,maps);};
+          items.append(button);
+        }
+        shown+=next.length;
+        more.hidden=shown>=candidates.length;
+        if(firstNewItem)items.children[firstNewItem].focus();
+      };
+      more.onclick();
     }catch(e){
-      if(current())this.$('locationHint').textContent=e.message;
+      if(current()){count.textContent='장소 검색';showMessage(e.message||'검색에 실패했어요. 다시 시도해 주세요.');}
     }finally{
       if(request===this.placeSearchRequest){
-        searchButton.disabled=false;
-        if(!current())this.$('placeResults').replaceChildren();
+        search.disabled=false;
+        if(!current())results.replaceChildren();
       }
     }
+  }
+  async mapPlaceCandidates(maps,bounds,origin,within,query,chargersOnly,current){
+    const service=new maps.services.Places();
+    const candidates=new Map();
+    const radians=value=>value*Math.PI/180;
+    const latitude=origin.getLat(),longitude=origin.getLng();
+    const add=(name,address,x,y,stationId)=>{
+      const lat=Number(y),lon=Number(x);
+      if(!name||!within(lat,lon))return;
+      const north=Math.sin(radians(lat-latitude)/2),east=Math.sin(radians(lon-longitude)/2);
+      const h=north**2+Math.cos(radians(latitude))*Math.cos(radians(lat))*east**2;
+      const distance=12742000*Math.asin(Math.min(1,Math.sqrt(h)));
+      const place={name:name.slice(0,200),address:(address||'').slice(0,300),latitude:lat,longitude:lon,provider:'kakao'};
+      if(stationId)place.station_id=String(stationId).slice(0,100);
+      candidates.set(stationId||`${name}:${x}:${y}`,{place,distance});
+    };
+    let hasMore=false;
+    for(let page=1;page<=3&&current();page++){
+      const [data,status,pagination]=await new Promise(resolve=>service.keywordSearch(
+        chargersOnly?'전기차 충전소':query,(...response)=>resolve(response),
+        {bounds,location:origin,sort:maps.services.SortBy.DISTANCE,size:15,page}
+      ));
+      if(!current())break;
+      hasMore=!!pagination?.hasNextPage;
+      if(status===maps.services.Status.ZERO_RESULT)break;
+      if(status!==maps.services.Status.OK)throw new Error('장소를 불러오지 못했어요. 다시 검색해 주세요.');
+      for(const row of data){
+        const category=(row.category_name||'').replace(/\s+/g,'');
+        if(chargersOnly&&!/(전기차|전기자동차)충전소/.test(category))continue;
+        add(row.place_name,row.road_address_name||row.address_name,row.x,row.y,row.id);
+      }
+      if(!hasMore)break;
+    }
+    if(!candidates.size&&!chargersOnly&&current()){
+      const [data,status]=await new Promise(resolve=>new maps.services.Geocoder().addressSearch(query,(...response)=>resolve(response)));
+      if(status===maps.services.Status.OK&&current()){
+        for(const row of data){
+          const address=row.road_address?.address_name||row.address_name||row.address?.address_name;
+          add(row.road_address?.building_name||address,address,row.x,row.y);
+        }
+      }
+    }
+    return {candidates:[...candidates.values()].sort((a,b)=>a.distance-b.distance),truncated:hasMore};
   }
   setDraftDirty(dirty){
     this.draftDirty=dirty;

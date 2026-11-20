@@ -2155,6 +2155,12 @@ export const journalDesign = `:host {
 #recordDialog .loc-search-row #placeQuery{border:0!important;background:transparent!important;box-shadow:none!important;padding:8px 0!important;min-height:36px}
 #recordDialog .btn-loc-search{min-height:36px!important;padding:6px 14px!important;border-radius:9px!important}
 #recordDialog #placeResults{background:#141c23;border:1px solid var(--j-border);border-radius:12px;padding:4px;gap:0;margin:6px 0 0;box-shadow:0 10px 28px rgba(0,0,0,.5)}
+#recordDialog .viewport-results-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-bottom:1px solid var(--j-border);color:var(--j-sub);font-size:12px;font-weight:650}
+#recordDialog .viewport-results-close,#recordDialog .viewport-results-more{min-height:30px;padding:4px 10px;font-size:12px}
+#recordDialog .viewport-results-items{max-height:min(220px,30dvh);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+#recordDialog .viewport-results-more{display:block;width:calc(100% - 24px);margin:6px 12px}
+#recordDialog .viewport-results-more[hidden]{display:none}
+#recordDialog .viewport-results-message{display:block;padding:10px 12px;color:var(--j-sub);font-size:13px}
 #recordDialog .place-result-item{border:0!important;border-radius:8px!important;background:transparent!important;min-height:0!important;padding:9px 10px!important}
 #recordDialog .place-result-item+.place-result-item{border-top:1px solid rgba(255,255,255,.06)!important;border-radius:0!important}
 #recordDialog .place-result-item:hover{background:var(--j-raised)!important}
@@ -2184,7 +2190,6 @@ export const journalDesign = `:host {
   #recordDialog #addLocation{display:none!important}
   #recordDialog #locationEditor{flex:1;min-height:0;position:relative;padding:0;gap:0;overflow:hidden;background:#0d1318;border-radius:14px}
   #recordDialog .loc-search-step{position:absolute;top:12px;left:12px;width:min(max(380px,45%),450px,calc(100% - 24px));z-index:5;gap:0}
-  #recordDialog #placeResults{max-height:min(420px,50%)}
   #recordDialog .loc-map-container{flex:1;min-height:0}
   #recordDialog #locationMap{height:100%!important}
 }
@@ -2217,7 +2222,6 @@ export const journalDesign = `:host {
   #recordDialog .loc-search-step{position:relative;flex:0 0 auto;padding:8px 10px;background:#141c23;border-bottom:1px solid var(--j-border);z-index:5;gap:0}
   #recordDialog .loc-search-step #placeResults{position:absolute;top:calc(100% + 4px);left:10px;right:10px;margin:0}
   #recordDialog .loc-search-step .loc-search-row{box-shadow:none}
-  #recordDialog #placeResults{max-height:46dvh}
   #recordDialog .loc-map-container{flex:1;min-height:0}
   #recordDialog #locationMap{height:100%!important}
   #recordDialog .selected-loc-section{grid-template-columns:1fr;padding:12px 14px calc(14px + env(safe-area-inset-bottom,0px))}
