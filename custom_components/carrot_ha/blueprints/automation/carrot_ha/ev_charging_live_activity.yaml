@@ -187,7 +187,7 @@ variables:
     {%- endif -%}
   has_active_helper: "{{ active_helper_id is string and active_helper_id | trim | length > 0 }}"
   soc_int: "{{ states(battery_sensor_id) | float(0) | round(0) | int }}"
-  notif_message: >-
+  notif_message: |-
     {%- set soc = states(battery_sensor_id) | float(none) -%}
     {%- set p = states(charge_power_sensor_id) | float(none) -%}
     {%- set mode = states(charge_mode_sensor_id) -%}

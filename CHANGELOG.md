@@ -4,6 +4,7 @@
 - 과거 분리 자동화 잔여 엔티티 2건(`automation.id4_cungjeon_eobdeiteu_raibeu_aegtibiti`, `automation.id4_cungjeon_jongryo_raibeu_aegtibiti`)을 엔티티 레지스트리에서 정리했다.
 - 커스텀 구성요소에 iOS(Live Activities) 및 Android(Live Updates) 공용 블루프린트(`custom_components/carrot_ha/blueprints/automation/carrot_ha/ev_charging_live_activity.yaml`)와 시작 시 `/config/blueprints` 자동 동기화(`custom_components/carrot_ha/blueprint_sync.py`, `__init__.py`)를 추가했다. 알림 대상은 `mobile_app` 기기 다중 선택 드롭다운(`device` 셀렉터 `multiple: true` + `device_attr` 슬러그 변환)으로 여러 기기를 고를 수 있고, 아이콘/배경 색상은 `color_rgb` 컬러 피커로 선택해 `#rrggbb`로 변환하도록 구성했다.
 - 검증: `python3 -m unittest tests/test_ev_charging_blueprint.py` 통과(로컬 PyYAML 미설치 환경으로 텍스트 검사 및 `sync_blueprints` 단위 테스트 수행). 운영 HA에서 `carrot_ha/ev_charging_live_activity.yaml` 저장 및 `automation.carrot_ha_ev_cungjeon_raibeu_aegtibiti_live_update` 실기기(`임도균의 iPhone`) 스키마 검증·적용 완료. 커스텀 구성요소 변경분은 `main` 푸시 후 HACS 릴리즈 발행 대기 상태다.
+- 수정(줄바꿈): `ev_charging_live_activity.yaml`의 `notif_message` 블록 스칼라가 YAML 접힘(`>-`)으로 선언되어 `급속 · 70 kW`와 `80%까지 35분` 사이의 개행이 공백으로 합쳐지던 문제를 리터럴 블록(`|-`)으로 변경해 두 줄 표시를 복원했다. `python -m unittest tests/test_ev_charging_blueprint.py` 2건 통과. (현재 환경에서 HA SSH 직접 접속 불가로 운영 HA 반영 및 실기기 재확인은 대기 중)
 
 ## 2026-11-20 — 지도 범위 장소 검색과 목록 길이 제한
 
