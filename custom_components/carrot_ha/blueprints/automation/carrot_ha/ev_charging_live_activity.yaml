@@ -132,14 +132,14 @@ blueprint:
             icon: {}
         notification_icon_color:
           name: 아이콘 색상
-          default: "#4CAF50"
+          default: [76, 175, 80]
           selector:
-            text: {}
+            color_rgb: {}
         background_color:
           name: 배경 색상
-          default: "#000000"
+          default: [0, 0, 0]
           selector:
-            text: {}
+            color_rgb: {}
 
 mode: queued
 max: 10
@@ -167,6 +167,24 @@ variables:
   notification_icon_val: !input notification_icon
   notification_icon_color_val: !input notification_icon_color
   background_color_val: !input background_color
+  notification_icon_color_hex: >-
+    {%- if notification_icon_color_val is iterable and notification_icon_color_val is not string and (notification_icon_color_val | list | length) == 3 -%}
+      {%- set c = notification_icon_color_val | list -%}
+      {{ '#%02x%02x%02x' | format(c[0] | int(0), c[1] | int(0), c[2] | int(0)) }}
+    {%- elif notification_icon_color_val is string and notification_icon_color_val | trim | length > 0 -%}
+      {{ notification_icon_color_val | trim }}
+    {%- else -%}
+      #4caf50
+    {%- endif -%}
+  background_color_hex: >-
+    {%- if background_color_val is iterable and background_color_val is not string and (background_color_val | list | length) == 3 -%}
+      {%- set c = background_color_val | list -%}
+      {{ '#%02x%02x%02x' | format(c[0] | int(0), c[1] | int(0), c[2] | int(0)) }}
+    {%- elif background_color_val is string and background_color_val | trim | length > 0 -%}
+      {{ background_color_val | trim }}
+    {%- else -%}
+      #000000
+    {%- endif -%}
   has_active_helper: "{{ active_helper_id is string and active_helper_id | trim | length > 0 }}"
   soc_int: "{{ states(battery_sensor_id) | float(0) | round(0) | int }}"
   notif_message: >-
@@ -190,8 +208,8 @@ variables:
       'live_update': true,
       'critical_text': soc_int ~ '%',
       'notification_icon': notification_icon_val,
-      'notification_icon_color': notification_icon_color_val,
-      'background_color': background_color_val
+      'notification_icon_color': notification_icon_color_hex,
+      'background_color': background_color_hex
     } -%}
     {%- if show_progress_bar_val -%}
       {%- set d = dict(d, progress=soc_int | int, progress_max=100) -%}

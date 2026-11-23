@@ -58,6 +58,7 @@ class TestEvChargingBlueprint(unittest.TestCase):
         self.assertIn("silent=true", raw_text)
         self.assertIn("alert_once=true", raw_text)
         self.assertIn("clear_notification", raw_text)
+        self.assertIn("color_rgb: {}", raw_text)
 
         if yaml is None:
             return

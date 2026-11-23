@@ -2,7 +2,7 @@
 
 - 운영 HA의 `ID4 충전 라이브 액티비티`(`automation.id4_cungjeon_sijag_raibeu_aegtibiti`)에서 `sensor.id_4_battery` 속성 갱신마다 반복 트리거되던 문제(`to: null` 추가), `eta_recovered`의 `from: [unknown, unavailable]` 제한, `stop` 트리거의 `unknown` 전이 누락 보완, 활성 헬퍼 확인 및 HA 재시작 정리 분기 추가, 중복 메시지 템플릿의 `variables` 통합, Android 호환 `alert_once: true`를 반영했다.
 - 과거 분리 자동화 잔여 엔티티 2건(`automation.id4_cungjeon_eobdeiteu_raibeu_aegtibiti`, `automation.id4_cungjeon_jongryo_raibeu_aegtibiti`)을 엔티티 레지스트리에서 정리했다.
-- 커스텀 구성요소에 iOS(Live Activities) 및 Android(Live Updates) 공용 블루프린트(`custom_components/carrot_ha/blueprints/automation/carrot_ha/ev_charging_live_activity.yaml`)와 시작 시 `/config/blueprints` 자동 동기화(`custom_components/carrot_ha/blueprint_sync.py`, `__init__.py`)를 추가했다.
+- 커스텀 구성요소에 iOS(Live Activities) 및 Android(Live Updates) 공용 블루프린트(`custom_components/carrot_ha/blueprints/automation/carrot_ha/ev_charging_live_activity.yaml`)와 시작 시 `/config/blueprints` 자동 동기화(`custom_components/carrot_ha/blueprint_sync.py`, `__init__.py`)를 추가했다. 아이콘/배경 색상은 `color_rgb` 컬러 피커로 선택해 `#rrggbb`로 변환하도록 구성했다.
 - 검증: `python3 -m unittest tests/test_ev_charging_blueprint.py` 통과(로컬 PyYAML 미설치 환경으로 텍스트 검사 및 `sync_blueprints` 단위 테스트 수행). 운영 HA 자동화 반영 완료, 커스텀 구성요소 변경분은 로컬 커밋·푸시 및 HA 재시작/릴리즈 발행 전 상태다.
 
 ## 2026-11-20 — 지도 범위 장소 검색과 목록 길이 제한
