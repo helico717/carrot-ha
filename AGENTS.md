@@ -57,6 +57,11 @@ HA 등록부·로그 프론트엔드와 openpilot의 로그 동기화 연결부�
 
 현재 연결의 기준 문서: [직접 연결 구조](docs/CURRENT_CONNECTION_ARCHITECTURE.md).
 
+현재 차량의 CAN 배선·신규 진단/제어 기능 조사 전 반드시
+[현재 ID.4 게이트웨이 하네스](docs/CURRENT_VEHICLE_HARNESS.md)와 연결된 원본 도면을 읽는다.
+2026-11-16 사용자가 현재 연결로 확인했다. 도면의 핀·논리 bus·controller 번호를
+혼동하지 않으며, OBD 단자의 진단 지원을 현재 Comma 하네스의 접근 가능성으로 간주하지 않는다.
+
 ```text
 Comma → 집 서버 HTTPS 역방향 프록시
           ├─ /carrot-receiver/* → 독립 Carrot Vehicle Receiver (SQLite)
