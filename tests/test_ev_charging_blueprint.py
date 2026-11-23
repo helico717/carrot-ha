@@ -76,8 +76,9 @@ class TestEvChargingBlueprint(unittest.TestCase):
         self.assertIn("display_settings", inputs)
 
         notif_inputs = inputs["notification_targets"]["input"]
-        self.assertIn("notify_device", notif_inputs)
-        self.assertEqual(notif_inputs["notify_device"]["selector"]["device"]["filter"], [{"integration": "mobile_app"}])
+        self.assertIn("notify_devices", notif_inputs)
+        self.assertEqual(notif_inputs["notify_devices"]["selector"]["device"]["filter"], [{"integration": "mobile_app"}])
+        self.assertTrue(notif_inputs["notify_devices"]["selector"]["device"]["multiple"])
         self.assertIn("platform_mode", notif_inputs)
         options = [o["value"] for o in notif_inputs["platform_mode"]["selector"]["select"]["options"]]
         self.assertEqual(options, ["both", "ios", "android"])

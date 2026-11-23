@@ -71,14 +71,14 @@ blueprint:
       name: 알림 대상 및 플랫폼
       icon: mdi:cellphone-message
       input:
-        notify_device:
-          name: 알림을 받을 모바일 기기
-          description: Home Assistant Companion 앱이 설치된 모바일 기기를 선택하세요.
+        notify_devices:
+          name: 알림을 받을 모바일 기기 (1대 이상 선택)
+          description: Home Assistant Companion 앱이 설치된 모바일 기기를 1대 이상 선택하세요.
           selector:
             device:
               filter:
                 - integration: mobile_app
-              multiple: false
+              multiple: true
         platform_mode:
           name: 대상 플랫폼 모드
           description: >
@@ -152,6 +152,13 @@ variables:
   eta_80_sensor_id: !input eta_80_sensor
   eta_100_sensor_id: !input eta_100_sensor
   active_helper_id: !input active_helper
+  notify_devices_input: !input notify_devices
+  notify_devices_list: >-
+    {% if notify_devices_input is string %}
+      {{ [notify_devices_input] if notify_devices_input | trim | length > 0 else [] }}
+    {% else %}
+      {{ notify_devices_input | select('string') | map('trim') | reject('eq', '') | list }}
+    {% endif %}
   platform_mode_val: !input platform_mode
   notification_title_val: !input notification_title
   notification_tag_val: !input notification_tag
@@ -273,12 +280,15 @@ actions:
             entity_id: !input charging_binary_sensor
             state: "on"
         sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "{{ notification_title_val }}"
-            message: "{{ notif_message }}"
-            data: "{{ base_payload }}"
+          - repeat:
+              for_each: "{{ notify_devices_list }}"
+              sequence:
+                - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                  continue_on_error: true
+                  data:
+                    title: "{{ notification_title_val }}"
+                    message: "{{ notif_message }}"
+                    data: "{{ base_payload }}"
           - if:
               - condition: template
                 value_template: "{{ has_active_helper }}"
@@ -308,12 +318,15 @@ actions:
                 {{ trigger.from_state is not none and trigger.to_state is not none and is_number(trigger.from_state.state) and is_number(trigger.to_state.state) and trigger.to_state.state | float > trigger.from_state.state | float and trigger.to_state.state | float | int != trigger.from_state.state | float | int }}
               {% endif %}
         sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            title: "{{ notification_title_val }}"
-            message: "{{ notif_message }}"
-            data: "{{ update_payload }}"
+          - repeat:
+              for_each: "{{ notify_devices_list }}"
+              sequence:
+                - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                  continue_on_error: true
+                  data:
+                    title: "{{ notification_title_val }}"
+                    message: "{{ notif_message }}"
+                    data: "{{ update_payload }}"
 
       - conditions:
           - condition: or
@@ -332,12 +345,15 @@ actions:
           - condition: template
             value_template: "{{ (not has_active_helper) or is_state(active_helper_id, 'on') }}"
         sequence:
-          - domain: mobile_app
-            type: notify
-            device_id: !input notify_device
-            message: "clear_notification"
-            data:
-              tag: "{{ notification_tag_val }}"
+          - repeat:
+              for_each: "{{ notify_devices_list }}"
+              sequence:
+                - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+                  continue_on_error: true
+                  data:
+                    message: "clear_notification"
+                    data:
+                      tag: "{{ notification_tag_val }}"
           - if:
               - condition: template
                 value_template: "{{ has_active_helper }}"
