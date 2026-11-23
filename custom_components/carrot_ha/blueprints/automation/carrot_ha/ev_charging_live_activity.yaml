@@ -71,14 +71,14 @@ blueprint:
       name: 알림 대상 및 플랫폼
       icon: mdi:cellphone-message
       input:
-        notify_services:
-          name: 모바일 앱 알림 서비스
-          description: >
-            알림을 받을 모바일 앱 서비스 이름을 입력하세요. 여러 기기(iOS/Android)를 추가할 수 있습니다.
-            (예: notify.mobile_app_my_iphone, notify.mobile_app_my_galaxy)
+        notify_device:
+          name: 알림을 받을 모바일 기기
+          description: Home Assistant Companion 앱이 설치된 모바일 기기를 선택하세요.
           selector:
-            text:
-              multiple: true
+            device:
+              filter:
+                - integration: mobile_app
+              multiple: false
         platform_mode:
           name: 대상 플랫폼 모드
           description: >
@@ -152,13 +152,6 @@ variables:
   eta_80_sensor_id: !input eta_80_sensor
   eta_100_sensor_id: !input eta_100_sensor
   active_helper_id: !input active_helper
-  notify_services_input: !input notify_services
-  notify_services_list: >-
-    {% if notify_services_input is string %}
-      {{ [notify_services_input] if notify_services_input | trim | length > 0 else [] }}
-    {% else %}
-      {{ notify_services_input | select('string') | map('trim') | reject('eq', '') | list }}
-    {% endif %}
   platform_mode_val: !input platform_mode
   notification_title_val: !input notification_title
   notification_tag_val: !input notification_tag
@@ -280,14 +273,12 @@ actions:
             entity_id: !input charging_binary_sensor
             state: "on"
         sequence:
-          - repeat:
-              for_each: "{{ notify_services_list }}"
-              sequence:
-                - action: "{{ repeat.item }}"
-                  data:
-                    title: "{{ notification_title_val }}"
-                    message: "{{ notif_message }}"
-                    data: "{{ base_payload }}"
+          - domain: mobile_app
+            type: notify
+            device_id: !input notify_device
+            title: "{{ notification_title_val }}"
+            message: "{{ notif_message }}"
+            data: "{{ base_payload }}"
           - if:
               - condition: template
                 value_template: "{{ has_active_helper }}"
@@ -317,14 +308,12 @@ actions:
                 {{ trigger.from_state is not none and trigger.to_state is not none and is_number(trigger.from_state.state) and is_number(trigger.to_state.state) and trigger.to_state.state | float > trigger.from_state.state | float and trigger.to_state.state | float | int != trigger.from_state.state | float | int }}
               {% endif %}
         sequence:
-          - repeat:
-              for_each: "{{ notify_services_list }}"
-              sequence:
-                - action: "{{ repeat.item }}"
-                  data:
-                    title: "{{ notification_title_val }}"
-                    message: "{{ notif_message }}"
-                    data: "{{ update_payload }}"
+          - domain: mobile_app
+            type: notify
+            device_id: !input notify_device
+            title: "{{ notification_title_val }}"
+            message: "{{ notif_message }}"
+            data: "{{ update_payload }}"
 
       - conditions:
           - condition: or
@@ -343,14 +332,12 @@ actions:
           - condition: template
             value_template: "{{ (not has_active_helper) or is_state(active_helper_id, 'on') }}"
         sequence:
-          - repeat:
-              for_each: "{{ notify_services_list }}"
-              sequence:
-                - action: "{{ repeat.item }}"
-                  data:
-                    message: "clear_notification"
-                    data:
-                      tag: "{{ notification_tag_val }}"
+          - domain: mobile_app
+            type: notify
+            device_id: !input notify_device
+            message: "clear_notification"
+            data:
+              tag: "{{ notification_tag_val }}"
           - if:
               - condition: template
                 value_template: "{{ has_active_helper }}"
