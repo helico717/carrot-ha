@@ -1,0 +1,342 @@
+blueprint:
+  name: Carrot HA - EV 충전 라이브 액티비티 / Live Update
+  description: >
+    Carrot HA 차량 충전 센서를 이용해 iOS(Live Activities) 및 Android(Live Updates)
+    실시간 충전 진행 알림을 표시합니다. 충전 시작 시 생성하고, 배터리 1% 증가·남은 시간 복구·
+    5분 주기마다 조용히 갱신하며, 충전 종료 또는 기기 오프라인 시 알림을 자동으로 정리합니다.
+  domain: automation
+  author: Carrot HA
+  source_url: https://github.com/helico717/carrot-ha/blob/main/custom_components/carrot_ha/blueprints/automation/carrot_ha/ev_charging_live_activity.yaml
+  homeassistant:
+    min_version: "2024.10.0"
+  input:
+    vehicle_entities:
+      name: 차량 센서 (필수)
+      icon: mdi:car-electric
+      input:
+        charging_binary_sensor:
+          name: 충전 중 바이너리 센서
+          description: "예: binary_sensor.id_4_estimated_charging"
+          selector:
+            entity:
+              domain: binary_sensor
+        battery_sensor:
+          name: 배터리 잔량 센서
+          description: "예: sensor.id_4_battery"
+          selector:
+            entity:
+              domain: sensor
+              device_class: battery
+        charge_power_sensor:
+          name: 충전 전력 센서
+          description: "예: sensor.caryang_id_4_actual_charge_power_w"
+          selector:
+            entity:
+              domain: sensor
+        charge_mode_sensor:
+          name: 충전 모드 센서
+          description: "예: sensor.caryang_id_4_charge_mode"
+          selector:
+            entity:
+              domain: sensor
+        eta_80_sensor:
+          name: 80% 충전 남은시간 센서 (초)
+          description: "예: sensor.id_4_estimated_time_to_80_s"
+          selector:
+            entity:
+              domain: sensor
+        eta_100_sensor:
+          name: 100% 충전 남은시간 센서 (초)
+          description: "예: sensor.id_4_estimated_time_to_100_s"
+          selector:
+            entity:
+              domain: sensor
+        online_binary_sensor:
+          name: 콤마 연결 상태 바이너리 센서
+          description: "예: binary_sensor.id_4_comma_online"
+          selector:
+            entity:
+              domain: binary_sensor
+        active_helper:
+          name: 활성 상태 추적 헬퍼 (선택)
+          description: >
+            진행 중인 라이브 액티비티 상태를 저장할 input_boolean 헬퍼입니다.
+            비워 두면 헬퍼 없이 동작합니다.
+          default: ""
+          selector:
+            entity:
+              domain: input_boolean
+
+    notification_targets:
+      name: 알림 대상 및 플랫폼
+      icon: mdi:cellphone-message
+      input:
+        notify_services:
+          name: 모바일 앱 알림 서비스
+          description: >
+            알림을 받을 모바일 앱 서비스 이름을 입력하세요. 여러 기기(iOS/Android)를 추가할 수 있습니다.
+            (예: notify.mobile_app_my_iphone, notify.mobile_app_my_galaxy)
+          selector:
+            text:
+              multiple: true
+        platform_mode:
+          name: 대상 플랫폼 모드
+          description: >
+            iOS는 silent, Android는 alert_once/channel 옵션을 사용합니다.
+            두 기기를 함께 쓰거나 잘 모를 경우 'iOS + Android 공용'을 선택하세요.
+          default: both
+          selector:
+            select:
+              options:
+                - label: iOS + Android 공용 (권장)
+                  value: both
+                - label: iOS 전용 (Live Activities)
+                  value: ios
+                - label: Android 전용 (Live Updates)
+                  value: android
+
+    display_settings:
+      name: 표시 및 스타일 설정
+      icon: mdi:tune
+      collapsed: true
+      input:
+        notification_title:
+          name: 알림 제목
+          default: "EV 충전 중"
+          selector:
+            text: {}
+        notification_tag:
+          name: 알림 태그 (고유 ID)
+          description: 동일 차량의 알림을 덮어쓰고 종료 시 삭제하는 데 사용되는 고유 태그입니다.
+          default: "carrot_ev_charge"
+          selector:
+            text: {}
+        show_progress_bar:
+          name: 진행률 바(Progress Bar) 표시
+          description: >
+            켜면 진행률 바(progress/progress_max)를 함께 전송합니다.
+            Android에서 상태바 칩에 텍스트 대신 진행률을 우선 표시할 때 사용합니다.
+          default: true
+          selector:
+            boolean: {}
+        android_channel:
+          name: Android 알림 채널
+          description: Android 기기에서 사용할 알림 채널 이름입니다.
+          default: "EV Charging"
+          selector:
+            text: {}
+        notification_icon:
+          name: 알림 아이콘
+          default: "mdi:ev-station"
+          selector:
+            icon: {}
+        notification_icon_color:
+          name: 아이콘 색상
+          default: "#4CAF50"
+          selector:
+            text: {}
+        background_color:
+          name: 배경 색상
+          default: "#000000"
+          selector:
+            text: {}
+
+mode: queued
+max: 10
+
+variables:
+  battery_sensor_id: !input battery_sensor
+  charging_sensor_id: !input charging_binary_sensor
+  charge_power_sensor_id: !input charge_power_sensor
+  charge_mode_sensor_id: !input charge_mode_sensor
+  eta_80_sensor_id: !input eta_80_sensor
+  eta_100_sensor_id: !input eta_100_sensor
+  active_helper_id: !input active_helper
+  notify_services_input: !input notify_services
+  notify_services_list: >-
+    {% if notify_services_input is string %}
+      {{ [notify_services_input] if notify_services_input | trim | length > 0 else [] }}
+    {% else %}
+      {{ notify_services_input | select('string') | map('trim') | reject('eq', '') | list }}
+    {% endif %}
+  platform_mode_val: !input platform_mode
+  notification_title_val: !input notification_title
+  notification_tag_val: !input notification_tag
+  show_progress_bar_val: !input show_progress_bar
+  android_channel_val: !input android_channel
+  notification_icon_val: !input notification_icon
+  notification_icon_color_val: !input notification_icon_color
+  background_color_val: !input background_color
+  has_active_helper: "{{ active_helper_id is string and active_helper_id | trim | length > 0 }}"
+  soc_int: "{{ states(battery_sensor_id) | float(0) | round(0) | int }}"
+  notif_message: >-
+    {%- set soc = states(battery_sensor_id) | float(none) -%}
+    {%- set p = states(charge_power_sensor_id) | float(none) -%}
+    {%- set mode = states(charge_mode_sensor_id) -%}
+    {%- set target = 80 if soc is not none and soc < 80 else 100 -%}
+    {%- set eta_entity = eta_80_sensor_id if target == 80 else eta_100_sensor_id -%}
+    {%- set sec = states(eta_entity) | float(none) -%}
+    {%- set kind = '급속' if mode == 'DC 급속 충전' else '완속' if mode == 'AC 완속 충전' else '충전' -%}
+    {%- set power = ((p | round(0) | int) ~ ' kW') if p is not none and mode == 'DC 급속 충전' else ((p | round(1)) ~ ' kW') if p is not none else '전력 확인 중' -%}
+    {%- if sec is not none and sec >= 0 -%}
+    {%- set mins = (sec / 60) | round(0, 'ceil') | int -%}
+    {%- set remain = ((mins // 60) ~ '시간 ' ~ (mins % 60) ~ '분') if mins >= 60 else (mins ~ '분') -%}
+    {%- else -%}{%- set remain = '계산 중' -%}{%- endif -%}
+    {{ kind }} · {{ power }}
+    {{ target }}%까지 {{ remain }}
+  base_payload: >-
+    {%- set d = {
+      'tag': notification_tag_val,
+      'live_update': true,
+      'critical_text': soc_int ~ '%',
+      'notification_icon': notification_icon_val,
+      'notification_icon_color': notification_icon_color_val,
+      'background_color': background_color_val
+    } -%}
+    {%- if show_progress_bar_val -%}
+      {%- set d = dict(d, progress=soc_int | int, progress_max=100) -%}
+    {%- endif -%}
+    {%- if platform_mode_val in ['android', 'both'] and android_channel_val | trim | length > 0 -%}
+      {%- set d = dict(d, channel=android_channel_val | trim) -%}
+    {%- endif -%}
+    {{ d }}
+  update_payload: >-
+    {%- set d = base_payload -%}
+    {%- if platform_mode_val in ['ios', 'both'] -%}
+      {%- set d = dict(d, silent=true) -%}
+    {%- endif -%}
+    {%- if platform_mode_val in ['android', 'both'] -%}
+      {%- set d = dict(d, alert_once=true) -%}
+    {%- endif -%}
+    {{ d }}
+
+triggers:
+  - trigger: state
+    entity_id: !input charging_binary_sensor
+    to: "on"
+    id: start
+  - trigger: homeassistant
+    event: start
+    id: start_check
+  - trigger: state
+    entity_id: !input battery_sensor
+    to: null
+    id: update
+  - trigger: state
+    entity_id:
+      - !input eta_80_sensor
+      - !input eta_100_sensor
+    from:
+      - "unknown"
+      - "unavailable"
+    id: eta_recovered
+  - trigger: time_pattern
+    minutes: "/5"
+    id: refresh
+  - trigger: state
+    entity_id: !input charging_binary_sensor
+    to:
+      - "off"
+      - "unknown"
+      - "unavailable"
+    id: stop
+  - trigger: state
+    entity_id: !input online_binary_sensor
+    from: "on"
+    to:
+      - "off"
+      - "unknown"
+      - "unavailable"
+    id: stop
+
+conditions: []
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - start
+              - start_check
+          - condition: state
+            entity_id: !input charging_binary_sensor
+            state: "on"
+        sequence:
+          - repeat:
+              for_each: "{{ notify_services_list }}"
+              sequence:
+                - action: "{{ repeat.item }}"
+                  data:
+                    title: "{{ notification_title_val }}"
+                    message: "{{ notif_message }}"
+                    data: "{{ base_payload }}"
+          - if:
+              - condition: template
+                value_template: "{{ has_active_helper }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: "{{ active_helper_id }}"
+
+      - conditions:
+          - condition: trigger
+            id:
+              - update
+              - eta_recovered
+              - refresh
+          - condition: state
+            entity_id: !input charging_binary_sensor
+            state: "on"
+          - condition: template
+            value_template: "{{ (not has_active_helper) or is_state(active_helper_id, 'on') }}"
+          - condition: template
+            value_template: >-
+              {% if trigger.id == 'refresh' %}
+                true
+              {% elif trigger.id == 'eta_recovered' %}
+                {{ trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state in ['unknown', 'unavailable'] and is_number(trigger.to_state.state) and trigger.entity_id == (eta_80_sensor_id if states(battery_sensor_id) | float(0) < 80 else eta_100_sensor_id) }}
+              {% else %}
+                {{ trigger.from_state is not none and trigger.to_state is not none and is_number(trigger.from_state.state) and is_number(trigger.to_state.state) and trigger.to_state.state | float > trigger.from_state.state | float and trigger.to_state.state | float | int != trigger.from_state.state | float | int }}
+              {% endif %}
+        sequence:
+          - repeat:
+              for_each: "{{ notify_services_list }}"
+              sequence:
+                - action: "{{ repeat.item }}"
+                  data:
+                    title: "{{ notification_title_val }}"
+                    message: "{{ notif_message }}"
+                    data: "{{ update_payload }}"
+
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: stop
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: start_check
+                  - condition: not
+                    conditions:
+                      - condition: state
+                        entity_id: !input charging_binary_sensor
+                        state: "on"
+          - condition: template
+            value_template: "{{ (not has_active_helper) or is_state(active_helper_id, 'on') }}"
+        sequence:
+          - repeat:
+              for_each: "{{ notify_services_list }}"
+              sequence:
+                - action: "{{ repeat.item }}"
+                  data:
+                    message: "clear_notification"
+                    data:
+                      tag: "{{ notification_tag_val }}"
+          - if:
+              - condition: template
+                value_template: "{{ has_active_helper }}"
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: "{{ active_helper_id }}"

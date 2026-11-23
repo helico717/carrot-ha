@@ -25,6 +25,8 @@ async def async_setup(hass, config):
     models = Path(hass.config.path('carrot_ha', 'models'))
     if await hass.async_add_executor_job(models.is_dir):
         await hass.http.async_register_static_paths([StaticPathConfig('/carrot_ha_models', str(models), False)])
+    from .blueprint_sync import sync_blueprints
+    await hass.async_add_executor_job(sync_blueprints, Path(hass.config.path('blueprints')))
     version = await hass.async_add_executor_job(_read_frontend_version)
     hass.http.register_view(FrontendVersionView(hass, version))
     hass.http.register_view(ReceiveView(hass))
