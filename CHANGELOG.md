@@ -3,7 +3,7 @@
 - 원인: `custom_components/carrot_ha/__init__.py`에서 `async_track_time_interval`(일일 `run_daily_purge`, 주간 `run_weekly_vacuum`)과 `async_track_time_change`(자정 `refresh_after_midnight`)에 `async def` 코루틴 함수 대신 동기 `lambda _: hass.async_create_task(...)`를 전달했다. HA가 동기 콜백을 워커 스레드에서 실행하면서 `RuntimeError` (`calls hass.async_create_task from a thread other than the event loop`)와 `RuntimeWarning: coroutine 'run_daily_purge' was never awaited`가 발생해 부팅 직후 1회 이후 주기적 DB 정리와 주간 `VACUUM`이 멈춰 있었다.
 - 수정: `custom_components/carrot_ha/__init__.py`에서 세 타이머에 코루틴 함수(`run_daily_purge`, `run_weekly_vacuum`, `refresh_after_midnight`)를 직접 전달하도록 변경하고, `tests/test_timer_callbacks.py` 회귀 테스트를 추가했다.
 - 검증: `py_compile` 및 `tests/test_timer_callbacks.py`, `tests/test_storage_purge.py`, `tests/test_archive_compression.py` 로컬 단위 테스트 통과.
-- 배포: `main` 커밋·푸시 후 HA 서버 기존 `/config/custom_components/carrot_ha/__init__.py`(`7923235b` 기준)를 `/config/carrot_ha/deployment-backups/`에 백업하고, HA에 미설치된 `blueprint_sync.py` 의존성을 건드리지 않도록 동일 타이머 3줄 수정만 반영·구문/SHA-256 검증 예정. 사용자 HA Core 재시작 후 실제 주기 실행 확인 대기. 태그·릴리즈 발행 없음.
+- 배포: `e4e5139` `main` 푸시 후 HA 서버 기존 `/config/custom_components/carrot_ha/__init__.py`(`7923235b`, SHA-256 `99bf383e...`)를 `/config/carrot_ha/deployment-backups/e4e5139-timer-fix/__init__.py`에 백업하고, 미설치된 `blueprint_sync.py` 의존성을 건드리지 않도록 동일 타이머 3줄 수정만 반영(설치 SHA-256 `1e6271d7...`, `py_compile` 및 AST 검증 통과). 아울러 사용자 요청으로 구 백업·미사용 DB 8건(`before-compression.sqlite3` 396.18 MB, `direct-receiver-20261014/archive-before.sqlite3` 324.69 MB 등 총 722.84 MB)을 정리해 디스크 여유 공간을 22.99 GB → 23.75 GB로 확보했고, 활성 DB 3건 모두 `PRAGMA quick_check=ok`를 확인했다. 사용자 HA Core 재시작 후 실제 주기 실행 확인 대기. 태그·릴리즈 발행 없음.
 
 ## 2026-11-23 — EV 충전 라이브 액티비티 자동화 정리 및 iOS·Android 공용 블루프린트 추가
 
