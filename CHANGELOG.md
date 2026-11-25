@@ -1,7 +1,7 @@
 ## 2026-11-25 — 추세 탭 차트 방식 토글(꺾은선 | 막대), 시간순 막대·균일 두께 꺾은선 적용 (로컬 완료 · HA 반영 대기)
 
 - 변경: `carrot-journal-design.js`, `carrot-vehicle-journal.js`에서 추세 탭 지도 아래 `변동 있는 추세` 헤더 우측에 `월별 | 연도별`과 동일한 `.period-segmented` 스타일의 `[꺾은선 | 막대]` 토글을 추가하고 클라이언트별 `localStorage`(`carrot_journal_trend_chart_mode`, 미설정 시 기본값 `꺾은선`)로 저장하도록 구현했다. 꺾은선 모드는 `vector-effect="non-scaling-stroke"`로 `2.2px` 균일 선 두께를 유지하며, 막대 모드는 값 크기순 대신 시간순(`1일→31일`/`1월→12월`)으로 정렬한다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.
-- 상태: 로컬 프리뷰(데스크톱·390px 모바일, 새로고침 영속성 포함)·구문·diff 검사 완료 및 `main` 푸시. HA 서버 직접 반영·재시작·릴리즈는 보류.
+- 상태: 로컬 프리뷰(데스크톱·390px 모바일, 새로고침 영속성 포함)·구문·diff 검사 완료 및 `main` 푸시(`df15dc4`). HA 서버(`192.168.0.140`) 기존 3개 파일(`efficiency.py`, `carrot-journal-design.js`, `carrot-vehicle-journal.js`) 부모 해시 일치 확인 및 `/config/carrot_ha/deployment-backups/df15dc4-trends-ui` 백업 후 직접 반영·SHA-256/`py_compile` 검증 완료. 사용자 HA Core 재시작 및 브라우저 새로고침 대기. 태그·릴리즈 발행 없음.
 
 ## 2026-11-25 — 추세 카드 1줄 우상단 KPI·직선 추세 화살표·단가/주행거리 명칭 개선 (로컬 완료 · HA 반영 대기)
 

@@ -7,7 +7,7 @@
   - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `getTrendChartMode()`/`setTrendChartMode()`/`updateTrendChartToggle()`(`localStorage` 키 `carrot_journal_trend_chart_mode`, 기본 `'line'`), 균일 `2.2px` `vector-effect="non-scaling-stroke"` 기반 `generateTrendLineChartHtml()`, 시간순 막대 정렬(`1일→31일`/`1월→12월`, `최고 <값>`) 구현 및 `.trend-chart-axis-labels` 중복/안내 문구 제거.
   - `vehicle-journal/tests/browser-check.cjs`: 막대/꺾은선 모드 전환 후 `.trend-hit` 검사 수행하도록 갱신.
 - 검증: `.preview/trends-fuel-cost/` 브라우저에서 기본 `꺾은선` 활성화·`2.2px` 균일 선 두께·`막대` 전환·새로고침 후 클라이언트 설정 유지·`390px` 모바일 레이아웃·콘솔 오류 0건 확인. `node --check` 2개 JS 파일 및 `git diff --check` 통과. (`browser-check.cjs` Playwright 실행은 로컬 미수행.)
-- 배포 상태: 사용자 요청에 따라 HA 서버 직접 반영·재시작은 보류 중.
+- 배포 상태: `df15dc4` `main` 푸시 후 HA 서버(`192.168.0.140`) 기존 3개 파일의 부모 커밋(`2443c60`) 해시 일치 확인 및 `/config/carrot_ha/deployment-backups/df15dc4-trends-ui` 백업(원본 3파일·`manifest.json`·`rollback.sh`·`deployment.json`) 후 직접 반영 완료. 설치 SHA-256(`efficiency.py` `bdf8933d...`, `carrot-journal-design.js` `7a946b14...`, `carrot-vehicle-journal.js` `215be771...`)이 `df15dc4`와 일치하며 `py_compile` 통과. 사용자 HA Core 재시작(Python 적용 및 최상위 패널 해시 URL 갱신) 후 실제 화면·동작 확인 대기. 태그·릴리즈 발행 없음.
 
 ## 2026-11-25 — vehicle-journal: 추세 카드 1줄 우상단 KPI · 직선 추세 화살표 · 단가/주행거리 명칭 개선
 
@@ -18,7 +18,7 @@
   - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `trendArrowGraphic()` 직선 대각선/수평 SVG 화살표(배경·테두리 없음) 및 `formatTrendKpi()`(소수점 1자리 또는 천 단위 쉼표 정수) 구현, `renderTrendCard()`에서 `›`와 요약 문장 제거(데이터 수집 중 사유만 유지), `원/kWh`·`원/L`·`계기판 총 주행거리`·조건부 `수동 구간 주행거리` 반영.
   - `vehicle-journal/tests/browser-check.cjs`: 새 KPI 헤더·화살표·제거된 `›` 검증으로 갱신.
 - 검증: `.preview/trends-fuel-cost/` 브라우저에서 내연기관(2026-10 데스크톱/390px 모바일, `계기판 총 주행거리` `2,961 km`, `주유 단가` `1,813 원/L`, `수동 구간 주행거리` 숨김)과 전기차 `ID.4`(2026-11, `충전 단가` `314 원/kWh`, `km당 평균 주행요금` `61 원/km`) 렌더링, 콘솔 오류 0건, 오버플로우 없음 확인. `node --check`, `py_compile`, `test_station_backup.py`(11건 통과), `git diff --check` 통과. (`browser-check.cjs` Playwright 실행은 로컬 미수행.)
-- 배포 상태: 사용자 요청에 따라 HA 서버 직접 반영·재시작은 보류 중.
+- 배포 상태: `df15dc4` `main` 푸시 후 HA 서버(`192.168.0.140`) 기존 3개 파일의 부모 커밋(`2443c60`) 해시 일치 확인 및 `/config/carrot_ha/deployment-backups/df15dc4-trends-ui` 백업(원본 3파일·`manifest.json`·`rollback.sh`·`deployment.json`) 후 직접 반영 완료. 설치 SHA-256(`efficiency.py` `bdf8933d...`, `carrot-journal-design.js` `7a946b14...`, `carrot-vehicle-journal.js` `215be771...`)이 `df15dc4`와 일치하며 `py_compile` 통과. 사용자 HA Core 재시작(Python 적용 및 최상위 패널 해시 URL 갱신) 후 실제 화면·동작 확인 대기. 태그·릴리즈 발행 없음.
 
 ## 2026-11-25 — vehicle-journal: 내연기관 평균연비 · 공통 km당 주행요금 추세 카드 및 분할 주유 연비 보완
 
