@@ -1500,7 +1500,7 @@ export const journalDesign = `:host {
 /* 추세 카드 스타일링 */
 .trend-card { background: #141c23; border: 1px solid var(--j-border); border-radius: 20px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); transition: transform 0.2s ease, border-color 0.2s ease; box-sizing: border-box; }
 .trend-card:hover { border-color: rgba(255, 255, 255, 0.22); transform: translateY(-2px); }
-.trend-card-top { display: flex; justify-content: space-between; align-items: center; }
+.trend-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
 .trend-title-group { display: flex; align-items: center; gap: 8px; }
 .trend-badge-icon { font-size: 17.5px; line-height: 1; display:inline-flex; }
 .j-ico{width:1.1em;height:1.1em;vertical-align:-0.2em;flex-shrink:0}.btn-loc-add .j-ico,.btn-loc-pin-link .j-ico{margin-right:2px}.loc-name-state .j-ico{margin-right:2px}.photo-pick-tile .j-ico{width:26px;height:26px}.receipt-notice-banner .j-ico{width:1.2em;height:1.2em}
@@ -1509,6 +1509,21 @@ export const journalDesign = `:host {
 .trend-card-summary { overflow-wrap: anywhere; font-size: 15.5px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
 .trend-card-summary strong { color: var(--trend-color); font-weight: 850; }
 .trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 6px 0; }
+.trend-kpi-inline { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 7px; margin-left: auto; flex-wrap: nowrap; white-space: nowrap; }
+.trend-period-tag { font-size: 12.5px; font-weight: 600; color: #9fb4c3; letter-spacing: -0.2px; }
+.trend-kpi-value { display: inline-flex; align-items: center; gap: 5px; }
+.trend-arrow-badge { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex-shrink: 0; }
+.trend-arrow-badge.up { color: #81e6c5; }
+.trend-arrow-badge.down { color: #ff7b7b; }
+.trend-arrow-badge.consistent { color: #a8bdca; }
+.trend-kpi-num { font-size: 23px; font-weight: 850; color: #ffffff; letter-spacing: -0.6px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.trend-kpi-unit { font-size: 12.5px; font-weight: 650; color: #a8bdca; margin-left: 2px; }
+@media (max-width: 600px) {
+  .trend-period-tag { font-size: 12px; }
+  .trend-arrow-badge { width: 15px; height: 15px; }
+  .trend-kpi-num { font-size: 20px; }
+  .trend-kpi-unit { font-size: 11.5px; }
+}
 .trend-headline { font-size: 16.5px; font-weight: 750; color: #ffffff; letter-spacing: -0.4px; margin: 0; line-height: 1.35; }
 .trend-direction { color: var(--trend-color); font-weight: 850; }
 .trend-chart-box { width: 100%; display: flex; flex-direction: column; position: relative; margin-top: 4px; padding-top: 24px; }

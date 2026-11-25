@@ -59,7 +59,8 @@ const emptyLocation=()=>({name:'',address:'',latitude:null,longitude:null});
 const hasPlace=place=>!!(place&&(place.name||place.address||place.latitude!=null));
 const recordLocation=place=>{const result={};for(const key of ['name','address','latitude','longitude','provider','station_id','station_type','selection_source'])if(place[key]!=null&&place[key]!=='')result[key]=place[key];if(result.selection_source&&!['automatic','automatic_address','manual','favorite'].includes(result.selection_source))result.selection_source='manual';return result;};
 
-const trendValue=(value,unit)=>(unit==='원'||unit==='원/km')?numeric(value,0):String(value);
+const isWonUnit=unit=>unit==='원'||unit==='원/km'||unit==='원/kWh'||unit==='원/L';
+const trendValue=(value,unit)=>isWonUnit(unit)?numeric(value,0):String(value);
 const categories={refueling:'주유비',charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',accident:'사고',other:'기타'};
 const recordTypeIcons={
   charging:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
@@ -1113,7 +1114,7 @@ export class VehicleJournal extends HTMLElement {
         const diffPct=pastVal>0?(diff/pastVal)*100:(currVal>0?100:0);
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
-          const changeValue=(unit==='원'||unit==='원/km')?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
+          const changeValue=isWonUnit(unit)?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
           // A difference between two percentages is percentage points, not a ratio.
           changeText=`${changeValue.toLocaleString('ko-KR')}${unit==='%'?'%p':unit} ${diff>0?'증가':'감소'}`;
           const pastText=`${trendValue(pastVal,unit)}${unit==='%'?'':' '}${unit}`;
@@ -1159,7 +1160,7 @@ export class VehicleJournal extends HTMLElement {
       createMetric('efficiency','평균 전비',jIcon('bolt'),'#81e6c5','km/kWh',currEff,pastEff,effBars),
       createMetric('distance','일일 주행거리',jIcon('car'),'#ff9f0a','km',currDist,prevDist,distBars),
       createMetric('charge_kwh','일일 충전량',jIcon('plug'),'#30b0c7','kWh',currCharge,prevCharge,chargeBars),
-      createMetric('charge_rate','충전 단가',jIcon('card'),'#ffd60a','원',currRate,prevRate,rateBars),
+      createMetric('charge_rate','충전 단가',jIcon('card'),'#ffd60a','원/kWh',currRate,prevRate,rateBars),
       createMetric('drive_soc','일일 배터리 소모',jIcon('battery'),'#af52de','%',currDriveSoc,prevDriveSoc,driveSocBars),
       createMetric('fast_ratio','급속 충전 비중',jIcon('bolt'),'#ff453a','%',currFastRatio,prevFastRatio,fastRatioBars)
     ];
@@ -1228,15 +1229,16 @@ export class VehicleJournal extends HTMLElement {
       if(iceCostPerKm==null&&ef.warnings?.length){
         costKmMetric.subDesc=`연비 구간 부족으로 계산할 수 없어요. (${ef.warnings[0].reason})`;
       }
-      const distanceMetric=createMetric('observed_distance','계기판 주행거리',jIcon('car'),'#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true});
+      const distanceMetric=createMetric('observed_distance','계기판 총 주행거리',jIcon('car'),'#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true});
       distanceMetric.subDesc=`관측 구간 ${o.from||'기준 없음'} ~ ${o.to||'기록 없음'} · ${o.warning||'월 경계 밖 주행이 포함될 수 있어요.'}`;distanceMetric.changeText='';
+      const hasManualDistance=(totals.distance_km!=null&&totals.distance_km>0)||(prevTotals.distance_km!=null&&prevTotals.distance_km>0);
       metrics.push(
         effMetric,
         costKmMetric,
         distanceMetric,
-        createMetric('manual_distance','구간 기록 주행거리',jIcon('road'),'#7bb6ff','km',totals.distance_km??null,prevTotals.distance_km??null,bins.map(b=>b.day_count?b.distance_km:null),{total:true}),
+        ...(hasManualDistance?[createMetric('manual_distance','수동 구간 주행거리',jIcon('road'),'#7bb6ff','km',totals.distance_km??null,prevTotals.distance_km??null,bins.map(b=>b.day_count?b.distance_km:null),{total:true})]:[]),
         createMetric('fuel_liters','총 주유량',jIcon('fuel'),'#81e6c5','L',f.totals?.fuel_liters??null,pf.totals?.fuel_liters??null,fuelBins(rows=>rows.some(r=>r.fuel_liters!=null)?sum(rows,'fuel_liters'):null),{total:true}),
-        createMetric('fuel_price','주유 단가',jIcon('card'),'#ffd60a','원',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelPriceBars),
+        createMetric('fuel_price','주유 단가',jIcon('card'),'#ffd60a','원/L',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelPriceBars),
         createMetric('fuel_count','총 주유 횟수',jIcon('fuel'),'#81e6c5','회',f.totals?.fuel_count??null,pf.totals?.fuel_count??null,fuelBins(rows=>sum(rows,'fuel_count')),{total:true}),
         createMetric('total_cost','총 차량 지출',jIcon('wallet'),'#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+spending(r),0)),{total:true})
       );
@@ -1288,7 +1290,7 @@ export class VehicleJournal extends HTMLElement {
   // Totals are period sums, so bins are compared with the previous period's per-bin average.
   trendBaseline(m){return m.pastAvg==null?null:m.isTotal?m.pastAvg/Math.max(1,(m.bars||[]).length):m.pastAvg;}
   trendBaselineName(m){return m.isTotal?(this.scope==='year'?'지난해 월 평균':'지난달 2일 평균'):m.pastPeriodLabel;}
-  trendFormat(value,unit){return value==null?'미관측':(unit==='원'||unit==='원/km')?numeric(value,0):numeric(value,1);}
+  trendFormat(value,unit){return value==null?'미관측':isWonUnit(unit)?numeric(value,0):numeric(value,1);}
   trendPeriodShort(i){return this.scope==='year'?`${i+1}월`:`${i*2+1}일`;}
   // Matches the bins built in renderTrendsDashboard: two-day bins (the last may be one day) or calendar months.
   trendPeriod(i){
@@ -1399,11 +1401,28 @@ export class VehicleJournal extends HTMLElement {
       badge.textContent=`${count}개 ${word}`;
     }
   }
+  trendArrowGraphic(status){
+    if(status==='up'){
+      return `<span class="trend-arrow-badge up" aria-label="증가 추세" title="증가 추세"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19L19 5"/><path d="M10 5h9v9"/></svg></span>`;
+    }
+    if(status==='down'){
+      return `<span class="trend-arrow-badge down" aria-label="감소 추세" title="감소 추세"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5l14 14"/><path d="M19 10v9h-9"/></svg></span>`;
+    }
+    return `<span class="trend-arrow-badge consistent" aria-label="일관된 추세" title="일관된 추세"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></span>`;
+  }
+  formatTrendKpi(value,unit){
+    if(value==null||!Number.isFinite(value))return '';
+    if(isWonUnit(unit)||unit==='회')return Math.round(value).toLocaleString('ko-KR');
+    return Number(value.toFixed(1)).toLocaleString('ko-KR',{maximumFractionDigits:1});
+  }
   renderTrendCard(m){
     const chartHtml=this.generateTrendCardChartHtml(m);
-    const changeIndex=m.changeText?m.subDesc.indexOf(m.changeText):-1;
-    const summaryHtml=changeIndex<0?esc(m.subDesc):`${esc(m.subDesc.slice(0,changeIndex))}<strong class="trend-change">${esc(m.changeText)}</strong>${esc(m.subDesc.slice(changeIndex+m.changeText.length))}`;
-    const headlineHtml=esc(m.headline).replace(/증가|감소|일관/g,word=>`<strong class="trend-direction">${word}</strong>`);
+    const periodLabel=m.currPeriodLabel?m.currPeriodLabel.replace(/\s*(평균|합계)$/,'')+' 동안':'';
+    const hasVal=m.avg!=null&&Number.isFinite(m.avg);
+    const rightHtml=hasVal
+      ?`<div class="trend-kpi-inline"><span class="trend-period-tag">${esc(periodLabel)}</span><div class="trend-kpi-value">${m.pastAvg!=null?this.trendArrowGraphic(m.trendStatus):''}<span class="trend-kpi-num">${esc(this.formatTrendKpi(m.avg,m.unit))}<span class="trend-kpi-unit">${esc(m.unit)}</span></span></div></div>`
+      :`<div class="trend-kpi-inline"><span class="trend-period-tag">${esc(m.headline||'데이터 수집 중')}</span></div>`;
+    const emptyNote=!hasVal&&m.subDesc?`<p class="trend-card-summary">${esc(m.subDesc)}</p>`:'';
     return `
       <article class="trend-card" data-trend="${esc(m.id)}" style="--trend-color:${m.color};">
         <div class="trend-card-top">
@@ -1411,10 +1430,9 @@ export class VehicleJournal extends HTMLElement {
             <span class="trend-badge-icon">${m.icon}</span>
             <span class="trend-metric-name" style="color:${m.color};">${esc(m.name)}</span>
           </div>
-          <span class="trend-arrow">›</span>
+          ${rightHtml}
         </div>
-        <h4 class="trend-headline">${headlineHtml}</h4>
-        <p class="trend-card-summary">${summaryHtml}</p>
+        ${emptyNote}
         <div class="trend-divider"></div>
         ${chartHtml}
       </article>

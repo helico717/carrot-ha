@@ -1,3 +1,14 @@
+## 2026-11-25 — vehicle-journal: 추세 카드 1줄 우상단 KPI · 직선 추세 화살표 · 단가/주행거리 명칭 개선
+
+- 제목: `vehicle-journal: compact trend card KPI header with diagonal arrows and explicit units`.
+- 요청: 추세 카드의 장식 화살표(`›`)와 긴 설명 문구를 제거해 시인성과 카드 밀도를 개선하고, 카드 제목 옆 우상단에 `<기간> 동안 [직선 대각선 SVG 화살표] <수치>`를 한 줄로 배치하며, `충전 단가`(`원/kWh`)·`주유 단가`(`원/L`)·`계기판 총 주행거리`·`수동 구간 주행거리`(기록 있을 때만 표시)로 명칭과 단위를 명확히 함.
+- 변경:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: `.trend-card-top` wrap 정렬 및 `.trend-kpi-inline`, `.trend-period-tag`, `.trend-arrow-badge`, `.trend-kpi-num`, `.trend-kpi-unit` 스타일 추가(데스크톱/모바일 반응형 포함).
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `trendArrowGraphic()` 직선 대각선/수평 SVG 화살표(배경·테두리 없음) 및 `formatTrendKpi()`(소수점 1자리 또는 천 단위 쉼표 정수) 구현, `renderTrendCard()`에서 `›`와 요약 문장 제거(데이터 수집 중 사유만 유지), `원/kWh`·`원/L`·`계기판 총 주행거리`·조건부 `수동 구간 주행거리` 반영.
+  - `vehicle-journal/tests/browser-check.cjs`: 새 KPI 헤더·화살표·제거된 `›` 검증으로 갱신.
+- 검증: `.preview/trends-fuel-cost/` 브라우저에서 내연기관(2026-10 데스크톱/390px 모바일, `계기판 총 주행거리` `2,961 km`, `주유 단가` `1,813 원/L`, `수동 구간 주행거리` 숨김)과 전기차 `ID.4`(2026-11, `충전 단가` `314 원/kWh`, `km당 평균 주행요금` `61 원/km`) 렌더링, 콘솔 오류 0건, 오버플로우 없음 확인. `node --check`, `py_compile`, `test_station_backup.py`(11건 통과), `git diff --check` 통과. (`browser-check.cjs` Playwright 실행은 로컬 미수행.)
+- 배포 상태: 사용자 요청에 따라 HA 서버 직접 반영·재시작은 보류 중.
+
 ## 2026-11-25 — vehicle-journal: 내연기관 평균연비 · 공통 km당 주행요금 추세 카드 및 분할 주유 연비 보완
 
 - 제목: `vehicle-journal: add ICE fuel efficiency and per-km energy cost trends with split-fill handling`.

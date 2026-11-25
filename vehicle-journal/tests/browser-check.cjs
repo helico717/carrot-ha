@@ -71,28 +71,20 @@ const path=require('path');
     for(const [section,word] of [['changingTrendsSection','감지'],['stableTrendsSection','유지']]){const count=card.$(section.replace('Section','Grid')).querySelectorAll('.trend-card').length,badge=card.$(section).querySelector('.trends-section-count');if(count&&badge?.textContent!==`${count}개 ${word}`)throw Error('trend count badge mismatch: '+section);}
     if(/NaN|undefined/.test(card.$('changingTrendsGrid').innerHTML+card.$('stableTrendsGrid').innerHTML))throw Error('invalid trend value: '+scope);
     if(previous&&!card.$('changingTrendsGrid').querySelector('.trend-card'))throw Error('period comparison not rendered: '+scope);
-    for(const change of card.shadowRoot.querySelectorAll('.trend-change')){
-     if(!/^[0-9.,]+(km|kWh|km\/kWh|원|%p|회) (증가|감소)$/.test(change.textContent))throw Error('invalid change emphasis');
-     if(getComputedStyle(change).color!==getComputedStyle(change.closest('.trend-card').querySelector('.trend-metric-name')).color)throw Error('change color does not match metric');
-    }
-    if(previous&&!card.shadowRoot.querySelector('.trend-change'))throw Error('missing change emphasis');
     for(const item of card.shadowRoot.querySelectorAll('.trend-card')){
-     const name=item.querySelector('.trend-metric-name'),headline=item.querySelector('.trend-headline');
-     if(parseFloat(getComputedStyle(name).fontSize)<=parseFloat(getComputedStyle(headline).fontSize))throw Error('metric title must be larger than headline');
-     for(const direction of headline.querySelectorAll('.trend-direction')){
-      if(!/^(증가|감소|일관)$/.test(direction.textContent)||getComputedStyle(direction).color!==getComputedStyle(name).color)throw Error('headline direction emphasis incorrect');
-     }
-     if(previous&&!headline.querySelector('.trend-direction'))throw Error('missing headline direction emphasis');
+     const name=item.querySelector('.trend-metric-name'),kpiNum=item.querySelector('.trend-kpi-num'),periodTag=item.querySelector('.trend-period-tag'),arrow=item.querySelector('.trend-arrow-badge');
+     if(item.querySelector('.trend-arrow'))throw Error('decorative chevron arrow must be removed');
+     if(kpiNum&&arrow&&parseFloat(getComputedStyle(kpiNum).fontSize)<=parseFloat(getComputedStyle(arrow).height))throw Error('KPI value must be larger than trend arrow');
+     if(kpiNum&&item.querySelector('.trend-card-summary'))throw Error('verbose summary must not appear when KPI value exists');
+     if(previous&&kpiNum&&!arrow)throw Error('missing trend arrow graphic');
+     if(periodTag&&kpiNum&&!periodTag.textContent.trim().endsWith('동안'))throw Error('missing period label');
      if(item.textContent.includes('안정적인 패턴'))throw Error('legacy stable wording remains');
-     const summary=item.querySelector('.trend-card-summary').textContent;
      const metricId=item.dataset.trend;
-     if(metricId==='charge_rate'||metricId==='cost100'||metricId==='total_cost'||metricId.startsWith('cost_')){
-      for(const text of [summary,...[...item.querySelectorAll('.trend-chart-avg-label,svg title')].map(el=>el.textContent)]){
+     if(metricId==='charge_rate'||metricId==='cost_per_km'||metricId==='total_cost'||metricId.startsWith('cost_')){
+      for(const text of [kpiNum?.textContent||'',...[...item.querySelectorAll('.trend-chart-avg-label,svg title')].map(el=>el.textContent)]){
        if(/\d{4,}\s*원/.test(text))throw Error('currency grouping missing: '+text);
       }
      }
-     if(/기록이 있는 날|기간 충전 단가|실제·추정 비용|누적 지출|주행거리당 SOC|기록 범위/.test(summary))throw Error('unrequested explanatory text remains');
-     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|km\/L|원\/km|원|%p|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
     }
    }
   }
@@ -256,7 +248,7 @@ const path=require('path');
   await page.setViewportSize({width,height:1100});
   await root.locator('#tab1').click();
   if(width<=600){
-   const hierarchy=await page.evaluate(()=>[...document.querySelector('carrot-vehicle-journal').shadowRoot.querySelectorAll('.trend-card')].every(item=>parseFloat(getComputedStyle(item.querySelector('.trend-metric-name')).fontSize)>parseFloat(getComputedStyle(item.querySelector('.trend-headline')).fontSize)));
+   const hierarchy=await page.evaluate(()=>[...document.querySelector('carrot-vehicle-journal').shadowRoot.querySelectorAll('.trend-card')].every(item=>{const num=item.querySelector('.trend-kpi-num'),tag=item.querySelector('.trend-period-tag');return !num||!tag||parseFloat(getComputedStyle(num).fontSize)>parseFloat(getComputedStyle(tag).fontSize);}));
    if(!hierarchy)throw Error('mobile title hierarchy incorrect at '+width);
    const columns=await page.evaluate(()=>getComputedStyle(document.querySelector('carrot-vehicle-journal').shadowRoot.querySelector('.trends-grid')).gridTemplateColumns.split(' ').length);
    if(columns!==1)throw Error('mobile trends must have one column at '+width);
