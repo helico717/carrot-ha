@@ -2199,8 +2199,11 @@ export const journalDesign = `:host {
 @media (min-width:761px){
   /* 창 크기에 비례: 폭 76vw(최대 1330px), 높이 82dvh(최대 840px). 작은 창은 여백 24px만 남긴다. */
   dialog#recordDialog{width:min(max(76vw,1060px),1330px,calc(100vw - 48px));height:min(max(82dvh,680px),840px,calc(100dvh - 48px))}
+  dialog#recordDialog:is([data-mode=trip],[data-mode=accident]){width:min(540px,calc(100vw - 48px));height:auto;max-height:min(86dvh,calc(100dvh - 48px))}
   #recordDialog .modal-scroll-body{display:flex;flex-direction:column;overflow:hidden;padding:16px 20px}
+  #recordDialog:is([data-mode=trip],[data-mode=accident]) .modal-scroll-body{overflow-y:auto}
   #recordDialog .entry-split{flex:1;min-height:0;display:grid;grid-template-columns:clamp(360px,36%,470px) minmax(0,1fr);gap:clamp(20px,1.6vw,32px)}
+  #recordDialog:is([data-mode=trip],[data-mode=accident]) .entry-split{display:block}
   #recordDialog .entry-split>.fields{margin:0;overflow-y:auto;align-content:start;padding:2px 6px 2px 2px}
   #recordDialog .entry-split>#recordLocationField{grid-column:2!important;grid-row:1;margin:0;min-height:0;display:flex;flex-direction:column;gap:10px}
   #recordDialog #addLocation{display:none!important}

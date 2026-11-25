@@ -1,3 +1,13 @@
+## 2026-11-25 — vehicle-journal: 주행 기록·사고 기록 모달 지도 제거 및 컴팩트 1열 폭 적용
+
+- 제목: `vehicle-journal: hide location map and use compact dialog width for trip and accident records`.
+- 요청: 지도를 쓰지 않는 `주행 기록` 모달이 데스크톱 2열 폭으로 넓게 열려 우측이 비는 문제와, `사고 기록` 모달에 불필요한 위치 기록(지도) 영역이 노출되는 문제를 수정.
+- 변경:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: `@media (min-width:761px)`에서 `dialog#recordDialog:is([data-mode=trip],[data-mode=accident])` 폭을 `min(540px, calc(100vw - 48px))`, 높이 `auto`, `.entry-split`을 `display: block`으로 조정.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `formFields()`, `openRecord()`, `saveRecord()`에서 `accident`의 `recordLocationField` 노출·`renderLocation()` 호출·`payload.location` 전송을 제외.
+- 검증: `.preview/trends-fuel-cost/` 브라우저 데스크톱(`1280×800`)·모바일(`390×844`)에서 `주행 기록`(`540×688`, 위치 숨김), `사고 기록`(`540×688`, 위치 숨김), `주유 기록`(`1060×680`, 2열 지도 유지), 콘솔 오류 0건, 오버플로우 없음 확인. `node --check` 2개 JS 파일 및 `git diff --check` 통과.
+- 배포 상태: `main` 푸시 후 HA 서버(`192.168.0.140`) 기존 2개 JS 파일(`df15dc4`) 해시 확인 및 `/config/carrot_ha/deployment-backups/` 백업 후 직접 반영·SHA-256 일치 검증 예정. 사용자 HA Core 재시작 대기.
+
 ## 2026-11-25 — vehicle-journal: 추세 탭 [꺾은선 | 막대] 토글 및 시간순 막대·균일 두께 꺾은선 구현
 
 - 제목: `vehicle-journal: add persisted line/bar chart toggle and chronological trend charts`.

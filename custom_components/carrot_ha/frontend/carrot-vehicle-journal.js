@@ -1855,7 +1855,8 @@ export class VehicleJournal extends HTMLElement {
   formFields(){const mode=this.recordMode||'maintenance',kind=this.$('kind').value||'expense',form=this.$('recordForm'),dedicated=mode!=='maintenance';
     const visible=new Set(['dateField','memoField','recordPhotoField',...(this.editing?.import_source?['importSourceDetails']:[])]);
     if(!dedicated){for(const id of ['categoryField','subcategoryField','amountField','odometerField','recordLocationField'])visible.add(id);}
-    if(['washing','accident','refueling','charging'].includes(mode)){visible.add('amountField');visible.add('recordLocationField');}
+    if(['washing','refueling','charging'].includes(mode)){visible.add('amountField');visible.add('recordLocationField');}
+    if(mode==='accident'){visible.add('amountField');}
     if(mode==='washing')visible.add('odometerField');
     if(mode==='refueling')for(const id of ['odometerField','fuelTypeField','unitPriceField','fuelLitersField','tankModeField','washCostField'])visible.add(id);
     if(mode==='charging')for(const id of ['odometerField','billedField','unitPriceField'])visible.add(id);
@@ -2137,7 +2138,7 @@ export class VehicleJournal extends HTMLElement {
     }
     this.estimateChargeUnitPrice();
     this.$('dialogTitle').textContent={washing:'세차 기록',accident:'사고 기록',trip:'주행 기록',refueling:'주유 기록',charging:'충전 기록',maintenance:'정비/기타 기록'}[this.recordMode];
-    this.$('importSourceDetails').hidden=!record?.import_source;this.$('importSourceFields').innerHTML=Object.entries(record?.import_source?.fields||{}).map(([key,value])=>`<div class="list-row"><span>${esc(key)}</span><span>${['금액','단가'].includes(key)&&value!==''?money(Number(String(value).replaceAll(',',''))):esc(value===''?'미입력':value)}</span></div>`).join('');this.formFields();this.renderSelectedPhotos();this.$('recordDialog').classList.remove('loc-sheet-open');if(this.recordMode!=='trip'&&!this.draftLocation&&!compactRecord())this.draftLocation=emptyLocation();this.$('recordDialog').showModal();if(this.recordMode!=='trip')this.renderLocation();
+    this.$('importSourceDetails').hidden=!record?.import_source;this.$('importSourceFields').innerHTML=Object.entries(record?.import_source?.fields||{}).map(([key,value])=>`<div class="list-row"><span>${esc(key)}</span><span>${['금액','단가'].includes(key)&&value!==''?money(Number(String(value).replaceAll(',',''))):esc(value===''?'미입력':value)}</span></div>`).join('');this.formFields();this.renderSelectedPhotos();this.$('recordDialog').classList.remove('loc-sheet-open');const hasLocation=!['trip','accident'].includes(this.recordMode);if(hasLocation&&!this.draftLocation&&!compactRecord())this.draftLocation=emptyLocation();this.$('recordDialog').showModal();if(hasLocation)this.renderLocation();
     if(record?.origin==='automatic'&&this.recordMode==='charging'&&!hasPlace(record.location))void this.loadChargeEditHint(record);
     if(!record&&['refueling','charging'].includes(this.recordMode)&&this.automaticLocations!==false&&!this.isReceiptMode)this.autoSelectStation();
   }
@@ -2154,6 +2155,7 @@ export class VehicleJournal extends HTMLElement {
     const clockValue=form.elements.time.value;
     if(clockValue){if(payload.kind==='expense')payload.time=clockValue;else if(payload.kind==='trip')payload.started_at=new Date(`${payload.date}T${clockValue}`).toISOString();}
     if(this.recordMode==='trip'){delete payload.distance_km;delete payload.location;delete payload.memo;}
+    if(this.recordMode==='accident'){delete payload.location;}
     const rawAmt=form.elements.actual_krw?.value?.replace(/[^\d]/g,'');
     if(rawAmt)payload.actual_krw=Number(rawAmt);
     if(payload.kind!=='expense')for(const field of ['distance_km','drive_energy_kwh','battery_charge_kwh','billed_charge_kwh','odometer_km','soc_start_percent','soc_end_percent','started_at','ended_at','charge_mode']){const value=form.elements[field]?.value;if(value!==undefined&&value!==''&&!form.elements[field].closest('[hidden]'))payload[field]=['started_at','ended_at','charge_mode'].includes(field)?(field==='charge_mode'?value:new Date(value).toISOString()):Number(String(value).replaceAll(',',''));}
