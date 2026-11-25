@@ -36,6 +36,18 @@ class FactsTests(unittest.TestCase):
     def test_incomplete_and_same_day_full_not_fabricated(self):
         self.fuel('2026-02-01',1000,50);self.fuel('2026-02-05',1100,None,False);self.fuel('2026-02-10',1500,30);self.fuel('2026-02-10',1600,10)
         q=self.j.query('2026-02-01','2026-02-28');self.assertIsNone(q['efficiency_facts']['selected']['efficiency_km_l']);self.assertTrue(q['efficiency_facts']['warnings'])
+    def test_same_day_split_full_fill_and_partial_plus_full(self):
+        self.fuel('2026-03-01',10000,50)
+        self.fuel('2026-03-10',10800,45)
+        self.fuel('2026-03-10',10801,5)
+        self.fuel('2026-03-20',11200,10,False)
+        self.fuel('2026-03-20',11500,30,True)
+        q=self.j.query('2026-03-01','2026-03-31');e=q['efficiency_facts']
+        self.assertEqual(e['warnings'],[])
+        self.assertEqual(e['selected']['interval_count'],2)
+        self.assertEqual(e['selected']['distance_km'],1500)
+        self.assertEqual(e['selected']['fuel_liters'],90)
+        self.assertAlmostEqual(e['selected']['efficiency_km_l'],1500/90,places=4)
     def test_snapshot_roundtrip_location_and_quantities(self):
         self.fuel('2026-01-01',1000,40);meta={'vehicle_id':self.j.vehicle,'device_id':'car','title':'Synthetic','fuel':'diesel','timezone':'Asia/Seoul'}
         self.content=export_snapshot(self.j,meta);self.assertTrue(verify(self.content)['restored'])

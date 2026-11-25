@@ -15,12 +15,33 @@ def calculate(db,vehicle,start,end):
         extra=json.loads(text);data=extra.get('input') or {};fields=extra.get('import_source',{}).get('fields',{})
         flag=data.get('full_tank');raw=fields.get('구분','')
         if type(flag)is not bool:flag=True if '가득' in raw else False if '부분' in raw else None
-        by_day[d].append({'id':key,'date':d,'full':flag,'odometer':value(data,fields,'odometer_km','누적주행거리'),'liters':value(data,fields,'fuel_liters','주유량'),'estimated':data.get('fuel_quantity_source')=='estimated','fuel':data.get('fuel_type')})
+        by_day[d].append({'id':key,'date':d,'full':flag,'odometer':value(data,fields,'odometer_km','누적주행거리'),'liters':value(data,fields,'fuel_liters','주유량'),'estimated':data.get('fuel_quantity_source')=='estimated','fuel':data.get('fuel_type'),'time':data.get('time') or extra.get('occurred_at')})
     anchor=None;pending=[];intervals=[];warnings=[]
     for d,rows in sorted(by_day.items()):
         if len(rows)>1 and any(r['full'] is not False for r in rows):
-            if start<=d<=end:warnings.append({'date':d,'reason':'같은 날 가득 주유를 포함한 여러 기록의 순서를 확인할 수 없어 제외했어요.'})
-            anchor=None;pending=[];continue
+            if any(r['full'] is None for r in rows):
+                if start<=d<=end:warnings.append({'date':d,'reason':'가득/부분 주유 여부가 없어 구간을 계산하지 않았어요.'})
+                anchor=None;pending=[];continue
+            full_rows=[r for r in rows if r['full'] is True]
+            partial_rows=[r for r in rows if r['full'] is False]
+            odos=[r['odometer'] for r in rows if r['odometer'] is not None]
+            fuels={r['fuel'] for r in rows if r['fuel']}
+            liters_ok=all(r['liters'] is not None and r['liters']>0 for r in rows)
+            # Split payment on a single full fill (e.g. multiple cards within 5 km, same fuel).
+            if len(full_rows)>=2 and len(odos)==len(rows) and (max(odos)-min(odos))<=5 and len(fuels)<=1 and liters_ok and not partial_rows:
+                rows=[{
+                    'id':rows[-1]['id'],'date':d,'full':True,'odometer':max(odos),
+                    'liters':sum(r['liters'] for r in rows),
+                    'estimated':any(r['estimated'] for r in rows),
+                    'fuel':next(iter(fuels),None),
+                    'record_ids':[r['id'] for r in rows],
+                }]
+            elif len(full_rows)==1 and partial_rows:
+                # Single full fill plus partial fill(s) on the same day: partials precede the full fill unless clearly ordered after.
+                rows=partial_rows+full_rows
+            else:
+                if start<=d<=end:warnings.append({'date':d,'reason':'같은 날 가득 주유를 포함한 여러 기록의 순서를 확인할 수 없어 제외했어요.'})
+                anchor=None;pending=[];continue
         for row in rows:
             if row['full'] is None:
                 if start<=d<=end:warnings.append({'date':d,'reason':'가득/부분 주유 여부가 없어 구간을 계산하지 않았어요.'})
@@ -39,7 +60,10 @@ def calculate(db,vehicle,start,end):
                     if start<=d<=end:warnings.append({'date':d,'reason':reason})
                 else:
                     qty=sum(liters);distance=b-a
-                    intervals.append({'from':anchor['date'],'to':d,'distance_km':distance,'fuel_liters':qty,'efficiency_km_l':distance/qty,'partial_count':len(pending),'estimated':any(r['estimated'] for r in fuel_rows),'record_ids':[anchor['id']]+[r['id'] for r in fuel_rows]})
+                    row_ids=row.get('record_ids') or [row['id']]
+                    anchor_ids=anchor.get('record_ids') or [anchor['id']]
+                    pending_ids=[cid for r in pending for cid in (r.get('record_ids') or [r['id']])]
+                    intervals.append({'from':anchor['date'],'to':d,'distance_km':distance,'fuel_liters':qty,'efficiency_km_l':distance/qty,'partial_count':len(pending),'estimated':any(r['estimated'] for r in fuel_rows),'record_ids':anchor_ids+pending_ids+row_ids})
             anchor=row;pending=[]
     selected=[i for i in intervals if start<=i['to']<=end]
     def weighted(items):

@@ -59,7 +59,7 @@ const emptyLocation=()=>({name:'',address:'',latitude:null,longitude:null});
 const hasPlace=place=>!!(place&&(place.name||place.address||place.latitude!=null));
 const recordLocation=place=>{const result={};for(const key of ['name','address','latitude','longitude','provider','station_id','station_type','selection_source'])if(place[key]!=null&&place[key]!=='')result[key]=place[key];if(result.selection_source&&!['automatic','automatic_address','manual','favorite'].includes(result.selection_source))result.selection_source='manual';return result;};
 
-const trendValue=(value,unit)=>unit==='원'?numeric(value,0):String(value);
+const trendValue=(value,unit)=>(unit==='원'||unit==='원/km')?numeric(value,0):String(value);
 const categories={refueling:'주유비',charging:'충전비',maintenance:'정비 / 소모품',washing:'세차비',tuning:'튜닝',insurance:'보험',tax:'세금',parking:'주차비',toll:'통행료',accident:'사고',other:'기타'};
 const recordTypeIcons={
   charging:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
@@ -1113,7 +1113,7 @@ export class VehicleJournal extends HTMLElement {
         const diffPct=pastVal>0?(diff/pastVal)*100:(currVal>0?100:0);
         if(Math.abs(diffPct)>=5.0){
           isChanging=true;
-          const changeValue=unit==='원'?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
+          const changeValue=(unit==='원'||unit==='원/km')?Math.round(Math.abs(diff)):Number(Math.abs(diff).toFixed(1));
           // A difference between two percentages is percentage points, not a ratio.
           changeText=`${changeValue.toLocaleString('ko-KR')}${unit==='%'?'%p':unit} ${diff>0?'증가':'감소'}`;
           const pastText=`${trendValue(pastVal,unit)}${unit==='%'?'':' '}${unit}`;
@@ -1129,7 +1129,7 @@ export class VehicleJournal extends HTMLElement {
         }else{
           trendStatus='consistent';
           headline=`${periodName} 동안 일관된 추세`;
-          subDesc=`${prevPeriodName}과 비슷한 일관된 추세예요.`;
+          subDesc=`${prevPeriodName}${prevPeriodName==='지난해'?'와':'과'} 비슷한 일관된 추세예요.`;
         }
       }else if(hasCurrent){
         headline='이전 기간 비교 데이터 수집 중';
@@ -1166,10 +1166,10 @@ export class VehicleJournal extends HTMLElement {
 
     const round=value=>value==null?null:Number(value.toFixed(1));
     const chargeCount=t=>(t.slow_count||0)+(t.fast_count||0)+(t.unknown_count||0);
-    const cost100=(t,eff)=>{
+    const costPerKm=(t,eff)=>{
       const kwh=t.billed_charge_kwh>0?t.billed_charge_kwh:t.battery_charge_kwh;
       eff=t.efficiency_km_kwh??eff;
-      return eff>0&&kwh>0&&t.charge_effective_krw!=null?Math.round(t.charge_effective_krw/kwh/eff*100):null;
+      return eff>0&&kwh>0&&t.charge_effective_krw!=null?Math.round(t.charge_effective_krw/kwh/eff):null;
     };
     const soc100=(t,km)=>t.drive_soc_used_pp!=null&&km>0?round(t.drive_soc_used_pp/km*100):null;
     const perCharge=t=>chargeCount(t)>0&&t.battery_charge_kwh!=null?round(t.battery_charge_kwh/chargeCount(t)):null;
@@ -1181,7 +1181,7 @@ export class VehicleJournal extends HTMLElement {
     }
     const observed=(fn)=>bins.map((b,i)=>extraBins[i].length?fn(b,i):null);
     metrics.push(
-      createMetric('cost100','100km당 충전 비용',jIcon('coin'),'#64d2ff','원',cost100(totals,currEff),cost100(prevTotals,pastEff),observed(b=>cost100(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{}),
+      createMetric('cost_per_km','km당 평균 주행요금',jIcon('coin'),'#64d2ff','원/km',costPerKm(totals,currEff),costPerKm(prevTotals,pastEff),observed(b=>costPerKm(b,b.drive_energy_kwh>0?b.energy_distance_km/b.drive_energy_kwh:null)),{}),
       createMetric('total_cost','총 차량 지출',jIcon('wallet'),'#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((sum,r)=>sum+spending(r),0)),{total:true}),
       createMetric('charge_count','총 충전 횟수',jIcon('plug'),'#30b0c7','회',daily.length?chargeCount(totals):null,prevDaily.length?chargeCount(prevTotals):null,observed(b=>chargeCount(b)),{total:true}),
       createMetric('per_charge','1회 평균 충전량',jIcon('battery'),'#81e6c5','kWh',perCharge(totals),perCharge(prevTotals),observed(b=>perCharge(b))),
@@ -1196,19 +1196,51 @@ export class VehicleJournal extends HTMLElement {
     if(this.isCombustion()){
       metrics.length=0;
       const f=this.data.fuel_facts||{},pf=this.data.previous?.fuel_facts||{},o=this.data.odometer_facts||{},po=this.data.previous?.odometer_facts||{};
+      const ef=this.data.efficiency_facts||{},pef=this.data.previous?.efficiency_facts||{};
       const fuelBins=fn=>bins.map((_,i)=>{const rows=(f.daily||[]).filter(r=>(isYear?Number(r.day.slice(5,7))-1:Math.floor((Number(r.day.slice(8,10))-1)/2))===i);return rows.length?fn(rows):null;});
       const sum=(rows,key)=>rows.reduce((n,r)=>n+(r[key]||0),0);
       const distanceBars=bins.map((_,i)=>{const rows=(o.daily||[]).filter(r=>(isYear?Number(r.day.slice(5,7))-1:Math.floor((Number(r.day.slice(8,10))-1)/2))===i);return rows.length?sum(rows,'distance_km'):null;});
+      const iceCurrEff=ef.selected?.efficiency_km_l!=null&&ef.selected.efficiency_km_l>0?Number(ef.selected.efficiency_km_l.toFixed(1)):null;
+      const icePastEff=pef.selected?.efficiency_km_l!=null&&pef.selected.efficiency_km_l>0?Number(pef.selected.efficiency_km_l.toFixed(1)):null;
+      const iceEffBars=bins.map((_,i)=>{
+        const rows=(ef.intervals||[]).filter(iv=>iv.to&&(isYear?Number(iv.to.slice(5,7))-1:Math.floor((Number(iv.to.slice(8,10))-1)/2))===i);
+        const l=sum(rows,'fuel_liters'),d=sum(rows,'distance_km');
+        return l>0&&d>0?Number((d/l).toFixed(1)):null;
+      });
+      const fuelPriceBars=fuelBins(rows=>sum(rows,'priced_liters')>0?Math.round(sum(rows,'priced_cost_krw')/sum(rows,'priced_liters')):null);
+      const iceFuelPrice=f.totals?.fuel_price_krw_l;
+      const prevIceFuelPrice=pf.totals?.fuel_price_krw_l;
+      const iceCostPerKm=(iceFuelPrice!=null&&ef.selected?.efficiency_km_l>0)?Math.round(iceFuelPrice/ef.selected.efficiency_km_l):null;
+      const prevIceCostPerKm=(prevIceFuelPrice!=null&&pef.selected?.efficiency_km_l>0)?Math.round(prevIceFuelPrice/pef.selected.efficiency_km_l):null;
+      const iceCostPerKmBars=iceEffBars.map((eff,i)=>{
+        const p=fuelPriceBars[i]??iceFuelPrice;
+        return eff>0&&p!=null?Math.round(p/eff):null;
+      });
+      const effMetric=createMetric('fuel_efficiency','평균 연비',jIcon('fuel'),'#81e6c5','km/L',iceCurrEff,icePastEff,iceEffBars);
+      if(iceCurrEff==null&&ef.warnings?.length){
+        effMetric.subDesc=ef.warnings[0].reason;
+      }else if(iceCurrEff!=null){
+        const overallNote=ef.overall?.efficiency_km_l!=null?` · 누적 ${ef.overall.efficiency_km_l.toFixed(1)} km/L`:'';
+        const basisNote=`가득 주유 ${ef.selected?.interval_count||0}구간${overallNote}`;
+        effMetric.subDesc=effMetric.changeText?`${effMetric.subDesc} (${basisNote})`:`${effMetric.subDesc} · ${basisNote}`;
+      }
+      const costKmMetric=createMetric('cost_per_km','km당 평균 주행요금',jIcon('coin'),'#64d2ff','원/km',iceCostPerKm,prevIceCostPerKm,iceCostPerKmBars);
+      if(iceCostPerKm==null&&ef.warnings?.length){
+        costKmMetric.subDesc=`연비 구간 부족으로 계산할 수 없어요. (${ef.warnings[0].reason})`;
+      }
+      const distanceMetric=createMetric('observed_distance','계기판 주행거리',jIcon('car'),'#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true});
+      distanceMetric.subDesc=`관측 구간 ${o.from||'기준 없음'} ~ ${o.to||'기록 없음'} · ${o.warning||'월 경계 밖 주행이 포함될 수 있어요.'}`;distanceMetric.changeText='';
       metrics.push(
-        createMetric('observed_distance','계기판 주행거리',jIcon('car'),'#7bb6ff','km',o.distance_km??null,po.distance_km??null,distanceBars,{total:true}),
+        effMetric,
+        costKmMetric,
+        distanceMetric,
         createMetric('manual_distance','구간 기록 주행거리',jIcon('road'),'#7bb6ff','km',totals.distance_km??null,prevTotals.distance_km??null,bins.map(b=>b.day_count?b.distance_km:null),{total:true}),
         createMetric('fuel_liters','총 주유량',jIcon('fuel'),'#81e6c5','L',f.totals?.fuel_liters??null,pf.totals?.fuel_liters??null,fuelBins(rows=>rows.some(r=>r.fuel_liters!=null)?sum(rows,'fuel_liters'):null),{total:true}),
-        createMetric('fuel_price','주유 단가',jIcon('card'),'#ffd60a','원',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelBins(rows=>sum(rows,'priced_liters')>0?Math.round(sum(rows,'priced_cost_krw')/sum(rows,'priced_liters')):null)),
+        createMetric('fuel_price','주유 단가',jIcon('card'),'#ffd60a','원',f.totals?.fuel_price_krw_l==null?null:Math.round(f.totals.fuel_price_krw_l),pf.totals?.fuel_price_krw_l==null?null:Math.round(pf.totals.fuel_price_krw_l),fuelPriceBars),
         createMetric('fuel_count','총 주유 횟수',jIcon('fuel'),'#81e6c5','회',f.totals?.fuel_count??null,pf.totals?.fuel_count??null,fuelBins(rows=>sum(rows,'fuel_count')),{total:true}),
         createMetric('total_cost','총 차량 지출',jIcon('wallet'),'#ff9f0a','원',totals.total_cost_krw??null,prevDaily.length?prevTotals.total_cost_krw??null:null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+spending(r),0)),{total:true})
       );
       for(const [key,label] of Object.entries(categories)){if(key==='charging')continue;const current=totals.categories?.[key],past=prevTotals.categories?.[key];if(!current&&!past)continue;metrics.push(createMetric(`cost_${key}`,`${label} 지출`,jIcon('card'),this.categoryColor(key),'원',current?.effective_krw??null,past?.effective_krw??null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+(r.cost_categories?.[key]?.effective_krw||0),0)),{total:true}));}
-      const distanceMetric=metrics[0];distanceMetric.subDesc=`관측 구간 ${o.from||'기준 없음'} ~ ${o.to||'기록 없음'} · ${o.warning||'월 경계 밖 주행이 포함될 수 있어요.'}`;distanceMetric.changeText='';
     }
     const changingItems=metrics.filter(m=>m.isChanging);
     const stableItems=metrics.filter(m=>!m.isChanging);
@@ -1256,7 +1288,7 @@ export class VehicleJournal extends HTMLElement {
   // Totals are period sums, so bins are compared with the previous period's per-bin average.
   trendBaseline(m){return m.pastAvg==null?null:m.isTotal?m.pastAvg/Math.max(1,(m.bars||[]).length):m.pastAvg;}
   trendBaselineName(m){return m.isTotal?(this.scope==='year'?'지난해 월 평균':'지난달 2일 평균'):m.pastPeriodLabel;}
-  trendFormat(value,unit){return value==null?'미관측':unit==='원'?numeric(value,0):numeric(value,1);}
+  trendFormat(value,unit){return value==null?'미관측':(unit==='원'||unit==='원/km')?numeric(value,0):numeric(value,1);}
   trendPeriodShort(i){return this.scope==='year'?`${i+1}월`:`${i*2+1}일`;}
   // Matches the bins built in renderTrendsDashboard: two-day bins (the last may be one day) or calendar months.
   trendPeriod(i){
@@ -1348,6 +1380,7 @@ export class VehicleJournal extends HTMLElement {
   }
   trendRelatedRecords(m,records){
     const expense=r=>r.kind==='expense';
+    if(m.id==='cost_per_km')return this.isCombustion()?records.filter(r=>expense(r)&&r.category==='refueling'):records.filter(r=>expense(r)&&r.category==='charging');
     if(m.id.startsWith('cost_')&&m.id!=='cost100')return records.filter(r=>expense(r)&&r.category===m.id.slice(5));
     if(m.id==='total_cost')return records.filter(expense);
     if(m.id==='charge_rate')return records.filter(r=>expense(r)&&r.category==='charging');

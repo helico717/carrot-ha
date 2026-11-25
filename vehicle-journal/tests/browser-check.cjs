@@ -92,14 +92,14 @@ const path=require('path');
       }
      }
      if(/기록이 있는 날|기간 충전 단가|실제·추정 비용|누적 지출|주행거리당 SOC|기록 범위/.test(summary))throw Error('unrequested explanatory text remains');
-     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|원|%p|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
+     if(previous&&headline.querySelector('.trend-direction')?.textContent!=='일관'&&!/대비 [0-9.,]+(km|kWh|km\/kWh|km\/L|원\/km|원|%p|회) (증가|감소)했어요\.$/.test(summary))throw Error('comparison summary must contain only comparison data');
     }
    }
   }
   card.data={...original,daily:[]};card.renderTrendsDashboard();
   if(!card.$('changingTrendsGrid').textContent.includes('데이터가 아직 없어요'))throw Error('missing empty trend state');
   card.scope='month';card.$('month').value='2026-10';card.data=original;card.renderTrendsDashboard();
-  const expected={efficiency:'평균 전비',charge_rate:'충전 단가',distance:'일일 주행거리',charge_kwh:'일일 충전량',drive_soc:'일일 배터리 소모',fast_ratio:'급속 충전 비중',cost100:'100km당 충전 비용',total_cost:'총 차량 지출',charge_count:'총 충전 횟수',per_charge:'1회 평균 충전량',soc100:'100km당 배터리 소모'};
+  const expected={efficiency:'평균 전비',charge_rate:'충전 단가',distance:'일일 주행거리',charge_kwh:'일일 충전량',drive_soc:'일일 배터리 소모',fast_ratio:'급속 충전 비중',cost_per_km:'km당 평균 주행요금',total_cost:'총 차량 지출',charge_count:'총 충전 횟수',per_charge:'1회 평균 충전량',soc100:'100km당 배터리 소모'};
   for(const [id,title] of Object.entries(expected))if(trend(id).querySelector('.trend-metric-name').textContent!==title)throw Error('incorrect approved title: '+id);
  });
  // Date buttons follow the selected month/year, reset ledger pagination, and retain the tab.

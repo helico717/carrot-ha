@@ -1,3 +1,15 @@
+## 2026-11-25 — vehicle-journal: 내연기관 평균연비 · 공통 km당 주행요금 추세 카드 및 분할 주유 연비 보완
+
+- 제목: `vehicle-journal: add ICE fuel efficiency and per-km energy cost trends with split-fill handling`.
+- 요청: 내연기관 추세 탭에 풀투풀 `평균 연비 (km/L)`를 표시하고, 전기차와 내연기관 모두 순수 에너지 기준 `km당 평균 주행요금 (원/km)`을 비교할 수 있게 하며, 같은 날 분할 결제 주유 기록이 들어와도 연비 계산이 끊기지 않도록 보완.
+- 변경:
+  - `custom_components/carrot_ha/vehicle_journal/efficiency.py`: 같은 날 여러 주유 기록 중 `부분 주유 + 가득 주유` 조합과 유종이 같고 누적거리 차이 5 km 이내이며 주유량이 유효한 `가득 주유` 분할 결제는 1회 만충으로 합산 처리하고, 누적거리 누락/역전/장거리 분리 등 순서를 확정할 수 없는 경우만 제외하도록 보완.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: 내연기관 추세 탭에 `평균 연비 (km/L)`(가득 주유 구간 기반, 누적 평균 및 경고 안내 포함)와 `km당 평균 주행요금 (원/km)`(`주유 단가 ÷ 평균 연비`) 추가, 전기차 추세 탭의 `100km당 충전 비용`을 `km당 평균 주행요금 (원/km)`(`충전 단가 ÷ 평균 전비`)으로 전환, `지난해와` 조사 오타 수정.
+  - `vehicle-journal/tests/test_station_backup.py`: 같은 날 분할 결제 및 `부분+가득` 회귀 테스트 추가.
+  - `vehicle-journal/tests/browser-check.cjs`: `km/L`, `원/km`, `cost_per_km` 기대값 갱신.
+- 검증: `py_compile`, `node --check`, `test_station_backup.py`(11건 전체 통과), `test_journal.py`(27건 중 22건 통과, Mac Python `PIL` 미설치로 사진 5건 환경 오류), `git diff --check` 로컬 검증 및 `.preview/trends-fuel-cost/` 브라우저 프리뷰 확인. (`browser-check.cjs` Playwright 실행은 로컬 미수행.)
+- 배포 상태: 사용자 요청에 따라 HA 서버 직접 반영 및 재시작은 대기 중.
+
 ## 2026-11-20 — vehicle-journal: preview map-scoped place results
 
 - 수정 창에서 일반 키워드가 전국 검색으로 넘어가고 긴 목록이 지도를 덮는 사례를 확인했다. `preview/charge-location-prefill/index.html`에 실제 카드와 합성 지도·장소 응답을 연결해 현재 지도 범위만 검색하고 충전 기록의 일반어 `전기차`·`충전소`를 전기차 충전소 검색으로 처리하는 변경을 준비했다.

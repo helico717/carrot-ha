@@ -1,3 +1,8 @@
+## 2026-11-25 — 내연기관 평균연비 · 전기차/내연기관 km당 평균 주행요금 추세 카드 및 분할 주유 연비 보완 (로컬 완료 · HA 반영 대기)
+
+- 변경: `carrot-vehicle-journal.js` 추세 탭에 내연기관 `평균 연비 (km/L)`와 전기차·내연기관 공통 `km당 평균 주행요금 (원/km)`(순수 에너지 기준) 카드를 추가하고, `efficiency.py`에서 같은 날 `부분+가득` 조합 및 누적거리 5 km 이내 분할 결제 `가득 주유` 합산을 허용하도록 보완했다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.
+- 상태: 로컬 검증 완료(`main` 푸시 예정). 사용자 요청에 따라 HA 서버 직접 반영·재시작·릴리즈는 보류.
+
 ## 2026-11-25 — 일일 DB 정리·주간 VACUUM·자정 갱신 타이머 스레드 안전성 수정
 
 - 원인: `custom_components/carrot_ha/__init__.py`에서 `async_track_time_interval`(일일 `run_daily_purge`, 주간 `run_weekly_vacuum`)과 `async_track_time_change`(자정 `refresh_after_midnight`)에 `async def` 코루틴 함수 대신 동기 `lambda _: hass.async_create_task(...)`를 전달했다. HA가 동기 콜백을 워커 스레드에서 실행하면서 `RuntimeError` (`calls hass.async_create_task from a thread other than the event loop`)와 `RuntimeWarning: coroutine 'run_daily_purge' was never awaited`가 발생해 부팅 직후 1회 이후 주기적 DB 정리와 주간 `VACUUM`이 멈춰 있었다.
