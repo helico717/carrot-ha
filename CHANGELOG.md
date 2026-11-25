@@ -1,3 +1,10 @@
+## 2026-11-25 — 일일 DB 정리·주간 VACUUM·자정 갱신 타이머 스레드 안전성 수정
+
+- 원인: `custom_components/carrot_ha/__init__.py`에서 `async_track_time_interval`(일일 `run_daily_purge`, 주간 `run_weekly_vacuum`)과 `async_track_time_change`(자정 `refresh_after_midnight`)에 `async def` 코루틴 함수 대신 동기 `lambda _: hass.async_create_task(...)`를 전달했다. HA가 동기 콜백을 워커 스레드에서 실행하면서 `RuntimeError` (`calls hass.async_create_task from a thread other than the event loop`)와 `RuntimeWarning: coroutine 'run_daily_purge' was never awaited`가 발생해 부팅 직후 1회 이후 주기적 DB 정리와 주간 `VACUUM`이 멈춰 있었다.
+- 수정: `custom_components/carrot_ha/__init__.py`에서 세 타이머에 코루틴 함수(`run_daily_purge`, `run_weekly_vacuum`, `refresh_after_midnight`)를 직접 전달하도록 변경하고, `tests/test_timer_callbacks.py` 회귀 테스트를 추가했다.
+- 검증: `py_compile` 및 `tests/test_timer_callbacks.py`, `tests/test_storage_purge.py`, `tests/test_archive_compression.py` 로컬 단위 테스트 통과.
+- 배포: `main` 커밋·푸시 후 HA 서버 기존 `/config/custom_components/carrot_ha/__init__.py`(`7923235b` 기준)를 `/config/carrot_ha/deployment-backups/`에 백업하고, HA에 미설치된 `blueprint_sync.py` 의존성을 건드리지 않도록 동일 타이머 3줄 수정만 반영·구문/SHA-256 검증 예정. 사용자 HA Core 재시작 후 실제 주기 실행 확인 대기. 태그·릴리즈 발행 없음.
+
 ## 2026-11-23 — EV 충전 라이브 액티비티 자동화 정리 및 iOS·Android 공용 블루프린트 추가
 
 - 운영 HA의 `ID4 충전 라이브 액티비티`(`automation.id4_cungjeon_sijag_raibeu_aegtibiti`)에서 `sensor.id_4_battery` 속성 갱신마다 반복 트리거되던 문제(`to: null` 추가), `eta_recovered`의 `from: [unknown, unavailable]` 제한, `stop` 트리거의 `unknown` 전이 누락 보완, 활성 헬퍼 확인 및 HA 재시작 정리 분기 추가, 중복 메시지 템플릿의 `variables` 통합, Android 호환 `alert_once: true`를 반영했다.

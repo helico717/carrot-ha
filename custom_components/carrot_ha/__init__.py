@@ -208,8 +208,8 @@ async def async_setup_entry(hass, entry):
     async def run_weekly_vacuum(now=None):
         await hass.async_add_executor_job(archive.vacuum)
 
-    entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_daily_purge()), timedelta(days=1)))
-    entry.async_on_unload(async_track_time_interval(hass, lambda _: hass.async_create_task(run_weekly_vacuum()), timedelta(days=7)))
+    entry.async_on_unload(async_track_time_interval(hass, run_daily_purge, timedelta(days=1)))
+    entry.async_on_unload(async_track_time_interval(hass, run_weekly_vacuum, timedelta(days=7)))
 
     async def refresh_after_midnight(now=None):
         # Day-dependent assist values (today, day streaks) change at local midnight even
@@ -219,7 +219,7 @@ async def async_setup_entry(hass, entry):
 
     from homeassistant.helpers.event import async_track_time_change
     entry.async_on_unload(async_track_time_change(
-        hass, lambda _: hass.async_create_task(refresh_after_midnight()), hour=0, minute=0, second=30))
+        hass, refresh_after_midnight, hour=0, minute=0, second=30))
     hass.async_create_task(run_daily_purge())
 
     from .github_actions_runtime import setup as setup_github_actions
