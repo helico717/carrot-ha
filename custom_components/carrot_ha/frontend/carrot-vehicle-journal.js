@@ -210,7 +210,7 @@ const styles=`
 `;
 
 export class VehicleJournal extends HTMLElement {
-  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.comparisonCategory=null;this.recordCategories=new Set();this.recordSort='time';this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
+  constructor(){super();this.attachShadow({mode:'open'});this.tab=0;this.offset=0;this.metric='distance_km';this.period='day';this.scope='month';this.trendChartMode=this.getTrendChartMode();this.comparisonCategory=null;this.recordCategories=new Set();this.recordSort='time';this.entries=[];this.request=0;this.thumbnailCache=new Map();this.lightboxRecord=null;this.lightboxIndex=0;}
   setConfig(config){this.config=config||{};if(!this.ready)this.build();if(this.$('cardSettingsTop'))this.$('cardSettingsTop').hidden=!!this.config.panel;if(this.config.entry_id&&this.entry!==this.config.entry_id){this.entry=this.config.entry_id;this.data=null;this.offset=0;}this.load();}
   set hass(hass){this._hass=hass;if(!this.ready)this.build();this.load();}
   getCardSize(){return 12;}
@@ -332,7 +332,7 @@ export class VehicleJournal extends HTMLElement {
 
           </div>
         </section>
-    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><section class="panel trends-map-panel" id="trendsMapSection"><div class="trends-map-header"><h3>방문한 충전소 · 주유소</h3><p id="placeStatisticsBasis" class="note"></p></div><div class="trends-map-wrapper"><div id="trendsMap" class="trends-map-canvas"></div><button type="button" id="trendsMapReset" class="trends-map-reset-btn" title="한반도 전체 지도 보기">전체 보기</button><div id="trendsMapNotice" class="note" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:16px;background:rgba(20,28,35,0.9);border-radius:12px;z-index:5;" hidden></div><div id="trendsPlaceCard" class="trends-place-card" hidden></div></div></section><div class="trends-section" id="changingTrendsSection"><h3 class="trends-section-title">변동 있는 추세</h3><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
+    <section id="page1" role="tabpanel" aria-labelledby="tab1" hidden><div class="trends-container"><div class="trends-header"><h2 class="trends-main-title">추세</h2><p class="trends-main-desc">주행 및 충전 데이터의 패턴을 분석하고, 변동 사항이 있을 때 알려드려요.</p></div><section class="panel trends-map-panel" id="trendsMapSection"><div class="trends-map-header"><h3>방문한 충전소 · 주유소</h3><p id="placeStatisticsBasis" class="note"></p></div><div class="trends-map-wrapper"><div id="trendsMap" class="trends-map-canvas"></div><button type="button" id="trendsMapReset" class="trends-map-reset-btn" title="한반도 전체 지도 보기">전체 보기</button><div id="trendsMapNotice" class="note" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:16px;background:rgba(20,28,35,0.9);border-radius:12px;z-index:5;" hidden></div><div id="trendsPlaceCard" class="trends-place-card" hidden></div></div></section><div class="trends-section" id="changingTrendsSection"><div class="trends-section-head"><h3 class="trends-section-title">변동 있는 추세</h3><div class="period-segmented" role="group" aria-label="차트 표시 방식">${[['line','꺾은선'],['bar','막대']].map(([key,label])=>`<button type="button" class="period-tab-btn ${this.trendChartMode===key?'active':''}" data-trend-chart="${key}" aria-pressed="${this.trendChartMode===key}">${label}</button>`).join('')}</div></div><div class="trends-grid" id="changingTrendsGrid"></div></div><div class="trends-section" id="stableTrendsSection"><h3 class="trends-section-title">변동 없는 추세</h3><div class="trends-grid" id="stableTrendsGrid"></div></div></div></section>
     <section id="page2" role="tabpanel" aria-labelledby="tab2" hidden><p id="compareBasis" class="note"></p><div class="grid savings-layout"><article class="panel wide hero savings-hero"><h2>같은 거리를 다른 차로 달렸다면요.</h2><div class="compare-value" id="saving"></div><div id="compareDetail" class="savings-bars"></div></article><article class="panel narrow savings-controls"><div class="controls-content"><div class="row spaced"><label><strong class="slider-title">주행거리</strong> <b id="distanceValue"></b></label><button id="recordedDistance" class="compact">기록된 거리</button></div><input id="compareDistance" aria-label="주행거리" type="range" min="0" max="5000" step="0.1"><small id="distanceStatus"></small><hr><div class="fuel-topline"><label><strong class="slider-title">비교 유종</strong> · <span id="priceValue"></span></label><div class="fuel-switch">${[['gasoline','휘발유'],['premium','고급유'],['diesel','경유']].map(([key,label])=>`<button class="compact" data-compare-fuel="${key}">${label}</button>`).join('')}</div></div><input id="comparePrice" aria-label="유가" type="range" min="1" max="5000" step="1"><div class="row spaced"><small id="priceStatus"></small><button id="averagePrice" class="compact">전국 평균으로 돌아가기</button></div><hr><label><strong class="slider-title">비교 차량 연비</strong> <b id="economyValue"></b></label><input id="economy" aria-label="비교 차량 연비" type="range" min="1" max="50" step="0.1" value="15"><details class="settings"><summary>유가 연결 기준</summary><input id="fuel" type="hidden" value="gasoline"><div id="fuelConnections"></div><form id="compareForm" hidden><input id="editFuel" type="hidden"><label>HA 유가 센서<input id="fuelEntity" placeholder="sensor.average_gasoline" required></label><div class="row"><button class="compact" type="submit">저장</button><button class="compact" id="cancelFuelEdit" type="button">취소</button></div><p id="compareMessage" class="note" role="status"></p></form></details></div></article></div><p class="note">같은 거리의 에너지 비용 비교예요. 충전 단가와 전비로 계산하며 전체 차량 유지비는 포함하지 않아요.</p></section>
     <section id="page3" role="tabpanel" aria-labelledby="tab3" hidden><article class="panel"><div class="ledger-panel-header"><h2>차량 지출 내역이에요.</h2></div><p class="note">자동 충전 결제와 직접 남긴 차량 지출을 함께 보여줘요. 삭제한 수동 기록은 복원할 수 있어요.</p><div class="ledger-filters" id="ledgerFilters"><details class="ledger-dropdown" id="ledgerDropdown"><summary>분류 선택 <span id="ledgerFilterSummary">전체</span></summary><div class="ledger-category-filters" role="group" aria-label="기록 분류 선택 (복수 선택)"><label class="ledger-filter-option"><input type="checkbox" id="ledgerAll" checked>전체</label>${Object.entries(categories).filter(([key])=>['charging','refueling','maintenance','washing','tuning','other'].includes(key)).map(([key,label])=>`<label class="ledger-filter-option" style="--category-color:${this.categoryColor(key)}"><input type="checkbox" data-ledger-category="${key}">${esc(label)}</label>`).join('')}</div></details></div><div class="table-wrap"><table class="table ledger-table"><colgroup><col class="ledger-date-col"><col class="ledger-memo-col"><col class="ledger-value-col"><col class="ledger-actions-col"></colgroup><thead><tr><th>날짜 / 출처</th><th>기록 / 메모</th><th id="ledgerAmountHeader" aria-sort="none"><button id="ledgerSort" type="button" aria-label="금액 정렬 변경">금액 · 시간순</button></th><th>관리</th></tr></thead><tbody id="records"></tbody></table></div><div class="row" style="margin-top:16px"><button id="previous">이전 기록</button><button id="next">다음 기록</button><span id="pageLabel" class="muted"></span></div></article></section>
     <p class="status" id="message" role="status" aria-live="polite">HA 기록을 불러오고 있어요.</p>
@@ -399,6 +399,7 @@ export class VehicleJournal extends HTMLElement {
     this.$('periodNext').onclick=()=>this.stepPeriod(1);
     this.$('periodCurrent').onclick=()=>this.selectCurrentPeriod();
     for(const button of this.shadowRoot.querySelectorAll('[data-scope]'))button.onclick=()=>this.setScope(button.dataset.scope);
+    for(const button of this.shadowRoot.querySelectorAll('[data-trend-chart]'))button.onclick=()=>this.setTrendChartMode(button.dataset.trendChart);
     this.$('ledgerSort').onclick=()=>{this.recordSort={time:'amount_desc',amount_desc:'amount_asc',amount_asc:'time'}[this.recordSort];this.changeLedgerFilters();};
     this.$('ledgerAll').onclick=()=>{this.recordCategories.clear();this.changeLedgerFilters();};
     for(const button of this.shadowRoot.querySelectorAll('[data-ledger-category]'))button.onclick=()=>{const key=button.dataset.ledgerCategory;if(this.recordCategories.has(key))this.recordCategories.delete(key);else{this.recordCategories.add(key);}this.changeLedgerFilters();};
@@ -1258,32 +1259,86 @@ export class VehicleJournal extends HTMLElement {
     stableContainer.innerHTML=stableItems.map(m=>this.renderTrendCard(m)).join('');
     this.updateTrendCounts();
   }
-  // Trend chart: periods ranked from highest to lowest. Each bar is a hover/tap target that opens that period's records.
+  // Trend chart: chronological periods (left to right). Line+area (default) or chronological bars. Each point/bar is a hover/tap target.
+  generateTrendLineChartHtml(m){
+    if(m.avg==null)return '<div class="trends-empty-pill">데이터 수집 중</div>';
+    this.trendMetrics??=new Map();this.trendMetrics.set(m.id,m);
+    const bars=m.bars||[],pts=[];
+    bars.forEach((v,i)=>{if(v!=null&&Number.isFinite(v))pts.push({i,v});});
+    if(!pts.length)return '<div class="trends-empty-pill">데이터 수집 중</div>';
+    const past=this.trendBaseline(m),top=22,base=88,height=109;
+    const vals=pts.map(p=>p.v);
+    const rawMin=Math.min(...vals,past??Infinity),rawMax=Math.max(...vals,past??-Infinity);
+    const span=Math.max(1e-6,rawMax-rawMin);
+    const minY=Math.max(0,rawMin-span*0.35),maxY=rawMax+span*0.25;
+    const y=v=>base-(base-top)*(v-minY)/Math.max(1e-9,maxY-minY);
+    let topPt=pts[0];
+    for(const p of pts)if(p.v>topPt.v)topPt=p;
+    const padX=8,usableW=100-padX*2;
+    const coords=pts.map((p,idx)=>({...p,x:pts.length===1?50:padX+(idx/(pts.length-1))*usableW,y:y(p.v)}));
+    const linePts=coords.map(c=>`${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(' ');
+    const areaPts=coords.length>1?`${coords[0].x.toFixed(2)},${base} ${linePts} ${coords[coords.length-1].x.toFixed(2)},${base}`:'';
+    const gradId=`tg-${m.id}-${Math.random().toString(36).slice(2,7)}`;
+    const pastLine=past==null?'':`<line x1="0" x2="100%" y1="${y(past).toFixed(1)}" y2="${y(past).toFixed(1)}" stroke="#a8bdca" stroke-dasharray="3 4" opacity=".75"/><text x="100%" dx="-2" y="${Math.max(11,y(past)-5).toFixed(1)}" text-anchor="end" class="trend-rank-note">${esc(this.trendBaselineName(m))} ${this.trendFormat(past,m.unit)}</text>`;
+    const areaEl=areaPts?`<polygon points="${areaPts}" fill="url(#${gradId})"/>`:'';
+    const lineEl=coords.length>1?`<polyline points="${linePts}" fill="none" stroke="${m.color}" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>`:'';
+    let dots='',labels='',hits='';
+    const every=coords.length>9?2:1;
+    coords.forEach((c,idx)=>{
+      const isTop=c.i===topPt.i;
+      dots+=`<circle cx="${c.x.toFixed(2)}%" cy="${c.y.toFixed(1)}" r="${isTop?4.2:3.1}" fill="${isTop?m.color:'#141c23'}" stroke="${m.color}" stroke-width="2"/>`;
+      if(idx%every===0||idx===coords.length-1)labels+=`<text x="${c.x.toFixed(2)}%" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShort(c.i)}</text>`;
+      if(isTop){
+        const align=c.x>78?'end':c.x<22?'start':'middle';
+        labels+=`<text x="${c.x.toFixed(2)}%" y="${Math.max(11,c.y-8).toFixed(1)}" text-anchor="${align}" class="trend-rank-top" fill="${m.color}">최고 ${this.trendFormat(c.v,m.unit)}</text>`;
+      }
+      const slotW=coords.length===1?40:Math.min(24,usableW/Math.max(1,coords.length-1));
+      hits+=`<rect class="trend-hit" data-index="${c.i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(c.i).label} ${this.trendFormat(c.v,m.unit)}${m.unit}`)}" x="${Math.max(0,c.x-slotW/2).toFixed(2)}%" y="0" width="${slotW.toFixed(2)}%" height="${height}" rx="6" fill="transparent"/>`;
+    });
+    const firstLabel=this.trendPeriodShort(coords[0].i),lastLabel=this.trendPeriodShort(coords[coords.length-1].i);
+    return `
+      <div class="trend-rank">
+        <svg class="trend-rank-svg" viewBox="0 0 100 ${height}" preserveAspectRatio="none" width="100%" height="${height}" role="img" aria-label="${esc(m.name)} 기간별 추세" style="overflow:visible">
+          <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${m.color}" stop-opacity="0.28"/><stop offset="100%" stop-color="${m.color}" stop-opacity="0.02"/></linearGradient></defs>
+          <line x1="0" x2="100" y1="${base}" y2="${base}" stroke="var(--j-border)" vector-effect="non-scaling-stroke"/>
+          ${areaEl}${lineEl}
+        </svg>
+        <svg class="trend-rank-svg" width="100%" height="${height}" style="margin-top:-${height}px;display:block;position:relative;z-index:2;" aria-hidden="true">
+          ${pastLine}${dots}${labels}${hits}
+        </svg>
+      </div>
+    `;
+  }
   generateTrendCardChartHtml(m){
+    if(this.trendChartMode!=='bar')return this.generateTrendLineChartHtml(m);
     if(m.avg==null)return '<div class="trends-empty-pill">데이터 수집 중</div>';
     this.trendMetrics??=new Map();this.trendMetrics.set(m.id,m);
     const bars=m.bars||[],n=Math.max(1,bars.length),values=bars.filter(v=>v!=null);
     const past=this.trendBaseline(m),top=18,base=90,height=109;
     const max=Math.max(1e-9,...values,past??0)*1.12,y=v=>base-(base-top)*v/max;
-    const order=bars.map((_,i)=>i).sort((a,b)=>(bars[b]??-Infinity)-(bars[a]??-Infinity));
+    let topIdx=-1,topVal=-Infinity;
+    bars.forEach((v,i)=>{if(v!=null&&v>topVal){topVal=v;topIdx=i;}});
     const slot=100/n,width=slot*.62,every=n>12?2:1,pct=v=>`${v.toFixed(3)}%`;
     let marks='',labels='',hits='';
-    order.forEach((i,k)=>{
-      const v=bars[i],cx=(k+.5)*slot;
+    bars.forEach((v,i)=>{
+      const cx=(i+.5)*slot,isTop=i===topIdx&&v!=null;
       marks+=v==null
-        ?`<line x1="${pct(cx-width/2)}" x2="${pct(cx+width/2)}" y1="${base}" y2="${base}" stroke="#a8bdca" stroke-dasharray="2 2"/>`
-        :`<rect x="${pct(cx-width/2)}" y="${y(v).toFixed(1)}" width="${pct(width)}" height="${(base-y(v)).toFixed(1)}" rx="3" fill="${m.color}" opacity="${k===0?1:(.85-.6*k/n).toFixed(2)}"/>`;
-      if(k%every===0)labels+=`<text x="${pct(cx)}" y="${base+13}" text-anchor="middle" class="trend-rank-label"${k===0?` fill="${m.color}"`:''}>${this.trendPeriodShort(i)}</text>`;
-      if(k===0&&v!=null)labels+=`<text x="${pct(cx-width/2)}" y="${Math.max(11,y(v)-5).toFixed(1)}" class="trend-rank-top" fill="${m.color}">1위 ${this.trendFormat(v,m.unit)}</text>`;
-      hits+=`<rect class="trend-hit" data-index="${i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(i).label} ${this.trendFormat(v,m.unit)}${v==null?'':m.unit}`)}" x="${pct(k*slot)}" y="0" width="${pct(slot)}" height="${height}" rx="6" fill="transparent"/>`;
+        ?`<line x1="${pct(cx-width/2)}" x2="${pct(cx+width/2)}" y1="${base}" y2="${base}" stroke="#a8bdca" stroke-dasharray="2 2" opacity=".55"/>`
+        :`<rect x="${pct(cx-width/2)}" y="${y(v).toFixed(1)}" width="${pct(width)}" height="${(base-y(v)).toFixed(1)}" rx="3" fill="${m.color}" opacity="${isTop?1:0.65}"/>`;
+      if(i%every===0)labels+=`<text x="${pct(cx)}" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShort(i)}</text>`;
+      if(isTop){
+        const align=i>=n-3?'end':i<=2?'start':'middle';
+        const tx=align==='end'?pct(cx+width/2):align==='start'?pct(cx-width/2):pct(cx);
+        labels+=`<text x="${tx}" y="${Math.max(11,y(v)-5).toFixed(1)}" text-anchor="${align}" class="trend-rank-top" fill="${m.color}">최고 ${this.trendFormat(v,m.unit)}</text>`;
+      }
+      hits+=`<rect class="trend-hit" data-index="${i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(i).label} ${this.trendFormat(v,m.unit)}${v==null?'':m.unit}`)}" x="${pct(i*slot)}" y="0" width="${pct(slot)}" height="${height}" rx="6" fill="transparent"/>`;
     });
     const pastLine=past==null?'':`<line x1="0" x2="100%" y1="${y(past).toFixed(1)}" y2="${y(past).toFixed(1)}" stroke="#a8bdca" stroke-dasharray="3 4" opacity=".75"/><text x="100%" dx="-2" y="${(y(past)-5).toFixed(1)}" text-anchor="end" class="trend-rank-note">${esc(this.trendBaselineName(m))} ${this.trendFormat(past,m.unit)}</text>`;
     return `
       <div class="trend-rank">
-        <svg class="trend-rank-svg" width="100%" height="${height}" role="img" aria-label="${esc(m.name)} 기간별 순위">
+        <svg class="trend-rank-svg" width="100%" height="${height}" role="img" aria-label="${esc(m.name)} 기간별 추세">
           <line x1="0" x2="100%" y1="${base}" y2="${base}" stroke="var(--j-border)"/>${pastLine}${marks}${labels}${hits}
         </svg>
-        <div class="trend-chart-axis-labels"><span>높은 기간</span><span class="trend-rank-hint">${esc(m.unit)} · 막대를 눌러 기록 보기</span><span>낮은 기간</span></div>
       </div>
     `;
   }
@@ -1529,6 +1584,9 @@ export class VehicleJournal extends HTMLElement {
   }
   getFavoriteVehicle(){try{return localStorage.getItem('carrot_journal_favorite_vehicle');}catch{return null;}}
   setFavoriteVehicle(entryId){try{if(entryId)localStorage.setItem('carrot_journal_favorite_vehicle',entryId);else localStorage.removeItem('carrot_journal_favorite_vehicle');}catch{}}
+  getTrendChartMode(){try{const mode=localStorage.getItem('carrot_journal_trend_chart_mode');return mode==='bar'||mode==='line'?mode:'line';}catch{return 'line';}}
+  setTrendChartMode(mode){if(mode!=='bar'&&mode!=='line'||mode===this.trendChartMode)return;this.trendChartMode=mode;try{localStorage.setItem('carrot_journal_trend_chart_mode',mode);}catch{}this.updateTrendChartToggle();this.renderTrendsDashboard();}
+  updateTrendChartToggle(){for(const button of this.shadowRoot?.querySelectorAll('[data-trend-chart]')||[]){const active=button.dataset.trendChart===this.trendChartMode;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}}
   vehicleOptions(){const fav=this.getFavoriteVehicle();return this.entries.map(e=>`<option value="${esc(e.entry_id)}">${esc(e.title)}${e.entry_id===fav?' ★':''}</option>`).join('')+'<option value="__add__">＋ 새 차량 추가</option>';}
   updateDefaultVehicleButton(){const btn=this.$('pinDefault');if(!btn)return;const fav=this.getFavoriteVehicle();const isFav=!!(this.entry&&this.entry===fav);btn.classList.toggle('active',isFav);btn.textContent=isFav?'★':'☆';btn.title=isFav?'즐겨찾기 기본 차량으로 설정되어 있어요':'현재 차량을 즐겨찾기 기본 차량으로 지정';btn.setAttribute('aria-label',btn.title);}
   async refreshVehicles(selected){this.entries=await this._hass.callWS({type:'carrot_ha/journal/entries'});const fav=this.getFavoriteVehicle();const favExists=fav&&this.entries.some(e=>e.entry_id===fav);this.entry=selected||this.entries.find(e=>e.entry_id===this.entry)?.entry_id||(favExists?fav:null)||this.entries.find(e=>e.is_default)?.entry_id||this.entries[0]?.entry_id;this.$('entry').innerHTML=this.vehicleOptions();this.$('entry').value=this.entry||'__add__';this.updateDefaultVehicleButton();this.offset=0;await this.load(true);}

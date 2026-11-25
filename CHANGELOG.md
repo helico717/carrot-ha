@@ -1,3 +1,8 @@
+## 2026-11-25 — 추세 탭 차트 방식 토글(꺾은선 | 막대), 시간순 막대·균일 두께 꺾은선 적용 (로컬 완료 · HA 반영 대기)
+
+- 변경: `carrot-journal-design.js`, `carrot-vehicle-journal.js`에서 추세 탭 지도 아래 `변동 있는 추세` 헤더 우측에 `월별 | 연도별`과 동일한 `.period-segmented` 스타일의 `[꺾은선 | 막대]` 토글을 추가하고 클라이언트별 `localStorage`(`carrot_journal_trend_chart_mode`, 미설정 시 기본값 `꺾은선`)로 저장하도록 구현했다. 꺾은선 모드는 `vector-effect="non-scaling-stroke"`로 `2.2px` 균일 선 두께를 유지하며, 막대 모드는 값 크기순 대신 시간순(`1일→31일`/`1월→12월`)으로 정렬한다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.
+- 상태: 로컬 프리뷰(데스크톱·390px 모바일, 새로고침 영속성 포함)·구문·diff 검사 완료 및 `main` 푸시. HA 서버 직접 반영·재시작·릴리즈는 보류.
+
 ## 2026-11-25 — 추세 카드 1줄 우상단 KPI·직선 추세 화살표·단가/주행거리 명칭 개선 (로컬 완료 · HA 반영 대기)
 
 - 변경: `carrot-journal-design.js`, `carrot-vehicle-journal.js`에서 추세 카드 우상단 장식 `›` 및 중복 설명 문장을 제거하고 카드 제목과 같은 줄 우측에 `<기간> 동안 [직선 대각선 SVG 화살표] <수치·단위>`를 배치했다. `충전 단가`(`원/kWh`), `주유 단가`(`원/L`), `계기판 총 주행거리`로 단위·명칭을 명확히 하고, 내연기관 `수동 구간 주행거리`는 기록이 있을 때만 표시하도록 변경했다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.

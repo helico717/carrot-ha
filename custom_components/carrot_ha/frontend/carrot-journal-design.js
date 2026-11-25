@@ -1487,6 +1487,7 @@ export const journalDesign = `:host {
 .trends-main-title { font-size: 27.5px; font-weight: 850; color: #ffffff; margin: 0 0 6px 0; letter-spacing: -0.6px; }
 .trends-main-desc { font-size: 15px; color: var(--j-sub); margin: 0; line-height: 1.5; }
 .trends-section { display: flex; flex-direction: column; gap: 12px; }
+.trends-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 12px; flex-wrap: wrap; }
 .trends-section-title { font-size: 20.5px; font-weight: 750; color: #ffffff; margin: 0; letter-spacing: -0.4px; display: flex; align-items: center; gap: 8px; }
 .trends-empty-pill { background: var(--j-surface); border: 1px solid var(--j-border); color: var(--j-sub); border-radius: 12px; padding: 16px 20px; font-size: 15.5px; font-weight: 600; text-align: center; }
 
@@ -1508,7 +1509,7 @@ export const journalDesign = `:host {
 .trend-arrow { color: #647b8e; font-size: 19.5px; font-weight: 600; line-height: 1; }
 .trend-card-summary { overflow-wrap: anywhere; font-size: 15.5px; font-weight: 600; color: #e2ecf3; line-height: 1.45; margin: 0; letter-spacing: -0.2px; }
 .trend-card-summary strong { color: var(--trend-color); font-weight: 850; }
-.trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 6px 0; }
+.trend-divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: auto 0 6px 0; }
 .trend-kpi-inline { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 7px; margin-left: auto; flex-wrap: nowrap; white-space: nowrap; }
 .trend-period-tag { font-size: 12.5px; font-weight: 600; color: #9fb4c3; letter-spacing: -0.2px; }
 .trend-kpi-value { display: inline-flex; align-items: center; gap: 5px; }

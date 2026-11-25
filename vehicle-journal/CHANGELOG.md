@@ -1,3 +1,14 @@
+## 2026-11-25 — vehicle-journal: 추세 탭 [꺾은선 | 막대] 토글 및 시간순 막대·균일 두께 꺾은선 구현
+
+- 제목: `vehicle-journal: add persisted line/bar chart toggle and chronological trend charts`.
+- 요청: 추세 탭 지도(`#trendsMapSection`) 아래 차트 섹션 헤더(`.trends-section-head`) 우측에 `월별 | 연도별`과 동일한 스타일의 차트 방식 토글을 추가하고, 클라이언트별 `localStorage`에 저장(미설정 클라이언트는 `꺾은선` 기본값)하며, 꺾은선 경사 두께 왜곡 제거 및 막대 그래프 시간순 정렬을 프로덕션에 적용.
+- 변경:
+  - `custom_components/carrot_ha/frontend/carrot-journal-design.js`: `.trends-section-head`를 반응형 flex 배치로 추가해 지도 하단 `변동 있는 추세` 제목 우측에 `.period-segmented` 토글을 정렬하고, `.trend-divider`에 `margin: auto 0 6px 0`를 적용해 헤더 줄 수와 무관하게 카드 하단 차트 X축 높이를 맞춤.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`: `getTrendChartMode()`/`setTrendChartMode()`/`updateTrendChartToggle()`(`localStorage` 키 `carrot_journal_trend_chart_mode`, 기본 `'line'`), 균일 `2.2px` `vector-effect="non-scaling-stroke"` 기반 `generateTrendLineChartHtml()`, 시간순 막대 정렬(`1일→31일`/`1월→12월`, `최고 <값>`) 구현 및 `.trend-chart-axis-labels` 중복/안내 문구 제거.
+  - `vehicle-journal/tests/browser-check.cjs`: 막대/꺾은선 모드 전환 후 `.trend-hit` 검사 수행하도록 갱신.
+- 검증: `.preview/trends-fuel-cost/` 브라우저에서 기본 `꺾은선` 활성화·`2.2px` 균일 선 두께·`막대` 전환·새로고침 후 클라이언트 설정 유지·`390px` 모바일 레이아웃·콘솔 오류 0건 확인. `node --check` 2개 JS 파일 및 `git diff --check` 통과. (`browser-check.cjs` Playwright 실행은 로컬 미수행.)
+- 배포 상태: 사용자 요청에 따라 HA 서버 직접 반영·재시작은 보류 중.
+
 ## 2026-11-25 — vehicle-journal: 추세 카드 1줄 우상단 KPI · 직선 추세 화살표 · 단가/주행거리 명칭 개선
 
 - 제목: `vehicle-journal: compact trend card KPI header with diagonal arrows and explicit units`.
