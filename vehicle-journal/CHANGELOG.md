@@ -1,3 +1,16 @@
+## 2026-11-27 — vehicle-journal: 추세 차트 오버레이 스크롤 추적 및 연도별 보험·세금 X축 적용
+
+- 제목: `vehicle-journal: follow scroll on trend tooltip and show annual insurance/tax by year`.
+- 요청: 추세 차트에서 막대/점을 눌러 띄운 오버레이(`trend-tip`)가 페이지 스크롤을 따라가지 않는 문제 수정, 및 연도별(`scope === 'year'`) 추세에서 연 1~2회만 발생하는 `보험`·`세금` 카드의 X축을 `1월~12월` 대신 연도별(`YYYY년`) 시간순으로 표시.
+- 변경:
+  - `custom_components/carrot_ha/vehicle_journal/store.py`: `query()`에서 해당 차량의 활성 지출 중 `insurance`·`tax`를 연도별로 합산한 `yearly_categories` 필드를 응답에 추가.
+  - `custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`:
+    - `setupTrendTooltip()`, `disconnectedCallback()`에 `window`·`shadowRoot` 캡처 `scroll`/`resize` 리스너(`requestAnimationFrame` 스로틀)를 추가해 오버레이가 선택한 `.trend-hit`을 실시간으로 따라가고, 대상이 화면 밖으로 벗어나면 자동으로 닫히도록 수정.
+    - `renderTrendsDashboard()`, `generateTrendLineChartHtml()`, `generateTrendCardChartHtml()`, `showTrendTip()`에서 `scope === 'year'`일 때 `cost_insurance`, `cost_tax`에 `axisMode='yearly'`를 적용해 X축 라벨(`YYYY년`)과 툴팁 조회 범위(`YYYY-01-01`~`YYYY-12-31`)가 연도별로 동작하도록 개선.
+  - `vehicle-journal/review-trend-tip-scroll.html`, `vehicle-journal/review-yearly-axis.html`: 로컬 인터랙티브 프리뷰 추가.
+- 검증: `node --check custom_components/carrot_ha/frontend/carrot-vehicle-journal.js`, `python -m py_compile custom_components/carrot_ha/vehicle_journal/store.py`, `git diff --check` 통과. (`browser-check.cjs`는 로컬 `playwright` 미설치로 미실행.)
+- 배포 상태: 로컬 커밋 및 `main` 푸시 예정. HA 서버 반영·재시작 대기.
+
 ## 2026-11-25 — vehicle-journal: 주행 기록·사고 기록 모달 지도 제거 및 컴팩트 1열 폭 적용
 
 - 제목: `vehicle-journal: hide location map and use compact dialog width for trip and accident records`.

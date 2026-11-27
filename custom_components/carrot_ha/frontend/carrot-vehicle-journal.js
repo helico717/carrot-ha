@@ -217,7 +217,7 @@ export class VehicleJournal extends HTMLElement {
   getGridOptions(){return {columns:36,rows:'auto',min_columns:6};}
   static getStubConfig(){return {entry_id:''};}
   connectedCallback(){if(!this.ready)this.build();this.setupTabsObserver();this.visibility=()=>{if(!document.hidden)this.load(true);};document.addEventListener('visibilitychange',this.visibility);this.timer=setInterval(()=>{if(!document.hidden&&!this.$('recordDialog').open&&!this.$('photoViewerDialog')?.open)this.load(true);},60000);this.load();}
-  disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
+  disconnectedCallback(){this._tabsObserver?.disconnect();this._tabsObserver=null;if(this._onTrendScroll){window.removeEventListener('scroll',this._onTrendScroll,{capture:true});window.removeEventListener('resize',this._onTrendScroll);}if(this._trendScrollRaf){cancelAnimationFrame(this._trendScrollRaf);this._trendScrollRaf=0;}for(const url of this.photoURLs||[])URL.revokeObjectURL(url);for(const url of this.thumbnailCache.values())URL.revokeObjectURL(url);this.thumbnailCache.clear();this.resize?.disconnect();clearInterval(this.timer);document.removeEventListener('visibilitychange',this.visibility);this.request++;}
   setupTabsObserver(){
     this._tabsObserver?.disconnect();
     this._tabsObserver=null;
@@ -1245,6 +1245,16 @@ export class VehicleJournal extends HTMLElement {
       );
       for(const [key,label] of Object.entries(categories)){if(key==='charging')continue;const current=totals.categories?.[key],past=prevTotals.categories?.[key];if(!current&&!past)continue;metrics.push(createMetric(`cost_${key}`,`${label} 지출`,jIcon('card'),this.categoryColor(key),'원',current?.effective_krw??null,past?.effective_krw??null,observed((b,i)=>extraBins[i].reduce((n,r)=>n+(r.cost_categories?.[key]?.effective_krw||0),0)),{total:true}));}
     }
+    const yearlyCats=isYear?this.data.yearly_categories:null;
+    if(yearlyCats){
+      for(const m of metrics){
+        if(m.id!=='cost_insurance'&&m.id!=='cost_tax')continue;
+        const cat=m.id.slice(5);
+        const yrs=Object.keys(yearlyCats).filter(y=>yearlyCats[y]?.[cat]!=null).sort();
+        if(!yrs.length)continue;
+        m.axisMode='yearly';m.years=yrs;m.bars=yrs.map(y=>yearlyCats[y][cat]);m.pastAvg=null;
+      }
+    }
     const changingItems=metrics.filter(m=>m.isChanging);
     const stableItems=metrics.filter(m=>!m.isChanging);
 
@@ -1287,15 +1297,15 @@ export class VehicleJournal extends HTMLElement {
     coords.forEach((c,idx)=>{
       const isTop=c.i===topPt.i;
       dots+=`<circle cx="${c.x.toFixed(2)}%" cy="${c.y.toFixed(1)}" r="${isTop?4.2:3.1}" fill="${isTop?m.color:'#141c23'}" stroke="${m.color}" stroke-width="2"/>`;
-      if(idx%every===0||idx===coords.length-1)labels+=`<text x="${c.x.toFixed(2)}%" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShort(c.i)}</text>`;
+      if(idx%every===0||idx===coords.length-1)labels+=`<text x="${c.x.toFixed(2)}%" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShortFor(m,c.i)}</text>`;
       if(isTop){
         const align=c.x>78?'end':c.x<22?'start':'middle';
         labels+=`<text x="${c.x.toFixed(2)}%" y="${Math.max(11,c.y-8).toFixed(1)}" text-anchor="${align}" class="trend-rank-top" fill="${m.color}">최고 ${this.trendFormat(c.v,m.unit)}</text>`;
       }
       const slotW=coords.length===1?40:Math.min(24,usableW/Math.max(1,coords.length-1));
-      hits+=`<rect class="trend-hit" data-index="${c.i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(c.i).label} ${this.trendFormat(c.v,m.unit)}${m.unit}`)}" x="${Math.max(0,c.x-slotW/2).toFixed(2)}%" y="0" width="${slotW.toFixed(2)}%" height="${height}" rx="6" fill="transparent"/>`;
+      hits+=`<rect class="trend-hit" data-index="${c.i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriodFor(m,c.i).label} ${this.trendFormat(c.v,m.unit)}${m.unit}`)}" x="${Math.max(0,c.x-slotW/2).toFixed(2)}%" y="0" width="${slotW.toFixed(2)}%" height="${height}" rx="6" fill="transparent"/>`;
     });
-    const firstLabel=this.trendPeriodShort(coords[0].i),lastLabel=this.trendPeriodShort(coords[coords.length-1].i);
+    const firstLabel=this.trendPeriodShortFor(m,coords[0].i),lastLabel=this.trendPeriodShortFor(m,coords[coords.length-1].i);
     return `
       <div class="trend-rank">
         <svg class="trend-rank-svg" viewBox="0 0 100 ${height}" preserveAspectRatio="none" width="100%" height="${height}" role="img" aria-label="${esc(m.name)} 기간별 추세" style="overflow:visible">
@@ -1325,13 +1335,13 @@ export class VehicleJournal extends HTMLElement {
       marks+=v==null
         ?`<line x1="${pct(cx-width/2)}" x2="${pct(cx+width/2)}" y1="${base}" y2="${base}" stroke="#a8bdca" stroke-dasharray="2 2" opacity=".55"/>`
         :`<rect x="${pct(cx-width/2)}" y="${y(v).toFixed(1)}" width="${pct(width)}" height="${(base-y(v)).toFixed(1)}" rx="3" fill="${m.color}" opacity="${isTop?1:0.65}"/>`;
-      if(i%every===0)labels+=`<text x="${pct(cx)}" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShort(i)}</text>`;
+      if(i%every===0)labels+=`<text x="${pct(cx)}" y="${base+13}" text-anchor="middle" class="trend-rank-label"${isTop?` fill="${m.color}"`:''}>${this.trendPeriodShortFor(m,i)}</text>`;
       if(isTop){
         const align=i>=n-3?'end':i<=2?'start':'middle';
         const tx=align==='end'?pct(cx+width/2):align==='start'?pct(cx-width/2):pct(cx);
         labels+=`<text x="${tx}" y="${Math.max(11,y(v)-5).toFixed(1)}" text-anchor="${align}" class="trend-rank-top" fill="${m.color}">최고 ${this.trendFormat(v,m.unit)}</text>`;
       }
-      hits+=`<rect class="trend-hit" data-index="${i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriod(i).label} ${this.trendFormat(v,m.unit)}${v==null?'':m.unit}`)}" x="${pct(i*slot)}" y="0" width="${pct(slot)}" height="${height}" rx="6" fill="transparent"/>`;
+      hits+=`<rect class="trend-hit" data-index="${i}" tabindex="0" role="button" aria-label="${esc(`${this.trendPeriodFor(m,i).label} ${this.trendFormat(v,m.unit)}${v==null?'':m.unit}`)}" x="${pct(i*slot)}" y="0" width="${pct(slot)}" height="${height}" rx="6" fill="transparent"/>`;
     });
     const pastLine=past==null?'':`<line x1="0" x2="100%" y1="${y(past).toFixed(1)}" y2="${y(past).toFixed(1)}" stroke="#a8bdca" stroke-dasharray="3 4" opacity=".75"/><text x="100%" dx="-2" y="${(y(past)-5).toFixed(1)}" text-anchor="end" class="trend-rank-note">${esc(this.trendBaselineName(m))} ${this.trendFormat(past,m.unit)}</text>`;
     return `
@@ -1347,6 +1357,11 @@ export class VehicleJournal extends HTMLElement {
   trendBaselineName(m){return m.isTotal?(this.scope==='year'?'지난해 월 평균':'지난달 2일 평균'):m.pastPeriodLabel;}
   trendFormat(value,unit){return value==null?'미관측':isWonUnit(unit)?numeric(value,0):numeric(value,1);}
   trendPeriodShort(i){return this.scope==='year'?`${i+1}월`:`${i*2+1}일`;}
+  trendPeriodShortFor(m,i){return m?.axisMode==='yearly'&&m.years?.[i]?`${m.years[i]}년`:this.trendPeriodShort(i);}
+  trendPeriodFor(m,i){
+    if(m?.axisMode==='yearly'&&m.years?.[i]){const yr=m.years[i];return {label:`${yr}년`,unit:'연간 집계',from:`${yr}-01-01`,to:`${yr}-12-31`};}
+    return this.trendPeriod(i);
+  }
   // Matches the bins built in renderTrendsDashboard: two-day bins (the last may be one day) or calendar months.
   trendPeriod(i){
     const start=this.range()?.from;if(!start)return {label:'',from:'',to:''};
@@ -1371,6 +1386,21 @@ export class VehicleJournal extends HTMLElement {
     });
     root.addEventListener('keydown',e=>{if(e.key==='Escape')this.hideTrendTip();});
     this.addEventListener('pointerleave',()=>this.hideTrendTip());
+    this._trendScrollRaf=0;
+    this._onTrendScroll=()=>{
+      if(this._trendScrollRaf||!this.trendTip||this.trendTip.hidden||!this.trendTipHit)return;
+      this._trendScrollRaf=requestAnimationFrame(()=>{
+        this._trendScrollRaf=0;
+        if(!this.trendTip||this.trendTip.hidden||!this.trendTipHit)return;
+        if(!this.trendTipHit.isConnected){this.hideTrendTip();return;}
+        const box=this.trendTipHit.getBoundingClientRect();
+        if((box.width===0&&box.height===0)||box.bottom<0||box.top>innerHeight||box.right<0||box.left>innerWidth){this.hideTrendTip();return;}
+        this.placeTrendTip(this.trendTipHit);
+      });
+    };
+    window.addEventListener('scroll',this._onTrendScroll,{capture:true,passive:true});
+    window.addEventListener('resize',this._onTrendScroll,{passive:true});
+    root.addEventListener('scroll',this._onTrendScroll,{capture:true,passive:true});
   }
   hideTrendTip(){if(!this.trendTip)return;this.trendTip.hidden=true;this.trendTipHit?.classList.remove('active');this.trendTipHit=null;clearTimeout(this.trendTipTimer);}
   showTrendTip(e){
@@ -1378,7 +1408,7 @@ export class VehicleJournal extends HTMLElement {
     if(!hit){if(e.type==='pointermove'&&this.trendTipHit)this.hideTrendTip();return;}
     const m=this.trendMetrics?.get(hit.closest('[data-trend]')?.dataset.trend),i=Number(hit.dataset.index);if(!m)return;
     if(this.trendTipHit!==hit){this.trendTipHit?.classList.remove('active');this.trendTipHit=hit;hit.classList.add('active');}
-    const period=this.trendPeriod(i),key=`${this.entry}|${period.from}|${period.to}`;
+    const period=this.trendPeriodFor(m,i),key=`${this.entry}|${period.from}|${period.to}`;
     if(this.trendTip.dataset.key!==`${key}|${m.id}`||this.trendTip.hidden){
       this.trendTip.dataset.key=`${key}|${m.id}`;
       this.trendTip.innerHTML=this.trendTipHead(m,i,period)+this.trendTipBody(m,this.trendTipCache.get(key));

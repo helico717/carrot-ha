@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>일별 · 월별 · 연도별 스위처 프리뷰</title>
+<!-- 실제 전체 차계부 모듈을 불러오는 합성 데이터 프리뷰. 프로덕션 코드를 변경하지 않는다.
+저장소 루트에서 python -m http.server 8765 --bind 127.0.0.1 실행 후
+http://127.0.0.1:8765/vehicle-journal/review-yearly-axis.html 접속. -->
+<style>
+  :root{--j-bg:#0b1014;--j-surface:#161e25;--j-raised:#202c36;--j-border:#2a3945;--j-ink:#f1f6fa;--j-sub:#a8bdca;--j-accent:#81e6c5}
+  html,body{margin:0;background:var(--j-bg);color:var(--j-ink);font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic",sans-serif}
+  .bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;background:#0f161c;border-bottom:1px solid var(--j-border);font-size:13px}
+  .bar b{color:var(--j-accent)}
+  .seg{display:inline-flex;border:1px solid var(--j-border);border-radius:10px;overflow:hidden}
+  .seg button{background:var(--j-raised);color:var(--j-sub);border:0;padding:7px 12px;font-size:12.5px;cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--j-accent);color:#0b1014;font-weight:700}
+  .bar small{color:var(--j-sub)}
+  .stage{display:flex;justify-content:center;align-items:flex-start;height:calc(100dvh - 54px);overflow:hidden}
+  .stage iframe{border:0;display:block;background:var(--j-bg);width:100%;height:100%}
+  .stage.mobile{padding:16px 12px;box-sizing:border-box;overflow:auto}
+  .stage.mobile iframe{width:390px;height:800px;box-sizing:content-box;flex:0 0 auto;border-radius:36px;border:10px solid #1d262e;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  body.embed{overflow:auto;height:100%}
+  body.embed .bar,body.embed .stage{display:none}
+  #haScrollShell{display:none}
+  body.embed #haScrollShell{display:block;height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+  <b>일별 · 월별 · 연도별 스위처 프리뷰</b>
+  <span class="seg" id="deviceSeg"><button data-device="desktop">데스크톱</button><button data-device="mobile">모바일 390×800</button></span>
+  <small>차계부 우측 상단의 [일별 | 월별 | 연도별] 버튼으로 X축(1~30일 / 1~12월 / 2023~2026년)이 일관되게 바뀝니다.</small>
+</div>
+<div class="stage" id="stage"><iframe id="frame" title="일별·월별·연도별 프리뷰"></iframe></div>
+<div id="haScrollShell"><main id="mount"></main></div>
+
+<script type="module">
+const params=new URLSearchParams(location.search);
+const embed=params.has('embed');
+
+if(!embed){
+  const stage=document.getElementById('stage');
+  const frame=document.getElementById('frame');
+  let device='desktop';
+  const syncButtons=()=>{
+    for(const b of document.querySelectorAll('#deviceSeg button'))b.setAttribute('aria-pressed',String(b.dataset.device===device));
+  };
+  frame.src=`${location.pathname}?embed=1&t=${Date.now()}`;
+  syncButtons();
+  document.getElementById('deviceSeg').addEventListener('click',e=>{
+    const btn=e.target.closest('button[data-device]');if(!btn)return;
+    device=btn.dataset.device;stage.classList.toggle('mobile',device==='mobile');syncButtons();
+  });
+}else{
+  document.body.classList.add('embed');
+  const v='preview-'+Date.now();
+  const realFetch=window.fetch.bind(window);
+  window.fetch=(url,opts)=>String(url).includes('/api/carrot_ha/frontend-version')
+    ?Promise.resolve(new Response(JSON.stringify({version:'0.0.0-'+v})))
+    :realFetch(url,opts);
+
+  const curYear=new Date().getFullYear();
+  const years=[curYear-3,curYear-2,curYear-1,curYear];
+
+  // 합성 다년도 연간 지출/운행 데이터 (차량별: ID.4 / 아테온)
+  const yearlyExpensesByVehicle={
+    id4:{
+      [curYear-3]:{insurance:1184200,tax:130000},
+      [curYear-2]:{insurance:1032500,tax:130000},
+      [curYear-1]:{insurance:928400,tax:130000},
+      [curYear]:{insurance:846900,tax:130000}
+    },
+    arteon:{
+      [curYear-3]:{insurance:1342000,tax:519800},
+      [curYear-2]:{insurance:1215000,tax:493810},
+      [curYear-1]:{insurance:1098000,tax:467820},
+      [curYear]:{insurance:984500,tax:441830}
+    }
+  };
+
+  const evEffByMonth=[4.1,4.3,5.0,5.6,5.9,5.5,5.1,5.0,5.7,6.0,5.2,4.2];
+  const iceEffByMonth=[13.4,13.8,14.6,15.3,15.9,15.5,14.8,14.5,15.6,16.2,14.9,13.7];
+  const distScaleByMonth=[0.88,0.84,0.96,1.04,1.18,1.02,1.12,1.25,1.06,1.15,0.95,0.92];
+  const sampleDays=[3,7,11,16,21,25];
+  const yearScale={[curYear-3]:0.86,[curYear-2]:0.93,[curYear-1]:0.97,[curYear]:1.0};
+
+  const makeYearDaily=(yr,entryId='id4')=>{
+    const scale=yearScale[yr]??1;
+    const days=[];
+    const isIce=entryId==='arteon';
+    const yc=yearlyExpensesByVehicle[entryId]||yearlyExpensesByVehicle.id4;
+    for(let m=1;m<=12;m++){
+      const mm=String(m).padStart(2,'0');
+      const monthDist=(isIce?980:1150)*distScaleByMonth[m-1]*scale;
+      const eff=isIce?iceEffByMonth[m-1]:evEffByMonth[m-1];
+      sampleDays.forEach((d,idx)=>{
+        const dd=String(d).padStart(2,'0');
+        const day=`${yr}-${mm}-${dd}`;
+        const dayDist=Math.round((monthDist/sampleDays.length)*(0.75+((m+idx)%4)*0.18)*10)/10;
+        const kwh=isIce?0:Math.round((dayDist/eff)*10)/10;
+        const hasChg=!isIce&&(idx===1||idx===4);
+        const isFast=hasChg&&(m%3===0&&idx===4);
+        const chg=hasChg?Math.round((kwh*2.9)*10)/10:0;
+        const chgCost=hasChg?Math.round(chg*(isFast?365:295)):0;
+        const hasFuel=isIce&&(idx===1||idx===4);
+        const fuelCost=hasFuel?Math.round((dayDist*2.8/eff)*(1530+((m*23+yr*17)%140))):0;
+        const washCost=(idx===2&&m%2===0)?15000:0;
+        const maintCost=(idx===3&&m===5)?(isIce?185000:112000):(idx===3&&m===10)?68000:0;
+        const insCost=(idx===3&&m===11)?yc[yr]?.insurance||0:0;
+        const taxCost=(idx===0&&m===1)?yc[yr]?.tax||0:0;
+        const cats={};
+        if(chgCost)cats.charging={effective_krw:chgCost};
+        if(fuelCost)cats.refueling={effective_krw:fuelCost};
+        if(washCost)cats.washing={effective_krw:washCost};
+        if(maintCost)cats.maintenance={effective_krw:maintCost};
+        if(insCost)cats.insurance={effective_krw:insCost};
+        if(taxCost)cats.tax={effective_krw:taxCost};
+        days.push({
+          day,distance_km:dayDist,energy_distance_km:dayDist,drive_energy_kwh:kwh,
+          battery_charge_kwh:chg,charge_effective_krw:chgCost,
+          drive_soc_used_pp:isIce?0:Math.round(kwh*1.29*10)/10,soc_distance_km:isIce?0:dayDist,
+          slow_count:hasChg&&!isFast?1:0,fast_count:hasChg&&isFast?1:0,unknown_count:0,
+          total_cost_krw:chgCost+fuelCost+washCost+maintCost+insCost+taxCost,
+          cost_categories:cats
+        });
+      });
+    }
+    return days;
+  };
+  const makeIceFacts=(yr)=>{
+    const scale=yearScale[yr]??1;
+    const fuelDaily=[],odoDaily=[],intervals=[];
+    let sumL=0,sumCost=0,sumCount=0,sumDist=0;
+    for(let m=1;m<=12;m++){
+      const mm=String(m).padStart(2,'0');
+      const day=`${yr}-${mm}-21`;
+      const dist=Math.round(980*distScaleByMonth[m-1]*scale);
+      const eff=iceEffByMonth[m-1];
+      const liters=Math.round((dist/eff)*10)/10;
+      const price=1530+((m*23+yr*17)%140);
+      const cost=Math.round(liters*price);
+      sumL+=liters;sumCost+=cost;sumCount+=2;sumDist+=dist;
+      fuelDaily.push({day,fuel_liters:liters,priced_liters:liters,priced_cost_krw:cost,fuel_count:2});
+      odoDaily.push({day,distance_km:dist});
+      intervals.push({to:day,fuel_liters:liters,distance_km:dist});
+    }
+    const avgEff=Number((sumDist/sumL).toFixed(1));
+    return {
+      fuel_facts:{daily:fuelDaily,totals:{fuel_liters:Number(sumL.toFixed(1)),fuel_price_krw_l:Math.round(sumCost/sumL),fuel_count:sumCount}},
+      odometer_facts:{daily:odoDaily,distance_km:sumDist,from:`${yr}-01-01`,to:`${yr}-12-31`},
+      efficiency_facts:{selected:{efficiency_km_l:avgEff,interval_count:12},overall:{efficiency_km_l:14.8},intervals,warnings:[]}
+    };
+  };
+  const sumDaily=days=>days.reduce((acc,r)=>{
+    acc.distance_km+=r.distance_km;acc.energy_distance_km+=r.energy_distance_km;
+    acc.drive_energy_kwh+=r.drive_energy_kwh;acc.battery_charge_kwh+=r.battery_charge_kwh;
+    acc.charge_effective_krw+=r.charge_effective_krw;acc.drive_soc_used_pp+=r.drive_soc_used_pp;
+    acc.slow_count+=r.slow_count;acc.fast_count+=r.fast_count;acc.total_cost_krw+=r.total_cost_krw;
+    for(const [k,v] of Object.entries(r.cost_categories||{})){
+      acc.categories[k]=acc.categories[k]||{actual_krw:0,estimated_krw:0,effective_krw:0};
+      acc.categories[k].actual_krw+=v.effective_krw;
+      acc.categories[k].effective_krw+=v.effective_krw;
+    }
+    return acc;
+  },{distance_km:0,energy_distance_km:0,drive_energy_kwh:0,battery_charge_kwh:0,charge_effective_krw:0,drive_soc_used_pp:0,slow_count:0,fast_count:0,unknown_count:0,total_cost_krw:0,categories:{}});
+
+  // 연도별(다년도) 모든 지표 집계 생성
+  const buildYearlyMetrics=(entryId)=>{
+    const isIce=entryId==='arteon';
+    const out={};
+    for(const yr of years){
+      const d=makeYearDaily(yr,entryId);
+      const t=sumDaily(d);
+      const eff=!isIce&&t.drive_energy_kwh>0?+(t.energy_distance_km/t.drive_energy_kwh).toFixed(1):null;
+      const chgCount=(t.slow_count||0)+(t.fast_count||0);
+      const ice=isIce?makeIceFacts(yr):null;
+      out[yr]={
+        efficiency:eff,
+        distance:Math.round(t.distance_km),
+        charge_kwh:Math.round(t.battery_charge_kwh),
+        charge_rate:t.battery_charge_kwh>0?Math.round(t.charge_effective_krw/t.battery_charge_kwh):null,
+        drive_soc:Math.round(t.drive_soc_used_pp),
+        fast_ratio:chgCount>0?Math.round((t.fast_count/chgCount)*100):null,
+        cost_per_km:(eff>0&&t.battery_charge_kwh>0)?Math.round(t.charge_effective_krw/t.battery_charge_kwh/eff):(ice?.efficiency_facts?.selected?.efficiency_km_l?Math.round(ice.fuel_facts.totals.fuel_price_krw_l/ice.efficiency_facts.selected.efficiency_km_l):null),
+        total_cost:t.total_cost_krw,
+        charge_count:chgCount,
+        per_charge:chgCount>0?+(t.battery_charge_kwh/chgCount).toFixed(1):null,
+        soc100:t.distance_km>0?+(t.drive_soc_used_pp/t.distance_km*100).toFixed(1):null,
+        fuel_efficiency:ice?.efficiency_facts?.selected?.efficiency_km_l??null,
+        observed_distance:ice?.odometer_facts?.distance_km??null,
+        fuel_liters:ice?.fuel_facts?.totals?.fuel_liters??null,
+        fuel_price:ice?.fuel_facts?.totals?.fuel_price_krw_l??null,
+        fuel_count:ice?.fuel_facts?.totals?.fuel_count??null,
+        categories:Object.fromEntries(Object.entries(t.categories).map(([k,v])=>[k,v.effective_krw]))
+      };
+    }
+    return out;
+  };
+
+  const makeRecordsForYear=(yr,entryId='id4')=>{
+    const yc=yearlyExpensesByVehicle[entryId]||yearlyExpensesByVehicle.id4;
+    const base=[
+      {id:`ins-${entryId}-${yr}`,kind:'expense',category:'insurance',accounting_date:`${yr}-11-16`,started_at:`${yr}-11-16T10:30:00+09:00`,actual_krw:yc[yr]?.insurance||846900,memo:`${yr}년 자동차 종합보험 갱신 (삼성화재 다이렉트)`},
+      {id:`tax-${entryId}-${yr}`,kind:'expense',category:'tax',accounting_date:`${yr}-01-16`,started_at:`${yr}-01-16T09:00:00+09:00`,actual_krw:yc[yr]?.tax||130000,memo:`${yr}년 자동차세 연납`},
+      {id:`mnt-${entryId}-${yr}`,kind:'expense',category:'maintenance',accounting_date:`${yr}-05-16`,started_at:`${yr}-05-16T14:20:00+09:00`,actual_krw:entryId==='arteon'?185000:112000,memo:entryId==='arteon'?'엔진오일·오일필터·에어크리너 교환':'에어컨 필터·와이퍼 블레이드 교체'},
+      {id:`wsh-${entryId}-${yr}`,kind:'expense',category:'washing',accounting_date:`${yr}-10-11`,started_at:`${yr}-10-11T16:05:00+09:00`,actual_krw:15000,memo:'셀프 세차장 폼건·하부세차'}
+    ];
+    if(entryId==='arteon'){
+      base.push({id:`fuel-${yr}`,kind:'expense',category:'refueling',accounting_date:`${yr}-11-21`,started_at:`${yr}-11-21T18:10:00+09:00`,actual_krw:82400,input:{fuel_liters:52.1},location:{name:'GS칼텍스 판교 셀프주유소',lat:37.394,lng:127.111},memo:'경유 가득 주유'});
+    }else{
+      base.push({id:`chg-${yr}-1`,kind:'charge',charge_mode:'slow',accounting_date:`${yr}-11-21`,started_at:`${yr}-11-21T22:15:00+09:00`,battery_charge_kwh:54.2,actual_krw:15989,location:{name:'아파트 지하주차장 완속충전기',lat:37.395,lng:127.109}});
+      base.push({id:`chg-${yr}-2`,kind:'charge',charge_mode:'fast',accounting_date:`${yr}-11-16`,started_at:`${yr}-11-16T15:40:00+09:00`,battery_charge_kwh:32.8,actual_krw:11972,location:{name:'기흥휴게소 E-pit 초급속',lat:37.232,lng:127.104}});
+    }
+    return base;
+  };
+  const sampleStations=entryId=>entryId==='arteon'
+    ?[{name:'GS칼텍스 판교 셀프주유소',lat:37.394,lng:127.111,count:14,total_krw:1120000,avg_unit_price:1580}]
+    :[{name:'아파트 지하주차장 완속충전기',lat:37.395,lng:127.109,count:36,total_krw:540000},{name:'기흥휴게소 E-pit 초급속',lat:37.232,lng:127.104,count:8,total_krw:124000}];
+
+  const hass={
+    language:'ko',themes:{darkMode:true},user:{id:'u',is_admin:true},states:{},
+    async callWS(msg){
+      if(msg.type==='carrot_ha/journal/entries')return [
+        {entry_id:'id4',title:'ID.4',fuel:'electric',is_default:true,linked:true},
+        {entry_id:'arteon',title:'아테온',fuel:'diesel',is_default:false,linked:false}
+      ];
+      if(msg.type.endsWith('/query')){
+        const entryId=msg.entry_id||'id4';
+        const isIce=entryId==='arteon';
+        const fromYear=Number((msg.from||String(curYear)).slice(0,4));
+        const toYear=Number((msg.to||String(curYear)).slice(0,4));
+        const isSingleYear=msg.from?.endsWith('-01-01')&&msg.to?.endsWith('-12-31')&&fromYear===toYear;
+        if(isSingleYear&&fromYear<curYear){
+          const d=makeYearDaily(fromYear,entryId);
+          return {record_count:6,timezone:'Asia/Seoul',has_more:false,status:{phase:'complete'},totals:sumDaily(d),daily:d,records:makeRecordsForYear(fromYear,entryId),...(isIce?makeIceFacts(fromYear):{})};
+        }
+        const currD=makeYearDaily(curYear,entryId);
+        const prevD=makeYearDaily(curYear-1,entryId);
+        const currT=sumDaily(currD);if(!isIce)currT.efficiency_km_kwh=currT.distance_km/currT.drive_energy_kwh;
+        const prevT=sumDaily(prevD);if(!isIce)prevT.efficiency_km_kwh=prevT.distance_km/prevT.drive_energy_kwh;
+        const iceCurr=isIce?makeIceFacts(curYear):{fuel_facts:null,odometer_facts:null,efficiency_facts:null};
+        const icePrev=isIce?makeIceFacts(curYear-1):{fuel_facts:null,odometer_facts:null,efficiency_facts:null};
+        return {
+          record_count:6,status:{phase:'complete'},timezone:'Asia/Seoul',
+          records:makeRecordsForYear(curYear,entryId),recent_records:makeRecordsForYear(curYear,entryId),
+          daily:currD,totals:currT,
+          previous:{daily:prevD,totals:prevT,...(isIce?icePrev:{})},
+          yearly_summary:buildYearlyMetrics(entryId),
+          ...iceCurr,
+          station_stats:sampleStations(entryId),
+          comparison:{fuel:'gasoline',economy_km_l:15,sensor_entities_json:'{}'},
+          fuel_price:{price:1680},fuel_sensors:{}
+        };
+      }
+      return {};
+    },
+    async fetchWithAuth(){return new Response('{}',{status:404});}
+  };
+
+  class PreviewPanel extends HTMLElement{constructor(){super();this.attachShadow({mode:'open'});}}
+  customElements.define('preview-journal-panel',PreviewPanel);
+  const panel=document.createElement('preview-journal-panel');panel._hass=hass;
+  document.getElementById('mount').append(panel);
+  const {mountJournalPanel}=await import('/custom_components/carrot_ha/frontend/carrot-journal-panel-runtime.js?v='+v);
+  await mountJournalPanel(panel,'0.0.0-'+v);
+
+  const card=panel.card||panel.shadowRoot.querySelector('main > *');
+  if(card){
+    const waitLoaded=async()=>{for(let i=0;i<50;i++){if(!card.loading&&card.data)break;await new Promise(r=>setTimeout(r,50));}};
+    await waitLoaded();
+
+    // 3단 스위처: [일별(1~30일) | 월별(1~12월) | 연도별(2023~2026년)]
+    let uiGranularity='all_years'; // 'daily' | 'monthly' | 'all_years'
+    const seg=card.shadowRoot.querySelector('.period-segmented');
+    if(seg){
+      seg.innerHTML=`
+        <button class="period-tab-btn" data-g="daily" aria-pressed="false">일별</button>
+        <button class="period-tab-btn" data-g="monthly" aria-pressed="false">월별</button>
+        <button class="period-tab-btn active" data-g="all_years" aria-pressed="true">연도별</button>
+      `;
+      seg.addEventListener('click',async e=>{
+        const btn=e.target.closest('button[data-g]');if(!btn)return;
+        uiGranularity=btn.dataset.g;
+        for(const b of seg.querySelectorAll('button[data-g]')){
+          const on=b.dataset.g===uiGranularity;
+          b.classList.toggle('active',on);
+          b.setAttribute('aria-pressed',String(on));
+        }
+        const nav=card.shadowRoot.querySelector('.date-navigation');
+        if(nav)nav.style.opacity=uiGranularity==='all_years'?'0.45':'1';
+        if(uiGranularity==='daily'){
+          card.setScope('month');
+        }else{
+          card.setScope('year');
+          await card.load(true);
+        }
+      });
+    }
+
+    const origRender=card.renderTrendsDashboard.bind(card);
+    const origLine=card.generateTrendLineChartHtml.bind(card);
+    const origBar=card.generateTrendCardChartHtml.bind(card);
+    const origShow=card.showTrendTip.bind(card);
+
+    card.renderTrendsDashboard=function(){
+      origRender();
+      if(uiGranularity!=='all_years')return;
+      const ys=this.data?.yearly_summary;
+      if(!ys||!this.trendMetrics)return;
+      const yrs=Object.keys(ys).sort();
+      for(const [id,m] of this.trendMetrics.entries()){
+        m.axisMode='yearly';
+        m.years=yrs;
+        m.bars=yrs.map(y=>{
+          if(id.startsWith('cost_')&&id!=='cost_per_km')return ys[y]?.categories?.[id.slice(5)]??null;
+          return ys[y]?.[id]??null;
+        });
+        m.pastAvg=null;
+        const cardEl=this.shadowRoot?.querySelector(`.trend-card[data-trend="${id}"]`);
+        if(cardEl){
+          const chartEl=cardEl.querySelector('.trend-rank');
+          if(chartEl)chartEl.outerHTML=this.generateTrendCardChartHtml(m);
+        }
+      }
+    };
+
+    const withYearAxis=(m,fn)=>{
+      if(m.axisMode!=='yearly'||!m.years?.length)return fn(m);
+      const savedShort=card.trendPeriodShort,savedPeriod=card.trendPeriod;
+      card.trendPeriodShort=i=>`${m.years[i]}년`;
+      card.trendPeriod=i=>{const yr=m.years[i];return {label:`${yr}년`,unit:'연간 집계',from:`${yr}-01-01`,to:`${yr}-12-31`};};
+      try{return fn(m);}finally{card.trendPeriodShort=savedShort;card.trendPeriod=savedPeriod;}
+    };
+    card.generateTrendLineChartHtml=m=>withYearAxis(m,origLine);
+    card.generateTrendCardChartHtml=m=>withYearAxis(m,origBar);
+
+    card.showTrendTip=function(e){
+      const hit=e.target.closest?.('.trend-hit');
+      const m=hit?this.trendMetrics?.get(hit.closest('[data-trend]')?.dataset.trend):null;
+      if(m?.axisMode==='yearly'&&hit){
+        const yr=m.years[Number(hit.dataset.index)];
+        const savedPeriod=this.trendPeriod;
+        this.trendPeriod=()=>({label:`${yr}년`,unit:'연간 집계',from:`${yr}-01-01`,to:`${yr}-12-31`});
+        try{origShow(e);}finally{this.trendPeriod=savedPeriod;}
+        return;
+      }
+      origShow(e);
+    };
+
+    // 스크롤 추적도 함께 적용
+    let raf=0;
+    const syncOnScroll=()=>{
+      if(raf)return;
+      raf=requestAnimationFrame(()=>{
+        raf=0;
+        if(!card.trendTip||card.trendTip.hidden||!card.trendTipHit)return;
+        if(!card.trendTipHit.isConnected){card.hideTrendTip();return;}
+        const box=card.trendTipHit.getBoundingClientRect();
+        if((box.width===0&&box.height===0)||box.bottom<0||box.top>innerHeight||box.right<0||box.left>innerWidth){
+          card.hideTrendTip();return;
+        }
+        card.placeTrendTip(card.trendTipHit);
+      });
+    };
+    window.addEventListener('scroll',syncOnScroll,{capture:true,passive:true});
+    window.addEventListener('resize',syncOnScroll,{passive:true});
+
+    // 초기 화면: 연도별(2023~2026년) + 추이 탭
+    card.setScope('year');
+    await card.load(true);
+    card.$('tab1')?.click();
+  }
+}
+</script>
+</body>
+</html>

@@ -1,3 +1,8 @@
+## 2026-11-27 — 추세 차트 오버레이 스크롤 추적 및 연도별 보험·세금 X축 적용
+
+- 변경: `carrot-vehicle-journal.js`에서 차트 오버레이(`trend-tip`)가 스크롤을 따라가며 대상이 화면을 벗어나면 닫히도록 `scroll`/`resize` 추적을 추가하고, `store.py`의 `yearly_categories` 집계를 통해 `연도별` 보기에서 `보험`·`세금` 지출 카드가 `1월~12월` 대신 연도별(`YYYY년`) X축으로 표시되도록 개선했다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.
+- 상태: `node --check`, `py_compile`, `git diff --check` 통과 및 `main` 푸시 예정. HA 서버 반영·재시작 대기.
+
 ## 2026-11-25 — 주행 기록 · 사고 기록 모달 지도 제거 및 컴팩트 폭 적용 (HA 직접 반영)
 
 - 변경: `carrot-journal-design.js`, `carrot-vehicle-journal.js`에서 지도가 불필요한 `주행 기록`(`trip`)과 `사고 기록`(`accident`) 모달의 `#recordLocationField`를 숨기고 `renderLocation()`/`payload.location` 전송을 제외하며, 데스크톱(`min-width: 761px`)에서 `540px` 1열 컴팩트 모달로 표시하도록 수정했다. 상세는 `vehicle-journal/CHANGELOG.md`에 기록한다.

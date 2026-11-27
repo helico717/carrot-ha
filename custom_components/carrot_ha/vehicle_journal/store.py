@@ -431,6 +431,13 @@ class Journal:
                 JOIN records r ON r.vehicle_id=e.vehicle_id AND r.id=e.record_id
                 WHERE e.vehicle_id=? AND r.status='active' AND e.accounting_date BETWEEN ? AND ?
                 GROUP BY e.category''',(self.vehicle,start,end)).fetchall())
+            yearly_categories={}
+            for yr,cat,amt in db.execute('''SELECT substr(e.accounting_date,1,4) AS yr,e.category,
+                SUM(COALESCE(e.actual_krw,e.estimated_krw,0)) AS amt
+                FROM expenses e JOIN records r ON r.vehicle_id=e.vehicle_id AND r.id=e.record_id
+                WHERE e.vehicle_id=? AND r.status='active' AND e.category IN ('insurance','tax')
+                GROUP BY yr,e.category ORDER BY yr''',(self.vehicle,)):
+                if yr:yearly_categories.setdefault(yr,{})[cat]=amt
             total=db.execute('SELECT COUNT(*) FROM records WHERE vehicle_id=? AND status=?',(self.vehicle,'active')).fetchone()[0]
         for row in daily:
             row['cost_categories']=json.loads(row.pop('cost_categories_json'))
@@ -463,7 +470,7 @@ class Journal:
         for category,count in counts.items():
             cats.setdefault(category,{'actual_krw':0,'estimated_krw':0,'effective_krw':0})['count']=count
         totals['categories']=cats;totals['total_cost_krw']=sum(v['effective_krw'] for v in cats.values())
-        return {'manual_trip_records_supported':True,'station_stats':station_stats,'efficiency_facts':efficiency_facts,'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
+        return {'manual_trip_records_supported':True,'station_stats':station_stats,'efficiency_facts':efficiency_facts,'odometer_facts':odometer_facts,'fuel_facts':fuel_facts,'daily':daily,'records':records,'recent_records':recent_records,'yearly_categories':yearly_categories,'expense_category_groups_supported':True,'expense_sort_supported':True,'expense_filters_supported':True,'record_filters_supported':True,'has_more':len(rows)>limit,'totals':totals,
                 'timezone':self.time_zone,'status':dict(phase) if phase else {'phase':'pending'},
                 'record_count':total,'comparison':dict(setting) if setting else None}
 
